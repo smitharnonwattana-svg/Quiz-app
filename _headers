@@ -1,0 +1,8 @@
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+
+/pdfs/*
+  Content-Type: application/pdf
+  Cache-Control: public, max-age=86400
+  Access-Control-Allow-Origin: *
