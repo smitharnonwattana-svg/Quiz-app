@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v9</title>
+  <title>Science Practice v10</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -133,6 +133,10 @@
     .rowActive{background:#f3f4f6;}
     .ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
     .titleInput{min-width:260px;max-width:520px;width:38vw;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;}
+    .correctBtns{display:flex;gap:4px;}
+    .correctBtn{width:34px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:13px;font-family:inherit;transition:all .12s;}
+    .correctBtn:hover{border-color:#9ca3af;background:#f3f4f6;}
+    .correctBtn.selected{background:var(--black);border-color:var(--black);color:#fff;}
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1605,21 +1609,25 @@ function initEditor(examId){
   list.forEach((q,idx)=>{
     const tr=document.createElement('tr');
     tr.addEventListener('click',()=>select(idx));
-    tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><select data-field="correct"><option value="A">ก</option><option value="B">ข</option><option value="C">ค</option><option value="D">ง</option></select></td>`;
-    const nodes=tr.querySelectorAll('[data-field]');
-    nodes.forEach(node=>{
-      const field=node.getAttribute('data-field');
-      refs[`${idx}:${field}`]=node;
-      if(field==='A'||field==='B'||field==='C'||field==='D') node.value=q.choices[field]||'';
-      else if(field==='correct') node.value=q.correct||'A';
-      node.addEventListener('focus',()=>select(idx));
-      node.addEventListener('keydown',(e)=>onFastKey(e,idx,field));
-      node.addEventListener('input',()=>{
-        if(field==='page') q.page=Math.max(1,Number(node.value||1));
-        else if(field==='correct') q.correct=node.value;
-        else q.choices[field]=node.value;
+    tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td>`;
+    // set correct highlight
+    const correctVal = q.correct||'A';
+    tr.querySelectorAll('.correctBtn').forEach(btn=>{
+      if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
+      btn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        select(idx);
+        tr.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        q.correct=btn.getAttribute('data-val');
       });
     });
+    // page input
+    const pageInput = tr.querySelector('input[data-field="page"]');
+    refs[`${idx}:page`]=pageInput;
+    pageInput.addEventListener('focus',()=>select(idx));
+    pageInput.addEventListener('keydown',(e)=>onFastKey(e,idx,'page'));
+    pageInput.addEventListener('input',()=>{ q.page=Math.max(1,Number(pageInput.value||1)); });
     tbody.appendChild(tr);
   });
   select(0);
