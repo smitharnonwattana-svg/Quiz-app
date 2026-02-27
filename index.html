@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v8</title>
+  <title>Science Practice v9</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1018,7 +1018,7 @@ function initTake(id){
       const div=document.createElement('label');
       div.className='choice'+((st.answers[q.id]===lab)?' active':'');
       if(!st.started){div.style.opacity='0.6';div.style.pointerEvents='none';}
-      div.innerHTML=`<input type="radio" name="ans" style="transform:scale(0.95);" ${st.answers[q.id]===lab?'checked':''} /><div><div style="font-weight:900;font-size:16px;width:24px;">${labelMap[lab]}</div><div style="margin-top:4px;white-space:pre-wrap;">${(q.choices[lab]||'').trim()?q.choices[lab]:"<span class='muted'>(ยังไม่ได้กรอกช้อยส์)</span>"}</div></div>`;
+      div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
       div.addEventListener('click',()=>{if(!st.started) return;st.answers[q.id]=lab;render();});
       wrap.appendChild(div);
     });
