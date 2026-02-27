@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@700;900&family=Noto+Sans+Thai:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <title>Science Practice v6</title>
+  <title>Science Practice v7</title>
   <style>
     /* ══════════════════════════════════════
        DESIGN SYSTEM — Light & Dark
@@ -42,15 +42,15 @@
       --serif: 'Noto Serif Thai', serif;
     }
     [data-theme="dark"] {
-      --bg:        #1a1d23;
-      --surface:   #22262e;
-      --surface2:  #2a2f38;
-      --surface3:  #333842;
-      --border:    rgba(255,255,255,.1);
-      --border2:   rgba(255,255,255,.18);
-      --text:      #e8eaf0;
-      --text2:     #a8b0c0;
-      --text3:     #6e7a8a;
+      --bg:        #20242c;
+      --surface:   #2c3140;
+      --surface2:  #353b4d;
+      --surface3:  #3e4558;
+      --border:    rgba(255,255,255,.14);
+      --border2:   rgba(255,255,255,.24);
+      --text:      #eceef5;
+      --text2:     #b0bac8;
+      --text3:     #7a8699;
       --accent:    #5eead4;
       --accent-fg: #042f2e;
       --ok:        #4ade80;
@@ -332,18 +332,18 @@
 
     /* ══ THEME TOGGLE — in nav ══ */
     .theme-toggle {
-      width: 36px; height: 36px; border-radius: 50%;
-      border: 1px solid var(--border2); background: var(--surface2);
-      color: var(--text); font-size: 16px; cursor: pointer;
+      width: 34px; height: 34px; border-radius: 50%;
+      border: none; background: transparent;
+      color: var(--text3); font-size: 17px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: all .2s; flex-shrink: 0;
+      transition: all .18s; flex-shrink: 0;
     }
-    .theme-toggle:hover { background: var(--surface3); transform: scale(1.08); }
+    .theme-toggle:hover { color: var(--text); background: var(--surface2); }
     /* top nav bar for non-take pages */
     .top-nav {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 24px;
-      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      background: var(--bg);
       position: sticky; top: 0; z-index: 50;
     }
     .top-nav-logo {
