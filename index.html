@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@700;900&family=Noto+Sans+Thai:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <title>Science Practice v5</title>
+  <title>Science Practice v6</title>
   <style>
     /* ══════════════════════════════════════
        DESIGN SYSTEM — Light & Dark
@@ -42,28 +42,28 @@
       --serif: 'Noto Serif Thai', serif;
     }
     [data-theme="dark"] {
-      --bg:        #0c0c12;
-      --surface:   #14141e;
-      --surface2:  #1e1e2a;
-      --surface3:  #262634;
-      --border:    rgba(255,255,255,.08);
-      --border2:   rgba(255,255,255,.15);
-      --text:      #ededf5;
-      --text2:     #b8b8cc;
-      --text3:     #7070888;
-      --accent:    #6ee7b7;
-      --accent-fg: #052e16;
-      --ok:        #34d399;
-      --ok-bg:     rgba(52,211,153,.12);
-      --ok-border: rgba(52,211,153,.3);
-      --warn:      #fbbf24;
-      --warn-bg:   rgba(251,191,36,.1);
-      --warn-border:rgba(251,191,36,.3);
-      --danger:    #f87171;
-      --danger-bg: rgba(248,113,113,.1);
-      --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
-      --shadow-md: 0 4px 20px rgba(0,0,0,.4);
-      --shadow-lg: 0 10px 40px rgba(0,0,0,.6);
+      --bg:        #1a1d23;
+      --surface:   #22262e;
+      --surface2:  #2a2f38;
+      --surface3:  #333842;
+      --border:    rgba(255,255,255,.1);
+      --border2:   rgba(255,255,255,.18);
+      --text:      #e8eaf0;
+      --text2:     #a8b0c0;
+      --text3:     #6e7a8a;
+      --accent:    #5eead4;
+      --accent-fg: #042f2e;
+      --ok:        #4ade80;
+      --ok-bg:     rgba(74,222,128,.12);
+      --ok-border: rgba(74,222,128,.3);
+      --warn:      #fcd34d;
+      --warn-bg:   rgba(252,211,77,.12);
+      --warn-border:rgba(252,211,77,.3);
+      --danger:    #fc8181;
+      --danger-bg: rgba(252,129,129,.12);
+      --shadow-sm: 0 1px 4px rgba(0,0,0,.25);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.35);
+      --shadow-lg: 0 10px 36px rgba(0,0,0,.5);
     }
 
     /* ── Reset & Base ── */
@@ -330,16 +330,26 @@
     .ctrls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .titleInput { min-width: 260px; max-width: 520px; width: 38vw; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; background: var(--surface); color: var(--text); font-size: 13px; }
 
-    /* ══ THEME TOGGLE ══ */
+    /* ══ THEME TOGGLE — in nav ══ */
     .theme-toggle {
-      position: fixed; bottom: 20px; right: 20px; z-index: 9997;
-      width: 46px; height: 46px; border-radius: 50%;
-      border: 1px solid var(--border2); background: var(--surface);
-      color: var(--text); font-size: 18px; cursor: pointer;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 1px solid var(--border2); background: var(--surface2);
+      color: var(--text); font-size: 16px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: var(--shadow-md); transition: all .2s;
+      transition: all .2s; flex-shrink: 0;
     }
-    .theme-toggle:hover { transform: scale(1.1); box-shadow: var(--shadow-lg); }
+    .theme-toggle:hover { background: var(--surface3); transform: scale(1.08); }
+    /* top nav bar for non-take pages */
+    .top-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .top-nav-logo {
+      font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+      color: var(--accent); font-weight: 700;
+    }
   </style>
   <script>
     // Apply saved theme BEFORE paint to avoid flash
@@ -1852,8 +1862,11 @@ Store.init();
 navigate('home');
 </script>
 
-<!-- THEME TOGGLE BUTTON -->
-<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="เปลี่ยน theme">🌙</button>
+<!-- TOP NAV (hidden on take page) -->
+<div class="top-nav" id="topNav">
+  <span class="top-nav-logo">◆ Science Practice</span>
+  <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="สลับ Light / Dark">🌙</button>
+</div>
 
 <script>
 // ── THEME SYSTEM ──
