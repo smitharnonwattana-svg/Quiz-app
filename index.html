@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v22</title>
+  <title>Science Practice v24</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -395,26 +395,63 @@
 </div>
 
 <!-- ===================== PAGE: ENTRANCE STATS ===================== -->
+<!-- ===================== PAGE: ENTRANCE STATS (เลือกโรงเรียน) ===================== -->
 <div id="page-entrance_stats" class="page">
-  <div class="container" style="max-width:1100px;">
+  <div class="container" style="max-width:800px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
-        <h1 class="h1">สถิติการสอบเข้า ม.1 สวนกุหลาบ</h1>
-        <div class="muted" style="margin-top:6px;">ข้อมูลจากกลุ่มรวบรวมคะแนน • GATE & EPLUS ปี 2568–2569</div>
+        <h1 class="h1">สถิติการสอบเข้า ม.1</h1>
+        <div class="muted" style="margin-top:6px;">เลือกโรงเรียนเพื่อดูข้อมูลและเปรียบเทียบผลสอบ</div>
       </div>
       <button class="btn" onclick="navigate('home')">หน้าแรก</button>
     </div>
+    <div class="list" style="margin-top:24px;" id="esSchoolList"></div>
+  </div>
+</div>
 
-    <!-- Tab: เลือกหลักสูตร/ปี -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;" id="esBmTabs"></div>
+<!-- ===================== PAGE: ENTRANCE PROGRAM (เลือกโปรแกรม) ===================== -->
+<div id="page-entrance_program" class="page">
+  <div class="container" style="max-width:800px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1" id="epSchoolTitle">เลือกโปรแกรม</h1>
+        <div class="muted" id="epSchoolSub" style="margin-top:6px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="navigate('entrance_stats')">← กลับ</button>
+        <button class="btn" onclick="navigate('home')">หน้าแรก</button>
+      </div>
+    </div>
+    <div class="list" style="margin-top:24px;" id="epProgramList"></div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ENTRANCE YEAR (เลือกปี + ดูสถิติ) ===================== -->
+<div id="page-entrance_year" class="page">
+  <div class="container" style="max-width:1100px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1" id="eyTitle">สถิติ</h1>
+        <div class="muted" id="eySub" style="margin-top:6px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btnPrimary" id="eyCompareBtnTop" onclick="navigate('entrance_compare')">🎯 เปรียบเทียบผลสอบ</button>
+        <button class="btn" id="eyBackBtn">← กลับ</button>
+        <button class="btn" onclick="navigate('home')">หน้าแรก</button>
+      </div>
+    </div>
+
+    <!-- เลือกปี -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;" id="eyYearTabs"></div>
 
     <!-- Overview cards -->
-    <div id="esOverviewCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:16px;"></div>
+    <div id="esOverviewCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-top:16px;"></div>
 
-    <!-- กราฟ distribution + ตาราง -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;" id="esChartsRow">
+    <!-- กราฟ + เกณฑ์ -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
       <div class="card" style="padding:16px;">
-        <div style="font-weight:800;margin-bottom:10px;">📊 Distribution คะแนนรวม</div>
+        <div style="font-weight:800;margin-bottom:4px;">📊 Distribution คะแนนรวม</div>
+        <div class="muted" style="font-size:11px;margin-bottom:10px;">แกนตั้ง = จำนวนผู้เข้าสอบ &nbsp;|&nbsp; แกนนอน = ช่วงคะแนนรวม (เต็ม 1,000)</div>
         <canvas id="esDistChart" style="width:100%;"></canvas>
         <div id="esDistEmpty" class="muted" style="display:none;font-size:13px;padding:8px 0;">ไม่มีข้อมูล</div>
       </div>
@@ -433,38 +470,52 @@
       <div class="tableWrap"><table id="esRankTable"><thead id="esRankHead"></thead><tbody id="esRankBody"></tbody></table></div>
     </div>
 
-    <!-- ส่วน: กรอกคะแนนเด็ก -->
-    <div class="card" style="padding:20px;margin-top:20px;">
-      <div style="font-weight:900;font-size:16px;margin-bottom:4px;">🎯 เปรียบเทียบผลสอบ</div>
-      <div class="muted" style="font-size:13px;margin-bottom:16px;">กรอกคะแนนรายวิชา ระบบจะประเมินเทียบกับข้อมูลจริง</div>
-
-      <!-- เลือกปีเปรียบเทียบ -->
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">เทียบกับข้อมูลปีใด <span class="muted">(เลือกได้หลายปี — จะใช้ค่าเฉลี่ยรวม)</span></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="esCmpToggleRow"></div>
-      </div>
-
-      <!-- รายชื่อเด็ก -->
-      <div id="esStudentList" style="display:grid;gap:10px;margin-bottom:14px;"></div>
-      <button class="btn" id="esAddStudentBtn" style="font-size:13px;">+ เพิ่มนักเรียน</button>
+    <!-- ปุ่ม compare ล่าง -->
+    <div style="margin-top:20px;text-align:center;">
+      <button class="btn btnPrimary" style="padding:14px 32px;font-size:15px;" onclick="navigate('entrance_compare')">🎯 เปรียบเทียบผลสอบของนักเรียน →</button>
     </div>
-
-    <!-- ผลเปรียบเทียบ -->
-    <div id="esCompareResults" style="margin-top:16px;display:grid;gap:14px;"></div>
   </div>
 </div>
 
-<!-- ===================== PAGE: ENTRANCE DETAIL ===================== -->
-<div id="page-entrance_detail" class="page">
+<!-- ===================== PAGE: ENTRANCE COMPARE ===================== -->
+<div id="page-entrance_compare" class="page">
   <div class="container" style="max-width:900px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
-        <h1 class="h1" id="edTitle">รายละเอียด</h1>
-        <div class="muted" id="edSub"></div>
+        <h1 class="h1">🎯 เปรียบเทียบผลสอบ</h1>
+        <div class="muted" style="margin-top:6px;">กรอกคะแนนรายวิชา เทียบกับข้อมูลจริงจากกลุ่มรวบรวม</div>
       </div>
-      <button class="btn" onclick="navigate('entrance_stats')">← กลับ</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="ecBackBtn">← กลับ</button>
+        <button class="btn" onclick="navigate('home')">หน้าแรก</button>
+      </div>
     </div>
-    <div id="edContent" style="margin-top:20px;"></div>
+
+    <!-- เลือกโปรแกรม + ปีที่เทียบ -->
+    <div class="card" style="padding:16px;margin-top:20px;display:grid;gap:14px;">
+      <div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">โปรแกรมที่สอบ</div>
+        <select id="ecProgramSelect" class="btn" style="padding:10px 14px;border-radius:12px;font-size:14px;">
+          <option value="">— เลือกโปรแกรม —</option>
+          <option value="gate">GATE</option>
+          <option value="eplus">EPLUS</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">เทียบกับปี <span class="muted">(เลือกได้หลายปี — จะใช้ค่าเฉลี่ยรวม)</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ecYearToggleRow"></div>
+      </div>
+    </div>
+
+    <!-- รายชื่อนักเรียน -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:800;font-size:15px;">นักเรียน</div>
+      <button class="btn" id="ecAddStudentBtn">+ เพิ่มนักเรียน</button>
+    </div>
+    <div id="ecStudentList" style="display:grid;gap:12px;"></div>
+
+    <!-- ผลเปรียบเทียบ -->
+    <div id="ecCompareResults" style="margin-top:20px;display:grid;gap:14px;"></div>
   </div>
 </div>
 
@@ -1094,7 +1145,9 @@ function navigate(page, params={}){
   else if(page==='admin_editor') initEditor(params.id);
   else if(page==='admin_benchmark') initAdminBenchmark();
   else if(page==='entrance_stats') initEntranceStats();
-  else if(page==='entrance_detail') initEntranceDetail(params);
+  else if(page==='entrance_program') initEntranceProgram(params);
+  else if(page==='entrance_year') initEntranceYear(params);
+  else if(page==='entrance_compare') initEntranceCompare(params);
 
   window.scrollTo(0,0);
 }
@@ -2605,10 +2658,9 @@ function renderBenchmarkWidget(containerId, score, examId) {
 // ===================== INIT =====================
 Store.init();
 navigate('home');
-</script>
-</body>
-</html>
-<script>
+
+
+
 // ===================== ENTRANCE STATS =====================
 
 // Metadata ของแต่ละ benchmark
@@ -2661,46 +2713,126 @@ function esAvgAdmitted(bm) {
   return result;
 }
 
-function initEntranceStats() {
-  const bms = esBmAll();
-  let activeBmId = bms[0]?.id || null;
-  // load saved students
-  let students = JSON.parse(localStorage.getItem('esStudents') || '[]');
-  // compare toggles
-  let cmpSelected = new Set(['bm_gate69','bm_eplus69','bm_gate68','bm_eplus68'].filter(id => bms.find(b=>b.id===id)));
+// ===================== ENTRANCE STATS — โครงสร้างใหม่ =====================
 
-  // ── Tabs ──
-  function renderTabs() {
-    const el = document.getElementById('esBmTabs');
+// โรงเรียนที่รองรับ
+const ES_SCHOOLS = [
+  { id: 'suankularb', name: 'โรงเรียนสวนกุหลาบวิทยาลัย', short: 'สวนกุหลาบ',
+    programs: [
+      { id: 'gate',  name: 'GATE',  desc: 'เน้นคณิตศาสตร์ + วิทยาศาสตร์',  bmIds: ['bm_gate69','bm_gate68'] },
+      { id: 'eplus', name: 'EPLUS', desc: 'เน้นภาษาอังกฤษ + คณิตศาสตร์ + วิทยาศาสตร์', bmIds: ['bm_eplus69','bm_eplus68'] },
+    ]
+  },
+  { id: 'other', name: 'โรงเรียนอื่น ๆ', short: 'อื่น ๆ', programs: [], comingSoon: true },
+];
+
+function esGetBms() { return Store.load().benchmarks || []; }
+
+// state ที่ส่งต่อระหว่างหน้า (เก็บใน sessionStorage เพื่อ back ได้)
+function esSaveState(obj) { sessionStorage.setItem('esState', JSON.stringify(obj)); }
+function esGetState() { try { return JSON.parse(sessionStorage.getItem('esState')||'{}'); } catch { return {}; } }
+
+// ── หน้า 1: เลือกโรงเรียน ──
+function initEntranceStats() {
+  const el = document.getElementById('esSchoolList');
+  if (!el) return;
+  el.innerHTML = ES_SCHOOLS.map((sch, idx) => {
+    const programs = sch.programs.map(p=>p.name).join(' · ');
+    const sub = sch.comingSoon ? 'เร็ว ๆ นี้' : programs;
+    const style = sch.comingSoon ? 'opacity:0.5;cursor:not-allowed;pointer-events:none;' : '';
+    return '<div class="linkCard" data-school-idx="'+idx+'" style="'+style+'">'
+      +'<div style="font-weight:900;font-size:16px;">'+sch.name+'</div>'
+      +'<div class="muted" style="margin-top:6px;">'+sub+'</div>'
+      +'</div>';
+  }).join('');
+  el.querySelectorAll('.linkCard').forEach(card => {
+    const idx = parseInt(card.dataset.schoolIdx);
+    const sch = ES_SCHOOLS[idx];
+    if (sch && !sch.comingSoon) {
+      card.onclick = () => navigate('entrance_program', {schoolId: sch.id});
+    }
+  });
+}
+// ── หน้า 2: เลือกโปรแกรม ──
+function initEntranceProgram(params) {
+  const sch = ES_SCHOOLS.find(s=>s.id===(params?.schoolId||esGetState().schoolId));
+  if (!sch) { navigate('entrance_stats'); return; }
+  esSaveState({...esGetState(), schoolId: sch.id});
+
+  document.getElementById('epSchoolTitle').textContent = sch.name;
+  document.getElementById('epSchoolSub').textContent = 'เลือกโปรแกรมการเรียนที่ต้องการดูข้อมูล';
+
+  const el = document.getElementById('epProgramList');
+  if (!el) return;
+  el.innerHTML = sch.programs.map(prog => `
+    <div class="linkCard" onclick="navigate('entrance_year',{schoolId:'${sch.id}',programId:'${prog.id}'})">
+      <div style="font-weight:900;font-size:16px;">${prog.name}</div>
+      <div class="muted" style="margin-top:6px;">${prog.desc}</div>
+    </div>`).join('');
+}
+
+// ── หน้า 3: เลือกปี + ดูสถิติ ──
+function initEntranceYear(params) {
+  const state = {...esGetState(), ...(params||{})};
+  esSaveState(state);
+  const {schoolId, programId} = state;
+
+  const sch = ES_SCHOOLS.find(s=>s.id===schoolId);
+  const prog = sch?.programs.find(p=>p.id===programId);
+  if (!sch||!prog) { navigate('entrance_stats'); return; }
+
+  document.getElementById('eyTitle').textContent = `${sch.short} — ${prog.name}`;
+  document.getElementById('eySub').textContent = `คะแนนเต็ม 1,000 • ข้อมูลจากกลุ่มรวบรวมคะแนน`;
+  document.getElementById('eyBackBtn').onclick = () => navigate('entrance_program', {schoolId});
+
+  const bms = esGetBms();
+  const progBms = prog.bmIds.map(id=>bms.find(b=>b.id===id)).filter(Boolean);
+  if (!progBms.length) {
+    document.getElementById('esOverviewCards').innerHTML = '<div class="muted">ไม่พบข้อมูล</div>';
+    return;
+  }
+
+  // เรียง: ปีล่าสุดก่อน
+  const yearOrder = {'bm_gate69':0,'bm_eplus69':0,'bm_gate68':1,'bm_eplus68':1};
+  progBms.sort((a,b)=>(yearOrder[a.id]||0)-(yearOrder[b.id]||0));
+
+  let activeBmId = progBms[0].id;
+
+  // ── Year tabs ──
+  function renderYearTabs() {
+    const el = document.getElementById('eyYearTabs');
     if (!el) return;
-    el.innerHTML = bms.map(bm => {
-      const meta = BM_META[bm.id] || {};
+    el.innerHTML = progBms.map(bm => {
+      const meta = BM_META[bm.id]||{};
       const active = bm.id === activeBmId;
-      return `<button onclick="esSetTab('${bm.id}')"
-        style="padding:8px 16px;border-radius:99px;font-weight:700;font-size:13px;cursor:pointer;border:2px solid ${active?meta.color||'#111':'var(--border)'};background:${active?meta.color||'#111':'#fff'};color:${active?'#fff':'#374151'};">
-        ${meta.label||bm.name}
+      const yearLabel = bm.id.endsWith('69') ? 'ปี 2569' : 'ปี 2568';
+      return `<button onclick="eySetYear('${bm.id}')"
+        style="padding:9px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;
+               border:2px solid ${active?meta.color||'#111':'var(--border)'};
+               background:${active?meta.color||'#111':'#fff'};color:${active?'#fff':'#374151'};">
+        ${yearLabel}
       </button>`;
     }).join('');
   }
-  window.esSetTab = function(id) { activeBmId = id; renderAll(); };
+  window.eySetYear = function(id) { activeBmId = id; renderYear(); };
 
   // ── Overview cards ──
   function renderOverview() {
     const el = document.getElementById('esOverviewCards');
     if (!el) return;
-    const bm = bms.find(b=>b.id===activeBmId);
-    if (!bm) { el.innerHTML=''; return; }
-    const meta = BM_META[bm.id] || {};
+    const bm = progBms.find(b=>b.id===activeBmId);
+    if (!bm) return;
+    const meta = BM_META[bm.id]||{};
     const cutoff = esCutoff(bm);
     const avg = esAvgAdmitted(bm);
-    const topScore = bm.rows[0]?.total || 0;
+    const topScore = bm.rows[0]?.total||0;
     const cards = [
-      { label:'คะแนนสูงสุด (อันดับ 1)', value: topScore.toFixed(2), sub:'คะแนนรวม', color: meta.color },
-      { label:'Cutoff Score', value: cutoff ? cutoff.toFixed(2) : '—', sub:`อันดับที่ ${meta.admit} (รับ ${meta.admit} คน)`, color:'#ef4444' },
-      { label:'ค่าเฉลี่ยคนสอบติด', value: avg.total ? avg.total.toFixed(1) : '—', sub:'คะแนนรวมเฉลี่ย', color:'#16a34a' },
-      { label:'ข้อมูลที่มี', value: bm.rows.length + ' อันดับ', sub:`สมัคร ${bm.totalRanks} คน`, color:'#6b7280' },
+      {label:'คะแนนสูงสุด (อันดับ 1)', value:topScore.toFixed(2), sub:'คะแนนรวม (เต็ม 1,000)', color:meta.color},
+      {label:'Cutoff Score', value:cutoff?cutoff.toFixed(2):'—', sub:`อันดับที่ ${meta.admit} · รับ ${meta.admit} คน`, color:'#ef4444'},
+      {label:'ค่าเฉลี่ยคนสอบติด', value:avg.total?avg.total.toFixed(1):'—', sub:'คะแนนรวมเฉลี่ย', color:'#16a34a'},
+      {label:'ข้อมูลที่รวบรวม', value:bm.rows.length+' อันดับ', sub:`ผู้สมัคร ${bm.totalRanks.toLocaleString()} คน`, color:'#6b7280'},
     ];
-    el.innerHTML = cards.map(c => `
+    el.innerHTML = cards.map(c=>`
       <div class="stat-card" style="border-left:4px solid ${c.color};">
         <div class="stat-card-label">${c.label}</div>
         <div class="stat-card-value" style="color:${c.color};font-size:20px;">${c.value}</div>
@@ -2712,82 +2844,105 @@ function initEntranceStats() {
   function renderDistChart() {
     const canvas = document.getElementById('esDistChart');
     const emptyEl = document.getElementById('esDistEmpty');
-    const bm = bms.find(b=>b.id===activeBmId);
-    if (!bm || !canvas) return;
-    const meta = BM_META[bm.id] || {};
-    const color = meta.color || '#6366f1';
+    const bm = progBms.find(b=>b.id===activeBmId);
+    if (!bm||!canvas) return;
+    const meta = BM_META[bm.id]||{};
+    const color = meta.color||'#6366f1';
     const cutoff = esCutoff(bm);
-
-    // bin ข้อมูล
     const totals = bm.rows.map(r=>r.total).filter(v=>v>0);
     if (totals.length < 2) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
     canvas.style.display='block'; emptyEl.style.display='none';
-    const minV = Math.floor(Math.min(...totals)/50)*50;
-    const maxV = Math.ceil(Math.max(...totals)/50)*50;
+
     const binSize = 50;
+    const minV = Math.floor(Math.min(...totals)/binSize)*binSize;
+    const maxV = Math.ceil(Math.max(...totals)/binSize)*binSize;
     const bins = [];
     for (let v=minV; v<maxV; v+=binSize) {
-      bins.push({ label:`${v}–${v+binSize}`, min:v, max:v+binSize, count:0, hasCutoff: cutoff && cutoff>=v && cutoff<v+binSize });
+      bins.push({label:`${v}`, min:v, max:v+binSize, count:0, hasCutoff: cutoff&&cutoff>=v&&cutoff<v+binSize});
     }
-    totals.forEach(t => {
-      const b = bins.find(b=>t>=b.min&&t<b.max) || bins[bins.length-1];
-      if (b) b.count++;
-    });
+    totals.forEach(t=>{ const b=bins.find(b=>t>=b.min&&t<b.max)||bins[bins.length-1]; if(b)b.count++; });
 
-    const W = canvas.offsetWidth || 400;
-    const H = 160;
-    canvas.width = W; canvas.height = H;
+    const W = canvas.offsetWidth||400;
+    const H = 200;
+    canvas.width = W*2; canvas.height = H*2; // retina
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
     const ctx = canvas.getContext('2d');
+    ctx.scale(2,2);
     ctx.clearRect(0,0,W,H);
-    const PAD = {t:16,r:12,b:36,l:32};
+
+    const PAD = {t:28,r:16,b:52,l:44};
     const gW = W-PAD.l-PAD.r, gH = H-PAD.t-PAD.b;
     const maxCount = Math.max(...bins.map(b=>b.count),1);
     const bW = gW/bins.length;
 
+    // Y grid lines + labels
+    [0,0.25,0.5,0.75,1].forEach(pct => {
+      const y = PAD.t + gH*(1-pct);
+      const val = Math.round(maxCount*pct);
+      ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=0.5;
+      ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+gW,y); ctx.stroke();
+      ctx.fillStyle='#9ca3af'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+      ctx.fillText(val, PAD.l-4, y+3);
+    });
+
+    // แกน Y title
+    ctx.save();
+    ctx.translate(10, PAD.t+gH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillStyle='#6b7280'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('จำนวน (คน)', 0, 0);
+    ctx.restore();
+
+    // bars
     bins.forEach((bin,i) => {
-      const x = PAD.l + i*bW;
+      const x = PAD.l+i*bW;
       const bh = (bin.count/maxCount)*gH;
-      const y = PAD.t + gH - bh;
-      ctx.fillStyle = bin.hasCutoff ? '#ef4444' : color + 'cc';
-      ctx.fillRect(x+1, y, bW-2, bh);
+      const y = PAD.t+gH-bh;
+      ctx.fillStyle = bin.hasCutoff ? '#ef4444' : color+'cc';
+      ctx.beginPath();
+      ctx.roundRect(x+1.5, y, bW-3, bh, [3,3,0,0]);
+      ctx.fill();
       if (bin.count>0) {
-        ctx.fillStyle='#374151'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-        ctx.fillText(bin.count, x+bW/2, y-3);
+        ctx.fillStyle='#374151'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+        ctx.fillText(bin.count, x+bW/2, y-4);
       }
     });
-    // x labels (แสดงทุก 2)
+
+    // X labels — ทุก bar แสดง
     bins.forEach((bin,i) => {
-      if (i%2!==0) return;
-      ctx.fillStyle='#9ca3af'; ctx.font='9px sans-serif'; ctx.textAlign='center';
-      ctx.fillText(bin.label, PAD.l+i*bW+bW/2, H-20);
+      const x = PAD.l+i*bW+bW/2;
+      ctx.fillStyle='#6b7280'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(bin.label, x, H-PAD.b+14);
     });
-    // cutoff line
-    if (cutoff) {
-      const cx = PAD.l + bins.findIndex(b=>b.hasCutoff)*bW + bW/2;
+
+    // แกน X title
+    ctx.fillStyle='#6b7280'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('คะแนนรวม (เต็ม 1,000)', PAD.l+gW/2, H-4);
+
+    // cutoff dashed line
+    const cutoffBinIdx = bins.findIndex(b=>b.hasCutoff);
+    if (cutoffBinIdx>=0) {
+      const cx = PAD.l + cutoffBinIdx*bW + bW/2;
       ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.5;
       ctx.setLineDash([4,3]);
       ctx.beginPath(); ctx.moveTo(cx,PAD.t); ctx.lineTo(cx,PAD.t+gH); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle='#ef4444'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('cutoff', cx, PAD.t-2);
+      ctx.fillText(`cutoff ${cutoff?.toFixed(0)}`, cx, PAD.t-6);
     }
-    // legend
-    ctx.fillStyle='#6b7280'; ctx.font='9px sans-serif'; ctx.textAlign='left';
-    ctx.fillText('(แดง = cutoff zone)', PAD.l, H-6);
   }
 
   // ── Criteria ──
   function renderCriteria() {
     const el = document.getElementById('esCriteria');
     if (!el) return;
-    const bm = bms.find(b=>b.id===activeBmId);
+    const bm = progBms.find(b=>b.id===activeBmId);
     if (!bm) return;
-    const meta = BM_META[bm.id] || {};
-    const criteria = meta.criteria || [];
+    const meta = BM_META[bm.id]||{};
     const avg = esAvgAdmitted(bm);
     el.innerHTML = `
-      <div class="muted" style="font-size:12px;margin-bottom:10px;">น้ำหนักวิชาที่ใช้คัดเลือก</div>
-      ${criteria.map(c => `
+      <div class="muted" style="font-size:12px;margin-bottom:10px;">น้ำหนักคะแนนในการคัดเลือก</div>
+      ${(meta.criteria||[]).map(c=>`
         <div style="display:grid;gap:4px;margin-bottom:10px;">
           <div style="display:flex;justify-content:space-between;font-size:13px;">
             <span style="font-weight:700;">${c.subj}</span>
@@ -2798,199 +2953,266 @@ function initEntranceStats() {
           </div>
           <div class="muted" style="font-size:11px;">ค่าเฉลี่ยคนสอบติด: ${avg[c.subj]?avg[c.subj].toFixed(1):'—'}</div>
         </div>`).join('')}
-      <div style="margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:10px;font-size:12px;">
-        📌 รับนักเรียน <b>${meta.admit||'—'} คน</b>
+      <div style="margin-top:10px;padding:8px 12px;background:#f9fafb;border-radius:10px;font-size:12px;line-height:1.7;">
+        📌 รับนักเรียน <b>${meta.admit||'—'} คน</b><br>
+        📋 คะแนนเต็มรวม <b>1,000 คะแนน</b>
       </div>`;
   }
 
-  // ── ตารางรายอันดับ ──
+  // ── Rank table ──
   function renderRankTable(filter='') {
-    const bm = bms.find(b=>b.id===activeBmId);
+    const bm = progBms.find(b=>b.id===activeBmId);
     const head = document.getElementById('esRankHead');
     const body = document.getElementById('esRankBody');
     if (!bm||!head||!body) return;
     const meta = BM_META[bm.id]||{};
     const subjs = bm.subjectCols||[];
-    const cutoff = esCutoff(bm);
-    head.innerHTML = `<tr><th style="width:70px;">อันดับ</th><th>คะแนนรวม</th>${subjs.map(s=>`<th>${s}</th>`).join('')}<th>สถานะ</th></tr>`;
-    const rows = bm.rows.filter(r => !filter || String(r.rank).includes(filter));
-    body.innerHTML = rows.map(r => {
-      const admitted = r.rank <= meta.admit;
+    const maxTotal = Math.max(...bm.rows.map(r=>r.total));
+    const maxSubj = {};
+    subjs.forEach(s=>{ maxSubj[s]=Math.max(...bm.rows.map(r=>r.subjects?.[s]??-Infinity).filter(isFinite)); });
+
+    head.innerHTML = `<tr>
+      <th style="width:60px;">อันดับ</th>
+      <th>คะแนนรวม<br/><span style="font-weight:400;font-size:10px;color:#9ca3af;">⭐ = ${maxTotal.toFixed(0)}</span></th>
+      ${subjs.map(s=>`<th>${s}<br/><span style="font-weight:400;font-size:10px;color:#9ca3af;">⭐ ${maxSubj[s]?.toFixed(0)||'—'}</span></th>`).join('')}
+      <th>สถานะ</th>
+    </tr>`;
+
+    const rows = bm.rows.filter(r=>!filter||String(r.rank).includes(filter));
+    body.innerHTML = rows.map(r=>{
+      const admitted = r.rank<=meta.admit;
+      const isCutoff = r.rank===meta.admit;
+      const isTopTotal = r.total===maxTotal;
       const statusHtml = admitted
         ? `<span style="color:#16a34a;font-weight:700;font-size:11px;">✅ ติด</span>`
         : `<span style="color:#9ca3af;font-size:11px;">—</span>`;
-      const rowStyle = r.rank === meta.admit ? 'background:#fef9c3;' : admitted ? 'background:#f0fdf4;' : '';
-      return `<tr style="${rowStyle}">
+      const rowStyle = isCutoff?'background:#fef9c3;':admitted?'background:#f0fdf4;':'';
+      const cutoffBorder = isCutoff?'border-bottom:3px solid #ef4444;':'';
+      const totalCell = `<td style="font-weight:700;">${r.total.toFixed(2)}${isTopTotal?' <span style="color:#f59e0b;">⭐</span>':''}</td>`;
+      const subjCells = subjs.map(s=>{
+        const v=r.subjects?.[s];
+        const isBest=v!=null&&v===maxSubj[s];
+        return `<td style="${isBest?'background:#fffbeb;font-weight:800;':''}">${v!=null?v.toFixed(2):'—'}${isBest?' <span style="color:#f59e0b;">⭐</span>':''}</td>`;
+      }).join('');
+      return `<tr style="${rowStyle}${cutoffBorder}">
         <td style="font-weight:800;text-align:center;">${r.rank}</td>
-        <td style="font-weight:700;">${r.total.toFixed(2)}</td>
-        ${subjs.map(s=>`<td>${r.subjects?.[s]!=null?r.subjects[s].toFixed(2):'—'}</td>`).join('')}
+        ${totalCell}${subjCells}
         <td>${statusHtml}</td>
       </tr>`;
-    }).join('') || `<tr><td colspan="${subjs.length+3}" class="muted">ไม่พบข้อมูล</td></tr>`;
+    }).join('')||`<tr><td colspan="${subjs.length+3}" class="muted">ไม่พบข้อมูล</td></tr>`;
   }
 
-  document.getElementById('esRankSearch')?.addEventListener('input', e => renderRankTable(e.target.value));
+  document.getElementById('esRankSearch')?.addEventListener('input', e=>renderRankTable(e.target.value));
 
-  // ── Compare toggles ──
-  function renderCmpToggles() {
-    const el = document.getElementById('esCmpToggleRow');
+  function renderYear() {
+    renderYearTabs();
+    renderOverview();
+    requestAnimationFrame(()=>renderDistChart());
+    renderCriteria();
+    renderRankTable();
+  }
+  renderYear();
+}
+
+// ── หน้า 4: เปรียบเทียบผลสอบ ──
+function initEntranceCompare(params) {
+  const state = esGetState();
+  const bms = esGetBms();
+
+  // back button
+  document.getElementById('ecBackBtn').onclick = () => navigate('entrance_year', state);
+
+  // ── load students ──
+  let students = JSON.parse(localStorage.getItem('ecStudents')||'[]');
+  function saveStudents() { localStorage.setItem('ecStudents', JSON.stringify(students)); }
+
+  // ── program select ──
+  const progSelect = document.getElementById('ecProgramSelect');
+  let selectedProgram = state.programId||'';
+  if (progSelect && selectedProgram) progSelect.value = selectedProgram;
+  progSelect?.addEventListener('change', e=>{ selectedProgram=e.target.value; renderYearToggles(); renderAll(); });
+
+  // ── year toggles ──
+  let selectedYears = new Set(['69','68']);
+
+  function renderYearToggles() {
+    const el = document.getElementById('ecYearToggleRow');
     if (!el) return;
-    el.innerHTML = bms.map(bm => {
-      const meta = BM_META[bm.id]||{};
-      const on = cmpSelected.has(bm.id);
-      return `<button onclick="esToggleCmp('${bm.id}')"
-        style="padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;cursor:pointer;
-               border:2px solid ${on?meta.color||'#111':'var(--border)'};
-               background:${on?meta.color||'#111':'#fff'};color:${on?'#fff':'#374151'};">
-        ${meta.shortLabel||bm.name}</button>`;
+    // กรอง bm ตาม program
+    const prog = selectedProgram; // 'gate' | 'eplus' | ''
+    const filtered = bms.filter(b=>{
+      if (!prog) return b.id.includes('gate')||b.id.includes('eplus');
+      return b.id.includes(prog);
+    });
+    const years = [...new Set(filtered.map(b=>b.id.endsWith('69')?'69':'68'))];
+    el.innerHTML = years.map(y=>{
+      const on = selectedYears.has(y);
+      return `<button onclick="ecToggleYear('${y}')"
+        style="padding:8px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;
+               border:2px solid ${on?'#111':'var(--border)'};background:${on?'#111':'#fff'};color:${on?'#fff':'#374151'};">
+        ปี 25${y}</button>`;
     }).join('');
   }
-  window.esToggleCmp = function(id) {
-    if (cmpSelected.has(id)) cmpSelected.delete(id); else cmpSelected.add(id);
-    renderCmpToggles(); renderCompare();
+  window.ecToggleYear = function(y) {
+    if(selectedYears.has(y)) selectedYears.delete(y); else selectedYears.add(y);
+    renderYearToggles(); renderAll();
   };
 
-  // ── Student list ──
-  function saveStudents() { localStorage.setItem('esStudents', JSON.stringify(students)); }
+  // ── helper: get active bms ──
+  function getActiveBms() {
+    const prog = selectedProgram;
+    return bms.filter(b=>{
+      const matchProg = !prog || b.id.includes(prog);
+      const year = b.id.endsWith('69')?'69':'68';
+      return matchProg && selectedYears.has(year);
+    });
+  }
 
-  function getInputSubjects() {
-    // union ของ subjectCols จาก benchmark ที่เลือก
+  // ── helper: subject list ──
+  function getSubjects() {
+    const activeBms = getActiveBms();
     const cols = new Set();
-    bms.filter(b=>cmpSelected.has(b.id)).forEach(b=>(b.subjectCols||[]).forEach(s=>cols.add(s)));
+    activeBms.forEach(b=>(b.subjectCols||[]).forEach(s=>cols.add(s)));
     return ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาอังกฤษ','ภาษาไทย'].filter(s=>cols.has(s));
   }
 
+  // ── student list ──
   function renderStudentList() {
-    const el = document.getElementById('esStudentList');
+    const el = document.getElementById('ecStudentList');
     if (!el) return;
-    const subjs = getInputSubjects();
+    const subjs = getSubjects();
     if (!students.length) {
-      el.innerHTML = `<div class="muted" style="font-size:13px;">ยังไม่มีนักเรียน กด "+ เพิ่มนักเรียน" เพื่อเริ่ม</div>`;
+      el.innerHTML = `<div class="card" style="padding:16px;"><div class="muted" style="font-size:13px;">ยังไม่มีนักเรียน — กด "+ เพิ่มนักเรียน" ด้านบน</div></div>`;
       return;
     }
-    el.innerHTML = students.map((stu,i) => {
+    el.innerHTML = students.map((stu,i)=>{
       const total = subjs.reduce((s,k)=>s+(parseFloat(stu.scores?.[k])||0),0);
-      return `<div class="card" style="padding:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      return `<div class="card" style="padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
           <input value="${esc(stu.name||'')}" placeholder="ชื่อนักเรียน"
-            class="btn" style="text-align:left;padding:8px 12px;font-weight:700;border-radius:10px;max-width:200px;"
-            oninput="esUpdateName(${i},this.value)"/>
+            class="btn" style="text-align:left;padding:9px 14px;font-weight:700;border-radius:12px;flex:1;max-width:220px;"
+            oninput="ecUpdateName(${i},this.value)"/>
           <div style="display:flex;gap:8px;align-items:center;">
-            <span style="font-weight:800;font-size:15px;">รวม ${total.toFixed(2)}</span>
-            <button class="btn-delete" onclick="esRemoveStudent(${i})">ลบ</button>
+            <span style="font-weight:900;font-size:16px;color:#111;">${total.toFixed(2)} <span style="font-size:12px;font-weight:400;color:#9ca3af;">/ 1,000</span></span>
+            <button class="btn-delete" onclick="ecRemoveStudent(${i})">ลบ</button>
           </div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
           ${subjs.map(s=>`
-            <label style="display:grid;gap:4px;min-width:110px;">
+            <div style="display:grid;gap:4px;min-width:120px;flex:1;">
               <span style="font-size:11px;font-weight:700;color:#6b7280;">${s}</span>
-              <input type="number" min="0" step="0.01" value="${stu.scores?.[s]??''}"
-                placeholder="0" class="btn"
-                style="text-align:center;padding:8px;width:100%;border-radius:10px;font-size:14px;"
-                oninput="esUpdateScore(${i},'${s}',this.value)"/>
-            </label>`).join('')}
+              <input type="number" min="0" max="1000" step="0.25"
+                class="btn" style="text-align:center;padding:10px;width:100%;border-radius:10px;font-size:15px;font-weight:700;"
+                placeholder="0"
+                value="${stu.scores?.[s]??''}"
+                onchange="ecUpdateScore(${i},'${s}',this.value)"
+                onblur="ecUpdateScore(${i},'${s}',this.value)"/>
+            </div>`).join('')}
         </div>
       </div>`;
     }).join('');
   }
 
-  window.esUpdateName = function(i,v){ students[i].name=v; saveStudents(); renderCompare(); };
-  window.esUpdateScore = function(i,s,v){ if(!students[i].scores) students[i].scores={}; students[i].scores[s]=v===''?null:parseFloat(v); saveStudents(); renderStudentList(); renderCompare(); };
-  window.esRemoveStudent = function(i){ students.splice(i,1); saveStudents(); renderStudentList(); renderCompare(); };
+  window.ecUpdateName = function(i,v){ students[i].name=v; saveStudents(); renderCompareResults(); };
+  window.ecUpdateScore = function(i,s,v){
+    if(!students[i].scores) students[i].scores={};
+    students[i].scores[s]=v===''?null:parseFloat(v);
+    saveStudents();
+    // update total display without full re-render (ป้องกัน focus หาย)
+    const subjs=getSubjects();
+    const total=subjs.reduce((acc,k)=>acc+(parseFloat(students[i].scores?.[k])||0),0);
+    const cards=document.querySelectorAll('#ecStudentList .card');
+    if(cards[i]){
+      const span=cards[i].querySelector('span[data-total]');
+      if(!span){ // fallback re-render ถ้า span ยังไม่มี
+        renderStudentList();
+      } else {
+        span.textContent=total.toFixed(2);
+      }
+    }
+    renderCompareResults();
+  };
+  window.ecRemoveStudent = function(i){ students.splice(i,1); saveStudents(); renderStudentList(); renderCompareResults(); };
 
-  document.getElementById('esAddStudentBtn')?.addEventListener('click', ()=>{
-    students.push({id:'stu_'+Date.now(), name:'', scores:{}});
-    saveStudents(); renderStudentList(); renderCompare();
-    // scroll ลงล่าง
-    setTimeout(()=>{ const el=document.getElementById('esStudentList'); el?.lastElementChild?.scrollIntoView({behavior:'smooth'}); },100);
+  document.getElementById('ecAddStudentBtn')?.addEventListener('click',()=>{
+    students.push({id:'stu_'+Date.now(),name:'',scores:{}});
+    saveStudents();
+    renderStudentList();
+    setTimeout(()=>document.getElementById('ecStudentList')?.lastElementChild?.scrollIntoView({behavior:'smooth'}),100);
   });
 
-  // ── Compare results ──
-  function renderCompare() {
-    const el = document.getElementById('esCompareResults');
+  // ── compare results ──
+  function renderCompareResults() {
+    const el = document.getElementById('ecCompareResults');
     if (!el) return;
-    const selBms = bms.filter(b=>cmpSelected.has(b.id));
-    if (!selBms.length || !students.length) { el.innerHTML=''; return; }
+    const activeBms = getActiveBms();
+    if (!activeBms.length||!students.length) { el.innerHTML=''; return; }
+    const subjs = getSubjects();
 
-    // คำนวณ avg admitted รวมจากทุก bm ที่เลือก (ถ้าเลือก 2 ปี avg รวม)
-    const avgPool = {}; // subj → [values]
-    const avgTotalPool = [];
-    selBms.forEach(bm=>{
+    // avg admitted รวม
+    const poolTotal=[]; const poolSubj={};
+    activeBms.forEach(bm=>{
       const meta=BM_META[bm.id]||{};
-      const admitted=bm.rows.filter(r=>r.rank>=1&&r.rank<=meta.admit);
-      admitted.forEach(r=>{
-        avgTotalPool.push(r.total);
-        Object.entries(r.subjects||{}).forEach(([k,v])=>{
-          if(v==null)return;
-          if(!avgPool[k]) avgPool[k]=[];
-          avgPool[k].push(v);
-        });
+      bm.rows.filter(r=>r.rank>=1&&r.rank<=meta.admit).forEach(r=>{
+        poolTotal.push(r.total);
+        Object.entries(r.subjects||{}).forEach(([k,v])=>{ if(v==null)return; if(!poolSubj[k])poolSubj[k]=[]; poolSubj[k].push(v); });
       });
     });
-    const avgTotal = avgTotalPool.length ? avgTotalPool.reduce((a,b)=>a+b,0)/avgTotalPool.length : 0;
-    const avgSubj = {};
-    Object.entries(avgPool).forEach(([k,arr])=>{ avgSubj[k]=arr.reduce((a,b)=>a+b,0)/arr.length; });
+    const avgTotal = poolTotal.length?poolTotal.reduce((a,b)=>a+b,0)/poolTotal.length:0;
+    const avgSubj={};
+    Object.entries(poolSubj).forEach(([k,arr])=>{ avgSubj[k]=arr.reduce((a,b)=>a+b,0)/arr.length; });
+    const cutoffs=activeBms.map(b=>esCutoff(b)).filter(v=>v!=null);
+    const avgCutoff=cutoffs.length?cutoffs.reduce((a,b)=>a+b,0)/cutoffs.length:null;
+    const bmLabel=activeBms.map(b=>b.id.endsWith('69')?'ปี 2569':'ปี 2568').join(' + ');
 
-    // cutoff: ใช้ cutoff ต่ำสุดในบรรดาที่เลือก (conservative) หรือเฉลี่ย
-    const cutoffs = selBms.map(bm=>esCutoff(bm)).filter(v=>v!=null);
-    const avgCutoff = cutoffs.length ? cutoffs.reduce((a,b)=>a+b,0)/cutoffs.length : null;
-
-    const subjs = getInputSubjects();
-    const bmLabel = selBms.map(b=>(BM_META[b.id]||{}).shortLabel||b.name).join(' + ');
-
-    el.innerHTML = students.map((stu,i) => {
+    el.innerHTML = students.map((stu,i)=>{
       const total = subjs.reduce((s,k)=>s+(parseFloat(stu.scores?.[k])||0),0);
       const name = stu.name||`นักเรียน ${i+1}`;
-      const gap = avgCutoff ? total - avgCutoff : null;
+      const gap = avgCutoff?total-avgCutoff:null;
       const gapColor = gap==null?'#9ca3af':gap>=0?'#16a34a':'#ef4444';
-      const gapText = gap==null?'—':gap>=0?`+${gap.toFixed(2)} (เกิน cutoff)`:` ${gap.toFixed(2)} (ขาด ${Math.abs(gap).toFixed(2)} คะแนน)`;
-
+      const gapText = gap==null?'—':gap>=0?`+${gap.toFixed(2)} (เกิน cutoff เฉลี่ย)`:`${gap.toFixed(2)} (ขาด ${Math.abs(gap).toFixed(2)} คะแนน)`;
+      let chance='—';
+      if(avgCutoff&&total>0){
+        const p=total/avgCutoff*100;
+        if(p>=100) chance='🟢 เกิน cutoff เฉลี่ย';
+        else if(p>=90) chance='🟡 ใกล้ cutoff (≥90%)';
+        else if(p>=75) chance='🟠 ห่างพอสมควร (75–90%)';
+        else chance='🔴 ยังห่างมาก (<75%)';
+      }
       const barsHtml = subjs.map(s=>{
-        const score = parseFloat(stu.scores?.[s])||0;
-        const avg = avgSubj[s]||0;
-        const diff = avg>0 ? score-avg : 0;
-        const diffColor = diff>=0?'#16a34a':'#ef4444';
-        const maxScore = selBms.reduce((mx,bm)=>{
-          const top=bm.rows[0]?.subjects?.[s]||0; return Math.max(mx,top);
-        },0)||300;
-        const pctStu = Math.min(100,score/maxScore*100);
-        const pctAvg = Math.min(100,avg/maxScore*100);
-        return `<div style="margin-bottom:10px;">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+        const score=parseFloat(stu.scores?.[s])||0;
+        const avg=avgSubj[s]||0;
+        const diff=avg>0?score-avg:0;
+        const diffColor=diff>=0?'#16a34a':'#ef4444';
+        const maxS=activeBms.reduce((mx,bm)=>Math.max(mx,bm.rows[0]?.subjects?.[s]||0),0)||400;
+        const pctStu=Math.min(100,score/maxS*100);
+        const pctAvg=Math.min(99,avg/maxS*100);
+        return `<div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
             <span style="font-weight:700;">${s}</span>
-            <span>${score.toFixed(2)} <span style="color:${diffColor};font-weight:700;">(${diff>=0?'+':''}${diff.toFixed(1)} จากค่าเฉลี่ย)</span></span>
+            <span style="font-weight:700;">${score.toFixed(2)}
+              <span style="color:${diffColor};font-size:12px;">(${diff>=0?'+':''}${diff.toFixed(1)} จากค่าเฉลี่ย)</span>
+            </span>
           </div>
-          <div style="position:relative;height:10px;background:#e5e7eb;border-radius:99px;overflow:visible;margin-bottom:2px;">
-            <div style="height:100%;width:${pctStu}%;background:${diff>=0?'#16a34a':'#ef4444'};border-radius:99px;transition:.5s;"></div>
-            <div style="position:absolute;top:-3px;left:${pctAvg}%;width:2px;height:16px;background:#111;border-radius:2px;" title="ค่าเฉลี่ย"></div>
+          <div style="position:relative;height:12px;background:#e5e7eb;border-radius:99px;overflow:visible;margin-bottom:3px;">
+            <div style="height:100%;width:${pctStu}%;background:${diffColor};border-radius:99px;transition:.5s;"></div>
+            <div style="position:absolute;top:-3px;left:${pctAvg}%;width:2px;height:18px;background:#111;border-radius:2px;" title="ค่าเฉลี่ยคนติด ${avg.toFixed(1)}"></div>
           </div>
-          <div class="muted" style="font-size:10px;">ค่าเฉลี่ยคนสอบติด: ${avg.toFixed(1)}</div>
+          <div class="muted" style="font-size:11px;">ค่าเฉลี่ยคนสอบติด: ${avg.toFixed(1)} | เส้นดำ = ค่าเฉลี่ย</div>
         </div>`;
       }).join('');
-
-      // โอกาสประเมิน
-      let chance = '—';
-      if (avgCutoff && total>0) {
-        const pct = Math.min(100, Math.max(0, (total/avgCutoff)*100));
-        if (pct>=100) chance='🟢 เกิน cutoff เฉลี่ย';
-        else if (pct>=90) chance='🟡 ใกล้ cutoff (90%+)';
-        else if (pct>=75) chance='🟠 ห่างพอสมควร';
-        else chance='🔴 ยังห่างจาก cutoff มาก';
-      }
-
-      return `<div class="card" style="padding:16px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-          <div>
-            <div style="font-weight:900;font-size:16px;">${esc(name)}</div>
-            <div class="muted" style="font-size:12px;">เทียบกับ ${esc(bmLabel)}</div>
-          </div>
+      return `<div class="card" style="padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div><div style="font-weight:900;font-size:17px;">${esc(name)}</div>
+               <div class="muted" style="font-size:12px;">เทียบกับ ${selectedProgram.toUpperCase()||'—'} ${bmLabel}</div></div>
           <div style="text-align:right;">
-            <div style="font-size:20px;font-weight:900;">${total.toFixed(2)}</div>
-            <div style="font-size:12px;color:${gapColor};font-weight:700;">${gapText}</div>
+            <div style="font-size:22px;font-weight:900;">${total.toFixed(2)}<span style="font-size:13px;color:#9ca3af;font-weight:400;"> / 1,000</span></div>
+            <div style="font-size:13px;color:${gapColor};font-weight:700;">${gapText}</div>
           </div>
         </div>
-        <div style="padding:8px 12px;background:#f9fafb;border-radius:10px;font-size:13px;margin-bottom:12px;">
-          ${chance} · cutoff เฉลี่ย: <b>${avgCutoff?avgCutoff.toFixed(2):'—'}</b> · ค่าเฉลี่ยคนติด: <b>${avgTotal.toFixed(1)}</b>
+        <div style="padding:10px 14px;background:#f9fafb;border-radius:12px;font-size:13px;margin-bottom:14px;line-height:1.8;">
+          ${chance}<br>
+          cutoff เฉลี่ย: <b>${avgCutoff?avgCutoff.toFixed(2):'—'}</b> &nbsp;·&nbsp; ค่าเฉลี่ยคนสอบติด: <b>${avgTotal.toFixed(1)}</b>
         </div>
         ${barsHtml}
       </div>`;
@@ -2998,21 +3220,15 @@ function initEntranceStats() {
   }
 
   function renderAll() {
-    renderTabs();
-    renderOverview();
-    requestAnimationFrame(()=>{ renderDistChart(); });
-    renderCriteria();
-    renderRankTable();
-    renderCmpToggles();
+    renderYearToggles();
     renderStudentList();
-    renderCompare();
+    renderCompareResults();
   }
   renderAll();
 }
 
-function initEntranceDetail(params) {
-  // placeholder — future detail page
-  const el = document.getElementById('edContent');
-  if (el) el.innerHTML = '<div class="muted">กำลังพัฒนา</div>';
-}
+
 </script>
+</body>
+</html>
+
