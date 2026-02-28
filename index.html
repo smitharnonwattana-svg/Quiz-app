@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v25</title>
+  <title>Science Practice v26</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -479,11 +479,12 @@
 
 <!-- ===================== PAGE: ENTRANCE COMPARE ===================== -->
 <div id="page-entrance_compare" class="page">
-  <div class="container" style="max-width:900px;">
+  <div class="container" style="max-width:860px;">
+    <!-- Header -->
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">🎯 เปรียบเทียบผลสอบ</h1>
-        <div class="muted" style="margin-top:6px;">กรอกคะแนนรายวิชาและบันทึก เพื่อเปรียบเทียบกับข้อมูลจริง</div>
+        <div class="muted" style="margin-top:6px;">กรอกคะแนนรายวิชา ระบบอัปเดตผลทันทีเมื่อพิมพ์</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn" id="ecBackBtn">← กลับ</button>
@@ -491,51 +492,14 @@
       </div>
     </div>
 
-    <!-- section GATE -->
-    <div style="margin-top:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-        <div>
-          <div style="font-weight:900;font-size:16px;">📘 GATE</div>
-          <div class="muted" style="font-size:12px;">คณิตศาสตร์ · วิทยาศาสตร์ · ภาษาอังกฤษ · ภาษาไทย</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div style="font-size:12px;font-weight:700;color:#6b7280;">เทียบกับ:</div>
-          <div style="display:flex;gap:6px;" id="ecGateYearRow"></div>
-          <button class="btn" id="ecAddGateBtn" style="font-size:13px;">+ เพิ่มนักเรียน</button>
-        </div>
-      </div>
-      <div id="ecGateList" style="display:grid;gap:12px;"></div>
-      <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-        <button class="btn btnPrimary" id="ecSaveGateBtn" style="font-size:13px;display:none;">💾 บันทึกผล GATE</button>
-      </div>
-    </div>
+    <!-- Program tabs -->
+    <div style="display:flex;gap:10px;margin-top:20px;" id="ecProgTabs"></div>
 
-    <!-- divider -->
-    <div class="hr" style="margin:28px 0;"></div>
-
-    <!-- section EPLUS -->
-    <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-        <div>
-          <div style="font-weight:900;font-size:16px;">📗 EPLUS</div>
-          <div class="muted" style="font-size:12px;">คณิตศาสตร์ · วิทยาศาสตร์ · ภาษาอังกฤษ</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div style="font-size:12px;font-weight:700;color:#6b7280;">เทียบกับ:</div>
-          <div style="display:flex;gap:6px;" id="ecEplusYearRow"></div>
-          <button class="btn" id="ecAddEplusBtn" style="font-size:13px;">+ เพิ่มนักเรียน</button>
-        </div>
-      </div>
-      <div id="ecEplusList" style="display:grid;gap:12px;"></div>
-      <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-        <button class="btn btnPrimary" id="ecSaveEplusBtn" style="font-size:13px;display:none;">💾 บันทึกผล EPLUS</button>
-      </div>
-    </div>
+    <!-- Active program area -->
+    <div id="ecActiveSection" style="margin-top:20px;"></div>
 
     <!-- ผลเปรียบเทียบ -->
-    <div class="hr" style="margin:28px 0;"></div>
-    <div style="font-weight:900;font-size:16px;margin-bottom:16px;">📊 ผลการเปรียบเทียบ</div>
-    <div id="ecCompareResults" style="display:grid;gap:14px;"></div>
+    <div id="ecCompareResults" style="margin-top:24px;display:grid;gap:14px;"></div>
   </div>
 </div>
 
@@ -3044,326 +3008,332 @@ function initEntranceYear(params) {
 // ── หน้า 4: เปรียบเทียบผลสอบ ──
 function initEntranceCompare(params) {
   const state = esGetState();
-  const bms = esGetBms();
+  const bms   = esGetBms();
 
   document.getElementById('ecBackBtn').onclick = () => navigate('entrance_year', state);
 
-  // ── storage keys แยกตาม program ──
-  const KEYS = { gate: 'ecStudents_gate', eplus: 'ecStudents_eplus' };
-  const YEARS_KEY = { gate: 'ecYears_gate', eplus: 'ecYears_eplus' };
+  // ── storage ──
+  const SKEYS = { gate:'ecStudents_gate', eplus:'ecStudents_eplus' };
+  const YKEYS = { gate:'ecYears_gate',    eplus:'ecYears_eplus'    };
+  function loadStudents(p){ try{return JSON.parse(localStorage.getItem(SKEYS[p])||'[]');}catch{return[];} }
+  function saveStudents(p,arr){ localStorage.setItem(SKEYS[p], JSON.stringify(arr)); }
+  function loadYears(p){ try{return new Set(JSON.parse(localStorage.getItem(YKEYS[p])||'["69","68"]'));}catch{return new Set(['69','68']);} }
+  function saveYears(p,s){ localStorage.setItem(YKEYS[p], JSON.stringify([...s])); }
 
-  function loadStudents(prog) {
-    try { return JSON.parse(localStorage.getItem(KEYS[prog])||'[]'); } catch { return []; }
-  }
-  function saveProg(prog, students) {
-    localStorage.setItem(KEYS[prog], JSON.stringify(students));
-  }
-  function loadYears(prog) {
-    try { return new Set(JSON.parse(localStorage.getItem(YEARS_KEY[prog])||'["69","68"]')); }
-    catch { return new Set(['69','68']); }
-  }
-  function saveYears(prog, years) {
-    localStorage.setItem(YEARS_KEY[prog], JSON.stringify([...years]));
-  }
-
-  // state per-program
-  const state_ = {
-    gate:  { students: loadStudents('gate'),  years: loadYears('gate'),  dirty: false },
-    eplus: { students: loadStudents('eplus'), years: loadYears('eplus'), dirty: false },
-  };
-
-  // subjects per program
+  // ── subjects: ลำดับใหม่ วิทย์ → เลข → อังกฤษ → ไทย ──
   const SUBJ = {
-    gate:  ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาอังกฤษ','ภาษาไทย'],
-    eplus: ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาอังกฤษ'],
+    gate:  ['วิทยาศาสตร์','คณิตศาสตร์','ภาษาอังกฤษ','ภาษาไทย'],
+    eplus: ['วิทยาศาสตร์','คณิตศาสตร์','ภาษาอังกฤษ'],
+  };
+  const PROG_META = {
+    gate:  { label:'GATE',  icon:'📘', color:'#6366f1', desc:'วิทย์ · เลข · อังกฤษ · ไทย' },
+    eplus: { label:'EPLUS', icon:'📗', color:'#f59e0b', desc:'วิทย์ · เลข · อังกฤษ' },
   };
 
-  function getActiveBms(prog) {
-    const years = state_[prog].years;
-    return bms.filter(b => b.id.includes(prog) && years.has(b.id.endsWith('69')?'69':'68'));
-  }
+  // ── state ──
+  const st = {
+    gate:  { students: loadStudents('gate'),  years: loadYears('gate')  },
+    eplus: { students: loadStudents('eplus'), years: loadYears('eplus') },
+  };
+  let activeProg = state.programId || 'gate';  // default ตาม program ที่มาจาก
 
-  function calcStats(prog) {
-    const activeBms = getActiveBms(prog);
-    const poolTotal=[]; const poolSubj={};
+  // ── helpers ──
+  function getActiveBms(p) {
+    return bms.filter(b => b.id.includes(p) && st[p].years.has(b.id.endsWith('69')?'69':'68'));
+  }
+  function calcStats(p) {
+    const activeBms = getActiveBms(p);
+    const poolTotal=[], poolSubj={};
     activeBms.forEach(bm=>{
       const meta=BM_META[bm.id]||{};
       bm.rows.filter(r=>r.rank>=1&&r.rank<=meta.admit).forEach(r=>{
         poolTotal.push(r.total);
-        Object.entries(r.subjects||{}).forEach(([k,v])=>{ if(v==null)return; if(!poolSubj[k])poolSubj[k]=[]; poolSubj[k].push(v); });
+        Object.entries(r.subjects||{}).forEach(([k,v])=>{
+          if(v==null) return;
+          if(!poolSubj[k]) poolSubj[k]=[];
+          poolSubj[k].push(v);
+        });
       });
     });
-    const avgTotal = poolTotal.length ? poolTotal.reduce((a,b)=>a+b,0)/poolTotal.length : 0;
-    const avgSubj  = {};
+    const avgTotal  = poolTotal.length ? poolTotal.reduce((a,b)=>a+b,0)/poolTotal.length : 0;
+    const avgSubj   = {};
     Object.entries(poolSubj).forEach(([k,arr])=>{ avgSubj[k]=arr.reduce((a,b)=>a+b,0)/arr.length; });
-    const cutoffs  = activeBms.map(b=>esCutoff(b)).filter(v=>v!=null);
-    const avgCutoff= cutoffs.length ? cutoffs.reduce((a,b)=>a+b,0)/cutoffs.length : null;
-    const bmLabel  = activeBms.map(b=>b.id.endsWith('69')?'ปี 2569':'ปี 2568').join(' + ');
-    return { avgTotal, avgSubj, avgCutoff, bmLabel, activeBms };
+    const cutoffs   = activeBms.map(b=>esCutoff(b)).filter(v=>v!=null);
+    const avgCutoff = cutoffs.length ? cutoffs.reduce((a,b)=>a+b,0)/cutoffs.length : null;
+    const bmLabel   = activeBms.map(b=>b.id.endsWith('69')?'ปี 2569':'ปี 2568').join(' + ');
+    // cutoff per-subject: avg ของ rows ที่ rank <= admit (คน cutoff zone)
+    const cutoffSubj = {};
+    SUBJ[p].forEach(s=>{
+      const vals = activeBms.flatMap(bm=>{
+        const meta=BM_META[bm.id]||{};
+        const cutoffTotal = esCutoff(bm);
+        if(!cutoffTotal) return [];
+        // หา rows ที่ total ≈ cutoff (within ±5)
+        const zone = bm.rows.filter(r=>r.rank<=meta.admit&&r.total<=cutoffTotal+5&&r.total>=cutoffTotal-5);
+        const fallback = bm.rows.filter(r=>r.rank<=meta.admit).slice(-3); // 3 rows สุดท้ายของคนติด
+        const rows = zone.length ? zone : fallback;
+        return rows.map(r=>r.subjects?.[s]).filter(v=>v!=null);
+      });
+      if(vals.length) cutoffSubj[s] = vals.reduce((a,b)=>a+b,0)/vals.length;
+    });
+    return { avgTotal, avgSubj, avgCutoff, cutoffSubj, bmLabel, activeBms };
   }
 
-  // ── render year toggles ──
-  function renderYearRow(prog) {
-    const elId = prog==='gate' ? 'ecGateYearRow' : 'ecEplusYearRow';
-    const el = document.getElementById(elId);
+  // ── Program tabs ──
+  function renderProgTabs() {
+    const el = document.getElementById('ecProgTabs');
     if (!el) return;
-    const years = state_[prog].years;
-    ['69','68'].forEach(y=>{
-      const hasBm = bms.some(b=>b.id.includes(prog)&&b.id.endsWith(y));
-      if (!hasBm) return;
+    el.innerHTML = ['gate','eplus'].map(p=>{
+      const m = PROG_META[p];
+      const on = p === activeProg;
+      const cnt = st[p].students.length;
+      return `<button onclick="ecSetProg('${p}')"
+        style="padding:10px 22px;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer;
+               border:2px solid ${on?m.color:'var(--border)'};
+               background:${on?m.color:'#fff'};color:${on?'#fff':'#374151'};
+               display:flex;align-items:center;gap:8px;transition:.15s;">
+        ${m.icon} ${m.label}
+        ${cnt?`<span style="background:${on?'rgba(255,255,255,.3)':'#e5e7eb'};color:${on?'#fff':'#374151'};border-radius:99px;padding:1px 8px;font-size:11px;">${cnt}</span>`:''}
+      </button>`;
+    }).join('');
+  }
+  window.ecSetProg = function(p){ activeProg=p; renderActiveSection(); renderProgTabs(); };
+
+  // ── Active section (กรอกคะแนน) ──
+  function renderActiveSection() {
+    const container = document.getElementById('ecActiveSection');
+    if (!container) return;
+    const p   = activeProg;
+    const m   = PROG_META[p];
+    const years = st[p].years;
+    const students = st[p].students;
+    const subjs = SUBJ[p];
+
+    // year toggles
+    const yearBtns = ['69','68'].map(y=>{
+      if(!bms.some(b=>b.id.includes(p)&&b.id.endsWith(y))) return '';
       const on = years.has(y);
-      // สร้าง/update ปุ่ม
-      let btn = el.querySelector(`[data-year="${y}"]`);
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.dataset.year = y;
-        btn.onclick = () => {
-          if(years.has(y)) years.delete(y); else years.add(y);
-          saveYears(prog, years);
-          renderYearRow(prog); renderSection(prog); renderResults();
-        };
-        el.appendChild(btn);
-      }
-      btn.textContent = 'ปี 25'+y;
-      btn.style.cssText = `padding:6px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
-        border:2px solid ${on?'#111':'var(--border)'};background:${on?'#111':'#fff'};color:${on?'#fff':'#374151'};`;
+      return `<button data-year="${y}" onclick="ecToggleYear('${p}','${y}')"
+        style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
+               border:2px solid ${on?m.color:'var(--border)'};
+               background:${on?m.color:'#fff'};color:${on?'#fff':'#374151'};">
+        ปี 25${y}</button>`;
+    }).join('');
+
+    // student cards
+    let studentHtml = '';
+    if (!students.length) {
+      studentHtml = `<div style="padding:14px;color:#9ca3af;font-size:13px;">ยังไม่มีนักเรียน — กด "+ เพิ่มนักเรียน" ด้านบน</div>`;
+    } else {
+      studentHtml = students.map((stu,i)=>{
+        const total = subjs.reduce((s,k)=>s+(parseFloat(stu.scores?.[k])||0),0);
+        const scoreFields = subjs.map(s=>`
+          <div style="display:grid;gap:4px;flex:1;min-width:100px;">
+            <span style="font-size:11px;font-weight:700;color:#6b7280;">${s}</span>
+            <input type="number" min="0" max="1000" step="0.25"
+              class="btn" style="text-align:center;padding:10px;width:100%;border-radius:10px;font-size:15px;font-weight:700;"
+              placeholder="0" value="${stu.scores?.[s]??''}"
+              oninput="ecLiveScore('${p}',${i},'${s}',this.value)"
+              onchange="ecLiveScore('${p}',${i},'${s}',this.value)"/>
+          </div>`).join('');
+        return `<div class="card" style="padding:16px;" id="ec-card-${p}-${i}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <input value="${esc(stu.name||'')}" placeholder="ชื่อนักเรียน"
+              class="btn" style="text-align:left;padding:9px 14px;font-weight:700;border-radius:12px;flex:1;max-width:220px;"
+              oninput="ecLiveName('${p}',${i},this.value)"/>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="ec-total-${p}-${i}" style="font-weight:900;font-size:16px;">${total.toFixed(2)}<span style="font-size:11px;color:#9ca3af;font-weight:400;"> / 1,000</span></span>
+              <button class="btn-delete" onclick="ecRemove('${p}',${i})">ลบ</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">${scoreFields}</div>
+        </div>`;
+      }).join('');
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <div>
+          <div style="font-weight:900;font-size:15px;color:${m.color};">${m.icon} ${m.label}</div>
+          <div class="muted" style="font-size:12px;">${m.desc}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:700;color:#6b7280;">เทียบกับ:</span>
+          ${yearBtns}
+          <button class="btn" id="ecAddBtn" style="font-size:13px;">+ เพิ่มนักเรียน</button>
+          <button class="btn btnPrimary" id="ecSaveBtn" style="font-size:13px;">💾 บันทึก</button>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px;">${studentHtml}</div>`;
+
+    document.getElementById('ecAddBtn')?.addEventListener('click', ()=>{
+      st[p].students.push({id:'stu_'+Date.now(), name:'', scores:{}});
+      saveStudents(p, st[p].students);
+      renderActiveSection();
+      renderProgTabs();
+      setTimeout(()=>document.getElementById('ecActiveSection')?.querySelector('.card:last-child')?.scrollIntoView({behavior:'smooth'}),100);
+    });
+    document.getElementById('ecSaveBtn')?.addEventListener('click', ()=>{
+      saveStudents(p, st[p].students);
+      renderCompareResults();
+      const btn = document.getElementById('ecSaveBtn');
+      if(btn){ btn.textContent='✅ บันทึกแล้ว'; btn.style.background='#16a34a';
+        setTimeout(()=>{ btn.textContent='💾 บันทึก'; btn.style.background=''; },1800); }
     });
   }
 
-  // ── render student input section ──
-  function renderSection(prog) {
-    const elId = prog==='gate' ? 'ecGateList' : 'ecEplusList';
-    const saveBtn = document.getElementById(prog==='gate'?'ecSaveGateBtn':'ecSaveEplusBtn');
-    const el = document.getElementById(elId);
-    if (!el) return;
-    const students = state_[prog].students;
-    const subjs = SUBJ[prog];
+  // ── Live update handlers (ไม่ re-render ทั้งหมด ป้องกัน focus หาย) ──
+  window.ecLiveName = function(p,i,v) {
+    st[p].students[i].name = v;
+  };
+  window.ecLiveScore = function(p,i,s,v) {
+    if(!st[p].students[i].scores) st[p].students[i].scores={};
+    st[p].students[i].scores[s] = v===''?null:parseFloat(v);
+    // update total span เฉพาะ (ไม่ re-render)
+    const subjs = SUBJ[p];
+    const total = subjs.reduce((acc,k)=>acc+(parseFloat(st[p].students[i].scores?.[k])||0),0);
+    const el = document.getElementById('ec-total-'+p+'-'+i);
+    if(el) el.innerHTML = total.toFixed(2)+'<span style="font-size:11px;color:#9ca3af;font-weight:400;"> / 1,000</span>';
+  };
+  window.ecRemove = function(p,i) {
+    st[p].students.splice(i,1);
+    saveStudents(p, st[p].students);
+    renderActiveSection(); renderProgTabs(); renderCompareResults();
+  };
+  window.ecToggleYear = function(p,y) {
+    if(st[p].years.has(y)) st[p].years.delete(y); else st[p].years.add(y);
+    saveYears(p, st[p].years);
+    renderActiveSection(); renderCompareResults();
+  };
 
-    if (!students.length) {
-      el.innerHTML = `<div class="card" style="padding:14px;"><div class="muted" style="font-size:13px;">ยังไม่มีนักเรียน — กด "+ เพิ่มนักเรียน"</div></div>`;
-      if (saveBtn) saveBtn.style.display='none';
-      return;
-    }
-    if (saveBtn) saveBtn.style.display = state_[prog].dirty ? 'inline-block' : 'none';
-
-    el.innerHTML = students.map((stu,i)=>{
-      const total = subjs.reduce((s,k)=>s+(parseFloat(stu.scores?.[k])||0),0);
-      return `<div class="card" style="padding:16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-          <input value="${esc(stu.name||'')}" placeholder="ชื่อนักเรียน"
-            class="btn" style="text-align:left;padding:9px 14px;font-weight:700;border-radius:12px;flex:1;max-width:220px;"
-            oninput="ecName('${prog}',${i},this.value)"/>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <span style="font-weight:900;font-size:16px;">${total.toFixed(2)}<span style="font-size:11px;color:#9ca3af;font-weight:400;"> / 1,000</span></span>
-            <button class="btn-delete" onclick="ecRemove('${prog}',${i})">ลบ</button>
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          ${subjs.map(s=>`
-            <div style="display:grid;gap:4px;min-width:110px;flex:1;">
-              <span style="font-size:11px;font-weight:700;color:#6b7280;">${s}</span>
-              <input type="number" min="0" max="1000" step="0.25"
-                class="btn" style="text-align:center;padding:10px;width:100%;border-radius:10px;font-size:15px;font-weight:700;"
-                placeholder="0" value="${stu.scores?.[s]??''}"
-                onchange="ecScore('${prog}',${i},'${s}',this.value)"
-                onblur="ecScore('${prog}',${i},'${s}',this.value)"/>
-            </div>`).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // ── render results section ──
-  function renderResults() {
+  // ── Compare results ──
+  function renderCompareResults() {
     const el = document.getElementById('ecCompareResults');
     if (!el) return;
     const out = [];
 
-    ['gate','eplus'].forEach(prog=>{
-      const students = state_[prog].students;
+    ['gate','eplus'].forEach(p=>{
+      const students = st[p].students;
       if (!students.length) return;
-      const { avgTotal, avgSubj, avgCutoff, bmLabel, activeBms } = calcStats(prog);
+      const { avgTotal, avgSubj, avgCutoff, cutoffSubj, bmLabel, activeBms } = calcStats(p);
       if (!activeBms.length) return;
-      const subjs = SUBJ[prog];
+      const subjs    = SUBJ[p];
+      const m        = PROG_META[p];
+      const topTotal = activeBms.reduce((mx,bm)=>Math.max(mx,bm.rows[0]?.total||0),0)||1000;
+
+      // max per subject (for bar scale)
       const maxS = {};
       subjs.forEach(s=>{ maxS[s]=activeBms.reduce((mx,bm)=>Math.max(mx,bm.rows[0]?.subjects?.[s]||0),0)||400; });
-      const pctCutoff = avgCutoff ? Math.min(99, avgCutoff / (activeBms.reduce((mx,bm)=>Math.max(mx,bm.rows[0]?.total||0),0)||1000) * 100) : null;
 
       students.forEach((stu,i)=>{
-        const total = subjs.reduce((s,k)=>s+(parseFloat(stu.scores?.[k])||0),0);
-        const name  = stu.name||`นักเรียน ${i+1}`;
-        const gap   = avgCutoff!=null ? total-avgCutoff : null;
-        const gapColor = gap==null?'#9ca3af':gap>=0?'#16a34a':'#ef4444';
-        const gapText  = gap==null?'—':gap>=0
+        const total  = subjs.reduce((s,k)=>s+(parseFloat(stu.scores?.[k])||0),0);
+        const name   = stu.name||`นักเรียน ${i+1}`;
+        const gap    = avgCutoff!=null ? total-avgCutoff : null;
+        const gapCol = gap==null?'#9ca3af':gap>=0?'#16a34a':'#dc2626';
+        const gapTxt = gap==null?'—':gap>=0
           ?`+${gap.toFixed(2)} (เกิน cutoff เฉลี่ย)`
           :`${gap.toFixed(2)} (ขาด ${Math.abs(gap).toFixed(2)} คะแนน)`;
         let chance='—';
         if(avgCutoff&&total>0){
-          const p=total/avgCutoff*100;
-          if(p>=100) chance='🟢 เกิน cutoff เฉลี่ย';
-          else if(p>=90) chance='🟡 ใกล้ cutoff (≥90%)';
-          else if(p>=75) chance='🟠 ห่างพอสมควร (75–90%)';
+          const pp=total/avgCutoff*100;
+          if(pp>=100) chance='🟢 เกิน cutoff เฉลี่ย';
+          else if(pp>=90) chance='🟡 ใกล้ cutoff (≥90%)';
+          else if(pp>=75) chance='🟠 ห่างพอสมควร (75–90%)';
           else chance='🔴 ยังห่างมาก (<75%)';
         }
 
-        // คะแนน cutoff บน total bar
-        const topTotal = activeBms.reduce((mx,bm)=>Math.max(mx,bm.rows[0]?.total||0),0)||1000;
-        const pctStuTotal = Math.min(100,total/topTotal*100);
-        const pctCutoffTotal = avgCutoff ? Math.min(99,avgCutoff/topTotal*100) : null;
-        const pctAvgTotal    = Math.min(99,avgTotal/topTotal*100);
+        // pct helpers
+        const pct=(v,mx)=>Math.min(99.5, Math.max(0, v/mx*100));
 
-        // total bar
-        const totalBarHtml = `
-          <div style="margin-bottom:16px;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-              <span style="font-weight:700;">คะแนนรวม</span>
-              <span style="font-weight:700;">${total.toFixed(2)} / 1,000</span>
+        // Total bar: student=สีตาม prog, cutoff=ส้ม, avg=ดำ
+        const pStu = pct(total, topTotal);
+        const pCut = avgCutoff ? pct(avgCutoff, topTotal) : null;
+        const pAvg = pct(avgTotal, topTotal);
+        const totalBarColor = gap!=null&&gap>=0 ? '#16a34a' : '#dc2626';
+        const totalBar = `
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:5px;">
+              <span>คะแนนรวม</span><span>${total.toFixed(2)} / 1,000</span>
             </div>
-            <div style="position:relative;height:14px;background:#e5e7eb;border-radius:99px;overflow:visible;margin-bottom:3px;">
-              <div style="height:100%;width:${pctStuTotal}%;background:${gap!=null&&gap>=0?'#16a34a':'#ef4444'};border-radius:99px;transition:.5s;"></div>
-              ${pctAvgTotal!=null?`<div style="position:absolute;top:-4px;left:${pctAvgTotal}%;width:2px;height:22px;background:#374151;border-radius:2px;" title="ค่าเฉลี่ยคนติด"></div>`:''}
-              ${pctCutoffTotal!=null?`<div style="position:absolute;top:-4px;left:${pctCutoffTotal}%;width:2px;height:22px;background:#ef4444;border-radius:2px;" title="Cutoff ${avgCutoff?.toFixed(0)}"></div>`:''}
+            <div style="position:relative;height:16px;background:#e5e7eb;border-radius:99px;overflow:visible;">
+              <div style="height:100%;width:${pStu}%;background:${totalBarColor};border-radius:99px;transition:.4s;"></div>
+              ${pCut!=null?`<div style="position:absolute;top:-3px;left:${pCut}%;width:3px;height:22px;background:#f97316;border-radius:2px;" title="Cutoff ${avgCutoff?.toFixed(0)}"></div>`:''}
+              <div style="position:absolute;top:-3px;left:${pAvg}%;width:3px;height:22px;background:#1f2937;border-radius:2px;" title="ค่าเฉลี่ย ${avgTotal.toFixed(0)}"></div>
             </div>
-            <div class="muted" style="font-size:10px;display:flex;gap:12px;">
-              <span>🔴 เส้นแดง = cutoff ${avgCutoff?avgCutoff.toFixed(0):'—'}</span>
-              <span>⬛ เส้นดำ = ค่าเฉลี่ยคนติด ${avgTotal.toFixed(0)}</span>
+            <div style="display:flex;gap:14px;font-size:10px;color:#6b7280;margin-top:4px;flex-wrap:wrap;">
+              <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:3px;"></span>cutoff ${avgCutoff?avgCutoff.toFixed(0):'—'}</span>
+              <span><span style="display:inline-block;width:10px;height:10px;background:#1f2937;border-radius:2px;margin-right:3px;"></span>ค่าเฉลี่ยคนติด ${avgTotal.toFixed(0)}</span>
             </div>
           </div>`;
 
-        // subject bars
-        const barsHtml = subjs.map(s=>{
+        // Subject bars
+        const subjBars = subjs.map(s=>{
           const score = parseFloat(stu.scores?.[s])||0;
           const avg   = avgSubj[s]||0;
+          const coff  = cutoffSubj[s]??null;
           const diff  = avg>0 ? score-avg : 0;
-          const diffColor = diff>=0?'#16a34a':'#ef4444';
-          const pctStu    = Math.min(100,score/maxS[s]*100);
-          const pctAvg    = Math.min(99,avg/maxS[s]*100);
-          // cutoff per-subject: ใช้ค่า avgSubj ของคน rank=admit จาก activeBms
-          const cutoffSubjVals = activeBms.map(bm=>{
-            const meta=BM_META[bm.id]||{};
-            const row=bm.rows.find(r=>r.rank===meta.admit);
-            return row?.subjects?.[s]??null;
-          }).filter(v=>v!=null);
-          const cutoffSubj = cutoffSubjVals.length ? cutoffSubjVals.reduce((a,b)=>a+b,0)/cutoffSubjVals.length : null;
-          const pctCutoffS = cutoffSubj!=null ? Math.min(99,cutoffSubj/maxS[s]*100) : null;
+          // สีแท่ง: เขียว = เหนือค่าเฉลี่ย, แดง = ต่ำกว่า
+          const barCol = diff>=0 ? '#16a34a' : '#dc2626';
+          const pS  = pct(score, maxS[s]);
+          const pA  = pct(avg,   maxS[s]);
+          const pC  = coff!=null ? pct(coff, maxS[s]) : null;
+          // diffColor: ถ้าแท่งสีเขียว ตัวเลขก็เขียว; แดงก็แดง (ไม่กลืนสี)
+          const diffCol = diff>=0 ? '#15803d' : '#dc2626';
 
-          return `<div style="margin-bottom:12px;">
-            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+          return `<div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;">
               <span style="font-weight:700;">${s}</span>
-              <span style="font-weight:700;">${score.toFixed(2)}
-                <span style="color:${diffColor};font-size:12px;">(${diff>=0?'+':''}${diff.toFixed(1)} จากค่าเฉลี่ย)</span>
+              <span>
+                <span style="font-weight:800;">${score.toFixed(2)}</span>
+                <span style="color:${diffCol};font-size:12px;margin-left:4px;">(${diff>=0?'+':''}${diff.toFixed(1)} จากค่าเฉลี่ย)</span>
               </span>
             </div>
-            <div style="position:relative;height:12px;background:#e5e7eb;border-radius:99px;overflow:visible;margin-bottom:3px;">
-              <div style="height:100%;width:${pctStu}%;background:${diffColor};border-radius:99px;transition:.5s;"></div>
-              <div style="position:absolute;top:-3px;left:${pctAvg}%;width:2px;height:18px;background:#374151;border-radius:2px;" title="ค่าเฉลี่ย ${avg.toFixed(1)}"></div>
-              ${pctCutoffS!=null?`<div style="position:absolute;top:-3px;left:${pctCutoffS}%;width:2px;height:18px;background:#ef4444;border-radius:2px;" title="Cutoff ${cutoffSubj?.toFixed(1)}"></div>`:''}
+            <div style="position:relative;height:13px;background:#e5e7eb;border-radius:99px;overflow:visible;">
+              <div style="height:100%;width:${pS}%;background:${barCol};border-radius:99px;transition:.4s;"></div>
+              ${pC!=null?`<div style="position:absolute;top:-3px;left:${pC}%;width:3px;height:19px;background:#f97316;border-radius:2px;" title="Cutoff ${coff?.toFixed(1)}"></div>`:''}
+              <div style="position:absolute;top:-3px;left:${pA}%;width:3px;height:19px;background:#1f2937;border-radius:2px;" title="ค่าเฉลี่ย ${avg.toFixed(1)}"></div>
             </div>
-            <div class="muted" style="font-size:10px;display:flex;gap:12px;">
-              <span>ค่าเฉลี่ยคนสอบติด: ${avg.toFixed(1)}</span>
-              ${cutoffSubj!=null?`<span>🔴 cutoff: ${cutoffSubj.toFixed(1)}</span>`:''}
+            <div style="display:flex;gap:12px;font-size:10px;color:#6b7280;margin-top:3px;flex-wrap:wrap;">
+              <span>ค่าเฉลี่ยคนติด: <b>${avg.toFixed(1)}</b></span>
+              ${coff!=null?`<span><span style="display:inline-block;width:8px;height:8px;background:#f97316;border-radius:2px;margin-right:2px;"></span>cutoff: <b>${coff.toFixed(1)}</b></span>`:''}
             </div>
           </div>`;
         }).join('');
 
-        const progColor = prog==='gate'?'#6366f1':'#f59e0b';
-        const progLabel = prog.toUpperCase();
-        out.push(`<div class="card" style="padding:18px;border-top:4px solid ${progColor};">
+        out.push(`<div class="card" style="padding:20px;border-top:4px solid ${m.color};">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
             <div>
-              <div style="font-size:11px;font-weight:800;color:${progColor};letter-spacing:1px;margin-bottom:2px;">${progLabel}</div>
+              <div style="font-size:11px;font-weight:800;color:${m.color};letter-spacing:1px;">${m.label}</div>
               <div style="font-weight:900;font-size:17px;">${esc(name)}</div>
-              <div class="muted" style="font-size:12px;">เทียบกับ ${progLabel} ${bmLabel}</div>
+              <div class="muted" style="font-size:12px;">เทียบกับ ${m.label} ${bmLabel}</div>
             </div>
             <div style="text-align:right;">
               <div style="font-size:22px;font-weight:900;">${total.toFixed(2)}<span style="font-size:13px;color:#9ca3af;font-weight:400;"> / 1,000</span></div>
-              <div style="font-size:13px;color:${gapColor};font-weight:700;">${gapText}</div>
+              <div style="font-size:13px;color:${gapCol};font-weight:700;">${gapTxt}</div>
             </div>
           </div>
-          <div style="padding:10px 14px;background:#f9fafb;border-radius:12px;font-size:13px;margin-bottom:14px;line-height:1.8;">
+          <div style="padding:10px 14px;background:#f9fafb;border-radius:12px;font-size:13px;margin-bottom:16px;line-height:1.9;">
             ${chance}<br>
-            cutoff เฉลี่ย: <b>${avgCutoff?avgCutoff.toFixed(2):'—'}</b> &nbsp;·&nbsp; ค่าเฉลี่ยคนสอบติด: <b>${avgTotal.toFixed(1)}</b>
+            cutoff เฉลี่ย: <b>${avgCutoff?avgCutoff.toFixed(2):'—'}</b>&nbsp;·&nbsp;ค่าเฉลี่ยคนสอบติด: <b>${avgTotal.toFixed(1)}</b>
           </div>
-          ${totalBarHtml}
-          ${barsHtml}
+          ${totalBar}
+          <div style="border-top:1px solid #e5e7eb;margin:12px 0 14px;"></div>
+          ${subjBars}
         </div>`);
       });
     });
 
-    el.innerHTML = out.length ? out.join('') : `<div class="muted" style="font-size:13px;padding:12px;">กรอกคะแนนและกด "💾 บันทึก" ด้านบนเพื่อดูผลเปรียบเทียบ</div>`;
+    el.innerHTML = out.length
+      ? out.join('')
+      : `<div class="muted" style="font-size:13px;padding:12px;">กรอกคะแนนแล้วกด "💾 บันทึก" เพื่อดูผลเปรียบเทียบ</div>`;
   }
 
-  // ── global handlers ──
-  window.ecName = function(prog,i,v) {
-    state_[prog].students[i].name = v;
-    state_[prog].dirty = true;
-    const saveBtn = document.getElementById(prog==='gate'?'ecSaveGateBtn':'ecSaveEplusBtn');
-    if (saveBtn) saveBtn.style.display='inline-block';
-  };
-  window.ecScore = function(prog,i,s,v) {
-    if (!state_[prog].students[i].scores) state_[prog].students[i].scores={};
-    state_[prog].students[i].scores[s] = v===''?null:parseFloat(v);
-    state_[prog].dirty = true;
-    // update total อย่างเดียว ไม่ re-render
-    const subjs=SUBJ[prog];
-    const total=subjs.reduce((acc,k)=>acc+(parseFloat(state_[prog].students[i].scores?.[k])||0),0);
-    const elId=prog==='gate'?'ecGateList':'ecEplusList';
-    const cards=document.querySelectorAll('#'+elId+' .card');
-    if(cards[i]){
-      const spans=cards[i].querySelectorAll('span');
-      spans.forEach(sp=>{ if(sp.textContent.match(/^\d+\.\d{2}$/)) { sp.textContent=total.toFixed(2); } });
-    }
-    const saveBtn=document.getElementById(prog==='gate'?'ecSaveGateBtn':'ecSaveEplusBtn');
-    if(saveBtn) saveBtn.style.display='inline-block';
-  };
-  window.ecRemove = function(prog,i) {
-    state_[prog].students.splice(i,1);
-    saveProg(prog, state_[prog].students);
-    state_[prog].dirty = false;
-    renderSection(prog); renderResults();
-  };
-
-  // ── add student ──
-  function addStudent(prog) {
-    state_[prog].students.push({id:'stu_'+Date.now(), name:'', scores:{}});
-    state_[prog].dirty = true;
-    renderSection(prog);
-    const elId=prog==='gate'?'ecGateList':'ecEplusList';
-    setTimeout(()=>document.getElementById(elId)?.lastElementChild?.scrollIntoView({behavior:'smooth'}),100);
-    const saveBtn=document.getElementById(prog==='gate'?'ecSaveGateBtn':'ecSaveEplusBtn');
-    if(saveBtn) saveBtn.style.display='inline-block';
-  }
-
-  document.getElementById('ecAddGateBtn')?.addEventListener('click',  ()=>addStudent('gate'));
-  document.getElementById('ecAddEplusBtn')?.addEventListener('click', ()=>addStudent('eplus'));
-
-  // ── save buttons ──
-  function setupSaveBtn(prog) {
-    const saveBtn = document.getElementById(prog==='gate'?'ecSaveGateBtn':'ecSaveEplusBtn');
-    if (!saveBtn) return;
-    saveBtn.onclick = () => {
-      saveProg(prog, state_[prog].students);
-      state_[prog].dirty = false;
-      saveBtn.textContent = '✅ บันทึกแล้ว';
-      saveBtn.style.background='#16a34a';
-      setTimeout(()=>{
-        saveBtn.textContent = '💾 บันทึกผล '+(prog==='gate'?'GATE':'EPLUS');
-        saveBtn.style.background='';
-        saveBtn.style.display='none';
-      }, 1800);
-      renderResults();
-    };
-  }
-  setupSaveBtn('gate'); setupSaveBtn('eplus');
-
-  // ── init render ──
-  function renderAll() {
-    renderYearRow('gate'); renderYearRow('eplus');
-    renderSection('gate'); renderSection('eplus');
-    renderResults();
-  }
-  renderAll();
+  // ── init ──
+  renderProgTabs();
+  renderActiveSection();
+  renderCompareResults();
 }
+
 
 
 </script>
