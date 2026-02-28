@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v12</title>
+  <title>Science Practice v14</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -213,6 +213,7 @@
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
     // Setup PDF.js worker
     if(typeof pdfjsLib !== 'undefined'){
@@ -532,6 +533,24 @@
           <span style="font-weight:900;">สร้างรายการข้อสอบทันที</span>
         </label>
       </div>
+      <!-- อัปโหลดเฉลยจาก Excel -->
+      <div style="border:2px dashed var(--border);border-radius:12px;padding:16px;background:#f9fafb;display:grid;gap:8px;">
+        <div style="font-weight:900;">📊 อัปโหลดเฉลยจาก Excel <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ)</span></div>
+        <div class="muted" style="font-size:12px;line-height:1.7;">
+          รูปแบบ: คอลัมน์ <b>A = ข้อที่</b> · <b>B = หน้า PDF</b> · <b>C = เฉลย</b> (ก/ข/ค/ง หรือ A/B/C/D)<br>
+          แถวแรกจะถูกตรวจว่าเป็น header หรือเปล่า ถ้าใช่จะข้ามให้อัตโนมัติ
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="btn" id="newDownloadTemplate" style="gap:6px;">⬇️ ดาวน์โหลด Template</button>
+          <label class="btn" style="cursor:pointer;">
+            📂 เลือกไฟล์ Excel / CSV
+            <input id="newExcelFile" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
+          </label>
+          <span id="newExcelStatus" class="muted" style="font-size:12px;"></span>
+        </div>
+        <div id="newExcelPreview" style="display:none;padding:8px 12px;background:#dcfce7;border-radius:8px;font-size:12px;color:#166534;font-weight:700;"></div>
+      </div>
+
       <button class="btn btnPrimary" id="newCreateBtn" style="width:fit-content;">สร้าง</button>
     </div>
   </div>
@@ -576,6 +595,12 @@
               <input id="editorFast" type="checkbox" checked />
               โหมดกรอกเร็ว
             </label>
+            <button type="button" class="btn" id="editorDownloadTemplate">⬇️ Template Excel</button>
+            <label class="btn" style="cursor:pointer;" title="คอลัมน์: A=ข้อ, B=หน้าPDF, C=เฉลย(ก/ข/ค/ง)">
+              📊 นำเข้าเฉลย Excel
+              <input id="editorExcelFile" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
+            </label>
+            <span id="editorExcelStatus" class="muted" style="font-size:12px;"></span>
             <button class="btn btnPrimary" id="editorSave">บันทึกทั้งหมด</button>
           </div>
         </div>
@@ -1618,6 +1643,14 @@ function initAdminNew(){
     const id='exam_'+Math.random().toString(16).slice(2);
     s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>({id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),choices:{A:'',B:'',C:'',D:''},correct:'A'})):[];
+    // apply excel data ถ้ามี
+    if(window._newExcelData && window._newExcelData.length > 0){
+      window._newExcelData.forEach(row=>{
+        const q=s.questions[id].find(q=>(q.number||q.no)===row.no);
+        if(q){ q.page=row.page; q.correct=row.correct; }
+      });
+      window._newExcelData=null;
+    }
     Store.save(s);toast('สร้างสำเร็จ');
     setTimeout(()=>navigate('admin_editor',{id}),400);
   });
@@ -1677,37 +1710,212 @@ function initEditor(examId){
     if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();const back=e.shiftKey;const t=back?prevField(ri,field):nextField(ri,field);select(t.rowIndex);requestAnimationFrame(()=>focusField(t.rowIndex,t.field));}
   }
 
-  const tbody=document.getElementById('editorTbody');
-  tbody.innerHTML='';
-  list.forEach((q,idx)=>{
-    const tr=document.createElement('tr');
-    tr.addEventListener('click',()=>select(idx));
-    tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td>`;
-    // set correct highlight
-    const correctVal = q.correct||'A';
-    tr.querySelectorAll('.correctBtn').forEach(btn=>{
-      if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
-      btn.addEventListener('click',(e)=>{
-        e.stopPropagation();
-        select(idx);
-        tr.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        q.correct=btn.getAttribute('data-val');
+  function renderTable(){
+    const tbody=document.getElementById('editorTbody');
+    tbody.innerHTML='';
+    // clear refs
+    Object.keys(refs).forEach(k=>delete refs[k]);
+    list.forEach((q,idx)=>{
+      const tr=document.createElement('tr');
+      tr.addEventListener('click',()=>select(idx));
+      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td>`;
+      const correctVal = q.correct||'A';
+      tr.querySelectorAll('.correctBtn').forEach(btn=>{
+        if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
+        btn.addEventListener('click',(e)=>{
+          e.stopPropagation();
+          select(idx);
+          tr.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
+          btn.classList.add('selected');
+          q.correct=btn.getAttribute('data-val');
+        });
       });
+      const pageInput = tr.querySelector('input[data-field="page"]');
+      refs[`${idx}:page`]=pageInput;
+      pageInput.addEventListener('focus',()=>select(idx));
+      pageInput.addEventListener('keydown',(e)=>onFastKey(e,idx,'page'));
+      pageInput.addEventListener('input',()=>{ q.page=Math.max(1,Number(pageInput.value||1)); });
+      tbody.appendChild(tr);
     });
-    // page input
-    const pageInput = tr.querySelector('input[data-field="page"]');
-    refs[`${idx}:page`]=pageInput;
-    pageInput.addEventListener('focus',()=>select(idx));
-    pageInput.addEventListener('keydown',(e)=>onFastKey(e,idx,'page'));
-    pageInput.addEventListener('input',()=>{ q.page=Math.max(1,Number(pageInput.value||1)); });
-    tbody.appendChild(tr);
-  });
-  select(0);
+    select(selectedIndex);
+  }
+  renderTable();
 
   document.getElementById('editorSave').onclick=()=>{
     s.questions[examId]=list;Store.save(s);toast('บันทึกแล้ว');
   };
+
+  // bind excel import สำหรับ editor
+  bindEditorExcel(examId, list, renderTable);
+}
+
+// ===================== EXCEL TEMPLATE DOWNLOAD =====================
+function downloadExcelTemplate(qCount, filename) {
+  if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
+
+  // header row
+  const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (ก/ข/ค/ง)']];
+
+  // data rows — ใส่ตัวอย่าง ก ไว้ทุกข้อ หน้า PDF เพิ่มทีละ 5 ข้อ
+  for (let i = 1; i <= qCount; i++) {
+    rows.push([i, Math.max(1, Math.ceil(i / 5)), 'ก']);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // ตั้งความกว้าง column
+  ws['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 20 }];
+
+  // style header (SheetJS community ทำได้แค่ basic)
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'เฉลย');
+  XLSX.writeFile(wb, filename || 'template_เฉลย.xlsx');
+}
+
+// bind ปุ่ม admin_new
+(function bindNewTemplate() {
+  const btn = document.getElementById('newDownloadTemplate');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const qCount = Math.max(1, parseInt(document.getElementById('newQCount')?.value || 50));
+    const title = (document.getElementById('newTitle')?.value || 'exam').trim().replace(/\s+/g, '_');
+    downloadExcelTemplate(qCount, `template_${title}.xlsx`);
+  });
+})();
+
+// ===================== EXCEL IMPORT =====================
+
+// แปลง ก/ข/ค/ง หรือ A/B/C/D → A/B/C/D
+function normalizeAnswer(v) {
+  if (!v) return null;
+  const s = String(v).trim().toUpperCase();
+  const map = {'ก':'A','ข':'B','ค':'C','ง':'D'};
+  if (map[String(v).trim()]) return map[String(v).trim()];
+  if (['A','B','C','D'].includes(s)) return s;
+  return null;
+}
+
+// อ่าน Excel/CSV แล้วคืน array [{no, page, correct}]
+function parseExcelFile(file) {
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX === 'undefined') {
+      reject(new Error('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        // ตรวจว่าแถวแรกเป็น header หรือเปล่า
+        // ถ้า col A แถวแรกไม่ใช่ตัวเลข → ถือเป็น header ข้าม
+        let startRow = 0;
+        if (rows.length > 0) {
+          const firstVal = String(rows[0][0] || '').trim();
+          if (isNaN(Number(firstVal)) || firstVal === '') startRow = 1;
+        }
+
+        const result = [];
+        for (let i = startRow; i < rows.length; i++) {
+          const row = rows[i];
+          const no = parseInt(row[0]);
+          const page = parseInt(row[1]) || 1;
+          const correct = normalizeAnswer(row[2]);
+          if (!isNaN(no) && no > 0 && correct) {
+            result.push({ no, page, correct });
+          }
+        }
+        resolve(result);
+      } catch(err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── admin_new: bind excel input ──
+(function bindNewExcel() {
+  const input = document.getElementById('newExcelFile');
+  const status = document.getElementById('newExcelStatus');
+  const preview = document.getElementById('newExcelPreview');
+  if (!input) return;
+
+  // เก็บข้อมูลที่ parse ไว้ใน closure สำหรับใช้ตอน create
+  window._newExcelData = null;
+
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    status.textContent = '⏳ กำลังอ่าน...';
+    preview.style.display = 'none';
+    try {
+      const data = await parseExcelFile(file);
+      if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
+      window._newExcelData = data;
+      // อัปเดต qCount ให้ตรงกับ excel
+      const qCountEl = document.getElementById('newQCount');
+      if (qCountEl) qCountEl.value = data.length;
+      status.textContent = '';
+      preview.style.display = 'block';
+      preview.textContent = `✅ อ่านสำเร็จ ${data.length} ข้อ — ตัวอย่าง: ข้อ${data[0].no} หน้า${data[0].page} เฉลย${data[0].correct}`;
+    } catch(err) {
+      window._newExcelData = null;
+      status.textContent = '❌ ' + err.message;
+      preview.style.display = 'none';
+    }
+  });
+})();
+
+// ── admin_editor: bind excel input ──
+function bindEditorExcel(examId, list, renderFn) {
+  // bind template download
+  const dlBtn = document.getElementById('editorDownloadTemplate');
+  if (dlBtn) {
+    const newDlBtn = dlBtn.cloneNode(true);
+    dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
+    newDlBtn.addEventListener('click', () => {
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`);
+    });
+  }
+
+  const input = document.getElementById('editorExcelFile');
+  const status = document.getElementById('editorExcelStatus');
+  if (!input) return;
+
+  // remove old listener
+  const newInput = input.cloneNode(true);
+  input.parentNode.replaceChild(newInput, input);
+
+  newInput.addEventListener('change', async () => {
+    const file = newInput.files[0];
+    if (!file) return;
+    status.textContent = '⏳ กำลังอ่าน...';
+    try {
+      const data = await parseExcelFile(file);
+      if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
+
+      // merge เข้า list
+      let updated = 0;
+      data.forEach(row => {
+        const q = list.find(q => (q.number || q.no) === row.no);
+        if (q) {
+          q.page = row.page;
+          q.correct = row.correct;
+          updated++;
+        }
+      });
+      // re-render table
+      if (renderFn) renderFn();
+      status.textContent = `✅ อัปเดต ${updated} ข้อ`;
+      toast(`นำเข้าเฉลยสำเร็จ ${updated} ข้อ`);
+    } catch(err) {
+      status.textContent = '❌ ' + err.message;
+    }
+  });
 }
 
 // ===================== INIT =====================
