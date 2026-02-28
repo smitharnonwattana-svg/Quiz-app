@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v17</title>
+  <title>Science Practice v18</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1479,12 +1479,7 @@ function initStats(){
     else{currentSubjectFilter='all';subjectEl.value='all';}
   }
 
-  // clone to remove old listeners
-  const newFilterEl=filterEl.cloneNode(false);
-  filterEl.parentNode.replaceChild(newFilterEl,filterEl);
-  const newSubjectEl=subjectEl.cloneNode(false);
-  subjectEl.parentNode.replaceChild(newSubjectEl,subjectEl);
-
+  // bind listeners โดยตรง (ไม่ต้อง clone — ป้องกัน bug options หาย)
   document.getElementById('statsFilterSubject').onchange=(e)=>{currentSubjectFilter=e.target.value||'all';currentExamFilter='all';document.getElementById('statsFilterExam').value='all';render();};
   document.getElementById('statsFilterExam').onchange=(e)=>{currentExamFilter=e.target.value||'all';render();};
 
@@ -1540,8 +1535,12 @@ function initStats(){
     const emptyEl=document.getElementById('statsChartEmpty');
     if(!canvas) return;
     // เรียงเก่า→ใหม่ เอาแค่ 20 ครั้งล่าสุด
-    const pts=[...attempts].sort((a,b)=>(a.startedAt||0)-(b.startedAt||0)).slice(-20)
-      .filter(a=>a.total>0).map(a=>({pct:Math.round((a.score/a.total)*100),label:a.examTitle||''}));
+    const sorted=[...attempts].sort((a,b)=>(a.startedAt||0)-(b.startedAt||0)).slice(-20).filter(a=>a.total>0);
+    const pts=sorted.map((a,i)=>({
+      pct:Math.round((a.score/a.total)*100),
+      date:a.startedAt?new Date(a.startedAt):null,
+      idx:i+1
+    }));
     if(pts.length<2){
       canvas.style.display='none';
       emptyEl.style.display='block';
@@ -1549,25 +1548,64 @@ function initStats(){
       return;
     }
     canvas.style.display='block'; emptyEl.style.display='none';
-    const W=canvas.offsetWidth||600; const H=160;
+
+    const W=canvas.offsetWidth||600;
+    const H=210; // สูงขึ้นเพื่อรองรับ label แกน X + Y title
     canvas.width=W; canvas.height=H;
     const ctx=canvas.getContext('2d');
     ctx.clearRect(0,0,W,H);
-    const PAD={t:10,r:10,b:30,l:36};
-    const gW=W-PAD.l-PAD.r; const gH=H-PAD.t-PAD.b;
-    // grid lines
+
+    // padding: บน=24(Y title) ขวา=12 ล่าง=52(X label+title) ซ้าย=44(Y label)
+    const PAD={t:24,r:12,b:52,l:44};
+    const gW=W-PAD.l-PAD.r;
+    const gH=H-PAD.t-PAD.b;
+
+    // ── แกน Y title (หมุน 90°) ──
+    ctx.save();
+    ctx.translate(11, PAD.t+gH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillStyle='#6b7280';
+    ctx.font='11px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('คะแนน (%)', 0, 0);
+    ctx.restore();
+
+    // ── grid lines + Y labels ──
     ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1;
     [0,25,50,75,100].forEach(v=>{
       const y=PAD.t+gH*(1-v/100);
       ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+gW,y);ctx.stroke();
       ctx.fillStyle='#9ca3af';ctx.font='10px sans-serif';ctx.textAlign='right';
-      ctx.fillText(v+'%',PAD.l-4,y+3);
+      ctx.fillText(v+'%',PAD.l-6,y+3);
     });
-    // line + fill
+
+    // ── แกน X: ลำดับครั้ง + วันที่ ──
     const xs=pts.map((_,i)=>PAD.l+(i/(pts.length-1))*gW);
+    pts.forEach((p,i)=>{
+      const x=xs[i];
+      // เส้น tick
+      ctx.strokeStyle='#d1d5db';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x,PAD.t+gH);ctx.lineTo(x,PAD.t+gH+4);ctx.stroke();
+      // label ครั้งที่
+      ctx.fillStyle='#374151';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+      ctx.fillText(`ครั้ง ${p.idx}`,x,PAD.t+gH+14);
+      // วันที่ย่อ
+      if(p.date){
+        const d=p.date;
+        const dStr=`${d.getDate()}/${d.getMonth()+1}`;
+        ctx.fillStyle='#9ca3af';ctx.font='9px sans-serif';
+        ctx.fillText(dStr,x,PAD.t+gH+26);
+      }
+    });
+
+    // ── X axis title ──
+    ctx.fillStyle='#6b7280';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText('ลำดับครั้งที่ทำ (เก่า → ใหม่)',PAD.l+gW/2,H-4);
+
+    // ── line + gradient fill ──
     const ys=pts.map(p=>PAD.t+gH*(1-p.pct/100));
     const grad=ctx.createLinearGradient(0,PAD.t,0,PAD.t+gH);
-    grad.addColorStop(0,'rgba(17,24,39,.18)');grad.addColorStop(1,'rgba(17,24,39,0)');
+    grad.addColorStop(0,'rgba(17,24,39,.15)');grad.addColorStop(1,'rgba(17,24,39,0)');
     ctx.beginPath();ctx.moveTo(xs[0],ys[0]);
     for(let i=1;i<pts.length;i++) ctx.lineTo(xs[i],ys[i]);
     ctx.lineTo(xs[xs.length-1],PAD.t+gH);ctx.lineTo(xs[0],PAD.t+gH);
@@ -1575,7 +1613,8 @@ function initStats(){
     ctx.beginPath();ctx.moveTo(xs[0],ys[0]);
     for(let i=1;i<pts.length;i++) ctx.lineTo(xs[i],ys[i]);
     ctx.strokeStyle='#111827';ctx.lineWidth=2;ctx.stroke();
-    // dots + value labels
+
+    // ── dots + value labels ──
     pts.forEach((p,i)=>{
       ctx.beginPath();ctx.arc(xs[i],ys[i],4,0,Math.PI*2);
       ctx.fillStyle=scoreColor(p.pct);ctx.fill();
@@ -1583,7 +1622,6 @@ function initStats(){
       ctx.fillStyle='#374151';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
       ctx.fillText(p.pct+'%',xs[i],ys[i]-8);
     });
-    // x-axis ticks (วันที่)
   }
 
   // ── ③ TOP 10 ข้อที่ผิดบ่อย ──
