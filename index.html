@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v14</title>
+  <title>Science Practice v17</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -179,6 +179,24 @@
     .opt .tag{margin-left:auto;font-size:12px;font-weight:700;opacity:.9;}
 
     /* stats page */
+    .stat-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;}
+    .stat-card .sc-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+    .stat-card .sc-value{font-size:26px;font-weight:900;color:#111;line-height:1.1;}
+    .stat-card .sc-sub{font-size:12px;color:var(--muted);}
+    .stat-card.accent{background:#111;border-color:#111;}
+    .stat-card.accent .sc-label{color:#9ca3af;}
+    .stat-card.accent .sc-value{color:#fff;}
+    .stat-card.accent .sc-sub{color:#6b7280;}
+    /* progress bar in table */
+    .score-cell{display:flex;flex-direction:column;gap:4px;}
+    .score-bar-wrap{height:4px;background:#e5e7eb;border-radius:99px;overflow:hidden;}
+    .score-bar-fill{height:100%;border-radius:99px;transition:width .5s ease;}
+    /* wrong top list */
+    .wrong-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+    .wrong-rank{width:22px;height:22px;border-radius:99px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0;}
+    .wrong-rank.top3{background:#111;color:#fff;}
+    .wrong-bar-wrap{flex:1;height:6px;background:#f3f4f6;border-radius:99px;overflow:hidden;}
+    .wrong-bar-fill{height:100%;border-radius:99px;background:#ef4444;}
     .stats-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;}
     .stats-table th,.stats-table td{padding:14px 16px;vertical-align:top;border-top:1px solid #e9eef7;}
     .stats-table thead th{background:#fbfcff;font-weight:700;}
@@ -374,6 +392,8 @@
 <!-- ===================== PAGE: STATS ===================== -->
 <div id="page-stats" class="page">
   <div class="container">
+
+    <!-- header -->
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">สถิติการทำข้อสอบ</h1>
@@ -384,32 +404,54 @@
         <button class="btn btnPrimary" onclick="navigate('exams')">ไปทำข้อสอบ</button>
       </div>
     </div>
+
+    <!-- ① Summary cards -->
+    <div id="statsSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:20px;"></div>
+
+    <!-- ② กราฟ + TOP10 -->
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;margin-top:16px;align-items:start;" id="statsChartsRow">
+      <div class="card" style="padding:16px;">
+        <div style="font-weight:800;font-size:14px;margin-bottom:12px;">📈 พัฒนาการคะแนน</div>
+        <canvas id="statsChart" height="160" style="width:100%;display:block;"></canvas>
+        <div id="statsChartEmpty" class="muted" style="display:none;text-align:center;padding:24px 0;">ยังไม่มีข้อมูล</div>
+      </div>
+      <div class="card" style="padding:16px;">
+        <div style="font-weight:800;font-size:14px;margin-bottom:12px;">❌ ข้อที่ผิดบ่อยสะสม TOP 10</div>
+        <div id="statsWrongTop" style="display:grid;gap:6px;"></div>
+        <div id="statsWrongTopEmpty" class="muted" style="display:none;text-align:center;padding:24px 0;">ยังไม่มีข้อมูล</div>
+      </div>
+    </div>
+    <style>
+      @media(max-width:760px){ #statsChartsRow{grid-template-columns:1fr;} }
+    </style>
+
+    <!-- ③ ตาราง -->
     <div class="card" style="padding:16px;margin-top:16px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="muted" style="white-space:nowrap;">วิชา</span>
-          <select id="statsFilterSubject" class="btn" style="padding:10px 12px;min-width:220px;"><option value="all">ทั้งหมด</option></select>
-          <span class="muted" style="white-space:nowrap;">กรองชุดข้อสอบ</span>
-          <select id="statsFilterExam" class="btn" style="padding:10px 12px;min-width:260px;"><option value="all">ทั้งหมด</option></select>
+          <select id="statsFilterSubject" class="btn" style="padding:10px 12px;min-width:200px;"><option value="all">ทั้งหมด</option></select>
+          <span class="muted" style="white-space:nowrap;">ชุดข้อสอบ</span>
+          <select id="statsFilterExam" class="btn" style="padding:10px 12px;min-width:240px;"><option value="all">ทั้งหมด</option></select>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <button id="statsBtnExport" class="btn btnPrimary">ดาวน์โหลดสถิติ</button>
-          <label class="btn">นำเข้าสถิติ<input id="statsFileImport" type="file" accept="application/json" style="display:none;" /></label>
+          <label class="btn">นำเข้าสถิติ<input id="statsFileImport" type="file" accept=".xlsx" style="display:none;" /></label>
           <button id="statsBtnClear" class="btn">ล้างสถิติ</button>
         </div>
       </div>
       <div style="overflow:auto;">
-        <table class="stats-table" style="min-width:900px;">
+        <table class="stats-table" style="min-width:860px;">
           <thead>
             <tr>
-              <th style="width:60px;">ครั้งที่</th>
-              <th style="width:200px;">วันที่ทำ</th>
-              <th style="width:160px;">ผู้ทำ</th>
-              <th style="width:140px;">วิชา</th>
+              <th style="width:50px;">ครั้งที่</th>
+              <th style="width:180px;">วันที่ทำ</th>
+              <th style="width:140px;">ผู้ทำ</th>
+              <th style="width:120px;">วิชา</th>
               <th>ชุด</th>
-              <th style="width:110px;">คะแนน</th>
-              <th style="width:110px;">เวลาที่ใช้</th>
-              <th style="width:100px;"></th>
+              <th style="width:160px;">คะแนน</th>
+              <th style="width:100px;">เวลา</th>
+              <th style="width:110px;"></th>
             </tr>
           </thead>
           <tbody id="statsRows">
@@ -522,17 +564,13 @@
         <input id="newPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
         <span class="muted">ไฟล์จะเก็บในเบราว์เซอร์ (IndexedDB) เครื่องนี้เท่านั้น</span>
       </label>
-      <div class="grid2" style="align-items:end;">
-        <label style="display:grid;gap:6px;">
-          <span style="font-weight:900;">จำนวนข้อ</span>
-          <input id="newQCount" type="number" min="1" max="999" value="50" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-          <span class="muted">แก้หน้า/ตัวเลือก/เฉลยได้ใน Editor</span>
-        </label>
-        <label style="display:flex;gap:10px;align-items:center;padding-bottom:28px;">
-          <input id="newCreatePlaceholder" type="checkbox" checked />
-          <span style="font-weight:900;">สร้างรายการข้อสอบทันที</span>
-        </label>
+      <div style="display:grid;gap:6px;">
+        <span style="font-weight:900;">จำนวนข้อ</span>
+        <input id="newQCount" type="number" min="1" max="999" value="50" style="width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        <span class="muted">แก้หน้า PDF / เฉลยได้ใน Editor</span>
       </div>
+      <!-- hidden: ยังใช้ใน JS อยู่ -->
+      <input id="newCreatePlaceholder" type="checkbox" checked style="display:none;" />
       <!-- อัปโหลดเฉลยจาก Excel -->
       <div style="border:2px dashed var(--border);border-radius:12px;padding:16px;background:#f9fafb;display:grid;gap:8px;">
         <div style="font-weight:900;">📊 อัปโหลดเฉลยจาก Excel <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ)</span></div>
@@ -588,13 +626,11 @@
               </div>
               <div class="muted" style="font-size:12px;">ใช้สำหรับจัดกลุ่ม/กรองรายวิชา</div>
             </div>
-            <div class="muted" style="font-size:13px;max-width:520px;margin-bottom:6px;">Fast: Enter/Tab ไปช่องถัดไป (Shift ย้อนกลับ)</div>
+
           </div>
           <div class="ctrls">
-            <label style="display:flex;gap:8px;align-items:center;font-size:13px;">
-              <input id="editorFast" type="checkbox" checked />
-              โหมดกรอกเร็ว
-            </label>
+            <!-- hidden: ยังใช้ใน JS อยู่ -->
+            <input id="editorFast" type="checkbox" checked style="display:none;" />
             <button type="button" class="btn" id="editorDownloadTemplate">⬇️ Template Excel</button>
             <label class="btn" style="cursor:pointer;" title="คอลัมน์: A=ข้อ, B=หน้าPDF, C=เฉลย(ก/ข/ค/ง)">
               📊 นำเข้าเฉลย Excel
@@ -1468,14 +1504,125 @@ function initStats(){
     Store.save(s);closeConfirm();render();
   };
 
+  // ── helpers ──
+  function scoreColor(pct){
+    if(pct>=80) return '#16a34a';
+    if(pct>=60) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  // ── ① Summary cards ──
+  function renderSummaryCards(attempts){
+    const el=document.getElementById('statsSummaryCards');
+    if(!el) return;
+    if(!attempts.length){el.innerHTML='';return;}
+    const total=attempts.length;
+    const avgPct=Math.round(attempts.reduce((s,a)=>s+(a.total?((a.score||0)/a.total)*100:0),0)/total);
+    const best=attempts.reduce((b,a)=>(!b||(a.total&&(a.score/a.total)>(b.score/b.total)))?a:b,null);
+    const avgSec=Math.round(attempts.reduce((s,a)=>s+(a.usedSeconds||0),0)/total);
+    const cards=[
+      {label:'ทำทั้งหมด',value:total+' ครั้ง',sub:'ทุกชุดรวมกัน',accent:false},
+      {label:'คะแนนเฉลี่ย',value:avgPct+'%',sub:`${attempts.reduce((s,a)=>s+(a.score||0),0)} / ${attempts.reduce((s,a)=>s+(a.total||0),0)} คะแนน`,accent:true},
+      {label:'ทำดีที่สุด',value:best?(Math.round((best.score/best.total)*100))+'%':'—',sub:best?esc(best.examTitle||'—'):'',accent:false},
+      {label:'เวลาเฉลี่ย',value:formatDuration(avgSec),sub:'ต่อครั้ง',accent:false},
+    ];
+    el.innerHTML=cards.map(c=>`
+      <div class="stat-card${c.accent?' accent':''}">
+        <div class="sc-label">${c.label}</div>
+        <div class="sc-value">${c.value}</div>
+        <div class="sc-sub">${c.sub}</div>
+      </div>`).join('');
+  }
+
+  // ── ② กราฟพัฒนาการ (Canvas) ──
+  function renderChart(attempts){
+    const canvas=document.getElementById('statsChart');
+    const emptyEl=document.getElementById('statsChartEmpty');
+    if(!canvas) return;
+    // เรียงเก่า→ใหม่ เอาแค่ 20 ครั้งล่าสุด
+    const pts=[...attempts].sort((a,b)=>(a.startedAt||0)-(b.startedAt||0)).slice(-20)
+      .filter(a=>a.total>0).map(a=>({pct:Math.round((a.score/a.total)*100),label:a.examTitle||''}));
+    if(pts.length<2){
+      canvas.style.display='none';
+      emptyEl.style.display='block';
+      emptyEl.textContent=pts.length===1?`ทำแล้ว 1 ครั้ง (${pts[0].pct}%) — ต้องการอย่างน้อย 2 ครั้ง`:'ยังไม่มีข้อมูล';
+      return;
+    }
+    canvas.style.display='block'; emptyEl.style.display='none';
+    const W=canvas.offsetWidth||600; const H=160;
+    canvas.width=W; canvas.height=H;
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,W,H);
+    const PAD={t:10,r:10,b:30,l:36};
+    const gW=W-PAD.l-PAD.r; const gH=H-PAD.t-PAD.b;
+    // grid lines
+    ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1;
+    [0,25,50,75,100].forEach(v=>{
+      const y=PAD.t+gH*(1-v/100);
+      ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+gW,y);ctx.stroke();
+      ctx.fillStyle='#9ca3af';ctx.font='10px sans-serif';ctx.textAlign='right';
+      ctx.fillText(v+'%',PAD.l-4,y+3);
+    });
+    // line + fill
+    const xs=pts.map((_,i)=>PAD.l+(i/(pts.length-1))*gW);
+    const ys=pts.map(p=>PAD.t+gH*(1-p.pct/100));
+    const grad=ctx.createLinearGradient(0,PAD.t,0,PAD.t+gH);
+    grad.addColorStop(0,'rgba(17,24,39,.18)');grad.addColorStop(1,'rgba(17,24,39,0)');
+    ctx.beginPath();ctx.moveTo(xs[0],ys[0]);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(xs[i],ys[i]);
+    ctx.lineTo(xs[xs.length-1],PAD.t+gH);ctx.lineTo(xs[0],PAD.t+gH);
+    ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+    ctx.beginPath();ctx.moveTo(xs[0],ys[0]);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(xs[i],ys[i]);
+    ctx.strokeStyle='#111827';ctx.lineWidth=2;ctx.stroke();
+    // dots + value labels
+    pts.forEach((p,i)=>{
+      ctx.beginPath();ctx.arc(xs[i],ys[i],4,0,Math.PI*2);
+      ctx.fillStyle=scoreColor(p.pct);ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='#374151';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+      ctx.fillText(p.pct+'%',xs[i],ys[i]-8);
+    });
+    // x-axis ticks (วันที่)
+  }
+
+  // ── ③ TOP 10 ข้อที่ผิดบ่อย ──
+  function renderWrongTop(attempts){
+    const el=document.getElementById('statsWrongTop');
+    const emptyEl=document.getElementById('statsWrongTopEmpty');
+    if(!el) return;
+    const wrongCount={};
+    attempts.forEach(a=>{
+      if(!Array.isArray(a.perQuestion)) return;
+      a.perQuestion.forEach(p=>{ if(!p.isCorrect&&p.no){ wrongCount[p.no]=(wrongCount[p.no]||0)+1; } });
+    });
+    const sorted=Object.entries(wrongCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    if(!sorted.length){el.innerHTML='';emptyEl.style.display='block';return;}
+    emptyEl.style.display='none';
+    const max=sorted[0][1];
+    el.innerHTML=sorted.map(([no,cnt],i)=>`
+      <div class="wrong-row">
+        <div class="wrong-rank${i<3?' top3':''}">ข้อ${no}</div>
+        <div class="wrong-bar-wrap"><div class="wrong-bar-fill" style="width:${Math.round((cnt/max)*100)}%"></div></div>
+        <div style="font-weight:700;font-size:12px;white-space:nowrap;">${cnt} ครั้ง</div>
+      </div>`).join('');
+  }
+
+  // ── ④ ตารางพร้อม progress bar ──
   function render(){
     const s=Store.load();
     rebuildSubjectOptions(s);rebuildFilterOptions(s);
     const allAttempts=(s.attempts||[]).slice().sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
     const bySubject=currentSubjectFilter==='all'?allAttempts:allAttempts.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
+
+    // render panels (ใช้ filtered attempts ยกเว้น summary ใช้ทั้งหมด)
+    renderSummaryCards(bySubject);
+    renderChart(attempts.length?attempts:bySubject);
+    renderWrongTop(attempts.length?attempts:bySubject);
+
     const rowsEl=document.getElementById('statsRows');
-    if(!attempts.length){rowsEl.innerHTML=`<tr><td colspan="8" class="muted">ยังไม่มีสถิติ (ลองทำข้อสอบแล้วกดส่งคำตอบ)</td></tr>`;return;}
+    if(!attempts.length){rowsEl.innerHTML=`<tr><td colspan="8" class="muted" style="padding:20px;">ยังไม่มีสถิติ</td></tr>`;return;}
     rowsEl.innerHTML=attempts.map((a,idx)=>{
       const exam=(s.exams||[]).find(e=>e.id===a.examId);
       const examTitle=exam?.title||a.examTitle||'—';
@@ -1484,33 +1631,126 @@ function initStats(){
       const started=a.startedAt?new Date(a.startedAt):null;
       const dateStr=started?started.toLocaleString('th-TH'):'—';
       const usedSec=Number.isFinite(a.usedSeconds)?a.usedSeconds:0;
+      const pct=a.total?Math.round((a.score||0)/a.total*100):0;
+      const barColor=scoreColor(pct);
       return `<tr>
         <td><b>${idx+1}</b></td>
         <td>${dateStr}<small>${a.id||''}</small></td>
         <td>${esc(takerName)}</td>
         <td>${esc(examSubject)}</td>
         <td>${esc(examTitle)}</td>
-        <td><b>${a.score||0}/${a.total||0}</b></td>
+        <td>
+          <div class="score-cell">
+            <div><b>${a.score||0}/${a.total||0}</b> <span style="color:${barColor};font-weight:700;font-size:12px;">(${pct}%)</span></div>
+            <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+          </div>
+        </td>
         <td>${formatDuration(usedSec)}</td>
         <td><button class="btn-delete" data-del="${a.id}">ลบ</button> <button class="btn" style="padding:6px 10px;font-size:12px;" data-review="${a.id}">ดูเฉลย</button></td>
       </tr>`;
     }).join('');
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
+
+    // render chart after DOM settled (ต้องรู้ width)
+    requestAnimationFrame(()=>renderChart(attempts.length?attempts:bySubject));
   }
 
   document.getElementById('statsBtnExport').onclick=()=>{
+    if(typeof XLSX==='undefined'){toast('SheetJS ยังโหลดไม่เสร็จ');return;}
     const s=Store.load();
-    const payload=JSON.stringify({version:1,attempts:s.attempts||[]},null,2);
-    const blob=new Blob([payload],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=`stats_${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    const attempts=s.attempts||[];
+    if(!attempts.length){toast('ยังไม่มีสถิติ');return;}
+
+    // Sheet 1: สรุปรายครั้ง
+    const header=['ครั้งที่','วันที่ทำ','ผู้ทำ','วิชา','ชุดข้อสอบ','คะแนน','จำนวนข้อทั้งหมด','%','เวลาที่ใช้ (วินาที)','attempt_id'];
+    const rows=attempts.map((a,i)=>{
+      const pct=a.total?Math.round((a.score||0)/a.total*100):0;
+      return [i+1, a.startedAt?new Date(a.startedAt).toLocaleString('th-TH'):'', a.takerName||'', a.examSubject||'', a.examTitle||'', a.score||0, a.total||0, pct, a.usedSeconds||0, a.id||''];
+    });
+    const ws1=XLSX.utils.aoa_to_sheet([header,...rows]);
+    ws1['!cols']=[{wch:8},{wch:22},{wch:14},{wch:14},{wch:30},{wch:8},{wch:10},{wch:6},{wch:16},{wch:24}];
+
+    // Sheet 2: perQuestion รายข้อทุก attempt (สำหรับ import กลับ)
+    const hdr2=['attempt_id','examId','examTitle','examSubject','takerName','startedAt','submittedAt','usedSeconds','score','total','no','isCorrect','correct','answered'];
+    const rows2=[];
+    attempts.forEach(a=>{
+      if(!Array.isArray(a.perQuestion)||!a.perQuestion.length){
+        // ถ้าไม่มี perQuestion ใส่แถวสรุปไว้ก่อน
+        rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,'','','','']);
+      } else {
+        a.perQuestion.forEach(p=>{
+          rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,p.no,p.isCorrect?1:0,p.correct||'',p.answered||'']);
+        });
+      }
+    });
+    const ws2=XLSX.utils.aoa_to_sheet([hdr2,...rows2]);
+    ws2['!cols']=[{wch:20},{wch:20},{wch:28},{wch:14},{wch:14},{wch:22},{wch:22},{wch:10},{wch:7},{wch:7},{wch:6},{wch:8},{wch:8},{wch:8}];
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws1,'สรุปรายครั้ง');
+    XLSX.utils.book_append_sheet(wb,ws2,'รายข้อ');
+    XLSX.writeFile(wb,`สถิติ_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
   document.getElementById('statsFileImport').onchange=async(e)=>{
     const file=e.target.files&&e.target.files[0];
     if(!file) return;
-    try{const text=await file.text();const data=JSON.parse(text);if(!data||!Array.isArray(data.attempts)) throw new Error('รูปแบบไฟล์ไม่ถูกต้อง');const s=Store.load();s.attempts=data.attempts;Store.save(s);render();alert('นำเข้าสถิติสำเร็จ');}
+    try{
+      if(typeof XLSX==='undefined') throw new Error('SheetJS ยังโหลดไม่เสร็จ');
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+
+      // อ่าน sheet "รายข้อ" ซึ่งเก็บข้อมูลครบ
+      const sheetName=wb.SheetNames.includes('รายข้อ')?'รายข้อ':wb.SheetNames[1]||wb.SheetNames[0];
+      const ws=wb.Sheets[sheetName];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+
+      if(!rows.length) throw new Error('ไม่พบข้อมูลในไฟล์');
+
+      // group rows by attempt_id → rebuild attempts array
+      const map=new Map();
+      rows.forEach(r=>{
+        const aid=String(r['attempt_id']||'').trim();
+        if(!aid) return;
+        if(!map.has(aid)){
+          map.set(aid,{
+            id:aid,
+            examId:String(r['examId']||''),
+            examTitle:String(r['examTitle']||''),
+            examSubject:String(r['examSubject']||''),
+            takerName:String(r['takerName']||''),
+            startedAt:String(r['startedAt']||''),
+            submittedAt:String(r['submittedAt']||''),
+            usedSeconds:Number(r['usedSeconds'])||0,
+            score:Number(r['score'])||0,
+            total:Number(r['total'])||0,
+            perQuestion:[],
+          });
+        }
+        const no=Number(r['no']);
+        if(no>0){
+          map.get(aid).perQuestion.push({
+            no,
+            isCorrect:Number(r['isCorrect'])===1||r['isCorrect']===true||r['isCorrect']==='true',
+            correct:String(r['correct']||''),
+            answered:String(r['answered']||''),
+          });
+        }
+      });
+
+      const imported=Array.from(map.values());
+      if(!imported.length) throw new Error('ไม่พบ attempt ในไฟล์');
+
+      const s=Store.load();
+      // merge: ไม่ทับ attempt ที่มีอยู่แล้ว (ตาม id)
+      const existingIds=new Set((s.attempts||[]).map(a=>a.id));
+      const newOnes=imported.filter(a=>!existingIds.has(a.id));
+      s.attempts=[...newOnes,...(s.attempts||[])];
+      Store.save(s);
+      render();
+      toast(`นำเข้าสำเร็จ ${imported.length} ครั้ง (ใหม่ ${newOnes.length} รายการ)`);
+    }
     catch(err){alert('นำเข้าไม่สำเร็จ: '+(err?.message||err));}
     finally{e.target.value='';}
   };
