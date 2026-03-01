@@ -646,7 +646,7 @@
           <span class="muted" style="white-space:nowrap;">ชุดข้อสอบ</span>
           <select id="statsFilterExam" class="btn" style="padding:10px 12px;min-width:240px;"><option value="all">ทั้งหมด</option></select>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <div id="statsTeacherBtns" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <button id="statsBtnExport" class="btn btnPrimary">ดาวน์โหลดสถิติ</button>
           <label class="btn">นำเข้าสถิติ<input id="statsFileImport" type="file" accept=".xlsx" style="display:none;" /></label>
           <button id="statsBtnClear" class="btn">ล้างสถิติ</button>
@@ -1923,6 +1923,10 @@ function initReview(attemptId){
 
 // ===================== STATS PAGE =====================
 function initStats(){
+  // Show/hide teacher-only controls based on role
+  const teacherBtns = document.getElementById('statsTeacherBtns');
+  if(teacherBtns) teacherBtns.style.display = Auth.isTeacher() ? 'flex' : 'none';
+
   let pendingDeleteAttemptId=null;
   let currentExamFilter='all';
   let currentSubjectFilter='all';
@@ -2175,7 +2179,7 @@ function initStats(){
           </div>
         </td>
         <td>${formatDuration(usedSec)}</td>
-        <td><button class="btn-delete" data-del="${a.id}">ลบ</button> <button class="btn" style="padding:6px 10px;font-size:12px;" data-review="${a.id}">ดูเฉลย</button></td>
+        <td>${Auth.isTeacher()?`<button class="btn-delete" data-del="${a.id}">ลบ</button> `:''}<button class="btn" style="padding:6px 10px;font-size:12px;" data-review="${a.id}">ดูเฉลย</button></td>
       </tr>`;
     }).join('');
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
