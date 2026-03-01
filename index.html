@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v28</title>
+  <title>Science Practice v30</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -244,11 +244,44 @@
 </head>
 <body>
 
+<!-- ===================== PAGE: LOGIN ===================== -->
+<div id="page-login" class="page active">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f4ff 0%,#fafafa 100%);">
+    <div style="width:100%;max-width:360px;padding:24px;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:48px;margin-bottom:12px;">🎯</div>
+        <div style="font-size:24px;font-weight:900;color:#111827;">Science Practice</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:6px;">กรอกรหัส 6 หลักเพื่อเข้าใช้งาน</div>
+      </div>
+
+      <div class="card" style="padding:28px;">
+        <div style="margin-bottom:20px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">รหัสผ่าน</label>
+          <input id="loginPinInput" type="password" inputmode="numeric" maxlength="6"
+            placeholder="● ● ● ● ● ●"
+            style="width:100%;padding:14px;font-size:22px;text-align:center;letter-spacing:8px;border:2px solid #e5e7eb;border-radius:12px;outline:none;font-family:monospace;"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+            onkeydown="if(event.key==='Enter') doLogin()"
+          />
+        </div>
+        <div id="loginError" style="color:#dc2626;font-size:13px;text-align:center;margin-bottom:12px;min-height:18px;"></div>
+        <button onclick="doLogin()" class="btn btnPrimary" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;">
+          เข้าใช้งาน →
+        </button>
+      </div>
+
+      <div style="text-align:center;margin-top:20px;font-size:11px;color:#9ca3af;">
+        Nanont Exam System
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast" class="toast"></div>
 
 <!-- ===================== PAGE: HOME ===================== -->
-<div id="page-home" class="page active">
+<div id="page-home" class="page">
   <div class="container">
     <h1 class="h1">Science Practice</h1>
     <p class="muted" style="margin-top:8px;">เดโม HTML ล้วน (ไม่มี server/db) สำหรับดูหน้าตา UI ทั้งระบบ</p>
@@ -1230,9 +1263,103 @@ function escHtml(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt
 let _currentPage='home';
 let _pageParams={};
 
+
+// ── Home page render (role-aware) ──
+function renderHome(){
+  const isTeacher = Auth.isTeacher();
+  const role = Auth.getRole();
+  const homeEl = document.getElementById('page-home');
+  if(!homeEl) return;
+  homeEl.innerHTML = `
+    <div class="container">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h1 class="h1">Science Practice</h1>
+          <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : '👨‍🎓 โหมดนักเรียน'}</div>
+        </div>
+        <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
+      </div>
+      <div class="list" style="margin-top:20px;">
+        <div class="linkCard" onclick="navigate('exams')">
+          <div style="font-weight:900;">📝 ทำข้อสอบ</div>
+          <div class="muted" style="margin-top:6px;">เลือกชุดข้อสอบ → เริ่มทำ (PDF + timer)</div>
+        </div>
+        <div class="linkCard" onclick="navigate('stats')">
+          <div style="font-weight:900;">📊 สถิติการทำข้อสอบ</div>
+          <div class="muted" style="margin-top:6px;">ดูคะแนน/วันที่ทำ</div>
+        </div>
+        ${isTeacher ? `
+        <div class="linkCard" onclick="navigate('admin')">
+          <div style="font-weight:900;">⚙️ Admin</div>
+          <div class="muted" style="margin-top:6px;">สร้าง/แก้ข้อสอบ + preview PDF</div>
+        </div>` : ''}
+        <div class="linkCard" onclick="navigate('entrance_stats')">
+          <div style="font-weight:900;">🎯 สถิติการสอบเข้า ม.1</div>
+          <div class="muted" style="margin-top:6px;">ข้อมูลคะแนน GATE/EPLUS · เปรียบเทียบผลสอบ</div>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div class="muted" style="font-size:11px;">☁️ ข้อมูล sync กับ Firebase อัตโนมัติ</div>
+    </div>
+  `;
+}
+
+// ===================== AUTH =====================
+const Auth = (() => {
+  const PINS = {
+    '134140': 'teacher',
+    '311257': 'student',
+  };
+  const SESSION_KEY = 'appSession';
+
+  function getRole() {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.role || null; }
+    catch { return null; }
+  }
+  function setRole(role) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role, ts: Date.now() }));
+  }
+  function isLoggedIn() { return !!getRole(); }
+  function isTeacher()  { return getRole() === 'teacher'; }
+  function logout() {
+    sessionStorage.removeItem(SESSION_KEY);
+    navigate('login');
+  }
+  function login(pin) {
+    const role = PINS[pin.trim()];
+    if (!role) return false;
+    setRole(role);
+    return role;
+  }
+  return { login, logout, isLoggedIn, isTeacher, getRole };
+})();
+
+function doLogin() {
+  const pin = document.getElementById('loginPinInput').value.trim();
+  const errEl = document.getElementById('loginError');
+  if (pin.length < 6) { errEl.textContent = 'กรุณากรอกรหัส 6 หลัก'; return; }
+  const role = Auth.login(pin);
+  if (!role) {
+    errEl.textContent = '❌ รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง';
+    document.getElementById('loginPinInput').value = '';
+    document.getElementById('loginPinInput').focus();
+    return;
+  }
+  errEl.textContent = '';
+  navigate('home');
+}
+
 function navigate(page, params={}){
   // hide take page cleanup
   if(_currentPage==='take') cleanupTake();
+
+  // ── Auth guard: redirect to login if not logged in ──
+  if(page !== 'login' && !Auth.isLoggedIn()){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    const lel=document.getElementById('page-login');
+    if(lel){ lel.classList.add('active'); setTimeout(()=>document.getElementById('loginPinInput')?.focus(),100); }
+    return;
+  }
 
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const el=document.getElementById('page-'+page);
@@ -1240,18 +1367,20 @@ function navigate(page, params={}){
   el.classList.add('active');
   _currentPage=page;
   _pageParams=params;
+  window._currentPage=page;
+  window._currentParams=params;
 
   // init page
-  if(page==='home'){}
+  if(page==='home'){ renderHome(); }
   else if(page==='exams') initExams();
   else if(page==='exam') initExamDetail(params.id);
   else if(page==='take') initTake(params.id);
   else if(page==='review') initReview(params.attemptId);
   else if(page==='stats') initStats();
-  else if(page==='admin') initAdmin();
-  else if(page==='admin_new') initAdminNew();
-  else if(page==='admin_editor') initEditor(params.id);
-  else if(page==='admin_benchmark') initAdminBenchmark();
+  else if(page==='admin'){ if(!Auth.isTeacher()){navigate('home');return;} initAdmin(); }
+  else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
+  else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
+  else if(page==='admin_benchmark'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBenchmark(); }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
@@ -2765,7 +2894,9 @@ function renderBenchmarkWidget(containerId, score, examId) {
 
 // ===================== INIT =====================
 Store.init();
-navigate('home');
+// Show login page on startup (navigate handles auth guard)
+navigate('login');
+setTimeout(()=>document.getElementById('loginPinInput')?.focus(), 300);
 
 
 
