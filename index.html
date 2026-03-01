@@ -1431,10 +1431,10 @@ const MemeScore = (() => {
     }
     cheerEl.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${tier.color}15;border-top:1px solid ${tier.color}30;">
-        <div style="font-size:18px;flex-shrink:0;">💪😁</div>
+        <div style="font-size:22px;flex-shrink:0;">💪😁</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:9px;font-weight:900;color:${tier.color};letter-spacing:.05em;">💬 ${tier.speaker}</div>
-          <div style="font-size:10px;font-weight:700;color:${tier.color};line-height:1.5;">${tier.cheer}</div>
+          <div style="font-size:11px;font-weight:900;color:${tier.color};letter-spacing:.05em;">💬 ${tier.speaker}</div>
+          <div style="font-size:12px;font-weight:700;color:${tier.color};line-height:1.5;">${tier.cheer}</div>
         </div>
       </div>
     `;
@@ -3804,7 +3804,7 @@ function initEntranceCompare(params) {
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:15px;min-width:26px;">${badge}</span>
             <span style="font-weight:800;font-size:14px;">${esc(stu.name||`นักเรียน ${stu.oi+1}`)}</span>
-            ${pct2!=null?`<span style="font-size:11px;color:#6b7280;">(${pct2}% of cutoff)</span>`:''}
+            ${pct2!=null?`<span style="font-size:13px;color:#6b7280;">(${pct2}% of cutoff)</span>`:''}
           </div>
           <div style="font-weight:900;font-size:15px;"><span style="color:${gapCol}">${stu.total.toFixed(0)}</span><span style="font-size:11px;margin-left:6px;color:${gapCol}">${gap==null?'':gap>=0?`+${gap.toFixed(0)}`:gap.toFixed(0)}</span></div>
         </div>
@@ -3936,12 +3936,12 @@ function initEntranceCompare(params) {
 
 <!-- ===================== MEME SCORE OVERLAY ===================== -->
 <div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;">
-  <div id="memeBox" style="background:#fff;border-radius:16px;width:min(340px,90vw);overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
+  <div id="memeBox" style="background:#fff;border-radius:16px;width:min(440px,92vw);overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
 
     <!-- Loading -->
-    <div id="memeLoading" style="padding:24px 20px;text-align:center;">
-      <div style="font-size:24px;margin-bottom:8px;">⚙️</div>
-      <div style="font-weight:900;font-size:14px;margin-bottom:8px;">ประมวลผลคำตอบ...</div>
+    <div id="memeLoading" style="padding:30px 24px;text-align:center;">
+      <div style="font-size:30px;margin-bottom:10px;">⚙️</div>
+      <div style="font-weight:900;font-size:17px;margin-bottom:8px;">ประมวลผลคำตอบ...</div>
       <div id="memeLoadingBar" style="height:6px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:0 auto 8px;max-width:180px;">
         <div id="memeLoadingFill" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#f59e0b);border-radius:99px;transition:width .1s linear;"></div>
       </div>
@@ -3950,25 +3950,25 @@ function initEntranceCompare(params) {
 
     <!-- Result: แนวนอน รูปซ้าย ข้อมูลขวา -->
     <div id="memeResult" style="display:none;">
-      <div style="display:flex;align-items:stretch;height:130px;">
+      <div style="display:flex;align-items:stretch;height:170px;">
         <!-- รูป meme ซ้าย -->
-        <div id="memeImgWrap" style="width:110px;min-width:110px;background:#f3f4f6;flex-shrink:0;overflow:hidden;">
+        <div id="memeImgWrap" style="width:143px;min-width:143px;background:#f3f4f6;flex-shrink:0;overflow:hidden;">
           <img id="memeImg" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;"
             onerror="this.parentElement.innerHTML='<div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:40px;' id='memeFallbackEmoji'></div>'" />
         </div>
         <!-- ข้อมูลขวา -->
-        <div id="memeInfoCol" style="flex:1;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;">
+        <div id="memeInfoCol" style="flex:1;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;">
           <div>
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-              <span id="memeEmoji" style="font-size:16px;"></span>
-              <span id="memeTitle" style="font-weight:900;font-size:13px;line-height:1.2;"></span>
+              <span id="memeEmoji" style="font-size:20px;"></span>
+              <span id="memeTitle" style="font-weight:900;font-size:17px;line-height:1.2;"></span>
             </div>
-            <div id="memeScore" style="font-size:22px;font-weight:900;line-height:1;margin:3px 0;"></div>
-            <div id="memePct" style="font-size:12px;font-weight:700;"></div>
-            <div id="memeCaption" style="font-size:10px;color:#6b7280;font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            <div id="memeScore" style="font-size:28px;font-weight:900;line-height:1;margin:4px 0;"></div>
+            <div id="memePct" style="font-size:15px;font-weight:700;"></div>
+            <div id="memeCaption" style="font-size:12px;color:#6b7280;font-style:italic;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
           </div>
           <button onclick="closeMemeOverlay()" class="btn"
-            style="padding:5px 10px;font-size:11px;font-weight:700;border-radius:8px;align-self:flex-start;">ดูเฉลย →</button>
+            style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:10px;align-self:flex-start;">ดูเฉลย →</button>
         </div>
       </div>
       <!-- ออลไมท์ cheer แถบด้านล่าง -->
