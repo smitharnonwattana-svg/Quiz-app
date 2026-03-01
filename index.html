@@ -1181,8 +1181,9 @@ const Store = {
     if(!cloud) return;
     try{ localStorage.setItem(this.key, JSON.stringify(cloud)); }catch(e){}
     console.log('[Store] synced from cloud');
-    // Refresh current page if it shows exam list or stats
-    if(typeof navigate==='function' && window._currentPage){
+    // Only refresh safe pages after initial sync
+    const safeSyncPages = ['home','exams','stats'];
+    if(typeof navigate==='function' && window._currentPage && safeSyncPages.includes(window._currentPage)){
       navigate(window._currentPage, window._currentParams||{});
     }
   },
@@ -1192,10 +1193,14 @@ const Store = {
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
     });
-    // Real-time listener: if another device saves, reload local + re-render
+    // Real-time listener: if another device saves, update localStorage only
+    // Do NOT call navigate() here — it resets scroll and re-inits page disruptively
+    // Instead just update the cache; next Store.load() will get fresh data
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
-      if(typeof navigate==='function' && window._currentPage){
+      // Only soft-refresh safe pages (home, exams list, stats) not mid-interaction pages
+      const safeSoftRefresh = ['home','exams','stats'];
+      if(typeof navigate==='function' && window._currentPage && safeSoftRefresh.includes(window._currentPage)){
         navigate(window._currentPage, window._currentParams||{});
       }
     });
@@ -1288,15 +1293,15 @@ function renderHome(){
           <div style="font-weight:900;">📊 สถิติการทำข้อสอบ</div>
           <div class="muted" style="margin-top:6px;">ดูคะแนน/วันที่ทำ</div>
         </div>
+        <div class="linkCard" onclick="navigate('entrance_stats')">
+          <div style="font-weight:900;">🎯 สถิติการสอบเข้า ม.1</div>
+          <div class="muted" style="margin-top:6px;">ข้อมูลคะแนน GATE/EPLUS · เปรียบเทียบผลสอบ</div>
+        </div>
         ${isTeacher ? `
         <div class="linkCard" onclick="navigate('admin')">
           <div style="font-weight:900;">⚙️ Admin</div>
           <div class="muted" style="margin-top:6px;">สร้าง/แก้ข้อสอบ + preview PDF</div>
         </div>` : ''}
-        <div class="linkCard" onclick="navigate('entrance_stats')">
-          <div style="font-weight:900;">🎯 สถิติการสอบเข้า ม.1</div>
-          <div class="muted" style="margin-top:6px;">ข้อมูลคะแนน GATE/EPLUS · เปรียบเทียบผลสอบ</div>
-        </div>
       </div>
       <div class="hr"></div>
       <div class="muted" style="font-size:11px;">☁️ ข้อมูล sync กับ Firebase อัตโนมัติ</div>
@@ -1386,7 +1391,7 @@ function navigate(page, params={}){
   else if(page==='entrance_year') initEntranceYear(params);
   else if(page==='entrance_compare') initEntranceCompare(params);
 
-  window.scrollTo(0,0);
+  if(!params._noScroll) window.scrollTo(0,0);
 }
 
 // ===================== EXAMS PAGE =====================
@@ -2243,19 +2248,15 @@ function initStats(){
 // ===================== ADMIN PAGE =====================
 function initAdmin(){
   const s=Store.init();
+  s.adminLoggedIn = Auth.isTeacher(); // sync with PIN auth
   let subjectFilter='';
   const subjFilterEl=document.getElementById('adminSubjFilter');
 
-  document.getElementById('adminLoginBtn').onclick=()=>{s.adminLoggedIn=true;Store.save(s);toast('Logged in (demo)');renderAdmin();};
-  document.getElementById('adminLogoutBtn').onclick=()=>{s.adminLoggedIn=false;Store.save(s);toast('Logged out (demo)');renderAdmin();};
+  // Admin login/logout handled by Auth PIN system — these buttons hidden for teacher role
   if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderAdmin();};
 
   function renderAdmin(){
-    if(!s.adminLoggedIn){
-      document.getElementById('adminGate').innerHTML=`<div class="card" style="padding:16px;"><div style="font-weight:900;">ต้องเข้าสู่ระบบก่อน</div><div class="muted" style="margin-top:6px;">กดปุ่ม Login มุมขวาบน (เดโม)</div></div>`;
-      document.getElementById('adminContent').style.display='none';
-      return;
-    }
+    // Auth is handled by PIN system — teacher role already verified in navigate()
     document.getElementById('adminGate').innerHTML='';
     document.getElementById('adminContent').style.display='block';
 
@@ -2320,7 +2321,7 @@ function initAdmin(){
 // ===================== ADMIN NEW PAGE =====================
 function initAdminNew(){
   const s=Store.init();
-  if(!s.adminLoggedIn){navigate('admin');return;}
+  if(!Auth.isTeacher()){navigate('home');return;}
 
   let lastUploadedPdfKey=null;
   const pdfFileEl=document.getElementById('newPdfFile');
@@ -2376,7 +2377,7 @@ function initAdminNew(){
 // ===================== ADMIN EDITOR PAGE =====================
 function initEditor(examId){
   const s=Store.init();
-  if(!s.adminLoggedIn){navigate('admin');return;}
+  if(!Auth.isTeacher()){navigate('home');return;}
   const exam=s.exams.find(e=>e.id===examId);
   if(!exam){navigate('admin');return;}
 
@@ -2678,7 +2679,7 @@ function bmTierBadge(rank, totalRanks) {
 // ===================== INIT ADMIN BENCHMARK =====================
 function initAdminBenchmark() {
   const s = Store.init();
-  if (!s.adminLoggedIn) { navigate('admin'); return; }
+  if(!Auth.isTeacher()){navigate('home');return;}
 
   let _bmData = null; // parsed excel data
 
@@ -3304,11 +3305,12 @@ function initEntranceCompare(params) {
   function listenEcRealtime(p){
     FirebaseSync.listenDoc(SKEYS[p], (data)=>{
       try{ localStorage.setItem(SKEYS[p],JSON.stringify(data)); }catch(e){}
-      st[p].students=data; renderAll();
+      // Only update if not currently editing (avoid disrupting input)
+      if(!st[p].editing){ st[p].students=data; renderAll(); }
     });
     FirebaseSync.listenDoc(YKEYS[p], (data)=>{
       try{ localStorage.setItem(YKEYS[p],JSON.stringify(data)); }catch(e){}
-      st[p].years=new Set(data); renderAll();
+      if(!st[p].editing){ st[p].years=new Set(data); renderAll(); }
     });
   }
 
