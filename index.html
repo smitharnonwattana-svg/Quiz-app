@@ -251,14 +251,14 @@
       <div style="text-align:center;margin-bottom:32px;">
         <div style="font-size:48px;margin-bottom:12px;">🎯</div>
         <div style="font-size:24px;font-weight:900;color:#111827;">Science Practice</div>
-        <div style="font-size:13px;color:#6b7280;margin-top:6px;">กรอกรหัส 6 หลักเพื่อเข้าใช้งาน</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:6px;">กรอกรหัสเพื่อเข้าใช้งาน</div>
       </div>
 
       <div class="card" style="padding:28px;">
         <div style="margin-bottom:20px;">
           <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">รหัสผ่าน</label>
           <input id="loginPinInput" type="password" inputmode="numeric" maxlength="6"
-            placeholder="● ● ● ● ● ●"
+            placeholder=""
             style="width:100%;padding:14px;font-size:22px;text-align:center;letter-spacing:8px;border:2px solid #e5e7eb;border-radius:12px;outline:none;font-family:monospace;"
             oninput="this.value=this.value.replace(/[^0-9]/g,'')"
             onkeydown="if(event.key==='Enter') doLogin()"
@@ -318,10 +318,10 @@
       </div>
       <button class="btn" onclick="navigate('home')">กลับหน้าแรก</button>
     </div>
-    <div class="card" style="padding:12px;margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <span class="muted">วิชา</span>
-      <select id="examsSubjFilter" class="btn" style="padding:10px 12px;min-width:240px;"></select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;" id="examsSubjPills">
+      <button id="examPill_0" onclick="ecSetSubjFilter('ทั้งหมด')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ทั้งหมด</button><button id="examPill_1" onclick="ecSetSubjFilter('คณิตศาสตร์')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">คณิตศาสตร์</button><button id="examPill_2" onclick="ecSetSubjFilter('วิทยาศาสตร์')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">วิทยาศาสตร์</button><button id="examPill_3" onclick="ecSetSubjFilter('ภาษาไทย')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ภาษาไทย</button><button id="examPill_4" onclick="ecSetSubjFilter('ภาษาอังกฤษ')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ภาษาอังกฤษ</button><button id="examPill_5" onclick="ecSetSubjFilter('สังคมศึกษา')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">สังคมศึกษา</button><button id="examPill_6" onclick="ecSetSubjFilter('อื่นๆ')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">อื่นๆ</button>
     </div>
+    <select id="examsSubjFilter" style="display:none;"></select>
     <div id="examsList" class="list"></div>
   </div>
 </div>
@@ -754,8 +754,18 @@
         <input id="newTitle" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" placeholder="เช่น วิทยาศาสตร์ ชุดที่ 2" />
       </label>
       <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">ชื่อวิชา</span>
-        <input id="newSubject" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" placeholder="เช่น วิทยาศาสตร์ / คณิตศาสตร์" />
+        <span style="font-weight:900;">วิชา</span>
+        <select id="newSubjectSelect" onchange="document.getElementById('newSubjectOther').style.display=this.value==='อื่นๆ'?'block':'none';document.getElementById('newSubject').value=this.value!=='อื่นๆ'?this.value:'';" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+            <option value="">-- เลือกวิชา --</option>
+            <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+            <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
+            <option value="ภาษาไทย">ภาษาไทย</option>
+            <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
+            <option value="สังคมศึกษา">สังคมศึกษา</option>
+            <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
+        </select>
+        <input id="newSubjectOther" style="display:none;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;margin-top:6px;" placeholder="ระบุชื่อวิชา" oninput="document.getElementById('newSubject').value=this.value" />
+        <input id="newSubject" type="hidden" value="" />
       </label>
       <div class="grid2">
         <label style="display:grid;gap:6px;">
@@ -837,7 +847,19 @@
             <div style="display:flex;flex-direction:column;gap:4px;">
               <div style="font-size:13px;font-weight:800;">ชื่อวิชา</div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <input id="editorExamSubject" class="titleInput" type="text" placeholder="เช่น วิทยาศาสตร์" />
+                <select id="editorExamSubjectSelect" class="btn" onchange="(function(){const v=document.getElementById('editorExamSubjectSelect').value;document.getElementById('editorSubjectOtherWrap').style.display=v==='อื่นๆ'?'flex':'none';if(v!=='อื่นๆ')document.getElementById('editorExamSubject').value=v;})()" style="padding:8px 12px;border-radius:10px;font-size:13px;">
+                  <option value="">-- เลือกวิชา --</option>
+                  <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+                  <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
+                  <option value="ภาษาไทย">ภาษาไทย</option>
+                  <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
+                  <option value="สังคมศึกษา">สังคมศึกษา</option>
+                  <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
+                </select>
+                <span id="editorSubjectOtherWrap" style="display:none;align-items:center;gap:6px;">
+                  <input id="editorExamSubject" class="titleInput" type="text" placeholder="ระบุวิชา" oninput="" />
+                </span>
+                <input id="editorExamSubjectHidden" type="hidden" />
                 <button class="btn" id="editorSubjectBtn" type="button">ยืนยันวิชา</button>
               </div>
               <div class="muted" style="font-size:12px;">ใช้สำหรับจัดกลุ่ม/กรองรายวิชา</div>
@@ -1329,6 +1351,12 @@ const Auth = (() => {
   function logout() {
     sessionStorage.removeItem(SESSION_KEY);
     navigate('login');
+    setTimeout(()=>{
+      const inp = document.getElementById('loginPinInput');
+      if(inp){ inp.value=''; inp.focus(); }
+      const err = document.getElementById('loginError');
+      if(err) err.textContent='';
+    }, 50);
   }
   function login(pin) {
     const role = PINS[pin.trim()];
@@ -1342,7 +1370,7 @@ const Auth = (() => {
 function doLogin() {
   const pin = document.getElementById('loginPinInput').value.trim();
   const errEl = document.getElementById('loginError');
-  if (pin.length < 6) { errEl.textContent = 'กรุณากรอกรหัส 6 หลัก'; return; }
+  if (pin.length < 1) { return; }
   const role = Auth.login(pin);
   if (!role) {
     errEl.textContent = '❌ รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง';
@@ -1401,13 +1429,32 @@ function initExams(){
   const subjFilterEl=document.getElementById('examsSubjFilter');
   let subjectFilter='';
 
+  // pill button subject filter
+  const FIXED_SUBJS = ['ทั้งหมด','คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','อื่นๆ'];
+  function updatePills(){
+    FIXED_SUBJS.forEach((s,i)=>{
+      const btn=document.getElementById('examPill_'+i);
+      if(!btn) return;
+      const active = (i===0&&!subjectFilter)||(s===subjectFilter);
+      btn.style.background = active ? '#111827' : '#fff';
+      btn.style.color = active ? '#fff' : '#374151';
+      btn.style.borderColor = active ? '#111827' : '#e5e7eb';
+    });
+  }
+  window.ecSetSubjFilter = (s)=>{
+    subjectFilter = (s==='ทั้งหมด') ? '' : s;
+    updatePills(); renderExams();
+  };
+  updatePills();
+
   const subjects=Array.from(new Set(published.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
   subjFilterEl.innerHTML=`<option value="">ทุกวิชา</option>${subjects.map(sub=>`<option value="${esc(sub)}">${esc(sub)}</option>`).join('')}`;
 
   function renderExams(){
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
-    const exams=subjectFilter?published.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter):published;
+    const KNOWN=['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'];
+    const exams=!subjectFilter?published:subjectFilter==='อื่นๆ'?published.filter(e=>!KNOWN.includes(e.subject||'')):published.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
     const list=document.getElementById('examsList');
     list.className='examGrid';
     list.innerHTML='';
@@ -2356,7 +2403,7 @@ function initAdminNew(){
     const pdfUrl=document.getElementById('newPdfUrl').value.trim();
     const createPlaceholder=document.getElementById('newCreatePlaceholder').checked;
     const qCount=Math.min(999,Math.max(1,Math.floor(Number(document.getElementById('newQCount').value||50))));
-    if(!subject) return toast('กรุณาใส่ชื่อวิชา');
+    if(!subject){ const other=document.getElementById('newSubjectOther')?.value?.trim(); if(!other) return toast('กรุณาเลือกหรือระบุวิชา'); }
     const maxOrder=Math.max(0,...(s.exams||[]).map(e=>(typeof e.order==='number'?e.order:0)));
     const id='exam_'+Math.random().toString(16).slice(2);
     s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
@@ -2402,17 +2449,31 @@ function initEditor(examId){
   titleInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applyRename();}};
 
   const subjectInput=document.getElementById('editorExamSubject');
+  const subjectSelect=document.getElementById('editorExamSubjectSelect');
   const subjectBtn=document.getElementById('editorSubjectBtn');
-  if(subjectInput) subjectInput.value=exam.subject||'';
+  const KNOWN_SUBJS=['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ', 'สังคมศึกษา'];
+
+  // Pre-populate dropdown with current subject
+  if(subjectSelect && exam.subject){
+    if(KNOWN_SUBJS.includes(exam.subject)){
+      subjectSelect.value=exam.subject;
+      document.getElementById('editorSubjectOtherWrap').style.display='none';
+    } else {
+      subjectSelect.value='อื่นๆ';
+      document.getElementById('editorSubjectOtherWrap').style.display='flex';
+      if(subjectInput) subjectInput.value=exam.subject;
+    }
+  }
 
   function applySubject(){
-    const v=(subjectInput?.value||'').trim()||'ทั่วไป';
+    const selVal=subjectSelect?.value||'';
+    const v=selVal==='อื่นๆ'?(subjectInput?.value||'').trim()||'ทั่วไป':selVal||'ทั่วไป';
     exam.subject=v;Store.save(s);
     document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
     toast('บันทึกวิชาแล้ว');
   }
   subjectBtn.onclick=(e)=>{e.preventDefault();applySubject();};
-  subjectInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applySubject();}};
+  if(subjectInput) subjectInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applySubject();}};
 
   let selectedIndex=0;
   const refs={};
