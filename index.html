@@ -232,6 +232,9 @@
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
   <script>
     // Setup PDF.js worker
     if(typeof pdfjsLib !== 'undefined'){
@@ -573,7 +576,7 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">สถิติการทำข้อสอบ</h1>
-        <div class="muted">เก็บใน localStorage (เครื่อง/เบราว์เซอร์นี้เท่านั้น)</div>
+        <div class="muted">เก็บใน Cloud (sync ทุก device อัตโนมัติ)</div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
@@ -1011,6 +1014,91 @@ const PdfViewer = (() => {
   return { create };
 })();
 
+// ===================== FIREBASE SYNC =====================
+const FirebaseSync = (() => {
+  const CFG = {
+    apiKey: "AIzaSyArMMqFEN4SuJGA_GxoCAvcn-_8kTm9yU0",
+    authDomain: "nanont-exam.firebaseapp.com",
+    projectId: "nanont-exam",
+    storageBucket: "nanont-exam.firebasestorage.app",
+    messagingSenderId: "693537085236",
+    appId: "1:693537085236:web:862dcb5af879787450b761"
+  };
+
+  let db = null, _ready = false, _statusEl = null;
+
+  function init() {
+    try {
+      if (!window.firebase) { console.warn('[FB] SDK not loaded'); return; }
+      if (!firebase.apps.length) firebase.initializeApp(CFG);
+      db = firebase.firestore();
+      // Enable offline persistence (works on mobile too)
+      db.enablePersistence({ synchronizeTabs: true }).catch(e => {
+        if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
+          console.warn('[FB] persistence err', e);
+      });
+      _ready = true;
+      setStatus('online', '☁️ sync พร้อม');
+      console.log('[FB] ready');
+    } catch(e) { console.warn('[FB] init err', e); setStatus('offline', '📴 offline (local only)'); }
+  }
+
+  function setStatus(state, txt) {
+    if (!_statusEl) _statusEl = document.getElementById('fbSyncStatus');
+    if (_statusEl) {
+      _statusEl.textContent = txt;
+      _statusEl.style.color = state==='online'?'#16a34a':state==='saving'?'#f59e0b':state==='error'?'#dc2626':'#9ca3af';
+    }
+  }
+
+  function _doc(id) { return db.collection('app').doc(id); }
+
+  // Write to Firestore
+  async function saveDoc(id, data) {
+    if (!_ready) return false;
+    try {
+      setStatus('saving', '💾 กำลัง sync...');
+      await _doc(id).set({ _d: JSON.stringify(data), _ts: Date.now() });
+      setStatus('online', '☁️ sync แล้ว ' + new Date().toLocaleTimeString('th'));
+      return true;
+    } catch(e) { console.warn('[FB] save err', e); setStatus('error', '⚠️ sync ล้มเหลว'); return false; }
+  }
+
+  // Read once from Firestore
+  async function loadDoc(id) {
+    if (!_ready) return null;
+    try {
+      const s = await _doc(id).get();
+      if (!s.exists) return null;
+      return JSON.parse(s.data()._d || 'null');
+    } catch(e) { console.warn('[FB] load err', e); return null; }
+  }
+
+  // Real-time listener — calls cb(data) whenever doc changes from any device
+  function listenDoc(id, cb) {
+    if (!_ready) return () => {};
+    return _doc(id).onSnapshot(s => {
+      if (!s.exists) return;
+      try { const d = JSON.parse(s.data()._d || 'null'); if (d) cb(d); } catch(e) {}
+    }, e => { console.warn('[FB] listen err', e); setStatus('error', '⚠️ sync ขัดข้อง'); });
+  }
+
+  // One-time migration: copy localStorage data → Firestore (only if Firestore empty)
+  async function migrateLS(lsKey, docId) {
+    if (!_ready) return;
+    try {
+      const cloud = await loadDoc(docId);
+      if (cloud !== null) return; // already in cloud
+      const local = localStorage.getItem(lsKey);
+      if (!local) return;
+      await saveDoc(docId, JSON.parse(local));
+      console.log('[FB] migrated', lsKey, '->', docId);
+    } catch(e) { console.warn('[FB] migrate err', e); }
+  }
+
+  return { init, saveDoc, loadDoc, listenDoc, migrateLS, ready: () => _ready };
+})();
+
 // ===================== STORE =====================
 const Store = {
   lastError:null,
@@ -1046,10 +1134,38 @@ const Store = {
   },
   load(){try{return JSON.parse(localStorage.getItem(this.key)||"{}");}catch{return {};}},
   save(data){
-    try{this.lastError=null;localStorage.setItem(this.key,JSON.stringify(data));return true;}
-    catch(e){this.lastError=String(e&&e.message?e.message:e);console.warn('Store.save failed',e);return false;}
+    try{
+      this.lastError=null;
+      localStorage.setItem(this.key,JSON.stringify(data));
+      // async sync to Firestore (fire-and-forget, non-blocking)
+      if(FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', data).catch(()=>{});
+      return true;
+    } catch(e){this.lastError=String(e&&e.message?e.message:e);console.warn('Store.save failed',e);return false;}
+  },
+  // Load from Firestore and overwrite localStorage (called once on startup)
+  async syncFromCloud(){
+    const cloud = await FirebaseSync.loadDoc('mainStore');
+    if(!cloud) return;
+    try{ localStorage.setItem(this.key, JSON.stringify(cloud)); }catch(e){}
+    console.log('[Store] synced from cloud');
+    // Refresh current page if it shows exam list or stats
+    if(typeof navigate==='function' && window._currentPage){
+      navigate(window._currentPage, window._currentParams||{});
+    }
   },
   init(){
+    // Boot Firebase, migrate old localStorage data to cloud
+    FirebaseSync.init();
+    FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
+      this.syncFromCloud();
+    });
+    // Real-time listener: if another device saves, reload local + re-render
+    FirebaseSync.listenDoc('mainStore', (cloudData) => {
+      try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
+      if(typeof navigate==='function' && window._currentPage){
+        navigate(window._currentPage, window._currentParams||{});
+      }
+    });
     const s=this.load();
     if(!s.exams){
       const examId="exam1";
@@ -3022,9 +3138,48 @@ function initEntranceCompare(params) {
   const SKEYS = { gate:'ecStudents_gate', eplus:'ecStudents_eplus' };
   const YKEYS = { gate:'ecYears_gate',    eplus:'ecYears_eplus' };
   function loadStu(p){ try{return JSON.parse(localStorage.getItem(SKEYS[p])||'[]');}catch{return[];} }
-  function saveStu(p,a){ localStorage.setItem(SKEYS[p],JSON.stringify(a)); }
+  function saveStu(p,a){
+    localStorage.setItem(SKEYS[p],JSON.stringify(a));
+    if(FirebaseSync.ready()) FirebaseSync.saveDoc(SKEYS[p], a).catch(()=>{});
+  }
   function loadYrs(p){ try{return new Set(JSON.parse(localStorage.getItem(YKEYS[p])||'["69","68"]'));}catch{return new Set(['69','68']);} }
-  function saveYrs(p,s){ localStorage.setItem(YKEYS[p],JSON.stringify([...s])); }
+  function saveYrs(p,s){
+    localStorage.setItem(YKEYS[p],JSON.stringify([...s]));
+    if(FirebaseSync.ready()) FirebaseSync.saveDoc(YKEYS[p],[...s]).catch(()=>{});
+  }
+  // On load: try to pull latest from Firestore (async, update UI when done)
+  async function syncEcFromCloud(p){
+    const [stuCloud, yrCloud] = await Promise.all([
+      FirebaseSync.loadDoc(SKEYS[p]),
+      FirebaseSync.loadDoc(YKEYS[p])
+    ]);
+    let changed=false;
+    if(stuCloud){
+      try{ localStorage.setItem(SKEYS[p],JSON.stringify(stuCloud)); }catch(e){}
+      st[p].students=stuCloud; changed=true;
+    }
+    if(yrCloud){
+      try{ localStorage.setItem(YKEYS[p],JSON.stringify(yrCloud)); }catch(e){}
+      st[p].years=new Set(yrCloud); changed=true;
+    }
+    if(changed) renderAll();
+  }
+  // Migrate old localStorage → Firestore (one-time)
+  async function migrateEcToCloud(p){
+    await FirebaseSync.migrateLS(SKEYS[p], SKEYS[p]);
+    await FirebaseSync.migrateLS(YKEYS[p], YKEYS[p]);
+  }
+  // Real-time listener for ecStudents (updates from other devices)
+  function listenEcRealtime(p){
+    FirebaseSync.listenDoc(SKEYS[p], (data)=>{
+      try{ localStorage.setItem(SKEYS[p],JSON.stringify(data)); }catch(e){}
+      st[p].students=data; renderAll();
+    });
+    FirebaseSync.listenDoc(YKEYS[p], (data)=>{
+      try{ localStorage.setItem(YKEYS[p],JSON.stringify(data)); }catch(e){}
+      st[p].years=new Set(data); renderAll();
+    });
+  }
 
   const SUBJ = {
     gate:  ['วิทยาศาสตร์','คณิตศาสตร์','ภาษาอังกฤษ','ภาษาไทย'],
@@ -3379,6 +3534,17 @@ function initEntranceCompare(params) {
 
   function renderBottom(){ renderCompareResults(); renderOverviewChart(); }
   function renderAll(){ renderTabs(); renderActiveSection(); renderBottom(); }
+
+  // ── Firebase: migrate, sync latest, then listen for real-time changes ──
+  if(FirebaseSync.ready()){
+    migrateEcToCloud('gate');
+    migrateEcToCloud('eplus');
+    syncEcFromCloud('gate');
+    syncEcFromCloud('eplus');
+    listenEcRealtime('gate');
+    listenEcRealtime('eplus');
+  }
+
   renderAll();
 }
 
