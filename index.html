@@ -1291,6 +1291,146 @@ let _currentPage='home';
 let _pageParams={};
 
 
+
+// ===================== MEME SCORE POPUP =====================
+const MemeScore = (() => {
+  // meme data: [ svgArt, caption ]  — all inline, no external images needed
+  function makeSVG(bg, lines) {
+    const rows = lines.map((l,i) => `<text x="200" y="${90 + i*58}" text-anchor="middle" font-size="${l[1]||64}" font-family="serif">${l[0]}</text>`).join('');
+    return `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='220' style='background:${bg}'>${rows}</svg>`;
+  }
+
+  const MEMES = {
+    // 0–39% 💀 หายนะ
+    disaster: [
+      [makeSVG('%23fecaca', [['😭',80],['💀 ข้อสอบฆ่าฉัน 💀',22]]), 'ข้อสอบ 1 - ฉัน 0'],
+      [makeSVG('%23fca5a5', [['🫠',80],['ละลายหายไปเลยดีกว่า',22]]), 'ขอกลับบ้านได้ไหมครับ'],
+      [makeSVG('%23fecdd3', [['😿',80],['แมวก็ยังร้องไห้แทน',22]]),   'น้ำตาจะไหลออกมาเอง'],
+      [makeSVG('%23fee2e2', [['🤡',80],['ตัวตลกแห่งวันนี้คือ...',22]]), 'ไม่ขอพูดถึงละกัน'],
+    ],
+    // 40–59% 😬 พอผ่าน
+    meh: [
+      [makeSVG('%23fef9c3', [['😬',80],['This is fine. 🔥',26]]),       'ยิ้มทน ๆ ไว้ก่อน'],
+      [makeSVG('%23fef08a', [['🙃',80],['ทุกอย่างโอเคนะ (โกหก)',22]]), 'ผ่านก็คือผ่าน ไม่ต้องพูดมาก'],
+      [makeSVG('%23fde68a', [['😐',80],['... อืม',26]]),                'อย่างน้อยก็ยังไม่ตาย'],
+      [makeSVG('%23fcd34d', [['🫤',80],['กึ่ง ๆ กลาง ๆ',26]]),          'เรียกว่าผ่านก็ได้มั้ง'],
+    ],
+    // 60–79% 😎 ดี
+    good: [
+      [makeSVG('%23bfdbfe', [['🐶',80],['wow. such score. very nice.',20]]), 'Doge พอใจแล้ว'],
+      [makeSVG('%23a5f3fc', [['😎',80],['ไม่เลวเลยนะเนี่ย',26]]),           'ทำต่อไปนะจ๊ะ'],
+      [makeSVG('%23c7d2fe', [['🤓',80],['เด็กเรียนเกิดขึ้นแล้ว',22]]),      'กำลังดีเลย ไปต่อได้!'],
+      [makeSVG('%23d9f99d', [['💪',80],['ร่างกายพร้อม สมองพร้อม',22]]),     'ดีมาก อีกนิดก็ 80%'],
+    ],
+    // 80–100% 🔥 เทพ
+    goat: [
+      [makeSVG('%23bbf7d0', [['🗿',80],['GIGACHAD MODE ACTIVATED',20]]),     'ทำไมเก่งขนาดนี้ ไม่แฟร์'],
+      [makeSVG('%23a7f3d0', [['📈',80],['STONKS ↑↑↑',26]]),                  'คะแนนพุ่งทะยาน'],
+      [makeSVG('%23d1fae5', [['🏆',80],['เทพเจ้าแห่งข้อสอบ',24]]),          'ขอบคุณเทพเจ้าที่ช่วยมา'],
+      [makeSVG('%23ecfdf5', [['🤩',80],['ว้าววว 😍',26]]),                   'เก่งมากเลยนะ ยอดเยี่ยมสุด ๆ'],
+    ],
+  };
+
+  const TIERS = [
+    { max:39,  key:'disaster', emoji:'💀', title:'โอ้โห...',        color:'#dc2626', bg:'#fef2f2' },
+    { max:59,  key:'meh',      emoji:'😬', title:'พอผ่านนะ',        color:'#f59e0b', bg:'#fffbeb' },
+    { max:79,  key:'good',     emoji:'😎', title:'เก่งเลย!',        color:'#2563eb', bg:'#eff6ff' },
+    { max:100, key:'goat',     emoji:'🔥', title:'เทพมากกกก!!!',   color:'#16a34a', bg:'#f0fdf4' },
+  ];
+
+  let _onClose = null;
+
+  function getTier(pct) {
+    return TIERS.find(t => pct <= t.max) || TIERS[TIERS.length-1];
+  }
+  function randMeme(key) {
+    const arr = MEMES[key];
+    return arr[Math.floor(Math.random()*arr.length)];
+  }
+
+  function show(score, total, onClose) {
+    _onClose = onClose;
+    const overlay = document.getElementById('memeOverlay');
+    const loading = document.getElementById('memeLoading');
+    const result  = document.getElementById('memeResult');
+    const fill    = document.getElementById('memeLoadingFill');
+    const loadTxt = document.getElementById('memeLoadingTxt');
+
+    loading.style.display = 'block';
+    result.style.display  = 'none';
+    overlay.style.display = 'flex';
+
+    // ── Loading animation: 3 seconds, fake progress bar ──
+    const DURATION = 3000;
+    loadTxt.textContent = `🔍 ตรวจข้อ 0/${total}...`;
+    const MESSAGES = [
+      `🔍 ตรวจข้อ 0/${total}...`,
+      `🔍 ตรวจข้อ ${Math.floor(total*0.3)}/${total}...`,
+      `🤔 ตรวจข้อ ${Math.floor(total*0.6)}/${total}...`,
+      `📊 ตรวจข้อ ${Math.floor(total*0.85)}/${total}...`,
+      `✅ เกือบเสร็จแล้ว (${total}/${total})`,
+    ];
+    let elapsed = 0;
+    let msgIdx = 0;
+    const interval = setInterval(() => {
+      elapsed += 80;
+      const pct = Math.min(100, (elapsed/DURATION)*100);
+      fill.style.width = pct + '%';
+      if(elapsed % 600 < 80) {
+        loadTxt.textContent = MESSAGES[msgIdx % MESSAGES.length];
+        msgIdx++;
+      }
+      if(elapsed >= DURATION) {
+        clearInterval(interval);
+        showResult(score, total);
+      }
+    }, 80);
+  }
+
+  function showResult(score, total) {
+    const pct   = total > 0 ? Math.round(score/total*100) : 0;
+    const tier  = getTier(pct);
+    const [img, caption] = randMeme(tier.key);
+
+    const loading = document.getElementById('memeLoading');
+    const result  = document.getElementById('memeResult');
+    const memeBox = document.getElementById('memeBox');
+
+    const memeImgEl = document.getElementById('memeImg');
+    memeImgEl.src = img;
+    memeImgEl.style.display = 'block';
+    memeImgEl.style.maxHeight = '200px';
+    memeImgEl.style.objectFit = 'contain';
+    memeImgEl.style.background = tier.bg;
+    document.getElementById('memeEmoji').textContent  = tier.emoji;
+    document.getElementById('memeTitle').textContent  = tier.title;
+    document.getElementById('memeTitle').style.color  = tier.color;
+    document.getElementById('memeScore').textContent  = `${score}/${total}`;
+    document.getElementById('memeScore').style.color  = tier.color;
+    document.getElementById('memePct').textContent    = `คิดเป็น ${pct}%`;
+    document.getElementById('memePct').style.color    = tier.color;
+    document.getElementById('memeCaption').textContent = caption;
+    memeBox.style.background = tier.bg;
+
+    loading.style.display = 'none';
+    result.style.display  = 'block';
+    // re-trigger animation
+    memeBox.style.animation = 'none';
+    memeBox.offsetHeight; // reflow
+    memeBox.style.animation = 'memePop .4s cubic-bezier(.34,1.56,.64,1)';
+  }
+
+  function close() {
+    document.getElementById('memeOverlay').style.display = 'none';
+    if(_onClose) _onClose();
+    _onClose = null;
+  }
+
+  return { show, close };
+})();
+
+function closeMemeOverlay() { MemeScore.close(); }
+
 // ── Home page render (role-aware) ──
 function renderHome(){
   const isTeacher = Auth.isTeacher();
@@ -1680,14 +1820,17 @@ function initTake(id){
     savedS.attempts.unshift({id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion});
     const ok=Store.save(savedS);
     if(!ok) alert('บันทึกสถิติไม่สำเร็จ\n\nสาเหตุที่พบบ่อย: เปิดไฟล์แบบออฟไลน์บน iPad/iOS จะไม่เก็บ localStorage\n\nทางแก้: เปิดผ่านลิงก์ https แล้วสถิติจะบันทึกได้');
-    navigate('review',{attemptId:st.attemptId});
+    // 🎉 Show meme popup before going to review
+    MemeScore.show(score, total, () => {
+      navigate('review', {attemptId: st.attemptId});
+    });
   }
 
   const submitBtn=document.getElementById('takeSubmitBtn');
   // remove old listeners by replacing
   const newSubmitBtn=submitBtn.cloneNode(true);
   submitBtn.parentNode.replaceChild(newSubmitBtn,submitBtn);
-  newSubmitBtn.addEventListener('click',()=>{if(confirm('ส่งคำตอบตอนนี้? (จะเข้าสู่โหมดเฉลย/ทบทวน)')) submit();});
+  newSubmitBtn.addEventListener('click',()=>{if(confirm('ส่งคำตอบตอนนี้?\n\n(คำตอบจะถูกส่งและดูผลคะแนน)')) submit();});
 
   const t1=document.getElementById('takeTimer'),t2=document.getElementById('takeTimer2');
   function setTimerDisplay(remaining){
@@ -3759,6 +3902,45 @@ function initEntranceCompare(params) {
 
 
 </script>
+
+<!-- ===================== MEME SCORE OVERLAY ===================== -->
+<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;">
+  <div id="memeBox" style="background:#fff;border-radius:24px;width:min(420px,96vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center;animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
+
+    <!-- Loading state -->
+    <div id="memeLoading" style="padding:48px 24px;">
+      <div style="font-size:36px;margin-bottom:16px;">⚙️</div>
+      <div style="font-weight:900;font-size:18px;margin-bottom:8px;">ประมวลผลคำตอบ...</div>
+      <div id="memeLoadingBar" style="height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:16px auto;max-width:240px;">
+        <div id="memeLoadingFill" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#f59e0b);border-radius:99px;transition:width .1s linear;"></div>
+      </div>
+      <div id="memeLoadingTxt" style="font-size:13px;color:#6b7280;">🔍 ตรวจข้อ...</div>
+    </div>
+
+    <!-- Result state -->
+    <div id="memeResult" style="display:none;">
+      <img id="memeImg" src="" alt="meme" style="width:100%;max-height:260px;object-fit:cover;display:block;" onerror="this.style.display='none'" />
+      <div style="padding:20px 24px 24px;">
+        <div id="memeEmoji" style="font-size:40px;margin-bottom:6px;"></div>
+        <div id="memeTitle" style="font-weight:900;font-size:22px;margin-bottom:4px;"></div>
+        <div id="memeScore" style="font-size:36px;font-weight:900;margin:10px 0;"></div>
+        <div id="memePct" style="font-size:18px;font-weight:700;margin-bottom:8px;"></div>
+        <div id="memeCaption" style="font-size:14px;color:#6b7280;margin-bottom:20px;font-style:italic;"></div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button onclick="closeMemeOverlay()" class="btn" style="padding:12px 24px;font-size:14px;font-weight:700;border-radius:14px;">ดูเฉลย →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<style>
+@keyframes memePop {
+  from { opacity:0; transform:scale(.7) translateY(30px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </body>
 </html>
 
