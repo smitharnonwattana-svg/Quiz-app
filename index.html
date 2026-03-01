@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Science Practice v30</title>
+  <title>My Exam Academia</title>
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -250,7 +250,7 @@
     <div style="width:100%;max-width:360px;padding:24px;">
       <div style="text-align:center;margin-bottom:32px;">
         <div style="font-size:48px;margin-bottom:12px;">🎯</div>
-        <div style="font-size:24px;font-weight:900;color:#111827;">Science Practice</div>
+        <div style="font-size:24px;font-weight:900;color:#111827;">My Exam Academia</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;">กรอกรหัสเพื่อเข้าใช้งาน</div>
       </div>
 
@@ -271,7 +271,7 @@
       </div>
 
       <div style="text-align:center;margin-top:20px;font-size:11px;color:#9ca3af;">
-        Nanont Exam System
+        Plus Ultra! 🔥
       </div>
     </div>
   </div>
@@ -283,7 +283,7 @@
 <!-- ===================== PAGE: HOME ===================== -->
 <div id="page-home" class="page">
   <div class="container">
-    <h1 class="h1">Science Practice</h1>
+    <h1 class="h1">My Exam Academia</h1>
     <p class="muted" style="margin-top:8px;">เดโม HTML ล้วน (ไม่มี server/db) สำหรับดูหน้าตา UI ทั้งระบบ</p>
     <div class="list">
       <div class="linkCard" onclick="navigate('exams')">
@@ -1294,48 +1294,61 @@ let _pageParams={};
 
 // ===================== MEME SCORE POPUP =====================
 const MemeScore = (() => {
-  // meme data: [ svgArt, caption ]  — all inline, no external images needed
-  function makeSVG(bg, lines) {
-    const rows = lines.map((l,i) => `<text x="200" y="${90 + i*58}" text-anchor="middle" font-size="${l[1]||64}" font-family="serif">${l[0]}</text>`).join('');
-    return `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='220' style='background:${bg}'>${rows}</svg>`;
-  }
-
+  // Tenor GIF URLs — hotlink OK, format: media.tenor.com
   const MEMES = {
-    // 0–39% 💀 หายนะ
+    // 💀 0–39% หายนะ — crying cat memes
     disaster: [
-      [makeSVG('%23fecaca', [['😭',80],['💀 ข้อสอบฆ่าฉัน 💀',22]]), 'ข้อสอบ 1 - ฉัน 0'],
-      [makeSVG('%23fca5a5', [['🫠',80],['ละลายหายไปเลยดีกว่า',22]]), 'ขอกลับบ้านได้ไหมครับ'],
-      [makeSVG('%23fecdd3', [['😿',80],['แมวก็ยังร้องไห้แทน',22]]),   'น้ำตาจะไหลออกมาเอง'],
-      [makeSVG('%23fee2e2', [['🤡',80],['ตัวตลกแห่งวันนี้คือ...',22]]), 'ไม่ขอพูดถึงละกัน'],
+      ['https://media.tenor.com/aJeIvS0AuHcAAAAM/cat1.gif',              'แมวก็ยังร้องไห้แทนเลย'],
+      ['https://media.tenor.com/O4TFmBT4OwYAAAAM/sad-sad-cat.gif',       'น้ำตาจะไหลออกมาเองเลย'],
+      ['https://media.tenor.com/kLjMvS6hVWwAAAAM/cat-meme-crying-cat-meme.gif', 'สมองไปเที่ยวไหนมาครับ?'],
+      ['https://media.tenor.com/nZWtNu1AUjUAAAAM/sad-cat-cat.gif',       'ยังมีวันพรุ่งนี้นะ... บางที'],
+      ['https://media.tenor.com/Lg21skpXtU4AAAAM/cat-meme.gif',          'ขอกลับบ้านได้ไหมครับ 😭'],
+      ['https://media.tenor.com/14b3oQe1uw0AAAAM/cat-crying-cat.gif',    'ข้อสอบ 1 - ฉัน 0'],
+      ['https://media.tenor.com/3gB2Htq7NqkAAAAM/crying-cat-meme.gif',   'ตัวตลกแห่งวันนี้คือ...'],
+      ['https://media.tenor.com/FBEhcibcCO8AAAAM/kitty.gif',             'แมวน้อยร้องให้แทนเลย'],
     ],
-    // 40–59% 😬 พอผ่าน
+    // 😬 40–59% พอผ่าน — this is fine + hide pain harold
     meh: [
-      [makeSVG('%23fef9c3', [['😬',80],['This is fine. 🔥',26]]),       'ยิ้มทน ๆ ไว้ก่อน'],
-      [makeSVG('%23fef08a', [['🙃',80],['ทุกอย่างโอเคนะ (โกหก)',22]]), 'ผ่านก็คือผ่าน ไม่ต้องพูดมาก'],
-      [makeSVG('%23fde68a', [['😐',80],['... อืม',26]]),                'อย่างน้อยก็ยังไม่ตาย'],
-      [makeSVG('%23fcd34d', [['🫤',80],['กึ่ง ๆ กลาง ๆ',26]]),          'เรียกว่าผ่านก็ได้มั้ง'],
+      ['https://media.tenor.com/HKAF__MnnR4AAAAM/thisisfine-fire.gif',   'This is fine. 🔥'],
+      ['https://media.tenor.com/LsQ6gXZQE4sAAAAM/sad-cat-sad.gif',       'ยิ้มทน... ก็ได้'],
+      ['https://media.tenor.com/WfQaO1AHmvAAAAAM/cat-meme-cat-sad.gif',  'ผ่านก็คือผ่าน ไม่ต้องพูดมาก'],
+      ['https://media.tenor.com/uDOnzRNPL8UAAAAM/trannhuquynh.gif',      'อย่างน้อยก็ยังไม่ตาย'],
+      ['https://media.tenor.com/yXNxw5d5g-4AAAAM/ok-cat-okay-cat.gif',   'OK... ก็โอเคนะ'],
+      ['https://media.tenor.com/wAOPu8jgUTkAAAAM/cat-thumbs-up.gif',     'โอเค (โกหก)'],
     ],
-    // 60–79% 😎 ดี
+    // 😎 60–79% ดี — doge + cool memes
     good: [
-      [makeSVG('%23bfdbfe', [['🐶',80],['wow. such score. very nice.',20]]), 'Doge พอใจแล้ว'],
-      [makeSVG('%23a5f3fc', [['😎',80],['ไม่เลวเลยนะเนี่ย',26]]),           'ทำต่อไปนะจ๊ะ'],
-      [makeSVG('%23c7d2fe', [['🤓',80],['เด็กเรียนเกิดขึ้นแล้ว',22]]),      'กำลังดีเลย ไปต่อได้!'],
-      [makeSVG('%23d9f99d', [['💪',80],['ร่างกายพร้อม สมองพร้อม',22]]),     'ดีมาก อีกนิดก็ 80%'],
+      ['https://media.tenor.com/FLBmfkn2QJ0AAAAM/im-good.gif',           'wow. such score. very nice.'],
+      ['https://media.tenor.com/aFpEBzZ9YH0AAAAM/cat-meme-cat-crying-meme.gif', 'Doge พอใจมากกก'],
+      ['https://media.tenor.com/ZyqhFIPi2OgAAAAM/cat-crying-cat.gif',    'ไม่เลวเลยนะเนี่ย!'],
+      ['https://media.tenor.com/Jybgy6OTwfkAAAAM/crying-hug.gif',        'กำลังดีมาก ไปต่อได้!'],
+      ['https://media.tenor.com/NZiI52eqVPgAAAAM/cat.gif',               'สมองทำงานแล้ว! 🧠'],
+      ['https://media.tenor.com/bpMxTi1JUy4AAAAM/cat.gif',               'เก่งขึ้นทุกวันเลยนะ'],
     ],
-    // 80–100% 🔥 เทพ
+    // 🔥 80–100% เทพ — stonks + celebration
     goat: [
-      [makeSVG('%23bbf7d0', [['🗿',80],['GIGACHAD MODE ACTIVATED',20]]),     'ทำไมเก่งขนาดนี้ ไม่แฟร์'],
-      [makeSVG('%23a7f3d0', [['📈',80],['STONKS ↑↑↑',26]]),                  'คะแนนพุ่งทะยาน'],
-      [makeSVG('%23d1fae5', [['🏆',80],['เทพเจ้าแห่งข้อสอบ',24]]),          'ขอบคุณเทพเจ้าที่ช่วยมา'],
-      [makeSVG('%23ecfdf5', [['🤩',80],['ว้าววว 😍',26]]),                   'เก่งมากเลยนะ ยอดเยี่ยมสุด ๆ'],
+      ['https://media.tenor.com/FLBmfkn2QJ0AAAAM/im-good.gif',           'PLUS ULTRA!!! 🔥🔥🔥'],
+      ['https://media.tenor.com/yfZLNsORj3EAAAAM/sobbing-tecazzz.gif',   'STONKS ↑↑↑ คะแนนพุ่ง!'],
+      ['https://media.tenor.com/9PR5loGMyLQAAAAM/shocked-wow.gif',       'OMG เทพมากกกก!!!'],
+      ['https://media.tenor.com/FBEhcibcCO8AAAAM/kitty.gif',             'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
+      ['https://media.tenor.com/wAOPu8jgUTkAAAAM/cat-thumbs-up.gif',     'GIGACHAD MODE 🗿'],
+      ['https://media.tenor.com/ZyqhFIPi2OgAAAAM/cat-crying-cat.gif',    'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
     ],
   };
 
   const TIERS = [
-    { max:39,  key:'disaster', emoji:'💀', title:'โอ้โห...',        color:'#dc2626', bg:'#fef2f2' },
-    { max:59,  key:'meh',      emoji:'😬', title:'พอผ่านนะ',        color:'#f59e0b', bg:'#fffbeb' },
-    { max:79,  key:'good',     emoji:'😎', title:'เก่งเลย!',        color:'#2563eb', bg:'#eff6ff' },
-    { max:100, key:'goat',     emoji:'🔥', title:'เทพมากกกก!!!',   color:'#16a34a', bg:'#f0fdf4' },
+    { max:39,  key:'disaster', emoji:'💀', title:'โอ้โห...',       color:'#dc2626', bg:'#fef2f2',
+      speaker: 'ออลไมท์',
+      cheer: 'ล้มแล้วลุกขึ้นได้เสมอ! ทุก Hero เคยผ่านช่วงฝึกฝนมาก่อนทั้งนั้น — Plus Ultra!' },
+    { max:59,  key:'meh',      emoji:'😬', title:'พอผ่านนะ!',      color:'#f59e0b', bg:'#fffbeb',
+      speaker: 'ออลไมท์',
+      cheer: 'อัตลักษณ์ของเธอยังปลดล็อคไม่หมด! ฝึกต่อแล้วจะทะลุขีดจำกัดได้เอง — Plus Ultra!' },
+    { max:79,  key:'good',     emoji:'😎', title:'เก่งมาก!',       color:'#2563eb', bg:'#eff6ff',
+      speaker: 'ออลไมท์',
+      cheer: 'เก่งมากเลย! แต่ยอดฮีโร่ต้องการมากกว่านี้ ก้าวต่อไปอีกขั้น — Plus Ultra!' },
+    { max:100, key:'goat',     emoji:'🔥', title:'PLUS ULTRA!!!',  color:'#16a34a', bg:'#f0fdf4',
+      speaker: 'ออลไมท์',
+      cheer: 'เธอคือฮีโร่ที่ยิ่งใหญ่ที่สุด! ไม่มีอะไรกั้นเธอได้อีกแล้ว — PLUS ULTRA!!!' },
   ];
 
   let _onClose = null;
@@ -1410,6 +1423,23 @@ const MemeScore = (() => {
     document.getElementById('memePct').textContent    = `คิดเป็น ${pct}%`;
     document.getElementById('memePct').style.color    = tier.color;
     document.getElementById('memeCaption').textContent = caption;
+    // Plus Ultra cheer speech bubble
+    let cheerEl = document.getElementById('memeCheer');
+    if(!cheerEl){
+      cheerEl = document.createElement('div');
+      cheerEl.id = 'memeCheer';
+      document.getElementById('memeCaption').after(cheerEl);
+    }
+    cheerEl.innerHTML = `
+      <div style="position:relative;background:${tier.color}18;border:2px solid ${tier.color}44;border-radius:14px;padding:10px 14px;margin-bottom:4px;text-align:left;">
+        <div style="font-size:11px;font-weight:900;color:${tier.color};margin-bottom:4px;letter-spacing:.05em;">💬 ${tier.speaker} :</div>
+        <div style="font-size:13px;font-weight:700;color:${tier.color};line-height:1.6;">${tier.cheer}</div>
+      </div>
+      <div style="text-align:left;padding-left:20px;">
+        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid ${tier.color}44;display:inline-block;"></div>
+      </div>
+      <div style="font-size:20px;padding-left:14px;margin-top:-2px;">💪😁💪</div>
+    `;
     memeBox.style.background = tier.bg;
 
     loading.style.display = 'none';
@@ -1441,7 +1471,7 @@ function renderHome(){
     <div class="container">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
-          <h1 class="h1">Science Practice</h1>
+          <h1 class="h1">My Exam Academia</h1>
           <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : '👨‍🎓 โหมดนักเรียน'}</div>
         </div>
         <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
