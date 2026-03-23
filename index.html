@@ -1301,10 +1301,20 @@ const Store = {
     // Instead just update the cache; next Store.load() will get fresh data
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
-      // Only soft-refresh safe pages (home, exams list, stats) not mid-interaction pages
       const safeSoftRefresh = ['home','exams','stats'];
-      if(typeof navigate==='function' && window._currentPage && safeSoftRefresh.includes(window._currentPage)){
-        navigate(window._currentPage, window._currentParams||{});
+      const adminPages = ['admin','admin_new','admin_editor','admin_benchmark'];
+      const pg = window._currentPage;
+      if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
+        navigate(pg, window._currentParams||{});
+      } else if(pg && adminPages.includes(pg)){
+        let banner = document.getElementById('_syncConflictBanner');
+        if(!banner){
+          banner = document.createElement('div');
+          banner.id = '_syncConflictBanner';
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#1c1917;padding:10px 16px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.2);';
+          banner.innerHTML = '<span>⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น — ข้อมูลของคุณอาจไม่ใช่เวอร์ชันล่าสุด</span><span style="display:flex;gap:8px;flex-shrink:0;"><button onclick="location.reload()" style="background:#1c1917;color:#fef3c7;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🔄 โหลดใหม่</button><button onclick="document.getElementById('"_syncConflictBanner"').remove()" style="background:transparent;color:#1c1917;border:2px solid #1c1917;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">✕ ปิด (บันทึกของฉันต่อ)</button></span>';
+          document.body.prepend(banner);
+        }
       }
     });
     const s=this.load();
