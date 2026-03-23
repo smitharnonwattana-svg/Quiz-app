@@ -1165,14 +1165,22 @@ const FirebaseSync = (() => {
     } catch(e) { console.warn('[FB] save err', e); setStatus('error', '⚠️ sync ล้มเหลว'); return false; }
   }
 
-  // Read once from Firestore
+  // Read once from Firestore — always from server to bypass offline cache
   async function loadDoc(id) {
     if (!_ready) return null;
     try {
-      const s = await _doc(id).get();
+      // source: 'server' forces fresh fetch, prevents stale cache causing overwrites
+      const s = await _doc(id).get({ source: 'server' });
       if (!s.exists) return null;
       return JSON.parse(s.data()._d || 'null');
-    } catch(e) { console.warn('[FB] load err', e); return null; }
+    } catch(e) {
+      // fallback to cache if server unreachable
+      try {
+        const s = await _doc(id).get();
+        if (!s.exists) return null;
+        return JSON.parse(s.data()._d || 'null');
+      } catch(e2) { console.warn('[FB] load err', e2); return null; }
+    }
   }
 
   // Real-time listener — calls cb(data) whenever doc changes from any device
@@ -1184,15 +1192,25 @@ const FirebaseSync = (() => {
     }, e => { console.warn('[FB] listen err', e); setStatus('error', '⚠️ sync ขัดข้อง'); });
   }
 
-  // One-time migration: copy localStorage data → Firestore (only if Firestore empty)
+  // One-time migration: copy localStorage data → Firestore (only if Firestore empty AND local is newer)
   async function migrateLS(lsKey, docId) {
     if (!_ready) return;
     try {
-      const cloud = await loadDoc(docId);
-      if (cloud !== null) return; // already in cloud
+      // Always get fresh data from server (not offline cache)
+      const snap = await _doc(docId).get({ source: 'server' }).catch(() => null);
+      if (snap && snap.exists) {
+        console.log('[FB] cloud already has data, skipping migration');
+        return; // cloud has data → never overwrite with local
+      }
       const local = localStorage.getItem(lsKey);
       if (!local) return;
-      await saveDoc(docId, JSON.parse(local));
+      const localData = JSON.parse(local);
+      // Extra safety: only migrate if local data has actual exams (not seed/empty)
+      if (!localData || !localData.exams || localData.exams.length === 0) {
+        console.log('[FB] local data is empty/seed, skipping migration');
+        return;
+      }
+      await saveDoc(docId, localData);
       console.log('[FB] migrated', lsKey, '->', _ns(docId));
     } catch(e) { console.warn('[FB] migrate err', e); }
   }
