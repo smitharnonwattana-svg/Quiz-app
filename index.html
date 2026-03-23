@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
+  <!-- APP_VERSION: v40.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -226,8 +227,18 @@
     .titleInput{min-width:260px;max-width:520px;width:38vw;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;}
     .correctBtns{display:flex;gap:4px;}
     .correctBtn{width:34px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:13px;font-family:inherit;transition:all .12s;}
+    .iPadDot{width:12px;height:12px;border-radius:50%;border:1.5px solid #9ca3af;background:transparent;transition:all .15s;}
+    .iPadDot.filled{background:#111827;border-color:#111827;}
+    .iPadDot.error{background:#dc2626;border-color:#dc2626;}
+    @keyframes iPadShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+    .iPadBtn{display:flex;align-items:center;justify-content:center;width:76px;height:76px;border-radius:50%;border:1px solid #d1d5db;background:#fff;cursor:pointer;font-size:26px;font-weight:400;font-family:inherit;color:#111827;margin:0 auto;transition:background .1s;box-shadow:0 1px 3px rgba(0,0,0,.08);user-select:none;}
+    .iPadBtn:active{background:#e5e7eb;}
+    .iPadBtnGhost{background:#f3f4f6;font-size:14px;font-weight:600;color:#374151;border-color:#e5e7eb;box-shadow:none;}
     .correctBtn:hover{border-color:#9ca3af;background:#f3f4f6;}
     .correctBtn.selected{background:var(--black);border-color:var(--black);color:#fff;}
+    .freeBtn{min-width:38px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;transition:all .12s;padding:0 8px;}
+    .freeBtn:hover{border-color:#f59e0b;background:#fffbeb;}
+    .freeBtn.active{background:#f59e0b;border-color:#f59e0b;color:#fff;}
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -246,33 +257,46 @@
 
 <!-- ===================== PAGE: LOGIN ===================== -->
 <div id="page-login" class="page active">
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0f4ff 0%,#fafafa 100%);">
-    <div style="width:100%;max-width:360px;padding:24px;">
-      <div style="text-align:center;margin-bottom:32px;">
-        <div style="font-size:48px;margin-bottom:12px;">🎯</div>
-        <div style="font-size:24px;font-weight:900;color:#111827;">My Exam Academia</div>
-        <div style="font-size:13px;color:#6b7280;margin-top:6px;">กรอกรหัสเพื่อเข้าใช้งาน</div>
-      </div>
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f7;padding:16px;">
+    <div style="width:100%;max-width:300px;text-align:center;">
+      <div style="font-size:42px;margin-bottom:8px;">🎯</div>
+      <div style="font-size:20px;font-weight:700;color:#1d1d1f;margin-bottom:4px;">My Exam Academia</div>
+      <div style="font-size:14px;color:#6b7280;margin-bottom:24px;">กรอกรหัสผ่าน</div>
 
-      <div class="card" style="padding:28px;">
-        <div style="margin-bottom:20px;">
-          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">รหัสผ่าน</label>
-          <input id="loginPinInput" type="password" inputmode="numeric" maxlength="6"
-            placeholder=""
-            style="width:100%;padding:14px;font-size:22px;text-align:center;letter-spacing:8px;border:2px solid #e5e7eb;border-radius:12px;outline:none;font-family:monospace;"
-            oninput="this.value=this.value.replace(/[^0-9]/g,'')"
-            onkeydown="if(event.key==='Enter') doLogin()"
-          />
-        </div>
-        <div id="loginError" style="color:#dc2626;font-size:13px;text-align:center;margin-bottom:12px;min-height:18px;"></div>
-        <button onclick="doLogin()" class="btn btnPrimary" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;">
-          เข้าใช้งาน →
-        </button>
+      <!-- PIN dots -->
+      <div id="pinDotsRow" style="display:flex;justify-content:center;gap:14px;margin-bottom:10px;">
+        <div class="iPadDot" id="pd0"></div>
+        <div class="iPadDot" id="pd1"></div>
+        <div class="iPadDot" id="pd2"></div>
+        <div class="iPadDot" id="pd3"></div>
+        <div class="iPadDot" id="pd4"></div>
+        <div class="iPadDot" id="pd5"></div>
       </div>
+      <div id="loginError" style="color:#dc2626;font-size:13px;min-height:20px;margin-bottom:16px;"></div>
 
-      <div style="text-align:center;margin-top:20px;font-size:11px;color:#9ca3af;">
-        Plus Ultra! 🔥
+      <!-- hidden input — focused always so keyboard works -->
+      <input id="loginPinInput" type="tel" maxlength="6"
+        style="position:fixed;top:-9999px;left:-9999px;opacity:0;"
+        oninput="syncPinFromInput()"
+        onkeydown="if(event.key==='Enter') doLogin()"
+      />
+
+      <!-- Numpad -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:280px;margin:0 auto;">
+        <button class="iPadBtn" onclick="numpadPress('1')">1</button>
+        <button class="iPadBtn" onclick="numpadPress('2')">2</button>
+        <button class="iPadBtn" onclick="numpadPress('3')">3</button>
+        <button class="iPadBtn" onclick="numpadPress('4')">4</button>
+        <button class="iPadBtn" onclick="numpadPress('5')">5</button>
+        <button class="iPadBtn" onclick="numpadPress('6')">6</button>
+        <button class="iPadBtn" onclick="numpadPress('7')">7</button>
+        <button class="iPadBtn" onclick="numpadPress('8')">8</button>
+        <button class="iPadBtn" onclick="numpadPress('9')">9</button>
+        <button class="iPadBtn iPadBtnGhost" onclick="numpadClear()">ล้าง</button>
+        <button class="iPadBtn" onclick="numpadPress('0')">0</button>
+        <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
+      <div style="text-align:right;margin-top:14px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.2</div>
     </div>
   </div>
 </div>
@@ -471,6 +495,7 @@
         <div class="muted" id="eySub" style="margin-top:6px;"></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" id="eySwitchProgBtn" style="display:none;font-weight:700;"></button>
         <button class="btn btnPrimary" id="eyCompareBtnTop" onclick="navigate('entrance_compare')">🎯 เปรียบเทียบผลสอบ</button>
         <button class="btn" id="eyBackBtn">← กลับ</button>
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
@@ -490,6 +515,11 @@
         <div class="muted" style="font-size:11px;margin-bottom:10px;">แกนตั้ง = จำนวนผู้เข้าสอบ &nbsp;|&nbsp; แกนนอน = ช่วงคะแนนรวม (เต็ม 1,000)</div>
         <canvas id="esDistChart" style="width:100%;"></canvas>
         <div id="esDistEmpty" class="muted" style="display:none;font-size:13px;padding:8px 0;">ไม่มีข้อมูล</div>
+        <div id="esDistLegend" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:12px;height:12px;background:#dc2626;border-radius:2px;"></span> cutoff (ผ่าน)</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:12px;height:12px;background:#db2777;border-radius:2px;"></span> สำรอง</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:12px;height:12px;background:#f9a8d4;border-radius:2px;"></span> ช่วงสำรอง</span>
+        </div>
       </div>
       <div class="card" style="padding:16px;">
         <div style="font-weight:800;margin-bottom:10px;">⚖️ น้ำหนักเกณฑ์คะแนน</div>
@@ -501,7 +531,18 @@
     <div class="card" style="padding:16px;margin-top:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
         <div style="font-weight:800;">📋 ตารางคะแนนรายอันดับ</div>
-        <input id="esRankSearch" class="btn" style="text-align:left;padding:8px 12px;width:160px;font-size:13px;border-radius:10px;" placeholder="ค้นหาอันดับ..."/>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;">
+            <input type="checkbox" id="esFilterAdmit" checked onchange="renderRankTable()"> <span style="color:#16a34a;font-weight:700;">✅ ติด</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;">
+            <input type="checkbox" id="esFilterReserve" checked onchange="renderRankTable()"> <span style="color:#f97316;font-weight:700;">🟠 สำรอง</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;">
+            <input type="checkbox" id="esFilterOther" checked onchange="renderRankTable()"> <span style="color:#6b7280;font-weight:700;">— อื่นๆ</span>
+          </label>
+          <input id="esRankSearch" class="btn" style="text-align:left;padding:8px 12px;width:140px;font-size:13px;border-radius:10px;" placeholder="ค้นหาอันดับ..."/>
+        </div>
       </div>
       <div class="tableWrap"><table id="esRankTable"><thead id="esRankHead"></thead><tbody id="esRankBody"></tbody></table></div>
     </div>
@@ -886,6 +927,7 @@
                 <th style="width:56px;">ข้อ</th>
                 <th style="width:100px;">หน้า PDF</th>
                 <th style="width:120px;">เฉลย</th>
+                <th style="width:60px;">ฟรี</th>
               </tr>
             </thead>
             <tbody id="editorTbody"></tbody>
@@ -1071,6 +1113,10 @@ const PdfViewer = (() => {
 
 // ===================== FIREBASE SYNC =====================
 const FirebaseSync = (() => {
+  // แยก namespace ตาม origin — ป้องกันข้อมูลปนกันระหว่างเปิดจาก file:// กับ web
+  const _origin = location.protocol === 'file:' ? 'local' : (location.hostname || 'web').replace(/[^a-zA-Z0-9_-]/g, '_');
+  function _ns(docId) { return _origin + '_' + docId; }
+
   const CFG = {
     apiKey: "AIzaSyArMMqFEN4SuJGA_GxoCAvcn-_8kTm9yU0",
     authDomain: "nanont-exam.firebaseapp.com",
@@ -1106,7 +1152,7 @@ const FirebaseSync = (() => {
     }
   }
 
-  function _doc(id) { return db.collection('app').doc(id); }
+  function _doc(id) { return db.collection('app').doc(_ns(id)); }
 
   // Write to Firestore
   async function saveDoc(id, data) {
@@ -1147,11 +1193,11 @@ const FirebaseSync = (() => {
       const local = localStorage.getItem(lsKey);
       if (!local) return;
       await saveDoc(docId, JSON.parse(local));
-      console.log('[FB] migrated', lsKey, '->', docId);
+      console.log('[FB] migrated', lsKey, '->', _ns(docId));
     } catch(e) { console.warn('[FB] migrate err', e); }
   }
 
-  return { init, saveDoc, loadDoc, listenDoc, migrateLS, ready: () => _ready };
+  return { init, saveDoc, loadDoc, listenDoc, migrateLS, ready: () => _ready, ns: _ns };
 })();
 
 // ===================== STORE =====================
@@ -1184,6 +1230,23 @@ const Store = {
     if(s.benchmarks.length===0 && typeof PRESET_BENCHMARKS!=='undefined'){
       s.benchmarks=JSON.parse(JSON.stringify(PRESET_BENCHMARKS));
       this.save(s);
+    } else if(typeof PRESET_BENCHMARKS!=='undefined') {
+      // อัปเดต preset benchmarks เสมอ — rows หรือ subjects อาจมีการอัปเดต
+      let bmChanged=false;
+      PRESET_BENCHMARKS.forEach(preset=>{
+        const idx=s.benchmarks.findIndex(b=>b.id===preset.id);
+        if(idx>=0){
+          const stored=s.benchmarks[idx];
+          // เปรียบเทียบ JSON เพื่อดูว่ามีการเปลี่ยนแปลง (rows หรือ totalRanks)
+          const storedJson=JSON.stringify({rows:stored.rows, totalRanks:stored.totalRanks});
+          const presetJson=JSON.stringify({rows:preset.rows, totalRanks:preset.totalRanks});
+          if(storedJson!==presetJson){
+            s.benchmarks[idx]=JSON.parse(JSON.stringify(preset));
+            bmChanged=true;
+          }
+        }
+      });
+      if(bmChanged) this.save(s);
     }
     return s;
   },
@@ -1383,24 +1446,31 @@ const MemeScore = (() => {
       `📊 ตรวจข้อ ${Math.floor(total*0.85)}/${total}...`,
       `✅ เกือบเสร็จแล้ว (${total}/${total})`,
     ];
-    let elapsed = 0;
     let msgIdx = 0;
+    const startTime = Date.now();
+    let done = false;
     const interval = setInterval(() => {
-      elapsed += 80;
+      const elapsed = Date.now() - startTime;
       const pct = Math.min(100, (elapsed/DURATION)*100);
       fill.style.width = pct + '%';
-      if(elapsed % 600 < 80) {
-        loadTxt.textContent = MESSAGES[msgIdx % MESSAGES.length];
-        msgIdx++;
-      }
-      if(elapsed >= DURATION) {
+      const mi = Math.floor(pct / 25);
+      if(mi !== msgIdx) { msgIdx = mi; loadTxt.textContent = MESSAGES[Math.min(mi, MESSAGES.length-1)]; }
+      if(elapsed >= DURATION && !done) {
+        done = true;
         clearInterval(interval);
+        fill.style.width = '100%';
+        loadTxt.textContent = MESSAGES[MESSAGES.length-1];
         showResult(score, total);
       }
     }, 80);
+    // Guaranteed fallback — fires even if tab was backgrounded
+    setTimeout(() => {
+      if(!done) { done = true; clearInterval(interval); fill.style.width='100%'; showResult(score, total); }
+    }, DURATION + 500);
   }
 
   function showResult(score, total) {
+    try {
     const pct   = total > 0 ? Math.round(score/total*100) : 0;
     const tier  = getTier(pct);
     const [img, caption] = randMeme(tier.key);
@@ -1449,6 +1519,11 @@ const MemeScore = (() => {
     memeBox.style.animation = 'none';
     memeBox.offsetHeight; // reflow
     memeBox.style.animation = 'memePop .4s cubic-bezier(.34,1.56,.64,1)';
+    } catch(err) {
+      // If anything fails, skip meme and go straight to review
+      console.warn('MemeScore showResult error:', err);
+      close();
+    }
   }
 
   function close() {
@@ -1521,6 +1596,7 @@ const Auth = (() => {
   function isTeacher()  { return getRole() === 'teacher'; }
   function logout() {
     sessionStorage.removeItem(SESSION_KEY);
+    if(typeof numpadClear === 'function') numpadClear();
     navigate('login');
     setTimeout(()=>{
       const inp = document.getElementById('loginPinInput');
@@ -1538,18 +1614,68 @@ const Auth = (() => {
   return { login, logout, isLoggedIn, isTeacher, getRole };
 })();
 
+// ===================== NUMPAD LOGIN =====================
+let _pinVal = '';
+function _updatePinDots(shake) {
+  const dotsEl = document.getElementById('pinDotsRow');
+  for(let i=0;i<6;i++){
+    const d=document.getElementById('pd'+i);
+    if(!d) continue;
+    d.className='iPadDot'+(i<_pinVal.length?' filled':'')+(shake?' error':'');
+  }
+  if(shake && dotsEl){
+    dotsEl.style.animation='none';
+    dotsEl.offsetHeight;
+    dotsEl.style.animation='iPadShake .5s ease';
+  }
+}
+function numpadPress(n){
+  if(_pinVal.length>=6) return;
+  _pinVal+=n;
+  _updatePinDots(false);
+  document.getElementById('loginError').textContent='';
+  if(_pinVal.length===6) setTimeout(doLogin,120);
+}
+function numpadBack(){
+  _pinVal=_pinVal.slice(0,-1);
+  _updatePinDots(false);
+}
+function numpadClear(){
+  _pinVal='';
+  _updatePinDots(false);
+  document.getElementById('loginError').textContent='';
+}
+function syncPinFromInput(){
+  const inp=document.getElementById('loginPinInput');
+  if(!inp) return;
+  _pinVal=inp.value.replace(/[^0-9]/g,'').slice(0,6);
+  _updatePinDots(false);
+  if(_pinVal.length===6) setTimeout(doLogin,120);
+}
+// keyboard support — listen on document so no focus needed
+document.addEventListener('keydown', function(e){
+  if(document.getElementById('page-login')?.classList.contains('active')){
+    if(e.key>='0'&&e.key<='9') numpadPress(e.key);
+    else if(e.key==='Backspace') numpadBack();
+    else if(e.key==='Escape') numpadClear();
+    else if(e.key==='Enter') doLogin();
+  }
+});
+
 function doLogin() {
-  const pin = document.getElementById('loginPinInput').value.trim();
+  const pin = _pinVal || document.getElementById('loginPinInput').value.trim();
   const errEl = document.getElementById('loginError');
   if (pin.length < 1) { return; }
   const role = Auth.login(pin);
   if (!role) {
     errEl.textContent = '❌ รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง';
-    document.getElementById('loginPinInput').value = '';
-    document.getElementById('loginPinInput').focus();
+    _updatePinDots(true);
+    setTimeout(()=>{ _pinVal=''; _updatePinDots(false); }, 600);
     return;
   }
   errEl.textContent = '';
+  _pinVal = '';
+  _updatePinDots(false);
   navigate('home');
 }
 
@@ -1839,21 +1965,23 @@ function initTake(id){
     if(!st.started){toast('กดเริ่มทำข้อสอบก่อน');return;}
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
     let score=0;
-    qsList.forEach(q=>{if(st.answers[q.id]&&st.answers[q.id]===q.correct) score++;});
+    qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&st.answers[q.id]===q.correct)) score++;});
     const perQuestion=qsList.map(q=>{
       const chosen=st.answers[q.id]||null;
       const correct=q.correct||null;
-      return{qid:q.id,no:q.no||q.number,page:q.page,chosen,correct,isCorrect:chosen&&correct?(chosen===correct):false,unsure:!!st.unsure[q.id]};
+      const isFree=!!q.isFree;
+      const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
+      return{qid:q.id,no:q.no||q.number,page:q.page,chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
     });
     const usedSeconds=st.startedAt?Math.min(Math.floor((Date.now()-st.startedAt)/1000),exam.durationSeconds):0;
     const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
     const savedS=Store.load();
     savedS.attempts.unshift({id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion});
     const ok=Store.save(savedS);
-    if(!ok) alert('บันทึกสถิติไม่สำเร็จ\n\nสาเหตุที่พบบ่อย: เปิดไฟล์แบบออฟไลน์บน iPad/iOS จะไม่เก็บ localStorage\n\nทางแก้: เปิดผ่านลิงก์ https แล้วสถิติจะบันทึกได้');
     // 🎉 Show meme popup before going to review
     MemeScore.show(score, total, () => {
       navigate('review', {attemptId: st.attemptId});
+      if(!ok) setTimeout(()=>toast('⚠️ บันทึกสถิติไม่สำเร็จ — ลองเปิดผ่านลิงก์ https'),300);
     });
   }
 
@@ -1998,17 +2126,18 @@ function initReview(attemptId){
     const chosen=(answers[q.id]??answers[String(q.id)]??null);
     const correct=(q.correct==null)?null:String(q.correct).trim();
     const isCorrect=isCorrectQ(q);
+    const isFree=!!(q.isFree||(Array.isArray(att.perQuestion)&&att.perQuestion.find(p=>Number(p.no)===Number(q.no))?.isFree));
     const wrap=document.createElement('div');
     wrap.className='qItem';wrap.id=`rq-${q.no}`;
     wrap.innerHTML=`
       <div class="qHead">
-        <div style="font-weight:800;">ข้อ ${q.no} <span class="muted">(หน้า ${q.page||1})</span></div>
+        <div style="font-weight:800;">ข้อ ${q.no} <span class="muted">(หน้า ${q.page||1})</span>${isFree?' <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:4px;">ฟรี</span>':''}</div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="qBadge ${isCorrect?'good':'bad'}">${isCorrect?'ถูก':(chosen?'ผิด':'ยังไม่ตอบ')}</span>
           ${(!_reviewIsGDrive && q.page) ? '<button class="btn" data-page="'+q.page+'">หน้า '+q.page+'</button>' : ''}
         </div>
       </div>
-      <div class="muted" style="margin-top:6px;">เฉลย: <b>${correct||'-'}</b> • คำตอบของคุณ: <b>${chosen==null?'-':String(chosen).trim()}</b></div>
+      <div class="muted" style="margin-top:6px;">${isFree?'<span style="color:#d97706;font-weight:700;">★ ข้อฟรี — ทุกคนได้คะแนนข้อนี้</span>':('เฉลย: <b>'+(correct||'-')+'</b> • คำตอบของคุณ: <b>'+(chosen==null?'-':String(chosen).trim())+'</b>')}</div>
       <div class="opts"></div>
     `;
     const pageBtn=wrap.querySelector('button[data-page]'); if(pageBtn) pageBtn.onclick=(e)=>{e.stopPropagation();setPdfPage(Number(pageBtn.dataset.page)||1);};
@@ -2655,13 +2784,13 @@ function initEditor(examId){
 
   let selectedIndex=0;
   const refs={};
-  const fieldOrder=['page','correct'];
+  const fieldOrder=['page','correct','free'];
 
   function select(i){selectedIndex=Math.max(0,Math.min(list.length-1,i));highlight();}
   function highlight(){[...document.getElementById('editorTbody').children].forEach((tr,idx)=>{tr.className=idx===selectedIndex?'rowActive':'';}); }
   function focusField(ri,field){const el=refs[`${ri}:${field}`];if(el&&el.focus) el.focus();}
   function nextField(ri,field){const i=fieldOrder.indexOf(field);if(i<fieldOrder.length-1) return{rowIndex:ri,field:fieldOrder[i+1]};return{rowIndex:Math.min(ri+1,list.length-1),field:'page'};}
-  function prevField(ri,field){const i=fieldOrder.indexOf(field);if(i>0) return{rowIndex:ri,field:fieldOrder[i-1]};return{rowIndex:Math.max(ri-1,0),field:'correct'};}
+  function prevField(ri,field){const i=fieldOrder.indexOf(field);if(i>0) return{rowIndex:ri,field:fieldOrder[i-1]};return{rowIndex:Math.max(ri-1,0),field:'free'};}
   function onFastKey(e,ri,field){
     if(!document.getElementById('editorFast').checked) return;
     if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();const back=e.shiftKey;const t=back?prevField(ri,field):nextField(ri,field);select(t.rowIndex);requestAnimationFrame(()=>focusField(t.rowIndex,t.field));}
@@ -2675,7 +2804,7 @@ function initEditor(examId){
     list.forEach((q,idx)=>{
       const tr=document.createElement('tr');
       tr.addEventListener('click',()=>select(idx));
-      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td>`;
+      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td>`;
       const correctVal = q.correct||'A';
       tr.querySelectorAll('.correctBtn').forEach(btn=>{
         if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
@@ -2691,7 +2820,30 @@ function initEditor(examId){
       refs[`${idx}:page`]=pageInput;
       pageInput.addEventListener('focus',()=>select(idx));
       pageInput.addEventListener('keydown',(e)=>onFastKey(e,idx,'page'));
-      pageInput.addEventListener('input',()=>{ q.page=Math.max(1,Number(pageInput.value||1)); });
+      pageInput.addEventListener('input',()=>{
+        const newPage = Math.max(1,Number(pageInput.value||1));
+        q.page = newPage;
+        // auto-fill ข้อถัดไปทั้งหมด
+        for(let i=idx+1; i<list.length; i++){
+          list[i].page = newPage;
+        }
+        // re-render inputs ของข้อถัดไป (ไม่ re-render ทั้งตาราง เพื่อไม่เสีย focus)
+        for(let i=idx+1; i<list.length; i++){
+          const el=refs[`${i}:page`];
+          if(el) el.value=newPage;
+        }
+      });
+      const freeBtn = tr.querySelector('.freeBtn');
+      refs[`${idx}:free`]=freeBtn;
+      freeBtn.addEventListener('focus',()=>select(idx));
+      freeBtn.addEventListener('keydown',(e)=>onFastKey(e,idx,'free'));
+      freeBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        select(idx);
+        q.isFree=!q.isFree;
+        freeBtn.classList.toggle('active',q.isFree);
+        freeBtn.textContent=q.isFree?'✓ ฟรี':'ฟรี';
+      });
       tbody.appendChild(tr);
     });
     select(selectedIndex);
@@ -2711,17 +2863,17 @@ function downloadExcelTemplate(qCount, filename) {
   if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
 
   // header row
-  const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (ก/ข/ค/ง)']];
+  const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (ก/ข/ค/ง)', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
 
   // data rows — ใส่ตัวอย่าง ก ไว้ทุกข้อ หน้า PDF เพิ่มทีละ 5 ข้อ
   for (let i = 1; i <= qCount; i++) {
-    rows.push([i, Math.max(1, Math.ceil(i / 5)), 'ก']);
+    rows.push([i, Math.max(1, Math.ceil(i / 5)), 'ก', '']);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
 
   // ตั้งความกว้าง column
-  ws['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 20 }];
+  ws['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 20 }];
 
   // style header (SheetJS community ทำได้แค่ basic)
   const wb = XLSX.utils.book_new();
@@ -2752,7 +2904,7 @@ function normalizeAnswer(v) {
   return null;
 }
 
-// อ่าน Excel/CSV แล้วคืน array [{no, page, correct}]
+// อ่าน Excel/CSV แล้วคืน array [{no, page, correct, isFree}]
 function parseExcelFile(file) {
   return new Promise((resolve, reject) => {
     if (typeof XLSX === 'undefined') {
@@ -2780,8 +2932,10 @@ function parseExcelFile(file) {
           const no = parseInt(row[0]);
           const page = parseInt(row[1]) || 1;
           const correct = normalizeAnswer(row[2]);
-          if (!isNaN(no) && no > 0 && correct) {
-            result.push({ no, page, correct });
+          const isFreeVal = String(row[3]||'').trim();
+          const isFree = isFreeVal==='1'||isFreeVal.toLowerCase()==='true'||isFreeVal==='ฟรี';
+          if (!isNaN(no) && no > 0 && (correct||isFree)) {
+            result.push({ no, page, correct: correct||'A', isFree });
           }
         }
         resolve(result);
@@ -2862,6 +3016,7 @@ function bindEditorExcel(examId, list, renderFn) {
         if (q) {
           q.page = row.page;
           q.correct = row.correct;
+          q.isFree = !!row.isFree;
           updated++;
         }
       });
@@ -2876,7 +3031,7 @@ function bindEditorExcel(examId, list, renderFn) {
 }
 
 
-const PRESET_BENCHMARKS = [{"id": "bm_gate69", "name": "สวนกุหลาบ GATE ปี 2569 (ผลจริง)", "examId": null, "rows": [{"rank": 1, "total": 834.0, "subjects": {"คณิตศาสตร์": 336.0, "วิทยาศาสตร์": 350.0, "ภาษาอังกฤษ": 88.0, "ภาษาไทย": 60.0}}, {"rank": 3, "total": 750.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 64.0}}, {"rank": 4, "total": 742.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 80.0, "ภาษาไทย": 68.0}}, {"rank": 11, "total": 726.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 80.0, "ภาษาไทย": 52.0}}, {"rank": 12, "total": 724.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 84.0, "ภาษาไทย": 72.0}}, {"rank": 13, "total": 722.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 310.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 64.0}}, {"rank": 14, "total": 722.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 48.0}}, {"rank": 20, "total": 708.0, "subjects": {"คณิตศาสตร์": 352.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 56.0}}, {"rank": 21, "total": 706.0, "subjects": {"คณิตศาสตร์": 290.0, "วิทยาศาสตร์": 288.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 64.0}}, {"rank": 22, "total": 704.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 340.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 52.0}}, {"rank": 26, "total": 694.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 28.0}}, {"rank": 27, "total": 694.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 72.0}}, {"rank": 28, "total": 694.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 56.0}}, {"rank": 32, "total": 686.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 56.0}}, {"rank": 35, "total": 682.0, "subjects": {"คณิตศาสตร์": 368.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 36.0}}, {"rank": 36, "total": 680.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 300.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 64.0}}, {"rank": 37, "total": 680.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 72.0}}, {"rank": 42, "total": 672.0, "subjects": {"คณิตศาสตร์": 280.0, "วิทยาศาสตร์": 288.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 60.0}}, {"rank": 45, "total": 666.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 310.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 80.0}}, {"rank": 49, "total": 660.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 300.0, "ภาษาอังกฤษ": 72.0, "ภาษาไทย": 48.0}}, {"rank": 50, "total": 658.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 52.0}}, {"rank": 52, "total": 654.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 72.0}}, {"rank": 58, "total": 650.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 64.0}}, {"rank": 63, "total": 648.0, "subjects": {"คณิตศาสตร์": 260.0, "วิทยาศาสตร์": 256.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 64.0}}, {"rank": 65, "total": 648.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 52.0}}, {"rank": 68, "total": 646.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 48.0}}, {"rank": 74, "total": 638.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 72.0, "ภาษาไทย": 72.0}}, {"rank": 75, "total": 638.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 190.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 52.0}}, {"rank": 76, "total": 636.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 88.0, "ภาษาไทย": 32.0}}, {"rank": 78, "total": 636.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 60.0}}, {"rank": 79, "total": 632.0, "subjects": {"คณิตศาสตร์": 208.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 80.0}}, {"rank": 84, "total": 624.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 36.0}}, {"rank": 85, "total": 624.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 68.0}}, {"rank": 87, "total": 624.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 32.0, "ภาษาไทย": 64.0}}, {"rank": 94, "total": 620.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 24.0}}, {"rank": 94, "total": 620.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 24.0}}, {"rank": 97, "total": 618.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 68.0}}, {"rank": 98, "total": 618.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 52.0}}, {"rank": 101, "total": 616.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 36.0}}, {"rank": 105, "total": 612.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 52.0}}, {"rank": 106, "total": 612.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 64.0}}, {"rank": 108, "total": 610.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 52.0}}, {"rank": 109, "total": 608.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 300.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 32.0}}, {"rank": 111, "total": 606.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 56.0}}, {"rank": 112, "total": 604.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 60.0}}, {"rank": 113, "total": 604.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 56.0}}, {"rank": 114, "total": 604.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 60.0}}, {"rank": 118, "total": 600.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 36.0}}, {"rank": 120, "total": 600.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 60.0}}, {"rank": 123, "total": 598.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 48.0}}, {"rank": 126, "total": 596.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 80.0, "ภาษาไทย": 12.0}}, {"rank": 128, "total": 594.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 80.0, "ภาษาไทย": 72.0}}, {"rank": 129, "total": 592.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 24.0}}, {"rank": 132, "total": 590.0, "subjects": {"คณิตศาสตร์": 208.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 56.0}}, {"rank": 134, "total": 590.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 64.0}}, {"rank": 135, "total": 588.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 25.0, "ภาษาไทย": 64.0}}, {"rank": 140, "total": 582.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 20.0, "ภาษาไทย": 40.0}}, {"rank": 142, "total": 582.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 58.0}}, {"rank": 143, "total": 582.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 190.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 36.0}}, {"rank": 146, "total": 578.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 36.0}}, {"rank": 147, "total": 578.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 56.0}}, {"rank": 150, "total": 578.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 60.0}}, {"rank": 152, "total": 576.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 72.0}}, {"rank": 155, "total": 574.0, "subjects": {"คณิตศาสตร์": 250.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 44.0}}, {"rank": 156, "total": 574.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 48.0}}, {"rank": 163, "total": 570.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 56.0}}, {"rank": 165, "total": 566.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 20.0, "ภาษาไทย": 60.0}}, {"rank": 167, "total": 562.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 48.0}}, {"rank": 169, "total": 560.0, "subjects": {"คณิตศาสตร์": 208.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 52.0}}, {"rank": 185, "total": 552.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 160.0, "ภาษาอังกฤษ": 72.0, "ภาษาไทย": 48.0}}, {"rank": 190, "total": 550.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 170.0, "ภาษาอังกฤษ": 72.0, "ภาษาไทย": 36.0}}, {"rank": 198, "total": 544.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 20.0, "ภาษาไทย": 52.0}}, {"rank": 199, "total": 544.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 24.0}}, {"rank": 202, "total": 544.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 60.0}}, {"rank": 212, "total": 538.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 44.0}}, {"rank": 213, "total": 538.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 170.0, "ภาษาอังกฤษ": 32.0, "ภาษาไทย": 48.0}}, {"rank": 239, "total": 520.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 16.0, "ภาษาไทย": 40.0}}, {"rank": 244, "total": 520.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 180.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 72.0}}, {"rank": 255, "total": 510.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 32.0, "ภาษาไทย": 36.0}}, {"rank": 262, "total": 508.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 180.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 60.0}}, {"rank": 276, "total": 500.0, "subjects": {"คณิตศาสตร์": 176.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 60.0}}, {"rank": 292, "total": 490.0, "subjects": {"คณิตศาสตร์": 208.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 44.0}}, {"rank": 309, "total": 484.0, "subjects": {"คณิตศาสตร์": 208.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 52.0}}, {"rank": 311, "total": 484.0, "subjects": {"คณิตศาสตร์": 144.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 72.0}}, {"rank": 316, "total": 482.0, "subjects": {"คณิตศาสตร์": 176.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 60.0}}, {"rank": 317, "total": 482.0, "subjects": {"คณิตศาสตร์": 144.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 72.0}}, {"rank": 321, "total": 480.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 48.0}}, {"rank": 412, "total": 428.0, "subjects": {"คณิตศาสตร์": 176.0, "วิทยาศาสตร์": 180.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 36.0}}], "subjectCols": ["คณิตศาสตร์", "วิทยาศาสตร์", "ภาษาอังกฤษ", "ภาษาไทย"], "totalRanks": 900, "createdAt": 1700000000000}, {"id": "bm_eplus69", "name": "สวนกุหลาบ EPLUS ปี 2569 (ผลจริง)", "examId": null, "rows": [{"rank": 1, "total": 876.25, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 480.0}}, {"rank": 2, "total": 872.5, "subjects": {"คณิตศาสตร์": 230.0, "วิทยาศาสตร์": 212.5, "ภาษาอังกฤษ": 430.0}}, {"rank": 3, "total": 841.25, "subjects": {"คณิตศาสตร์": 230.0, "วิทยาศาสตร์": 181.25, "ภาษาอังกฤษ": 430.0}}, {"rank": 5, "total": 817.5, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 187.5, "ภาษาอังกฤษ": 460.0}}, {"rank": 6, "total": 808.75, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 450.0}}, {"rank": 8, "total": 803.75, "subjects": {"คณิตศาสตร์": 200.0, "วิทยาศาสตร์": 193.75, "ภาษาอังกฤษ": 410.0}}, {"rank": 9, "total": 802.5, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 470.0}}, {"rank": 10, "total": 795.0, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 460.0}}, {"rank": 11, "total": 793.75, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 193.75, "ภาษาอังกฤษ": 460.0}}, {"rank": 12, "total": 793.75, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 193.75, "ภาษาอังกฤษ": 360.0}}, {"rank": 12, "total": 793.75, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 193.75, "ภาษาอังกฤษ": 360.0}}, {"rank": 13, "total": 791.25, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 181.25, "ภาษาอังกฤษ": 460.0}}, {"rank": 14, "total": 791.25, "subjects": {"คณิตศาสตร์": 180.0, "วิทยาศาสตร์": 181.25, "ภาษาอังกฤษ": 430.0}}, {"rank": 14, "total": 791.25, "subjects": {"คณิตศาสตร์": 180.0, "วิทยาศาสตร์": 181.25, "ภาษาอังกฤษ": 430.0}}, {"rank": 17, "total": 781.25, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 131.25, "ภาษาอังกฤษ": 460.0}}, {"rank": 19, "total": 778.75, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 470.0}}, {"rank": 21, "total": 770.0, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 460.0}}, {"rank": 22, "total": 770.0, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 460.0}}, {"rank": 23, "total": 770.0, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 450.0}}, {"rank": 25, "total": 767.5, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 137.5, "ภาษาอังกฤษ": 440.0}}, {"rank": 29, "total": 763.75, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 193.75, "ภาษาอังกฤษ": 400.0}}, {"rank": 30, "total": 762.5, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 430.0}}, {"rank": 33, "total": 756.25, "subjects": {"คณิตศาสตร์": 130.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 470.0}}, {"rank": 34, "total": 756.25, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 450.0}}, {"rank": 36, "total": 755.0, "subjects": {"คณิตศาสตร์": 210.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 370.0}}, {"rank": 37, "total": 752.5, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 430.0}}, {"rank": 38, "total": 750.0, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 450.0}}, {"rank": 38, "total": 750.0, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 450.0}}, {"rank": 39, "total": 748.75, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 430.0}}, {"rank": 40, "total": 748.5, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 420.0}}, {"rank": 41, "total": 747.5, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 187.5, "ภาษาอังกฤษ": 420.0}}, {"rank": 42, "total": 747.5, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 187.5, "ภาษาอังกฤษ": 370.0}}, {"rank": 44, "total": 745.0, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 420.0}}, {"rank": 50, "total": 736.25, "subjects": {"คณิตศาสตร์": 90.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 490.0}}, {"rank": 51, "total": 735.0, "subjects": {"คณิตศาสตร์": 130.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 430.0}}, {"rank": 52, "total": 732.5, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 400.0}}, {"rank": 56, "total": 725.0, "subjects": {"คณิตศาสตร์": 130.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 420.0}}, {"rank": 56, "total": 725.0, "subjects": {"คณิตศาสตร์": 130.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 420.0}}, {"rank": 57, "total": 725.0, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 125.0, "ภาษาอังกฤษ": 410.0}}, {"rank": 58, "total": 725.0, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 400.0}}, {"rank": 61, "total": 721.25, "subjects": {"คณิตศาสตร์": 130.0, "วิทยาศาสตร์": 181.25, "ภาษาอังกฤษ": 410.0}}, {"rank": 62, "total": 718.75, "subjects": {"คณิตศาสตร์": 80.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 470.0}}, {"rank": 63, "total": 718.75, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 410.0}}, {"rank": 64, "total": 718.75, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 218.75, "ภาษาอังกฤษ": 330.0}}, {"rank": 66, "total": 717.5, "subjects": {"คณิตศาสตร์": 110.0, "วิทยาศาสตร์": 187.5, "ภาษาอังกฤษ": 420.0}}, {"rank": 68, "total": 715.0, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 175.0, "ภาษาอังกฤษ": 420.0}}, {"rank": 69, "total": 713.75, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 143.75, "ภาษาอังกฤษ": 430.0}}, {"rank": 70, "total": 712.5, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 430.0}}, {"rank": 72, "total": 708.75, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 390.0}}, {"rank": 79, "total": 697.5, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 187.5, "ภาษาอังกฤษ": 390.0}}, {"rank": 80, "total": 696.25, "subjects": {"คณิตศาสตร์": 60.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 480.0}}, {"rank": 84, "total": 693.75, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 143.75, "ภาษาอังกฤษ": 360.0}}, {"rank": 95, "total": 686.25, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 380.0}}, {"rank": 98, "total": 682.5, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 360.0}}, {"rank": 112, "total": 671.25, "subjects": {"คณิตศาสตร์": 100.0, "วิทยาศาสตร์": 131.25, "ภาษาอังกฤษ": 440.0}}, {"rank": 129, "total": 657.5, "subjects": {"คณิตศาสตร์": 180.0, "วิทยาศาสตร์": 87.5, "ภาษาอังกฤษ": 390.0}}, {"rank": 133, "total": 652.5, "subjects": {"คณิตศาสตร์": 180.0, "วิทยาศาสตร์": 162.5, "ภาษาอังกฤษ": 310.0}}, {"rank": 134, "total": 651.25, "subjects": {"คณิตศาสตร์": 130.0, "วิทยาศาสตร์": 131.25, "ภาษาอังกฤษ": 390.0}}, {"rank": 196, "total": 607.5, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 137.5, "ภาษาอังกฤษ": 350.0}}, {"rank": 215, "total": 590.0, "subjects": {"คณิตศาสตร์": 100.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 340.0}}, {"rank": 234, "total": 566.25, "subjects": {"คณิตศาสตร์": 90.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 320.0}}, {"rank": 248, "total": 553.75, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 143.75, "ภาษาอังกฤษ": 290.0}}, {"rank": 252, "total": 547.5, "subjects": {"คณิตศาสตร์": 50.0, "วิทยาศาสตร์": 87.5, "ภาษาอังกฤษ": 410.0}}], "subjectCols": ["คณิตศาสตร์", "วิทยาศาสตร์", "ภาษาอังกฤษ"], "totalRanks": 900, "createdAt": 1700000000000}, {"id": "bm_gate68", "name": "สวนกุหลาบ GATE ปี 2568 (ผลจริง)", "examId": null, "rows": [{"rank": 1, "total": 826.0, "subjects": {"คณิตศาสตร์": 368.0, "วิทยาศาสตร์": 330.0, "ภาษาอังกฤษ": 92.0, "ภาษาไทย": 36.0}}, {"rank": 2, "total": 768.0, "subjects": {"คณิตศาสตร์": 336.0, "วิทยาศาสตร์": 300.0, "ภาษาอังกฤษ": 84.0, "ภาษาไทย": 48.0}}, {"rank": 3, "total": 744.0, "subjects": {"คณิตศาสตร์": 352.0, "วิทยาศาสตร์": 300.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 44.0}}, {"rank": 6, "total": 722.0, "subjects": {"คณิตศาสตร์": 336.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 88.0, "ภาษาไทย": 48.0}}, {"rank": 8, "total": 710.0, "subjects": {"คณิตศาสตร์": 352.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 32.0}}, {"rank": 9, "total": 702.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 48.0}}, {"rank": 12, "total": 692.0, "subjects": {"คณิตศาสตร์": 384.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 88.0, "ภาษาไทย": 20.0}}, {"rank": 14, "total": 690.0, "subjects": {"คณิตศาสตร์": 336.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 36.0}}, {"rank": 15, "total": 688.0, "subjects": {"คณิตศาสตร์": 368.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 44.0}}, {"rank": 16, "total": 686.0, "subjects": {"คณิตศาสตร์": 320.0, "วิทยาศาสตร์": 290.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 48.0}}, {"rank": 17, "total": 684.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 320.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 20.0}}, {"rank": 27, "total": 646.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 28.0}}, {"rank": 28, "total": 644.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 52.0}}, {"rank": 31, "total": 640.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 80.0, "ภาษาไทย": 44.0}}, {"rank": 32, "total": 640.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 52.0}}, {"rank": 33, "total": 638.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 52.0}}, {"rank": 34, "total": 636.0, "subjects": {"คณิตศาสตร์": 336.0, "วิทยาศาสตร์": 180.0, "ภาษาอังกฤษ": 68.0, "ภาษาไทย": 52.0}}, {"rank": 35, "total": 636.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 52.0}}, {"rank": 37, "total": 634.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 44.0}}, {"rank": 39, "total": 632.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 56.0}}, {"rank": 40, "total": 630.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 270.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 28.0}}, {"rank": 45, "total": 628.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 44.0}}, {"rank": 46, "total": 628.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 60.0}}, {"rank": 49, "total": 620.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 36.0}}, {"rank": 51, "total": 618.0, "subjects": {"คณิตศาสตร์": 352.0, "วิทยาศาสตร์": 170.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 32.0}}, {"rank": 53, "total": 616.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 44.0}}, {"rank": 55, "total": 616.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 54.0}}, {"rank": 60, "total": 612.0, "subjects": {"คณิตศาสตร์": 208.0, "วิทยาศาสตร์": 300.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 44.0}}, {"rank": 70, "total": 602.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 36.0}}, {"rank": 71, "total": 600.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 28.0}}, {"rank": 79, "total": 594.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 40.0}}, {"rank": 80, "total": 592.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 44.0}}, {"rank": 81, "total": 592.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 12.0, "ภาษาไทย": 32.0}}, {"rank": 82, "total": 592.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 36.0}}, {"rank": 84, "total": 590.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 44.0}}, {"rank": 86, "total": 590.0, "subjects": {"คณิตศาสตร์": 272.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 32.0, "ภาษาไทย": 56.0}}, {"rank": 88, "total": 586.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 16.0, "ภาษาไทย": 32.0}}, {"rank": 91, "total": 584.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 56.0}}, {"rank": 93, "total": 582.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 28.0}}, {"rank": 97, "total": 578.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 36.0}}, {"rank": 98, "total": 578.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 56.0, "ภาษาไทย": 32.0}}, {"rank": 102, "total": 574.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 44.0, "ภาษาไทย": 44.0}}, {"rank": 104, "total": 572.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 240.0, "ภาษาอังกฤษ": 36.0, "ภาษาไทย": 40.0}}, {"rank": 105, "total": 572.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 12.0}}, {"rank": 111, "total": 568.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 260.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 44.0}}, {"rank": 112, "total": 568.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 220.0, "ภาษาอังกฤษ": 64.0, "ภาษาไทย": 44.0}}, {"rank": 113, "total": 568.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 200.0, "ภาษาอังกฤษ": 28.0, "ภาษาไทย": 36.0}}, {"rank": 116, "total": 566.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 230.0, "ภาษาอังกฤษ": 60.0, "ภาษาไทย": 36.0}}, {"rank": 122, "total": 562.0, "subjects": {"คณิตศาสตร์": 224.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 52.0, "ภาษาไทย": 36.0}}, {"rank": 123, "total": 562.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 190.0, "ภาษาอังกฤษ": 40.0, "ภาษาไทย": 44.0}}, {"rank": 128, "total": 560.0, "subjects": {"คณิตศาสตร์": 288.0, "วิทยาศาสตร์": 160.0, "ภาษาอังกฤษ": 76.0, "ภาษาไทย": 36.0}}, {"rank": 131, "total": 558.0, "subjects": {"คณิตศาสตร์": 256.0, "วิทยาศาสตร์": 210.0, "ภาษาอังกฤษ": 48.0, "ภาษาไทย": 44.0}}, {"rank": 138, "total": 550.0, "subjects": {"คณิตศาสตร์": 240.0, "วิทยาศาสตร์": 250.0, "ภาษาอังกฤษ": 20.0, "ภาษาไทย": 40.0}}, {"rank": 140, "total": 548.0, "subjects": {"คณิตศาสตร์": 304.0, "วิทยาศาสตร์": 180.0, "ภาษาอังกฤษ": 24.0, "ภาษาไทย": 40.0}}, {"rank": 142, "total": 548.0, "subjects": {"คณิตศาสตร์": 192.0, "วิทยาศาสตร์": 280.0, "ภาษาอังกฤษ": 32.0, "ภาษาไทย": 44.0}}], "subjectCols": ["คณิตศาสตร์", "วิทยาศาสตร์", "ภาษาอังกฤษ", "ภาษาไทย"], "totalRanks": 855, "createdAt": 1700000000000}, {"id": "bm_eplus68", "name": "สวนกุหลาบ EPLUS ปี 2568 (ผลจริง)", "examId": null, "rows": [{"rank": 1, "total": 828.75, "subjects": {"คณิตศาสตร์": 230.0, "วิทยาศาสตร์": 168.75, "ภาษาอังกฤษ": 430.0}}, {"rank": 3, "total": 726.25, "subjects": {"คณิตศาสตร์": 180.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 390.0}}, {"rank": 11, "total": 665.0, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 125.0, "ภาษาอังกฤษ": 350.0}}, {"rank": 13, "total": 658.75, "subjects": {"คณิตศาสตร์": 160.0, "วิทยาศาสตร์": 118.75, "ภาษาอังกฤษ": 380.0}}, {"rank": 15, "total": 641.25, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 131.25, "ภาษาอังกฤษ": 340.0}}, {"rank": 16, "total": 641.25, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 131.25, "ภาษาอังกฤษ": 360.0}}, {"rank": 17, "total": 640.0, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 370.0}}, {"rank": 20, "total": 636.25, "subjects": {"คณิตศาสตร์": 80.0, "วิทยาศาสตร์": 156.25, "ภาษาอังกฤษ": 400.0}}, {"rank": 23, "total": 626.25, "subjects": {"คณิตศาสตร์": 100.0, "วิทยาศาสตร์": 106.25, "ภาษาอังกฤษ": 420.0}}, {"rank": 24, "total": 622.5, "subjects": {"คณิตศาสตร์": 190.0, "วิทยาศาสตร์": 112.5, "ภาษาอังกฤษ": 320.0}}, {"rank": 25, "total": 622.5, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 62.6, "ภาษาอังกฤษ": 420.0}}, {"rank": 27, "total": 620.0, "subjects": {"คณิตศาสตร์": 80.0, "วิทยาศาสตร์": 150.0, "ภาษาอังกฤษ": 390.0}}, {"rank": 28, "total": 618.75, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 118.75, "ภาษาอังกฤษ": 330.0}}, {"rank": 30, "total": 612.5, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 112.5, "ภาษาอังกฤษ": 380.0}}, {"rank": 33, "total": 608.75, "subjects": {"คณิตศาสตร์": 140.0, "วิทยาศาสตร์": 68.75, "ภาษาอังกฤษ": 400.0}}, {"rank": 35, "total": 606.25, "subjects": {"คณิตศาสตร์": 170.0, "วิทยาศาสตร์": 106.25, "ภาษาอังกฤษ": 330.0}}, {"rank": 37, "total": 601.25, "subjects": {"คณิตศาสตร์": 90.0, "วิทยาศาสตร์": 81.25, "ภาษาอังกฤษ": 430.0}}, {"rank": 44, "total": 591.25, "subjects": {"คณิตศาสตร์": 150.0, "วิทยาศาสตร์": 81.25, "ภาษาอังกฤษ": 360.0}}, {"rank": 49, "total": 583.75, "subjects": {"คณิตศาสตร์": 120.0, "วิทยาศาสตร์": 93.75, "ภาษาอังกฤษ": 370.0}}, {"rank": 52, "total": 580.0, "subjects": {"คณิตศาสตร์": 100.0, "วิทยาศาสตร์": 100.0, "ภาษาอังกฤษ": 380.0}}, {"rank": 59, "total": 563.75, "subjects": {}}], "subjectCols": ["คณิตศาสตร์", "วิทยาศาสตร์", "ภาษาอังกฤษ"], "totalRanks": 413, "createdAt": 1700000000000}];
+var PRESET_BENCHMARKS = [{"id":"bm_gate69","name":"สวนกุหลาบ GATE ปี 2569 (ผลจริง)","examId":null,"rows":[{"rank":1,"total":834.0,"subjects":{"คณิตศาสตร์":336.0,"วิทยาศาสตร์":350.0,"ภาษาอังกฤษ":88.0,"ภาษาไทย":60.0}},{"rank":3,"total":750.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":64.0}},{"rank":4,"total":742.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":80.0,"ภาษาไทย":68.0}},{"rank":10,"total":728.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":68.0}},{"rank":11,"total":726.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":80.0,"ภาษาไทย":52.0}},{"rank":12,"total":724.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":84.0,"ภาษาไทย":72.0}},{"rank":13,"total":722.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":310.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":64.0}},{"rank":14,"total":722.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":48.0}},{"rank":20,"total":708.0,"subjects":{"คณิตศาสตร์":352.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":56.0}},{"rank":21,"total":706.0,"subjects":{"คณิตศาสตร์":290.0,"วิทยาศาสตร์":288.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":64.0}},{"rank":22,"total":704.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":340.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":52.0}},{"rank":26,"total":694.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":28.0}},{"rank":27,"total":694.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":72.0}},{"rank":28,"total":694.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":56.0}},{"rank":32,"total":686.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":56.0}},{"rank":34,"total":684.0,"subjects":{"คณิตศาสตร์":336.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":72.0}},{"rank":35,"total":682.0,"subjects":{"คณิตศาสตร์":368.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":36.0}},{"rank":36,"total":680.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":300.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":64.0}},{"rank":37,"total":680.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":72.0}},{"rank":42,"total":672.0,"subjects":{"คณิตศาสตร์":280.0,"วิทยาศาสตร์":288.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":60.0}},{"rank":45,"total":666.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":310.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":80.0}},{"rank":49,"total":660.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":300.0,"ภาษาอังกฤษ":72.0,"ภาษาไทย":48.0}},{"rank":50,"total":658.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":52.0}},{"rank":52,"total":654.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":72.0}},{"rank":58,"total":650.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":64.0}},{"rank":60,"total":650.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":64.0}},{"rank":63,"total":648.0,"subjects":{"คณิตศาสตร์":260.0,"วิทยาศาสตร์":256.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":64.0}},{"rank":65,"total":648.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":52.0}},{"rank":68,"total":646.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":48.0}},{"rank":74,"total":638.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":72.0,"ภาษาไทย":72.0}},{"rank":75,"total":638.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":190.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":52.0}},{"rank":76,"total":636.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":88.0,"ภาษาไทย":32.0}},{"rank":78,"total":636.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":60.0}},{"rank":79,"total":632.0,"subjects":{"คณิตศาสตร์":208.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":80.0}},{"rank":80,"total":632.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":56.0}},{"rank":84,"total":624.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":36.0}},{"rank":85,"total":624.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":68.0}},{"rank":87,"total":624.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":32.0,"ภาษาไทย":64.0}},{"rank":94,"total":620.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":24.0}},{"rank":95,"total":620.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":68.0}},{"rank":97,"total":618.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":68.0}},{"rank":98,"total":618.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":52.0}},{"rank":99,"total":616.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":56.0}},{"rank":101,"total":616.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":36.0}},{"rank":102,"total":616.0,"subjects":{"คณิตศาสตร์":220.0,"วิทยาศาสตร์":288.0,"ภาษาอังกฤษ":72.0,"ภาษาไทย":36.0}},{"rank":103,"total":616.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":64.0}},{"rank":105,"total":612.0,"subjects":{}},{"rank":106,"total":612.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":64.0}},{"rank":108,"total":610.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":52.0}},{"rank":109,"total":608.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":300.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":32.0}},{"rank":111,"total":606.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":56.0}},{"rank":112,"total":604.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":60.0}},{"rank":113,"total":604.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":56.0}},{"rank":114,"total":604.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":60.0}},{"rank":115,"total":602.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":60.0}},{"rank":118,"total":600.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":36.0}},{"rank":120,"total":600.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":60.0}},{"rank":123,"total":598.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":48.0}},{"rank":126,"total":596.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":80.0,"ภาษาไทย":12.0}},{"rank":128,"total":594.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":80.0,"ภาษาไทย":72.0}},{"rank":129,"total":592.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":24.0}},{"rank":132,"total":590.0,"subjects":{"คณิตศาสตร์":208.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":56.0}},{"rank":134,"total":590.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":64.0}},{"rank":135,"total":588.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":25.0,"ภาษาไทย":64.0}},{"rank":137,"total":586.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":56.0}},{"rank":140,"total":582.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":20.0,"ภาษาไทย":40.0}},{"rank":142,"total":582.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":58.0}},{"rank":143,"total":582.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":190.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":36.0}},{"rank":145,"total":578.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":48.0}},{"rank":146,"total":578.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":36.0}},{"rank":147,"total":578.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":56.0}},{"rank":149,"total":578.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":36.0}},{"rank":150,"total":578.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":60.0}},{"rank":151,"total":576.0,"subjects":{"คณิตศาสตร์":308.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":48.0}},{"rank":152,"total":576.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":72.0}},{"rank":155,"total":574.0,"subjects":{"คณิตศาสตร์":250.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":44.0}},{"rank":156,"total":574.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":48.0}},{"rank":157,"total":572.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":52.0}},{"rank":160,"total":570.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":60.0}},{"rank":163,"total":570.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":56.0}},{"rank":165,"total":566.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":20.0,"ภาษาไทย":60.0}},{"rank":167,"total":562.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":48.0}},{"rank":169,"total":560.0,"subjects":{"คณิตศาสตร์":208.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":52.0}},{"rank":170,"total":560.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":44.0}},{"rank":173,"total":558.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":48.0}},{"rank":174,"total":558.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":60.0}},{"rank":176,"total":556.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":64.0}},{"rank":177,"total":556.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":52.0}},{"rank":185,"total":552.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":160.0,"ภาษาอังกฤษ":72.0,"ภาษาไทย":48.0}},{"rank":190,"total":550.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":170.0,"ภาษาอังกฤษ":72.0,"ภาษาไทย":36.0}},{"rank":198,"total":544.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":20.0,"ภาษาไทย":52.0}},{"rank":199,"total":544.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":24.0}},{"rank":202,"total":544.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":60.0}},{"rank":209,"total":542.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":170.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":56.0}},{"rank":212,"total":538.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":44.0}},{"rank":213,"total":538.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":170.0,"ภาษาอังกฤษ":32.0,"ภาษาไทย":48.0}},{"rank":239,"total":520.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":16.0,"ภาษาไทย":40.0}},{"rank":243,"total":520.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":44.0}},{"rank":244,"total":520.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":72.0}},{"rank":255,"total":510.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":32.0,"ภาษาไทย":36.0}},{"rank":262,"total":508.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":60.0}},{"rank":266,"total":506.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":16.0,"ภาษาไทย":56.0}},{"rank":276,"total":500.0,"subjects":{"คณิตศาสตร์":176.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":60.0}},{"rank":291,"total":490.0,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":72.0,"ภาษาไทย":38.0}},{"rank":292,"total":490.0,"subjects":{"คณิตศาสตร์":208.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":44.0}},{"rank":309,"total":484.0,"subjects":{"คณิตศาสตร์":208.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":52.0}},{"rank":311,"total":484.0,"subjects":{"คณิตศาสตร์":144.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":72.0}},{"rank":316,"total":482.0,"subjects":{"คณิตศาสตร์":176.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":60.0}},{"rank":317,"total":482.0,"subjects":{"คณิตศาสตร์":144.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":72.0}},{"rank":321,"total":480.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":48.0}},{"rank":336,"total":472.0,"subjects":{"คณิตศาสตร์":144.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":52.0}},{"rank":387,"total":442.0,"subjects":{"คณิตศาสตร์":11.0,"วิทยาศาสตร์":17.0,"ภาษาอังกฤษ":8.0,"ภาษาไทย":16.0}},{"rank":412,"total":428.0,"subjects":{"คณิตศาสตร์":176.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":36.0}},{"rank":440,"total":406.0,"subjects":{"คณิตศาสตร์":128.0,"วิทยาศาสตร์":170.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":60.0}},{"rank":528,"total":346.0,"subjects":{"คณิตศาสตร์":80.0,"วิทยาศาสตร์":190.0,"ภาษาอังกฤษ":32.0,"ภาษาไทย":44.0}}],"subjectCols":["คณิตศาสตร์","วิทยาศาสตร์","ภาษาอังกฤษ","ภาษาไทย"],"totalRanks":849,"createdAt":1700000000000},{"id":"bm_eplus69","name":"สวนกุหลาบ EPLUS ปี 2569 (ผลจริง)","examId":null,"rows":[{"rank":1,"total":876.25,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":480.0}},{"rank":2,"total":872.5,"subjects":{"คณิตศาสตร์":230.0,"วิทยาศาสตร์":212.5,"ภาษาอังกฤษ":430.0}},{"rank":3,"total":841.25,"subjects":{"คณิตศาสตร์":230.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":430.0}},{"rank":5,"total":817.5,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":187.5,"ภาษาอังกฤษ":460.0}},{"rank":6,"total":808.75,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":450.0}},{"rank":7,"total":806.25,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":206.25,"ภาษาอังกฤษ":410.0}},{"rank":8,"total":803.75,"subjects":{"คณิตศาสตร์":200.0,"วิทยาศาสตร์":193.75,"ภาษาอังกฤษ":410.0}},{"rank":9,"total":802.5,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":470.0}},{"rank":10,"total":795.0,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":460.0}},{"rank":11,"total":793.75,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":193.75,"ภาษาอังกฤษ":460.0}},{"rank":12,"total":793.75,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":193.75,"ภาษาอังกฤษ":360.0}},{"rank":13,"total":791.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":460.0}},{"rank":14,"total":791.25,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":430.0}},{"rank":17,"total":781.25,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":131.25,"ภาษาอังกฤษ":460.0}},{"rank":18,"total":781.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":450.0}},{"rank":19,"total":778.75,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":470.0}},{"rank":20,"total":772.5,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":470.0}},{"rank":21,"total":770.0,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":460.0}},{"rank":22,"total":770.0,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":460.0}},{"rank":23,"total":770.0,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":450.0}},{"rank":25,"total":767.5,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":137.5,"ภาษาอังกฤษ":440.0}},{"rank":27,"total":765.0,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":420.0}},{"rank":28,"total":765.0,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":420.0}},{"rank":29,"total":763.75,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":193.75,"ภาษาอังกฤษ":400.0}},{"rank":30,"total":762.5,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":430.0}},{"rank":31,"total":760.0,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":400.0}},{"rank":33,"total":756.25,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":470.0,"ภาษาไทย":0.0}},{"rank":34,"total":756.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":450.0}},{"rank":36,"total":755.0,"subjects":{"คณิตศาสตร์":210.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":370.0}},{"rank":37,"total":752.5,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":430.0}},{"rank":38,"total":750.0,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":450.0}},{"rank":39,"total":748.75,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":430.0}},{"rank":40,"total":748.5,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":420.0}},{"rank":41,"total":747.5,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":187.5,"ภาษาอังกฤษ":420.0}},{"rank":42,"total":747.5,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":187.5,"ภาษาอังกฤษ":370.0}},{"rank":43,"total":746.25,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":206.25,"ภาษาอังกฤษ":360.0}},{"rank":44,"total":745.0,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":420.0}},{"rank":50,"total":736.25,"subjects":{"คณิตศาสตร์":90.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":490.0}},{"rank":51,"total":735.0,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":430.0}},{"rank":52,"total":732.5,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":400.0}},{"rank":56,"total":725.0,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":420.0}},{"rank":57,"total":725.0,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":125.0,"ภาษาอังกฤษ":410.0}},{"rank":58,"total":725.0,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":400.0,"ภาษาไทย":0.0}},{"rank":59,"total":723.75,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":193.75,"ภาษาอังกฤษ":350.0}},{"rank":60,"total":722.5,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":440.0}},{"rank":61,"total":721.25,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":410.0}},{"rank":62,"total":718.75,"subjects":{"คณิตศาสตร์":80.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":470.0}},{"rank":63,"total":718.75,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":410.0}},{"rank":64,"total":718.75,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":218.75,"ภาษาอังกฤษ":330.0}},{"rank":66,"total":717.5,"subjects":{"คณิตศาสตร์":110.0,"วิทยาศาสตร์":187.5,"ภาษาอังกฤษ":420.0}},{"rank":67,"total":717.5,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":137.5,"ภาษาอังกฤษ":400.0}},{"rank":68,"total":715.0,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":420.0}},{"rank":69,"total":713.75,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":143.75,"ภาษาอังกฤษ":430.0}},{"rank":70,"total":712.5,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":430.0}},{"rank":71,"total":711.25,"subjects":{"คณิตศาสตร์":110.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":420.0}},{"rank":72,"total":708.75,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":390.0}},{"rank":75,"total":705.0,"subjects":{"คณิตศาสตร์":110.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":420.0}},{"rank":78,"total":698.75,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":400.0}},{"rank":79,"total":697.5,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":187.5,"ภาษาอังกฤษ":390.0}},{"rank":80,"total":696.25,"subjects":{"คณิตศาสตร์":60.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":480.0,"ภาษาไทย":0.0}},{"rank":82,"total":696.25,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":206.25,"ภาษาอังกฤษ":370.0}},{"rank":84,"total":693.75,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":143.75,"ภาษาอังกฤษ":360.0}},{"rank":91,"total":688.75,"subjects":{}},{"rank":92,"total":688.75,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":340.0}},{"rank":93,"total":687.5,"subjects":{"คณิตศาสตร์":110.0,"วิทยาศาสตร์":137.5,"ภาษาอังกฤษ":440.0}},{"rank":95,"total":686.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":380.0}},{"rank":96,"total":686.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":380.0}},{"rank":97,"total":682.5,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":112.5,"ภาษาอังกฤษ":400.0}},{"rank":98,"total":682.5,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":360.0,"ภาษาไทย":0.0}},{"rank":106,"total":676.25,"subjects":{"คณิตศาสตร์":90.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":430.0}},{"rank":107,"total":676.25,"subjects":{"คณิตศาสตร์":200.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":320.0}},{"rank":112,"total":671.25,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":131.25,"ภาษาอังกฤษ":440.0}},{"rank":119,"total":666.25,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":370.0}},{"rank":124,"total":661.25,"subjects":{"คณิตศาสตร์":80.0,"วิทยาศาสตร์":131.25,"ภาษาอังกฤษ":450.0}},{"rank":128,"total":657.5,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":137.5,"ภาษาอังกฤษ":420.0}},{"rank":129,"total":657.5,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":87.5,"ภาษาอังกฤษ":390.0}},{"rank":133,"total":652.5,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":162.5,"ภาษาอังกฤษ":310.0}},{"rank":134,"total":651.25,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":131.25,"ภาษาอังกฤษ":390.0}},{"rank":136,"total":648.75,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":380.0,"ภาษาไทย":0.0}},{"rank":157,"total":636.25,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":340.0}},{"rank":158,"total":635.0,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":175.0,"ภาษาอังกฤษ":360.0}},{"rank":196,"total":607.5,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":137.5,"ภาษาอังกฤษ":350.0}},{"rank":212,"total":592.5,"subjects":{"คณิตศาสตร์":130.0,"วิทยาศาสตร์":112.5,"ภาษาอังกฤษ":350.0}},{"rank":215,"total":590.0,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":340.0}},{"rank":230,"total":571.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":181.25,"ภาษาอังกฤษ":240.0}},{"rank":234,"total":566.25,"subjects":{"คณิตศาสตร์":90.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":320.0}},{"rank":248,"total":553.75,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":143.75,"ภาษาอังกฤษ":290.0}},{"rank":252,"total":547.5,"subjects":{"คณิตศาสตร์":50.0,"วิทยาศาสตร์":87.5,"ภาษาอังกฤษ":410.0}}],"subjectCols":["คณิตศาสตร์","วิทยาศาสตร์","ภาษาอังกฤษ"],"totalRanks":635,"createdAt":1700000000000},{"id":"bm_gate68","name":"สวนกุหลาบ GATE ปี 2568 (ผลจริง)","examId":null,"rows":[{"rank":1,"total":826.0,"subjects":{"คณิตศาสตร์":368.0,"วิทยาศาสตร์":330.0,"ภาษาอังกฤษ":92.0,"ภาษาไทย":36.0}},{"rank":2,"total":768.0,"subjects":{"คณิตศาสตร์":336.0,"วิทยาศาสตร์":300.0,"ภาษาอังกฤษ":84.0,"ภาษาไทย":48.0}},{"rank":3,"total":744.0,"subjects":{"คณิตศาสตร์":352.0,"วิทยาศาสตร์":300.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":44.0}},{"rank":6,"total":722.0,"subjects":{"คณิตศาสตร์":336.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":88.0,"ภาษาไทย":48.0}},{"rank":8,"total":710.0,"subjects":{"คณิตศาสตร์":352.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":32.0}},{"rank":9,"total":702.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":48.0}},{"rank":12,"total":692.0,"subjects":{"คณิตศาสตร์":384.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":88.0,"ภาษาไทย":20.0}},{"rank":14,"total":690.0,"subjects":{"คณิตศาสตร์":336.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":36.0}},{"rank":15,"total":688.0,"subjects":{"คณิตศาสตร์":368.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":44.0}},{"rank":16,"total":686.0,"subjects":{"คณิตศาสตร์":320.0,"วิทยาศาสตร์":290.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":48.0}},{"rank":17,"total":684.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":320.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":20.0}},{"rank":27,"total":646.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":28.0}},{"rank":28,"total":644.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":52.0}},{"rank":31,"total":640.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":80.0,"ภาษาไทย":44.0}},{"rank":32,"total":640.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":52.0}},{"rank":33,"total":638.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":52.0}},{"rank":34,"total":636.0,"subjects":{"คณิตศาสตร์":336.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":68.0,"ภาษาไทย":52.0}},{"rank":35,"total":636.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":52.0}},{"rank":37,"total":634.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":44.0}},{"rank":39,"total":632.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":56.0}},{"rank":40,"total":630.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":270.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":28.0}},{"rank":45,"total":628.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":44.0}},{"rank":46,"total":628.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":60.0}},{"rank":49,"total":620.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":36.0}},{"rank":51,"total":618.0,"subjects":{"คณิตศาสตร์":352.0,"วิทยาศาสตร์":170.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":32.0}},{"rank":53,"total":616.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":44.0}},{"rank":55,"total":616.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":54.0}},{"rank":60,"total":612.0,"subjects":{"คณิตศาสตร์":208.0,"วิทยาศาสตร์":300.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":44.0}},{"rank":70,"total":602.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":36.0}},{"rank":71,"total":600.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":28.0}},{"rank":79,"total":594.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":40.0}},{"rank":80,"total":592.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":44.0}},{"rank":81,"total":592.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":12.0,"ภาษาไทย":32.0}},{"rank":82,"total":592.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":36.0}},{"rank":84,"total":590.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":44.0}},{"rank":86,"total":590.0,"subjects":{"คณิตศาสตร์":272.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":32.0,"ภาษาไทย":56.0}},{"rank":88,"total":586.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":16.0,"ภาษาไทย":32.0}},{"rank":91,"total":584.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":56.0}},{"rank":93,"total":582.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":28.0}},{"rank":97,"total":578.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":36.0}},{"rank":98,"total":578.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":56.0,"ภาษาไทย":32.0}},{"rank":102,"total":574.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":44.0,"ภาษาไทย":44.0}},{"rank":104,"total":572.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":240.0,"ภาษาอังกฤษ":36.0,"ภาษาไทย":40.0}},{"rank":105,"total":572.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":12.0}},{"rank":111,"total":568.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":260.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":44.0}},{"rank":112,"total":568.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":220.0,"ภาษาอังกฤษ":64.0,"ภาษาไทย":44.0}},{"rank":113,"total":568.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":200.0,"ภาษาอังกฤษ":28.0,"ภาษาไทย":36.0}},{"rank":116,"total":566.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":230.0,"ภาษาอังกฤษ":60.0,"ภาษาไทย":36.0}},{"rank":122,"total":562.0,"subjects":{"คณิตศาสตร์":224.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":52.0,"ภาษาไทย":36.0}},{"rank":123,"total":562.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":190.0,"ภาษาอังกฤษ":40.0,"ภาษาไทย":44.0}},{"rank":128,"total":560.0,"subjects":{"คณิตศาสตร์":288.0,"วิทยาศาสตร์":160.0,"ภาษาอังกฤษ":76.0,"ภาษาไทย":36.0}},{"rank":131,"total":558.0,"subjects":{"คณิตศาสตร์":256.0,"วิทยาศาสตร์":210.0,"ภาษาอังกฤษ":48.0,"ภาษาไทย":44.0}},{"rank":138,"total":550.0,"subjects":{"คณิตศาสตร์":240.0,"วิทยาศาสตร์":250.0,"ภาษาอังกฤษ":20.0,"ภาษาไทย":40.0}},{"rank":140,"total":548.0,"subjects":{"คณิตศาสตร์":304.0,"วิทยาศาสตร์":180.0,"ภาษาอังกฤษ":24.0,"ภาษาไทย":40.0}},{"rank":142,"total":548.0,"subjects":{"คณิตศาสตร์":192.0,"วิทยาศาสตร์":280.0,"ภาษาอังกฤษ":32.0,"ภาษาไทย":44.0}}],"subjectCols":["คณิตศาสตร์","วิทยาศาสตร์","ภาษาอังกฤษ","ภาษาไทย"],"totalRanks":855,"createdAt":1700000000000},{"id":"bm_eplus68","name":"สวนกุหลาบ EPLUS ปี 2568 (ผลจริง)","examId":null,"rows":[{"rank":1,"total":828.75,"subjects":{"คณิตศาสตร์":230.0,"วิทยาศาสตร์":168.75,"ภาษาอังกฤษ":430.0}},{"rank":3,"total":726.25,"subjects":{"คณิตศาสตร์":180.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":390.0}},{"rank":11,"total":665.0,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":125.0,"ภาษาอังกฤษ":350.0}},{"rank":13,"total":658.75,"subjects":{"คณิตศาสตร์":160.0,"วิทยาศาสตร์":118.75,"ภาษาอังกฤษ":380.0}},{"rank":15,"total":641.25,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":131.25,"ภาษาอังกฤษ":340.0}},{"rank":16,"total":641.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":131.25,"ภาษาอังกฤษ":360.0}},{"rank":17,"total":640.0,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":370.0}},{"rank":20,"total":636.25,"subjects":{"คณิตศาสตร์":80.0,"วิทยาศาสตร์":156.25,"ภาษาอังกฤษ":400.0}},{"rank":23,"total":626.25,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":106.25,"ภาษาอังกฤษ":420.0}},{"rank":24,"total":622.5,"subjects":{"คณิตศาสตร์":190.0,"วิทยาศาสตร์":112.5,"ภาษาอังกฤษ":320.0}},{"rank":25,"total":622.5,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":62.6,"ภาษาอังกฤษ":420.0}},{"rank":27,"total":620.0,"subjects":{"คณิตศาสตร์":80.0,"วิทยาศาสตร์":150.0,"ภาษาอังกฤษ":390.0}},{"rank":28,"total":618.75,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":118.75,"ภาษาอังกฤษ":330.0}},{"rank":30,"total":612.5,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":112.5,"ภาษาอังกฤษ":380.0}},{"rank":33,"total":608.75,"subjects":{"คณิตศาสตร์":140.0,"วิทยาศาสตร์":68.75,"ภาษาอังกฤษ":400.0}},{"rank":35,"total":606.25,"subjects":{"คณิตศาสตร์":170.0,"วิทยาศาสตร์":106.25,"ภาษาอังกฤษ":330.0}},{"rank":37,"total":601.25,"subjects":{"คณิตศาสตร์":90.0,"วิทยาศาสตร์":81.25,"ภาษาอังกฤษ":430.0}},{"rank":44,"total":591.25,"subjects":{"คณิตศาสตร์":150.0,"วิทยาศาสตร์":81.25,"ภาษาอังกฤษ":360.0}},{"rank":49,"total":583.75,"subjects":{"คณิตศาสตร์":120.0,"วิทยาศาสตร์":93.75,"ภาษาอังกฤษ":370.0}},{"rank":52,"total":580.0,"subjects":{"คณิตศาสตร์":100.0,"วิทยาศาสตร์":100.0,"ภาษาอังกฤษ":380.0}},{"rank":59,"total":563.75,"subjects":{}}],"subjectCols":["คณิตศาสตร์","วิทยาศาสตร์","ภาษาอังกฤษ"],"totalRanks":413,"createdAt":1700000000000}];
 
 // ===================== BENCHMARK HELPERS =====================
 
@@ -3144,13 +3299,13 @@ setTimeout(()=>document.getElementById('loginPinInput')?.focus(), 300);
 
 // Metadata ของแต่ละ benchmark
 const BM_META = {
-  bm_gate69:  { label:'GATE 2569', shortLabel:'GATE 69', color:'#6366f1', admit:144,
+  bm_gate69:  { label:'GATE 2569', shortLabel:'GATE 69', color:'#6366f1', admit:144, reserve:32, totalRanks:849,
     criteria:[{subj:'คณิตศาสตร์',pct:40},{subj:'วิทยาศาสตร์',pct:40},{subj:'ภาษาอังกฤษ',pct:10},{subj:'ภาษาไทย',pct:10}] },
-  bm_eplus69: { label:'EPLUS 2569', shortLabel:'EPLUS 69', color:'#f59e0b', admit:90,
+  bm_eplus69: { label:'EPLUS 2569', shortLabel:'EPLUS 69', color:'#f59e0b', admit:90, reserve:7, totalRanks:635,
     criteria:[{subj:'คณิตศาสตร์',pct:25},{subj:'วิทยาศาสตร์',pct:25},{subj:'ภาษาอังกฤษ',pct:50}] },
-  bm_gate68:  { label:'GATE 2568', shortLabel:'GATE 68', color:'#8b5cf6', admit:144,
+  bm_gate68:  { label:'GATE 2568', shortLabel:'GATE 68', color:'#8b5cf6', admit:144, reserve:0,
     criteria:[{subj:'คณิตศาสตร์',pct:40},{subj:'วิทยาศาสตร์',pct:40},{subj:'ภาษาอังกฤษ',pct:10},{subj:'ภาษาไทย',pct:10}] },
-  bm_eplus68: { label:'EPLUS 2568', shortLabel:'EPLUS 68', color:'#10b981', admit:60,
+  bm_eplus68: { label:'EPLUS 2568', shortLabel:'EPLUS 68', color:'#10b981', admit:60, reserve:0,
     criteria:[{subj:'คณิตศาสตร์',pct:25},{subj:'วิทยาศาสตร์',pct:25},{subj:'ภาษาอังกฤษ',pct:50}] },
 };
 
@@ -3202,7 +3357,7 @@ function esAvgAdmitted(bm) {
 // ===================== ENTRANCE STATS — โครงสร้างใหม่ =====================
 
 // โรงเรียนที่รองรับ
-const ES_SCHOOLS = [
+var ES_SCHOOLS = [
   { id: 'suankularb', name: 'โรงเรียนสวนกุหลาบวิทยาลัย', short: 'สวนกุหลาบ',
     programs: [
       { id: 'gate',  name: 'GATE',  desc: 'เน้นคณิตศาสตร์ + วิทยาศาสตร์',  bmIds: ['bm_gate69','bm_gate68'] },
@@ -3271,6 +3426,19 @@ function initEntranceYear(params) {
   document.getElementById('eySub').textContent = `คะแนนเต็ม 1,000 • ข้อมูลจากกลุ่มรวบรวมคะแนน`;
   document.getElementById('eyBackBtn').onclick = () => navigate('entrance_program', {schoolId});
 
+  // ── ปุ่ม switch program (GATE ↔ EPLUS) ──
+  const switchBtn = document.getElementById('eySwitchProgBtn');
+  if (switchBtn) {
+    const otherProg = sch.programs.find(p=>p.id!==programId && !p.comingSoon);
+    if (otherProg) {
+      switchBtn.textContent = `⇄ ไป ${otherProg.name}`;
+      switchBtn.style.display = '';
+      switchBtn.onclick = () => navigate('entrance_year', {schoolId, programId: otherProg.id});
+    } else {
+      switchBtn.style.display = 'none';
+    }
+  }
+
   const bms = esGetBms();
   const progBms = prog.bmIds.map(id=>bms.find(b=>b.id===id)).filter(Boolean);
   if (!progBms.length) {
@@ -3312,9 +3480,19 @@ function initEntranceYear(params) {
     const cutoff = esCutoff(bm);
     const avg = esAvgAdmitted(bm);
     const topScore = bm.rows[0]?.total||0;
+    const reserveLimit = meta.admit + (meta.reserve||0);
+    const reserveRows = bm.rows.filter(r=>r.rank>meta.admit && r.rank<=reserveLimit);
+    const reserveCutoff = reserveRows.length ? Math.min(...reserveRows.map(r=>r.total)) : null;
+    const admittedCount = bm.rows.filter(r=>r.rank<=meta.admit).length;
+    const reserveCount  = reserveRows.length;
+    const beyondCount   = bm.rows.filter(r=>r.rank>reserveLimit).length;
+    const dataSubLine   = meta.reserve
+      ? `✅ ติด ${admittedCount} · 🟠 สำรอง ${reserveCount} · 📊 อื่นๆ ${beyondCount}`
+      : `${bm.rows.length} อันดับ`;
     const cards = [
       {label:'คะแนนสูงสุด (อันดับ 1)', value:topScore.toFixed(2), sub:'คะแนนรวม (เต็ม 1,000)', color:meta.color},
       {label:'Cutoff Score', value:cutoff?cutoff.toFixed(2):'—', sub:(()=>{ const cr=esCutoffRow(bm); return cr?`อันดับที่ ${cr.rank} (รับ ${meta.admit} คน)`:`รับ ${meta.admit} คน`; })(), color:'#ef4444'},
+      ...(meta.reserve ? [{label:'คะแนน Cutoff สำรอง', value:reserveCutoff?reserveCutoff.toFixed(2):'—', sub:`สำรอง ${meta.reserve} คน · ถึงอันดับ ${reserveLimit}`, color:'#db2777'}] : []),
       {label:'ค่าเฉลี่ยคนสอบติด', value:avg.total?avg.total.toFixed(1):'—', sub:'คะแนนรวมเฉลี่ย', color:'#16a34a'},
       {label:'ข้อมูลที่รวบรวม', value:bm.rows.length+' อันดับ', sub:`ผู้สมัคร ${bm.totalRanks.toLocaleString()} คน`, color:'#6b7280'},
     ];
@@ -3335,6 +3513,10 @@ function initEntranceYear(params) {
     const meta = BM_META[bm.id]||{};
     const color = meta.color||'#6366f1';
     const cutoff = esCutoff(bm);
+    const reserveLimit = meta.admit + (meta.reserve||0);
+    // cutoff score ของโซนสำรอง (rank <= reserveLimit, total ต่ำสุด)
+    const reserveRows = bm.rows.filter(r=>r.rank>meta.admit && r.rank<=reserveLimit);
+    const reserveCutoff = reserveRows.length ? Math.min(...reserveRows.map(r=>r.total)) : null;
     const totals = bm.rows.map(r=>r.total).filter(v=>v>0);
     if (totals.length < 2) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
     canvas.style.display='block'; emptyEl.style.display='none';
@@ -3344,7 +3526,12 @@ function initEntranceYear(params) {
     const maxV = Math.ceil(Math.max(...totals)/binSize)*binSize;
     const bins = [];
     for (let v=minV; v<maxV; v+=binSize) {
-      bins.push({label:`${v}`, min:v, max:v+binSize, count:0, hasCutoff: cutoff&&cutoff>=v&&cutoff<v+binSize});
+      const hasCutoff = cutoff&&cutoff>=v&&cutoff<v+binSize;
+      const hasReserveCutoff = reserveCutoff&&reserveCutoff>=v&&reserveCutoff<v+binSize;
+      const isReserveZone = (cutoff&&v<cutoff&&reserveCutoff&&v>=reserveCutoff) ||
+                            (cutoff&&reserveCutoff&&v>=reserveCutoff&&v<cutoff);
+      bins.push({label:`${v}`, min:v, max:v+binSize, count:0, hasCutoff, hasReserveCutoff,
+        isReserveZone: reserveCutoff&&cutoff&&v>=reserveCutoff&&v<cutoff});
     }
     totals.forEach(t=>{ const b=bins.find(b=>t>=b.min&&t<b.max)||bins[bins.length-1]; if(b)b.count++; });
 
@@ -3356,7 +3543,7 @@ function initEntranceYear(params) {
     ctx.scale(2,2);
     ctx.clearRect(0,0,W,H);
 
-    const PAD = {t:28,r:16,b:52,l:44};
+    const PAD = {t:42,r:16,b:52,l:44};
     const gW = W-PAD.l-PAD.r, gH = H-PAD.t-PAD.b;
     const maxCount = Math.max(...bins.map(b=>b.count),1);
     const bW = gW/bins.length;
@@ -3384,7 +3571,12 @@ function initEntranceYear(params) {
       const x = PAD.l+i*bW;
       const bh = (bin.count/maxCount)*gH;
       const y = PAD.t+gH-bh;
-      ctx.fillStyle = bin.hasCutoff ? '#ef4444' : color+'cc';
+      let barColor;
+      if (bin.hasCutoff) barColor = '#dc2626';
+      else if (bin.hasReserveCutoff) barColor = '#db2777';
+      else if (bin.isReserveZone) barColor = '#f9a8d4';
+      else barColor = color+'cc';
+      ctx.fillStyle = barColor;
       ctx.beginPath();
       ctx.roundRect(x+1.5, y, bW-3, bh, [3,3,0,0]);
       ctx.fill();
@@ -3394,7 +3586,7 @@ function initEntranceYear(params) {
       }
     });
 
-    // X labels — ทุก bar แสดง
+    // X labels
     bins.forEach((bin,i) => {
       const x = PAD.l+i*bW+bW/2;
       ctx.fillStyle='#6b7280'; ctx.font='9px sans-serif'; ctx.textAlign='center';
@@ -3405,16 +3597,37 @@ function initEntranceYear(params) {
     ctx.fillStyle='#6b7280'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
     ctx.fillText('คะแนนรวม (เต็ม 1,000)', PAD.l+gW/2, H-4);
 
-    // cutoff dashed line
-    const cutoffBinIdx = bins.findIndex(b=>b.hasCutoff);
-    if (cutoffBinIdx>=0) {
-      const cx = PAD.l + cutoffBinIdx*bW + bW/2;
-      ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.5;
-      ctx.setLineDash([4,3]);
-      ctx.beginPath(); ctx.moveTo(cx,PAD.t); ctx.lineTo(cx,PAD.t+gH); ctx.stroke();
+    // helper: draw labeled vertical line with background badge
+    function drawVLine(binIdx, lineColor, dashPattern, label, labelY) {
+      const cx = PAD.l + binIdx*bW + bW/2;
+      ctx.strokeStyle = lineColor; ctx.lineWidth = 2;
+      ctx.setLineDash(dashPattern);
+      ctx.beginPath(); ctx.moveTo(cx, PAD.t+14); ctx.lineTo(cx, PAD.t+gH); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle='#ef4444'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
-      ctx.fillText(`cutoff ${cutoff?.toFixed(0)}`, cx, PAD.t-6);
+      // badge background
+      const tw = ctx.measureText(label).width + 8;
+      const bx = Math.max(PAD.l, Math.min(cx - tw/2, PAD.l+gW - tw));
+      ctx.fillStyle = lineColor;
+      ctx.beginPath(); ctx.roundRect(bx, labelY-10, tw, 13, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(label, bx+4, labelY);
+    }
+
+    const cutoffBinIdx = bins.findIndex(b=>b.hasCutoff);
+    const resBinIdx = bins.findIndex(b=>b.hasReserveCutoff);
+    const samebin = cutoffBinIdx === resBinIdx;
+
+    if (resBinIdx>=0 && (meta.reserve||0)>0) {
+      // สำรองอยู่บรรทัดล่าง (หรือเดียวกับ cutoff ให้เลื่อนลง)
+      drawVLine(resBinIdx, '#db2777', [3,3],
+        `สำรอง ${reserveCutoff?.toFixed(0)}`,
+        samebin ? PAD.t+12 : PAD.t+3);
+    }
+    if (cutoffBinIdx>=0) {
+      // cutoff อยู่บรรทัดบน
+      drawVLine(cutoffBinIdx, '#dc2626', [5,3],
+        `cutoff ${cutoff?.toFixed(0)}`,
+        samebin ? PAD.t+26 : PAD.t+3);
     }
   }
 
@@ -3440,13 +3653,13 @@ function initEntranceYear(params) {
           <div class="muted" style="font-size:11px;">ค่าเฉลี่ยคนสอบติด: ${avg[c.subj]?avg[c.subj].toFixed(1):'—'}</div>
         </div>`).join('')}
       <div style="margin-top:10px;padding:8px 12px;background:#f9fafb;border-radius:10px;font-size:12px;line-height:1.7;">
-        📌 รับนักเรียน <b>${meta.admit||'—'} คน</b><br>
-        📋 คะแนนเต็มรวม <b>1,000 คะแนน</b>
+        📌 รับนักเรียน <b>${meta.admit||'—'} คน</b>${(meta.reserve||0)>0?` + สำรอง <b style="color:#f97316;">${meta.reserve} คน</b> (ถึงอันดับ ${(meta.admit||0)+(meta.reserve||0)})`:''}
+        <br>📋 คะแนนเต็มรวม <b>1,000 คะแนน</b>
       </div>`;
   }
 
   // ── Rank table ──
-  function renderRankTable(filter='') {
+  function renderRankTable() {
     const bm = progBms.find(b=>b.id===activeBmId);
     const head = document.getElementById('esRankHead');
     const body = document.getElementById('esRankBody');
@@ -3457,6 +3670,11 @@ function initEntranceYear(params) {
     const maxSubj = {};
     subjs.forEach(s=>{ maxSubj[s]=Math.max(...bm.rows.map(r=>r.subjects?.[s]??-Infinity).filter(isFinite)); });
 
+    const searchVal = (document.getElementById('esRankSearch')?.value||'').trim();
+    const showAdmit   = document.getElementById('esFilterAdmit')?.checked !== false;
+    const showReserve = document.getElementById('esFilterReserve')?.checked !== false;
+    const showOther   = document.getElementById('esFilterOther')?.checked !== false;
+
     head.innerHTML = `<tr>
       <th style="width:60px;">อันดับ</th>
       <th>คะแนนรวม<br/><span style="font-weight:400;font-size:10px;color:#9ca3af;">⭐ = ${maxTotal.toFixed(0)}</span></th>
@@ -3464,31 +3682,76 @@ function initEntranceYear(params) {
       <th>สถานะ</th>
     </tr>`;
 
-    const rows = bm.rows.filter(r=>!filter||String(r.rank).includes(filter));
-    body.innerHTML = rows.map(r=>{
-      const admitted = r.rank<=meta.admit;
-      const isCutoff = r.rank===meta.admit;
-      const isTopTotal = r.total===maxTotal;
+    const reserveLimit = meta.admit + (meta.reserve||0);
+
+    const classified = bm.rows.map(r => {
+      const admitted  = r.rank <= meta.admit;
+      const isReserve = !admitted && (meta.reserve||0) > 0 && r.rank <= reserveLimit;
+      const isBeyond  = !admitted && !isReserve;
+      return { ...r, admitted, isReserve, isBeyond };
+    });
+
+    const rows = classified.filter(r => {
+      if (searchVal && !String(r.rank).includes(searchVal)) return false;
+      if (r.admitted  && !showAdmit)   return false;
+      if (r.isReserve && !showReserve) return false;
+      if (r.isBeyond  && !showOther)   return false;
+      return true;
+    });
+
+    let html = '';
+    let shownReserveDivider = false;
+    let shownBeyondDivider = false;
+
+    rows.forEach(r => {
+      const { admitted, isReserve, isBeyond } = r;
+      const isTopTotal = r.total === maxTotal;
+
+      if (!shownReserveDivider && isReserve && !searchVal) {
+        shownReserveDivider = true;
+        html += `<tr><td colspan="${subjs.length+3}" style="background:#fff7ed;padding:4px 10px;font-size:11px;font-weight:700;color:#f97316;border-top:2px solid #f97316;border-bottom:1px solid #fed7aa;">🟠 โซนสำรอง (${meta.reserve} คน · ถึงอันดับ ${reserveLimit})</td></tr>`;
+      }
+      if (!shownBeyondDivider && isBeyond && !searchVal) {
+        shownBeyondDivider = true;
+        html += `<tr><td colspan="${subjs.length+3}" style="background:#f9fafb;padding:4px 10px;font-size:11px;font-weight:600;color:#6b7280;border-top:2px solid #e5e7eb;">📊 ข้อมูลอันดับอื่นๆ ที่รวบรวมได้</td></tr>`;
+      }
+
       const statusHtml = admitted
         ? `<span style="color:#16a34a;font-weight:700;font-size:11px;">✅ ติด</span>`
-        : `<span style="color:#9ca3af;font-size:11px;">—</span>`;
-      const rowStyle = isCutoff?'background:#fef9c3;':admitted?'background:#f0fdf4;':'';
-      const cutoffBorder = isCutoff?'border-bottom:3px solid #ef4444;':'';
-      const totalCell = `<td style="font-weight:700;">${r.total.toFixed(2)}${isTopTotal?' <span style="color:#f59e0b;">⭐</span>':''}</td>`;
-      const subjCells = subjs.map(s=>{
-        const v=r.subjects?.[s];
-        const isBest=v!=null&&v===maxSubj[s];
-        return `<td style="${isBest?'background:#fffbeb;font-weight:800;':''}">${v!=null?v.toFixed(2):'—'}${isBest?' <span style="color:#f59e0b;">⭐</span>':''}</td>`;
+        : isReserve
+          ? `<span style="color:#f97316;font-weight:700;font-size:11px;">🟠 สำรอง</span>`
+          : `<span style="color:#9ca3af;font-size:11px;">—</span>`;
+
+      const isCutoffRow = r.rank === meta.admit;
+      const isReserveCutoffRow = r.rank === reserveLimit;
+      const rowBg = isCutoffRow ? 'background:#fef9c3;' : admitted ? 'background:#f0fdf4;' : isReserve ? 'background:#fff7ed;' : '';
+      const rowBorder = isCutoffRow ? 'border-bottom:3px solid #ef4444;' : isReserveCutoffRow ? 'border-bottom:3px solid #f97316;' : '';
+
+      const totalCell = `<td style="font-weight:700;">${r.total.toFixed(2)}${isTopTotal ? ' <span style="color:#f59e0b;">⭐</span>' : ''}</td>`;
+      const subjCells = subjs.map(s => {
+        const v = r.subjects?.[s];
+        const isBest = v != null && v === maxSubj[s];
+        return `<td style="${isBest ? 'background:#fffbeb;font-weight:800;' : ''}">${v != null ? v.toFixed(2) : '—'}${isBest ? ' <span style="color:#f59e0b;">⭐</span>' : ''}</td>`;
       }).join('');
-      return `<tr style="${rowStyle}${cutoffBorder}">
+
+      html += `<tr style="${rowBg}${rowBorder}">
         <td style="font-weight:800;text-align:center;">${r.rank}</td>
         ${totalCell}${subjCells}
         <td>${statusHtml}</td>
       </tr>`;
-    }).join('')||`<tr><td colspan="${subjs.length+3}" class="muted">ไม่พบข้อมูล</td></tr>`;
+
+      if (isCutoffRow && !searchVal) {
+        html += `<tr><td colspan="${subjs.length+3}" style="background:#fef2f2;padding:4px 10px;font-size:11px;font-weight:700;color:#ef4444;border-bottom:1px solid #fecaca;">🔴 Cutoff: อันดับที่ ${meta.admit} · คะแนน ${r.total.toFixed(2)}</td></tr>`;
+      }
+    });
+
+    body.innerHTML = html || `<tr><td colspan="${subjs.length+3}" class="muted" style="padding:16px;text-align:center;">ไม่พบข้อมูล</td></tr>`;
   }
 
-  document.getElementById('esRankSearch')?.addEventListener('input', e=>renderRankTable(e.target.value));
+  // expose to global so onchange="renderRankTable()" in HTML works
+  window.renderRankTable = renderRankTable;
+
+  document.getElementById('esRankSearch')?.addEventListener('input', renderRankTable);
 
   function renderYear() {
     renderYearTabs();
@@ -3954,7 +4217,7 @@ function initEntranceCompare(params) {
         <!-- รูป meme ซ้าย -->
         <div id="memeImgWrap" style="width:143px;min-width:143px;background:#f3f4f6;flex-shrink:0;overflow:hidden;">
           <img id="memeImg" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="this.parentElement.innerHTML='<div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:40px;' id='memeFallbackEmoji'></div>'" />
+            onerror="this.parentElement.innerHTML='<div style=&quot;display:flex;align-items:center;justify-content:center;height:100%;font-size:40px;&quot; id=&quot;memeFallbackEmoji&quot;></div>'" />
         </div>
         <!-- ข้อมูลขวา -->
         <div id="memeInfoCol" style="flex:1;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;">
