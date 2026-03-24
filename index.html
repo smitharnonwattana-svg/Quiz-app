@@ -751,6 +751,29 @@
           <div class="muted" style="margin-top:6px;">อัปโหลดข้อมูลเปรียบเทียบจากกลุ่ม</div>
         </div>
       </div>
+
+      <!-- Member Management -->
+      <h2 class="h2" style="margin-top:20px;">👥 จัดการสมาชิก</h2>
+      <div class="card" style="margin-top:10px;padding:16px;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-size:12px;font-weight:700;color:#6b7280;">ชื่อสมาชิก</div>
+            <input id="memberNameInput" class="titleInput" type="text" placeholder="เช่น สมใจ" style="width:160px;" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-size:12px;font-weight:700;color:#6b7280;">รหัส 6 หลัก</div>
+            <input id="memberPinInput" class="titleInput" type="tel" maxlength="6" placeholder="xxxxxx" style="width:120px;" />
+          </div>
+          <button class="btn btnPrimary" id="memberAddBtn" type="button">+ เพิ่มสมาชิก</button>
+        </div>
+        <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
+        <div class="tableWrap">
+          <table>
+            <thead><tr><th>ชื่อ</th><th style="width:140px;">รหัส</th><th style="width:120px;">แก้ไข</th><th style="width:80px;">ลบ</th></tr></thead>
+            <tbody id="memberTbody"></tbody>
+          </table>
+        </div>
+      </div>
       <h2 class="h2" style="margin-top:16px;">รายการข้อสอบ</h2>
       <div class="card" style="padding:12px;margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <span class="muted">วิชา</span>
@@ -1423,6 +1446,7 @@ const Store = {
       s.questions[examId]=Array.from({length:50}).map((_,i)=>({id:"q"+(i+1),number:i+1,no:i+1,page:pageFor(i+1),choices:{A:"",B:"",C:"",D:""},correct:"A"}));
       s.attempts=[];
       s.benchmarks=[];
+      s.members=[{pin:'311257',name:'ณนนท์'}];
       s.adminLoggedIn=false;
       this.save(s);
     }
@@ -1700,18 +1724,35 @@ function renderHome(){
 
 // ===================== AUTH =====================
 const Auth = (() => {
-  const PINS = {
-    '134140': 'teacher',
-    '311257': 'student',
-  };
+  const ADMIN_PIN = '134140';
   const SESSION_KEY = 'appSession';
+
+  // Get members list from Store (dynamic)
+  function getMembers() {
+    try {
+      const s = Store.load();
+      return s.members || [{ pin: '311257', name: 'ณนนท์' }];
+    } catch { return [{ pin: '311257', name: 'ณนนท์' }]; }
+  }
+
+  function findByPin(pin) {
+    const p = pin.trim();
+    if (p === ADMIN_PIN) return { role: 'teacher', name: 'Admin', pin: p };
+    const m = getMembers().find(m => m.pin === p);
+    if (m) return { role: 'student', name: m.name, pin: p };
+    return null;
+  }
 
   function getRole() {
     try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.role || null; }
     catch { return null; }
   }
-  function setRole(role) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role, ts: Date.now() }));
+  function getName() {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.name || ''; }
+    catch { return ''; }
+  }
+  function setSession(role, name) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role, name, ts: Date.now() }));
   }
   function isLoggedIn() { return !!getRole(); }
   function isTeacher()  { return getRole() === 'teacher'; }
@@ -1727,14 +1768,13 @@ const Auth = (() => {
     }, 50);
   }
   function login(pin) {
-    const role = PINS[pin.trim()];
-    if (!role) return false;
-    setRole(role);
+    const found = findByPin(pin);
+    if (!found) return false;
+    setSession(found.role, found.name);
     // Claim session token so other devices know this is the latest active session
     setTimeout(() => {
       if (FirebaseSync.ready()) {
         FirebaseSync.claimSession();
-        // Listen for being kicked by another device
         FirebaseSync.listenSession(() => {
           if (isLoggedIn()) {
             logout();
@@ -1746,9 +1786,9 @@ const Auth = (() => {
         });
       }
     }, 1000);
-    return role;
+    return found.role;
   }
-  return { login, logout, isLoggedIn, isTeacher, getRole };
+  return { login, logout, isLoggedIn, isTeacher, getRole, getName, getMembers, findByPin, ADMIN_PIN };
 })();
 
 // ===================== NUMPAD LOGIN =====================
@@ -1944,13 +1984,21 @@ function initExamDetail(id){
       <div class="muted" style="font-size:12px;">ไม่กรอกชื่อก็กดเริ่มได้เลย · ระบบจำชื่อล่าสุดให้อัตโนมัติ</div>
     </div>
   `;
-  // restore last taker name
+  // restore last taker name — if student login, auto-fill and lock
   const takerEl = document.getElementById('detailTakerName');
-  takerEl.value = localStorage.getItem(LAST_TAKER_KEY) || '';
+  const _memberName = (!Auth.isTeacher() && Auth.getName()) ? Auth.getName() : '';
+  if (_memberName) {
+    takerEl.value = _memberName;
+    takerEl.readOnly = true;
+    takerEl.style.background = '#f3f4f6';
+    takerEl.style.color = '#6b7280';
+  } else {
+    takerEl.value = localStorage.getItem(LAST_TAKER_KEY) || '';
+  }
 
   document.getElementById('examStartBtn').onclick=()=>{
-    const name = takerEl.value.trim();
-    if(name) localStorage.setItem(LAST_TAKER_KEY, name);
+    const name = _memberName || takerEl.value.trim();
+    if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
     // Check if there's a pending resume for a DIFFERENT exam
     const _pendingResume = typeof loadTakeResume === 'function' ? loadTakeResume() : null;
     if (_pendingResume && _pendingResume.examId && _pendingResume.examId !== exam.id && _pendingResume.startedAt) {
@@ -2898,6 +2946,84 @@ function initAdmin(){
   }
 
   renderAdmin();
+
+  // ── Member Management ──
+  function renderMembers() {
+    const s = Store.load();
+    const members = s.members || [{pin:'311257',name:'ณนนท์'}];
+    const tbody = document.getElementById('memberTbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    members.forEach((m, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><input class="titleInput" style="width:140px;" value="' + m.name + '" id="mname_' + idx + '" /></td>' +
+        '<td><input class="titleInput" type="tel" maxlength="6" style="width:100px;" value="' + m.pin + '" id="mpin_' + idx + '" /></td>' +
+        '<td><button class="btn" data-save="' + idx + '">ยืนยัน</button></td>' +
+        '<td><button class="btn" style="border-color:#ef4444;color:#b91c1c;" data-del="' + idx + '">ลบ</button></td>';
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('[data-save]').forEach(btn => {
+      btn.onclick = () => {
+        const i = Number(btn.getAttribute('data-save'));
+        const s2 = Store.load();
+        const ms = s2.members || [{pin:'311257',name:'ณนนท์'}];
+        const newName = (document.getElementById('mname_'+i)?.value||'').trim();
+        const newPin  = (document.getElementById('mpin_'+i)?.value||'').trim();
+        const errEl = document.getElementById('memberError');
+        if (!newName) { errEl.textContent='กรุณากรอกชื่อ'; return; }
+        if (newPin.length !== 6 || isNaN(Number(newPin))) { errEl.textContent='รหัสต้องเป็นตัวเลข 6 หลัก'; return; }
+        if (newPin === Auth.ADMIN_PIN) { errEl.textContent='รหัสนี้ถูกใช้โดย Admin'; return; }
+        const dup = ms.find((x,j) => x.pin===newPin && j!==i);
+        if (dup) { errEl.textContent='รหัสนี้ใช้โดย "'+dup.name+'" อยู่แล้ว'; return; }
+        errEl.textContent='';
+        ms[i] = {pin:newPin, name:newName};
+        s2.members = ms;
+        Store.save(s2);
+        toast('✅ บันทึกแล้ว');
+        renderMembers();
+      };
+    });
+    tbody.querySelectorAll('[data-del]').forEach(btn => {
+      btn.onclick = () => {
+        const i = Number(btn.getAttribute('data-del'));
+        const s2 = Store.load();
+        const ms = s2.members || [];
+        if (!confirm('ลบสมาชิก "'+ms[i]?.name+'" ออกไหม?')) return;
+        ms.splice(i, 1);
+        s2.members = ms;
+        Store.save(s2);
+        toast('ลบสมาชิกแล้ว');
+        renderMembers();
+      };
+    });
+  }
+
+  const memberAddBtn = document.getElementById('memberAddBtn');
+  if (memberAddBtn) {
+    memberAddBtn.onclick = () => {
+      const errEl = document.getElementById('memberError');
+      const name = (document.getElementById('memberNameInput')?.value||'').trim();
+      const pin  = (document.getElementById('memberPinInput')?.value||'').trim();
+      if (!name) { errEl.textContent='กรุณากรอกชื่อ'; return; }
+      if (pin.length!==6||isNaN(Number(pin))) { errEl.textContent='รหัสต้องเป็นตัวเลข 6 หลัก'; return; }
+      if (pin === Auth.ADMIN_PIN) { errEl.textContent='รหัสนี้ถูกใช้โดย Admin'; return; }
+      const s2 = Store.load();
+      const ms = s2.members || [{pin:'311257',name:'ณนนท์'}];
+      const dup = ms.find(x => x.pin===pin);
+      if (dup) { errEl.textContent='รหัสนี้ใช้โดย "'+dup.name+'" อยู่แล้ว'; return; }
+      errEl.textContent='';
+      ms.push({pin, name});
+      s2.members = ms;
+      Store.save(s2);
+      document.getElementById('memberNameInput').value='';
+      document.getElementById('memberPinInput').value='';
+      toast('✅ เพิ่ม "'+name+'" แล้ว');
+      renderMembers();
+    };
+  }
+
+  renderMembers();
 }
 
 // ===================== ADMIN NEW PAGE =====================
