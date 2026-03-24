@@ -245,6 +245,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
   <script>
     // Setup PDF.js worker
@@ -829,7 +830,7 @@
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">หรืออัปโหลด PDF จากเครื่อง</span>
         <input id="newPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
-        <span class="muted">ไฟล์จะเก็บในเบราว์เซอร์ (IndexedDB) เครื่องนี้เท่านั้น</span>
+        <span class="muted">ไฟล์จะอัปโหลดขึ้น Firebase Storage — ใช้ได้ทุกเครื่อง</span>
       </label>
       <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">จำนวนข้อ</span>
@@ -1126,13 +1127,14 @@ const FirebaseSync = (() => {
     appId: "1:693537085236:web:862dcb5af879787450b761"
   };
 
-  let db = null, _ready = false, _statusEl = null;
+  let db = null, storage = null, _ready = false, _statusEl = null;
 
   function init() {
     try {
       if (!window.firebase) { console.warn('[FB] SDK not loaded'); return; }
       if (!firebase.apps.length) firebase.initializeApp(CFG);
       db = firebase.firestore();
+      storage = firebase.storage();
       // Enable offline persistence (works on mobile too)
       db.enablePersistence({ synchronizeTabs: true }).catch(e => {
         if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
@@ -1215,7 +1217,28 @@ const FirebaseSync = (() => {
     } catch(e) { console.warn('[FB] migrate err', e); }
   }
 
-  return { init, saveDoc, loadDoc, listenDoc, migrateLS, ready: () => _ready, ns: _ns };
+  // Upload PDF to Firebase Storage — returns download URL (accessible from all devices)
+  async function uploadPdf(file, onProgress) {
+    if (!_ready || !storage) throw new Error('Firebase Storage ยังไม่พร้อม');
+    const ext = file.name.split('.').pop() || 'pdf';
+    const path = 'pdfs/' + _origin + '_' + Date.now() + '_' + Math.random().toString(16).slice(2) + '.' + ext;
+    const ref = storage.ref(path);
+    return new Promise((resolve, reject) => {
+      const task = ref.put(file);
+      task.on('state_changed',
+        snap => { if(onProgress) onProgress(Math.round(snap.bytesTransferred/snap.totalBytes*100)); },
+        err => reject(err),
+        async () => {
+          try {
+            const url = await task.snapshot.ref.getDownloadURL();
+            resolve(url);
+          } catch(e) { reject(e); }
+        }
+      );
+    });
+  }
+
+  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, ready: () => _ready, ns: _ns };
 })();
 
 // ===================== STORE =====================
@@ -1312,7 +1335,20 @@ const Store = {
           banner = document.createElement('div');
           banner.id = '_syncConflictBanner';
           banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#1c1917;padding:10px 16px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.2);pointer-events:auto;';
-          banner.innerHTML = `<span>⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น — ข้อมูลของคุณอาจไม่ใช่เวอร์ชันล่าสุด</span><span style="display:flex;gap:8px;flex-shrink:0;"><button onclick="location.reload()" style="background:#1c1917;color:#fef3c7;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🔄 โหลดใหม่</button><button onclick="document.getElementById('_syncConflictBanner').remove()" style="background:transparent;color:#1c1917;border:2px solid #1c1917;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">✕ ปิด (บันทึกของฉันต่อ)</button></span>`;
+          const b1 = document.createElement('button');
+          b1.textContent = '🔄 โหลดใหม่';
+          b1.style.cssText = 'background:#1c1917;color:#fef3c7;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
+          b1.onclick = () => location.reload();
+          const b2 = document.createElement('button');
+          b2.textContent = '✕ ปิด (บันทึกของฉันต่อ)';
+          b2.style.cssText = 'background:transparent;color:#1c1917;border:2px solid #1c1917;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
+          b2.onclick = () => banner.remove();
+          const msg = document.createElement('span');
+          msg.textContent = '⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น — ข้อมูลของคุณอาจไม่ใช่เวอร์ชันล่าสุด';
+          const btnWrap = document.createElement('span');
+          btnWrap.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
+          btnWrap.append(b1, b2);
+          banner.append(msg, btnWrap);
           document.body.prepend(banner);
         }
       }
@@ -2719,12 +2755,19 @@ function initAdminNew(){
       const f=e.target.files&&e.target.files[0];
       if(!f) return;
       if(f.type&&f.type!=='application/pdf'){toast('กรุณาเลือกไฟล์ PDF');return;}
-      const key=`pdf_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      await PdfDB.put(key,f);
-      lastUploadedPdfKey=key;
-      pdfUrlEl.value=`localpdf:${key}`;
-      toast('อัปโหลดแล้ว (เก็บในเครื่องนี้)');
-    }catch(err){toast('อัปโหลดไม่สำเร็จ: '+(err?.message||err));}
+      toast('⏳ กำลังอัปโหลด PDF...');
+      pdfUrlEl.value='';
+      pdfUrlEl.placeholder='กำลังอัปโหลด...';
+      const url = await FirebaseSync.uploadPdf(f, pct => {
+        pdfUrlEl.placeholder = `อัปโหลด ${pct}%...`;
+      });
+      pdfUrlEl.value = url;
+      pdfUrlEl.placeholder = '';
+      toast('✅ อัปโหลด PDF สำเร็จ — ใช้ได้ทุกเครื่อง');
+    }catch(err){
+      pdfUrlEl.placeholder='';
+      toast('อัปโหลดไม่สำเร็จ: '+(err?.message||err));
+    }
   });
 
   const createBtn=document.getElementById('newCreateBtn');
