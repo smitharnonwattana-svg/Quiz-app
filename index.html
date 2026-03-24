@@ -908,6 +908,22 @@
             </div>
 
           </div>
+          <!-- PDF Change Section -->
+          <div class="ctrls" style="gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:13px;font-weight:800;">เปลี่ยน PDF</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input id="editorPdfUrl" class="titleInput" type="text" placeholder="วาง URL (Google Drive หรือ HTTPS)" style="min-width:260px;" />
+                <button class="btn" id="editorPdfUrlBtn" type="button">ยืนยัน URL</button>
+                <span style="color:#9ca3af;font-size:12px;">หรือ</span>
+                <label class="btn" style="cursor:pointer;">
+                  📎 อัปโหลด PDF ใหม่
+                  <input id="editorPdfFile" type="file" accept="application/pdf" style="display:none;" />
+                </label>
+              </div>
+              <div id="editorPdfStatus" class="muted" style="font-size:12px;"></div>
+            </div>
+          </div>
           <div class="ctrls">
             <!-- hidden: ยังใช้ใน JS อยู่ -->
             <input id="editorFast" type="checkbox" checked style="display:none;" />
@@ -1217,6 +1233,41 @@ const FirebaseSync = (() => {
     } catch(e) { console.warn('[FB] migrate err', e); }
   }
 
+  // ── Active Session Token — used to force-logout other devices ──
+  const _mySessionToken = 'sess_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+  let _sessionListenerActive = false;
+
+  async function claimSession() {
+    if (!_ready) return;
+    try { await saveDoc('activeSession', { token: _mySessionToken, ts: Date.now() }); } catch(e) {}
+  }
+
+  function listenSession(onKicked) {
+    if (_sessionListenerActive) return;
+    _sessionListenerActive = true;
+    listenDoc('activeSession', (data) => {
+      if (data && data.token && data.token !== _mySessionToken) {
+        onKicked();
+      }
+    });
+  }
+
+  function getMyToken() { return _mySessionToken; }
+
+  // Delete PDF from Firebase Storage by URL
+  async function deleteStoragePdf(url) {
+    if (!_ready || !storage) return;
+    if (!url || url.startsWith('localpdf:') || url.startsWith('./') || url.includes('drive.google.com')) return;
+    try {
+      const ref = storage.refFromURL(url);
+      await ref.delete();
+      console.log('[Storage] deleted', url);
+    } catch(e) {
+      // ignore not-found errors (file may already be gone)
+      if (e.code !== 'storage/object-not-found') console.warn('[Storage] delete err', e);
+    }
+  }
+
   // Upload PDF to Firebase Storage — returns download URL (accessible from all devices)
   async function uploadPdf(file, onProgress) {
     if (!_ready || !storage) throw new Error('Firebase Storage ยังไม่พร้อม');
@@ -1238,7 +1289,7 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, ready: () => _ready, ns: _ns };
+  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
 })();
 
 // ===================== STORE =====================
@@ -1343,11 +1394,19 @@ const Store = {
           b2.textContent = '✕ ปิด (บันทึกของฉันต่อ)';
           b2.style.cssText = 'background:transparent;color:#1c1917;border:2px solid #1c1917;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
           b2.onclick = () => banner.remove();
+          const b3 = document.createElement('button');
+          b3.textContent = '🔒 บังคับ logout เครื่องอื่น';
+          b3.style.cssText = 'background:#dc2626;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
+          b3.onclick = async () => {
+            await FirebaseSync.claimSession();
+            banner.remove();
+            toast('✅ เครื่องนี้เป็น session ล่าสุดแล้ว — เครื่องอื่นถูก logout แล้ว');
+          };
           const msg = document.createElement('span');
           msg.textContent = '⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น — ข้อมูลของคุณอาจไม่ใช่เวอร์ชันล่าสุด';
           const btnWrap = document.createElement('span');
           btnWrap.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
-          btnWrap.append(b1, b2);
+          btnWrap.append(b1, b3, b2);
           banner.append(msg, btnWrap);
           document.body.prepend(banner);
         }
@@ -1673,6 +1732,22 @@ const Auth = (() => {
     const role = PINS[pin.trim()];
     if (!role) return false;
     setRole(role);
+    // Claim session token so other devices know this is the latest active session
+    setTimeout(() => {
+      if (FirebaseSync.ready()) {
+        FirebaseSync.claimSession();
+        // Listen for being kicked by another device
+        FirebaseSync.listenSession(() => {
+          if (isLoggedIn()) {
+            logout();
+            setTimeout(() => {
+              const err = document.getElementById('loginError');
+              if (err) err.textContent = '⚠️ มีการ login จากอุปกรณ์อื่น — กรุณา login ใหม่';
+            }, 100);
+          }
+        });
+      }
+    }, 1000);
     return role;
   }
   return { login, logout, isLoggedIn, isTeacher, getRole };
@@ -2712,6 +2787,8 @@ function initAdmin(){
       btn.addEventListener('click',()=>{
         const id=btn.getAttribute('data-del');const exam=s.exams.find(x=>x.id===id);if(!exam) return;
         if(!confirm(`ต้องการลบ "${exam.title}"?`)) return;
+        // Delete PDF from Firebase Storage if it's a Storage URL
+        FirebaseSync.deleteStoragePdf(exam.pdfUrl);
         s.exams=s.exams.filter(x=>x.id!==id);
         if(s.questions&&s.questions[id]) delete s.questions[id];
         Store.save(s);toast('ลบชุดข้อสอบแล้ว');renderAdmin();
@@ -2852,6 +2929,49 @@ function initEditor(examId){
   }
   subjectBtn.onclick=(e)=>{e.preventDefault();applySubject();};
   if(subjectInput) subjectInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applySubject();}};
+
+  // ── PDF Change ──
+  const editorPdfUrlEl = document.getElementById('editorPdfUrl');
+  const editorPdfStatusEl = document.getElementById('editorPdfStatus');
+  if(editorPdfUrlEl) editorPdfUrlEl.value = (exam.pdfUrl && !exam.pdfUrl.startsWith('localpdf:')) ? exam.pdfUrl : '';
+
+  function updateExamPdf(newUrl) {
+    const oldUrl = exam.pdfUrl;
+    exam.pdfUrl = newUrl;
+    Store.save(s);
+    document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
+    // Delete old Storage PDF if it was a Firebase Storage URL
+    FirebaseSync.deleteStoragePdf(oldUrl);
+    toast('✅ อัปเดต PDF แล้ว');
+  }
+
+  document.getElementById('editorPdfUrlBtn').onclick = (e) => {
+    e.preventDefault();
+    const url = (editorPdfUrlEl.value || '').trim();
+    if (!url) { toast('กรุณากรอก URL'); return; }
+    updateExamPdf(url);
+    editorPdfStatusEl.textContent = '✅ บันทึก URL แล้ว';
+  };
+
+  const editorPdfFileInput = document.getElementById('editorPdfFile');
+  const clonedPdfInput = editorPdfFileInput.cloneNode(true);
+  editorPdfFileInput.parentNode.replaceChild(clonedPdfInput, editorPdfFileInput);
+  clonedPdfInput.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (f.type && f.type !== 'application/pdf') { toast('กรุณาเลือกไฟล์ PDF'); return; }
+    try {
+      editorPdfStatusEl.textContent = '⏳ กำลังอัปโหลด...';
+      const url = await FirebaseSync.uploadPdf(f, pct => {
+        editorPdfStatusEl.textContent = `⏳ อัปโหลด ${pct}%...`;
+      });
+      editorPdfUrlEl.value = url;
+      updateExamPdf(url);
+      editorPdfStatusEl.textContent = '✅ อัปโหลดสำเร็จ — ใช้ได้ทุกเครื่อง';
+    } catch(err) {
+      editorPdfStatusEl.textContent = '❌ ' + (err?.message || err);
+    }
+  });
 
   let selectedIndex=0;
   const refs={};
