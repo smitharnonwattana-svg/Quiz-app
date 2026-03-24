@@ -733,12 +733,10 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">Admin</h1>
-        <div class="muted" style="margin-top:6px;">เดโมนี้ใช้ปุ่ม login/logout จำลอง (ไม่ใช้รหัสจริง)</div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
-        <button class="btn" id="adminLoginBtn">Login</button>
-        <button class="btn" id="adminLogoutBtn">Logout</button>
+        <button class="btn" onclick="Auth.logout()" style="color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
       </div>
     </div>
     <div id="adminGate" style="margin-top:16px;"></div>
@@ -2116,6 +2114,7 @@ function initTake(id){
     const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
     const savedS=Store.load();
     savedS.attempts.unshift({id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion});
+    if(typeof clearTakeResume === 'function') clearTakeResume();
     const ok=Store.save(savedS);
     // 🎉 Show meme popup before going to review
     MemeScore.show(score, total, () => {
@@ -2156,13 +2155,27 @@ function initTake(id){
       const elapsed=Math.floor((Date.now()-st.startedAt)/1000);
       const remaining=Math.max(0,exam.durationSeconds-elapsed);
       setTimerDisplay(remaining);
-      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;submit();}
+      // Save resume state every tick so refresh can restore
+      if(typeof saveTakeResume === 'function') saveTakeResume(st);
+      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;clearTakeResume();submit();}
     },250);
+  }
+
+  // Check if we have resume data for this exam
+  const _resume = typeof loadTakeResume === 'function' ? loadTakeResume() : null;
+  if (_resume && _resume.examId === id && _resume.startedAt) {
+    // Restore answers, position and startedAt so timer continues from where it left off
+    st.answers = _resume.answers || {};
+    st.unsure = _resume.unsure || {};
+    st.startedAt = _resume.startedAt; // keep original startedAt so elapsed time is correct
+    st.currentIndex = _resume.currentIndex || 0;
+    if (_resume.takerName) st.takerName = _resume.takerName;
+    if (_resume.attemptId) st.attemptId = _resume.attemptId;
   }
 
   // Auto-start ทันทีเมื่อเข้าหน้า take (ชื่อกรอกมาแล้วจากหน้าก่อน)
   setTimeout(doStart, 300);
-  document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะไม่ถูกส่ง')){cleanupTake();navigate('exams');}};
+  document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะไม่ถูกส่ง')){clearTakeResume();cleanupTake();navigate('exams');}};
 
   render();
 }
@@ -3480,9 +3493,69 @@ function renderBenchmarkWidget(containerId, score, examId) {
 
 // ===================== INIT =====================
 Store.init();
-// Show login page on startup (navigate handles auth guard)
-navigate('login');
-setTimeout(()=>document.getElementById('loginPinInput')?.focus(), 300);
+// ── Session Persistence: restore page after refresh ──
+const _PERSIST_KEY = 'nanont:pageState';
+
+function savePageState(page, params) {
+  if (page === 'login') return; // never save login page
+  try {
+    sessionStorage.setItem(_PERSIST_KEY, JSON.stringify({ page, params: params || {}, ts: Date.now() }));
+  } catch(e) {}
+}
+
+function loadPageState() {
+  try { return JSON.parse(sessionStorage.getItem(_PERSIST_KEY) || 'null'); } catch { return null; }
+}
+
+// Patch navigate to auto-save page state
+const _origNavigate = navigate;
+window.navigate = function(page, params) {
+  _origNavigate(page, params);
+  savePageState(page, params);
+};
+navigate = window.navigate;
+
+// ── Take state persistence: save answers + timer across refresh ──
+const _TAKE_PERSIST_KEY = 'nanont:takeResume';
+
+function saveTakeResume(state) {
+  try {
+    sessionStorage.setItem(_TAKE_PERSIST_KEY, JSON.stringify({
+      examId: state.exam.id,
+      answers: state.answers,
+      unsure: state.unsure,
+      startedAt: state.startedAt,
+      currentIndex: state.currentIndex,
+      takerName: state.takerName,
+      attemptId: state.attemptId,
+      ts: Date.now()
+    }));
+  } catch(e) {}
+}
+
+function loadTakeResume() {
+  try { return JSON.parse(sessionStorage.getItem(_TAKE_PERSIST_KEY) || 'null'); } catch { return null; }
+}
+
+function clearTakeResume() {
+  sessionStorage.removeItem(_TAKE_PERSIST_KEY);
+}
+
+// Show login page on startup — but restore previous page if session still valid
+const _savedState = loadPageState();
+const _takeResume = loadTakeResume();
+
+if (_savedState && Auth.isLoggedIn()) {
+  if (_savedState.page === 'take' && _takeResume) {
+    // Seamless restore — jump straight back to take page, timer continues from startedAt
+    navigate('take', { id: _takeResume.examId });
+  } else {
+    navigate(_savedState.page, _savedState.params);
+  }
+} else {
+  navigate('login');
+  setTimeout(()=>document.getElementById('loginPinInput')?.focus(), 300);
+}
 
 
 
