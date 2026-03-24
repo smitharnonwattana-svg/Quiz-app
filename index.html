@@ -1951,7 +1951,42 @@ function initExamDetail(id){
   document.getElementById('examStartBtn').onclick=()=>{
     const name = takerEl.value.trim();
     if(name) localStorage.setItem(LAST_TAKER_KEY, name);
-    navigate('take', {id:exam.id, takerName:name});
+    // Check if there's a pending resume for a DIFFERENT exam
+    const _pendingResume = typeof loadTakeResume === 'function' ? loadTakeResume() : null;
+    if (_pendingResume && _pendingResume.examId && _pendingResume.examId !== exam.id && _pendingResume.startedAt) {
+      const _s2 = Store.load();
+      const _pendingExam = _s2.exams.find(e => e.id === _pendingResume.examId);
+      const _pendingTitle = _pendingExam ? _pendingExam.title : 'ข้อสอบที่ทำค้างไว้';
+      const _elapsed = Math.floor((Date.now() - _pendingResume.startedAt) / 1000);
+      const _remaining = _pendingExam ? Math.max(0, _pendingExam.durationSeconds - _elapsed) : 0;
+      const _mm = String(Math.floor(_remaining/60)).padStart(2,'0');
+      const _ss = String(_remaining%60).padStart(2,'0');
+
+      const _ov = document.createElement('div');
+      _ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+      const _box = document.createElement('div');
+      _box.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
+      _box.innerHTML = `
+        <div style="font-size:32px;margin-bottom:8px;">📝</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:6px;">มีข้อสอบค้างอยู่</div>
+        <div style="font-size:13px;color:#6b7280;margin-bottom:4px;">${_pendingTitle}</div>
+        <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">เวลาเหลือ <strong style="color:#111;">${_mm}:${_ss}</strong></div>
+      `;
+      const _bContinue = document.createElement('button');
+      _bContinue.textContent = '▶ ทำข้อสอบค้างต่อ';
+      _bContinue.style.cssText = 'width:100%;padding:13px;background:#111827;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;';
+      const _bNew = document.createElement('button');
+      _bNew.textContent = 'ทิ้งและเริ่มชุดใหม่';
+      _bNew.style.cssText = 'width:100%;padding:11px;background:transparent;color:#dc2626;border:1.5px solid #fca5a5;border-radius:12px;font-size:14px;cursor:pointer;';
+      _bContinue.onclick = () => { _ov.remove(); navigate('take', {id: _pendingResume.examId}); };
+      _bNew.onclick = () => { clearTakeResume(); _ov.remove(); navigate('take', {id:exam.id, takerName:name}); };
+      _box.appendChild(_bContinue);
+      _box.appendChild(_bNew);
+      _ov.appendChild(_box);
+      document.body.appendChild(_ov);
+    } else {
+      navigate('take', {id:exam.id, takerName:name});
+    }
   };
   // กด Enter ก็เริ่มได้เลย
   takerEl.addEventListener('keydown', (e)=>{
@@ -2145,37 +2180,76 @@ function initTake(id){
   }
   setTimerDisplay(exam.durationSeconds);
 
-  function doStart(){
+  function doStart(restoredStartedAt){
     if(st.started) return;
     st.started=true;
-    st.startedAt=Date.now();
-    newSubmitBtn.disabled=false; // ใช้ newSubmitBtn โดยตรง (ไม่ใช่ getElementById ที่หา element เก่าที่ replace ไปแล้ว)
+    st.startedAt = restoredStartedAt || Date.now();
+    newSubmitBtn.disabled=false;
     render();
     _takeInterval=setInterval(()=>{
       const elapsed=Math.floor((Date.now()-st.startedAt)/1000);
       const remaining=Math.max(0,exam.durationSeconds-elapsed);
       setTimerDisplay(remaining);
-      // Save resume state every tick so refresh can restore
       if(typeof saveTakeResume === 'function') saveTakeResume(st);
       if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;clearTakeResume();submit();}
     },250);
   }
 
-  // Check if we have resume data for this exam
+  // Check resume data — show popup if exists
   const _resume = typeof loadTakeResume === 'function' ? loadTakeResume() : null;
   if (_resume && _resume.examId === id && _resume.startedAt) {
-    // Restore answers, position and startedAt so timer continues from where it left off
-    st.answers = _resume.answers || {};
-    st.unsure = _resume.unsure || {};
-    st.startedAt = _resume.startedAt; // keep original startedAt so elapsed time is correct
-    st.currentIndex = _resume.currentIndex || 0;
-    if (_resume.takerName) st.takerName = _resume.takerName;
-    if (_resume.attemptId) st.attemptId = _resume.attemptId;
+    // Pause timer display at remaining time while waiting for user
+    const _pausedElapsed = Math.floor((Date.now() - _resume.startedAt) / 1000);
+    const _pausedRemaining = Math.max(0, exam.durationSeconds - _pausedElapsed);
+    setTimerDisplay(_pausedRemaining);
+
+    // Show resume popup
+    const _resumeOverlay = document.createElement('div');
+    _resumeOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+    const _resumeBox = document.createElement('div');
+    _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
+    const _mm = String(Math.floor(_pausedRemaining/60)).padStart(2,'0');
+    const _ss = String(_pausedRemaining%60).padStart(2,'0');
+    _resumeBox.innerHTML = `
+      <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:6px;">มีข้อสอบค้างอยู่</div>
+      <div style="font-size:14px;color:#6b7280;margin-bottom:4px;">${exam.title}</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">เวลาเหลือ <strong style="color:#111;">${_mm}:${_ss}</strong></div>
+    `;
+    const _btnContinue = document.createElement('button');
+    _btnContinue.textContent = '▶ ทำต่อ';
+    _btnContinue.style.cssText = 'width:100%;padding:13px;background:#111827;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;';
+    const _btnRestart = document.createElement('button');
+    _btnRestart.textContent = 'เริ่มใหม่';
+    _btnRestart.style.cssText = 'width:100%;padding:11px;background:transparent;color:#6b7280;border:1.5px solid #e5e7eb;border-radius:12px;font-size:14px;cursor:pointer;';
+
+    _btnContinue.onclick = () => {
+      _resumeOverlay.remove();
+      // Restore all state from resume
+      st.answers = _resume.answers || {};
+      st.unsure = _resume.unsure || {};
+      st.currentIndex = _resume.currentIndex || 0;
+      if (_resume.takerName) st.takerName = _resume.takerName;
+      if (_resume.attemptId) st.attemptId = _resume.attemptId;
+      render();
+      doStart(_resume.startedAt); // pass original startedAt — timer continues
+    };
+    _btnRestart.onclick = () => {
+      clearTakeResume();
+      _resumeOverlay.remove();
+      doStart(); // fresh start
+    };
+
+    _resumeBox.appendChild(_btnContinue);
+    _resumeBox.appendChild(_btnRestart);
+    _resumeOverlay.appendChild(_resumeBox);
+    document.body.appendChild(_resumeOverlay);
+  } else {
+    // No resume — auto-start normally
+    setTimeout(doStart, 300);
   }
 
-  // Auto-start ทันทีเมื่อเข้าหน้า take (ชื่อกรอกมาแล้วจากหน้าก่อน)
-  setTimeout(doStart, 300);
-  document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะไม่ถูกส่ง')){clearTakeResume();cleanupTake();navigate('exams');}};
+  document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะยังถูกบันทึกไว้')){cleanupTake();navigate('exams');}};
 
   render();
 }
@@ -3547,7 +3621,7 @@ const _takeResume = loadTakeResume();
 
 if (_savedState && Auth.isLoggedIn()) {
   if (_savedState.page === 'take' && _takeResume) {
-    // Seamless restore — jump straight back to take page, timer continues from startedAt
+    // Go back to take page — the resume popup inside initTake will handle pause/continue
     navigate('take', { id: _takeResume.examId });
   } else {
     navigate(_savedState.page, _savedState.params);
