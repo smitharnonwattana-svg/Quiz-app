@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v40.2 -->
+  <!-- APP_VERSION: v40.3 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -297,7 +297,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:14px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.2</div>
+      <div style="text-align:right;margin-top:14px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.3</div>
     </div>
   </div>
 </div>
@@ -1535,12 +1535,12 @@ const MemeScore = (() => {
     ],
     // 🔥 80–100% เทพ — stonks + celebration
     goat: [
+      ['https://media.tenor.com/FLBmfkn2QJ0AAAAM/im-good.gif',           'PLUS ULTRA!!! 🔥🔥🔥'],
       ['https://media.tenor.com/yfZLNsORj3EAAAAM/sobbing-tecazzz.gif',   'STONKS ↑↑↑ คะแนนพุ่ง!'],
       ['https://media.tenor.com/9PR5loGMyLQAAAAM/shocked-wow.gif',       'OMG เทพมากกกก!!!'],
-      ['https://media.tenor.com/FLBmfkn2QJ0AAAAM/im-good.gif',           'PLUS ULTRA!!! 🔥🔥🔥'],
-      ['https://media.tenor.com/NZiI52eqVPgAAAAM/cat.gif',               'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
-      ['https://media.tenor.com/bpMxTi1JUy4AAAAM/cat.gif',               'GIGACHAD MODE 🗿'],
-      ['https://media.tenor.com/Jybgy6OTwfkAAAAM/crying-hug.gif',        'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
+      ['https://media.tenor.com/FBEhcibcCO8AAAAM/kitty.gif',             'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
+      ['https://media.tenor.com/wAOPu8jgUTkAAAAM/cat-thumbs-up.gif',     'GIGACHAD MODE 🗿'],
+      ['https://media.tenor.com/ZyqhFIPi2OgAAAAM/cat-crying-cat.gif',    'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
     ],
   };
 
@@ -1717,7 +1717,7 @@ function renderHome(){
         </div>` : ''}
       </div>
       <div class="hr"></div>
-      <div class="muted" style="font-size:11px;">☁️ ข้อมูล sync กับ Firebase อัตโนมัติ</div>
+      <div class="muted" style="font-size:11px;">☁️ ข้อมูล sync กับ Firebase อัตโนมัติ &nbsp;·&nbsp; v40.3</div>
     </div>
   `;
 }
@@ -1842,7 +1842,7 @@ document.addEventListener('keydown', function(e){
 function doLogin() {
   const pin = _pinVal || document.getElementById('loginPinInput').value.trim();
   const errEl = document.getElementById('loginError');
-  if (pin.length < 6) { return; }
+  if (pin.length < 1) { return; }
   const role = Auth.login(pin);
   if (!role) {
     errEl.textContent = '❌ รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง';
@@ -2607,7 +2607,7 @@ function initStats(){
     const emptyEl=document.getElementById('statsChartEmpty');
     if(!canvas) return;
     // เรียงเก่า→ใหม่ เอาแค่ 20 ครั้งล่าสุด
-    const sorted=[...attempts].sort((a,b)=>new Date(a.startedAt||0)-new Date(b.startedAt||0)).slice(-20).filter(a=>a.total>0);
+    const sorted=[...attempts].sort((a,b)=>(a.startedAt||0)-(b.startedAt||0)).slice(-20).filter(a=>a.total>0);
     const pts=sorted.map((a,i)=>({
       pct:Math.round((a.score/a.total)*100),
       date:a.startedAt?new Date(a.startedAt):null,
@@ -2790,7 +2790,7 @@ function initStats(){
         rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,'','','','']);
       } else {
         a.perQuestion.forEach(p=>{
-          rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,p.no,p.isCorrect?1:0,p.correct||'',p.chosen||'']);
+          rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,p.no,p.isCorrect?1:0,p.correct||'',p.answered||'']);
         });
       }
     });
@@ -3065,16 +3065,13 @@ function initAdminNew(){
   createBtn.parentNode.replaceChild(newCreateBtn,createBtn);
   newCreateBtn.addEventListener('click',()=>{
     const title=document.getElementById('newTitle').value.trim()||'Exam ใหม่';
-    const _selVal=document.getElementById('newSubjectSelect')?.value||'';
-    const subject=(_selVal==='อื่นๆ'||!_selVal)
-      ?(document.getElementById('newSubjectOther')?.value?.trim()||document.getElementById('newSubject')?.value?.trim()||'')
-      :(_selVal||document.getElementById('newSubject')?.value?.trim()||'');
+    const subject=document.getElementById('newSubject').value.trim();
     const minutes=Math.max(1,Number(document.getElementById('newMinutes').value||45));
     const published=document.getElementById('newPublished').value==='true';
     const pdfUrl=document.getElementById('newPdfUrl').value.trim();
     const createPlaceholder=document.getElementById('newCreatePlaceholder').checked;
     const qCount=Math.min(999,Math.max(1,Math.floor(Number(document.getElementById('newQCount').value||50))));
-    if(!subject) return toast('กรุณาเลือกหรือระบุวิชา');
+    if(!subject){ const other=document.getElementById('newSubjectOther')?.value?.trim(); if(!other) return toast('กรุณาเลือกหรือระบุวิชา'); }
     const maxOrder=Math.max(0,...(s.exams||[]).map(e=>(typeof e.order==='number'?e.order:0)));
     const id='exam_'+Math.random().toString(16).slice(2);
     s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
@@ -4665,7 +4662,7 @@ function initEntranceCompare(params) {
 </script>
 
 <!-- ===================== MEME SCORE OVERLAY ===================== -->
-<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;">
+<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;flex-direction:row;">
   <div id="memeBox" style="background:#fff;border-radius:16px;width:min(440px,92vw);overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
 
     <!-- Loading -->
@@ -4714,6 +4711,7 @@ function initEntranceCompare(params) {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+
 </body>
 </html>
 
