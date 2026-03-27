@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v41.1 -->
+  <!-- APP_VERSION: v41.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -307,7 +307,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.1</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.2</div>
     </div>
   </div>
 </div>
@@ -1447,34 +1447,42 @@ const Store = {
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
         navigate(pg, window._currentParams||{});
       } else if(pg && pg === 'admin'){
-        let banner = document.getElementById('_syncConflictBanner');
-        if(!banner){
-          banner = document.createElement('div');
-          banner.id = '_syncConflictBanner';
-          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#1c1917;padding:10px 16px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.2);pointer-events:auto;';
-          const b1 = document.createElement('button');
-          b1.textContent = '🔄 โหลดใหม่';
-          b1.style.cssText = 'background:#1c1917;color:#fef3c7;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
-          b1.onclick = () => location.reload();
-          const b2 = document.createElement('button');
-          b2.textContent = '✕ ปิด (บันทึกของฉันต่อ)';
-          b2.style.cssText = 'background:transparent;color:#1c1917;border:2px solid #1c1917;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
-          b2.onclick = () => banner.remove();
-          const b3 = document.createElement('button');
-          b3.textContent = '🔒 บังคับ logout เครื่องอื่น';
-          b3.style.cssText = 'background:#dc2626;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
-          b3.onclick = async () => {
-            await FirebaseSync.claimSession();
-            banner.remove();
-            toast('✅ เครื่องนี้เป็น session ล่าสุดแล้ว — เครื่องอื่นถูก logout แล้ว');
-          };
-          const msg = document.createElement('span');
-          msg.textContent = '⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น — ข้อมูลของคุณอาจไม่ใช่เวอร์ชันล่าสุด';
-          const btnWrap = document.createElement('span');
-          btnWrap.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
-          btnWrap.append(b1, b3, b2);
-          banner.append(msg, btnWrap);
-          document.body.prepend(banner);
+        // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
+        if(!sessionStorage.getItem('_conflictBannerDismissed')){
+          let banner = document.getElementById('_syncConflictBanner');
+          if(!banner){
+            banner = document.createElement('div');
+            banner.id = '_syncConflictBanner';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#1c1917;padding:7px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.15);pointer-events:auto;';
+            const dismiss = () => {
+              banner.remove();
+              sessionStorage.setItem('_conflictBannerDismissed', '1');
+            };
+            const b1 = document.createElement('button');
+            b1.textContent = '🔄 โหลดใหม่';
+            b1.style.cssText = 'background:#1c1917;color:#fef3c7;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
+            b1.onclick = () => location.reload();
+            const b2 = document.createElement('button');
+            b2.textContent = '✕ ปิด';
+            b2.style.cssText = 'background:transparent;color:#1c1917;border:1.5px solid #1c1917;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
+            b2.onclick = dismiss;
+            const b3 = document.createElement('button');
+            b3.textContent = '🔒 logout เครื่องอื่น';
+            b3.style.cssText = 'background:#dc2626;color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
+            b3.onclick = async () => {
+              await FirebaseSync.claimSession();
+              dismiss();
+              toast('✅ เครื่องนี้เป็น session ล่าสุดแล้ว — เครื่องอื่นถูก logout แล้ว');
+            };
+            const msg = document.createElement('span');
+            msg.textContent = '⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น';
+            msg.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            const btnWrap = document.createElement('span');
+            btnWrap.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
+            btnWrap.append(b1, b3, b2);
+            banner.append(msg, btnWrap);
+            document.body.prepend(banner);
+          }
         }
       }
     });
@@ -1792,6 +1800,7 @@ const Auth = (() => {
   function isTeacher()  { return getRole() === 'teacher'; }
   function logout() {
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('_conflictBannerDismissed');
     if(typeof numpadClear === 'function') numpadClear();
     navigate('login');
     setTimeout(()=>{
