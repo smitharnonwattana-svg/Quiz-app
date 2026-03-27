@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v40.6 -->
+  <!-- APP_VERSION: v40.9 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -162,22 +162,32 @@
     .wrongText{font-size:15px;line-height:1.4;}
     .wrongText .label{color:#6b7280;}
     .wrongText .list{color:#b91c1c;font-weight:800;}
-    .qListReview{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
-    .qItem{border:1px solid var(--border);border-radius:16px;padding:10px;}
-    .qHead{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
-    .qBadge{border-radius:999px;padding:4px 10px;font-weight:600;border:1px solid var(--border);}
+    .qListReview{display:flex;flex-direction:column;gap:0;margin-top:12px;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+    .qItem{padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+    .qItem:last-child{border-bottom:none;}
+    .qItem:hover{background:#fafafa;}
+    .qItem.expanded{background:#fafafa;}
+    .qRow{display:flex;align-items:center;gap:10px;min-height:32px;}
+    .qRowNum{font-weight:800;font-size:13px;min-width:46px;color:#111;}
+    .qRowPage{font-size:11px;color:#9ca3af;min-width:38px;}
+    .qRowPills{display:flex;gap:5px;flex:1;}
+    .qPill{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;transition:all .1s;}
+    .qPill.correct{border-color:#22c55e;background:#dcfce7;color:#166534;}
+    .qPill.wrong{border-color:#ef4444;background:#fee2e2;color:#b91c1c;}
+    .qPill.chosen-correct{border-color:#22c55e;background:#16a34a;color:#fff;}
+    .qPill.chosen-wrong{border-color:#ef4444;background:#ef4444;color:#fff;}
+    .qBadge{border-radius:999px;padding:3px 9px;font-weight:700;font-size:11px;border:1px solid var(--border);white-space:nowrap;}
     .qBadge.good{border-color:#22c55e;color:#166534;background:#f0fdf4;}
     .qBadge.bad{border-color:#ef4444;color:#b91c1c;background:#fff5f5;}
-    .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
-    @media(max-width:980px){.opts{grid-template-columns:1fr;}}
-    .opt{border:1px solid var(--border);border-radius:14px;padding:10px;min-height:44px;display:flex;gap:10px;align-items:flex-start;}
+    .qBadge.skip{border-color:#d1d5db;color:#6b7280;background:#f9fafb;}
+    .qExpand{padding:8px 0 2px;display:none;flex-direction:column;gap:4px;}
+    .qItem.expanded .qExpand{display:flex;}
+    .qExpandRow{display:flex;gap:6px;align-items:flex-start;}
+    .qExpandKey{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;}
+    .qExpandKey.correct{border-color:#22c55e;background:#dcfce7;color:#166534;}
+    .qExpandKey.chosen-wrong{border-color:#ef4444;background:#fee2e2;color:#b91c1c;}
+    .qExpandText{font-size:12px;color:#374151;padding-top:3px;line-height:1.4;}
     .optKey{width:26px;height:26px;border-radius:999px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 auto;}
-    .opt.correct{border-color:#22c55e;background:#f0fdf4;}
-    .opt.correct .optKey{border-color:#22c55e;color:#166534;}
-    .opt.chosen.bad{border-color:#ef4444;background:#fff5f5;}
-    .opt.chosen.bad .optKey{border-color:#ef4444;color:#b91c1c;}
-    .opt.chosen.good{border-color:#22c55e;background:#f0fdf4;}
-    .opt .tag{margin-left:auto;font-size:12px;font-weight:700;opacity:.9;}
 
     /* stats page */
     .stat-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;}
@@ -231,7 +241,7 @@
     .iPadDot.filled{background:#111827;border-color:#111827;}
     .iPadDot.error{background:#dc2626;border-color:#dc2626;}
     @keyframes iPadShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
-    .iPadBtn{display:flex;align-items:center;justify-content:center;width:76px;height:76px;border-radius:50%;border:1px solid #d1d5db;background:#fff;cursor:pointer;font-size:26px;font-weight:400;font-family:inherit;color:#111827;margin:0 auto;transition:background .1s;box-shadow:0 1px 3px rgba(0,0,0,.08);user-select:none;}
+    .iPadBtn{display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:50%;border:1px solid #d1d5db;background:#fff;cursor:pointer;font-size:22px;font-weight:400;font-family:inherit;color:#111827;margin:0 auto;transition:background .1s;box-shadow:0 1px 3px rgba(0,0,0,.08);user-select:none;}
     .iPadBtn:active{background:#e5e7eb;}
     .iPadBtnGhost{background:#f3f4f6;font-size:14px;font-weight:600;color:#374151;border-color:#e5e7eb;box-shadow:none;}
     .correctBtn:hover{border-color:#9ca3af;background:#f3f4f6;}
@@ -260,12 +270,12 @@
 <div id="page-login" class="page active">
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f7;padding:16px;">
     <div style="width:100%;max-width:300px;text-align:center;">
-      <div style="font-size:42px;margin-bottom:8px;">🎯</div>
-      <div style="font-size:20px;font-weight:700;color:#1d1d1f;margin-bottom:4px;">My Exam Academia</div>
-      <div style="font-size:14px;color:#6b7280;margin-bottom:24px;">กรอกรหัสผ่าน</div>
+      <div style="font-size:32px;margin-bottom:6px;">🎯</div>
+      <div style="font-size:18px;font-weight:700;color:#1d1d1f;margin-bottom:2px;">My Exam Academia</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">กรอกรหัสผ่าน</div>
 
       <!-- PIN dots -->
-      <div id="pinDotsRow" style="display:flex;justify-content:center;gap:14px;margin-bottom:10px;">
+      <div id="pinDotsRow" style="display:flex;justify-content:center;gap:12px;margin-bottom:6px;">
         <div class="iPadDot" id="pd0"></div>
         <div class="iPadDot" id="pd1"></div>
         <div class="iPadDot" id="pd2"></div>
@@ -283,7 +293,7 @@
       />
 
       <!-- Numpad -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:280px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto;">
         <button class="iPadBtn" onclick="numpadPress('1')">1</button>
         <button class="iPadBtn" onclick="numpadPress('2')">2</button>
         <button class="iPadBtn" onclick="numpadPress('3')">3</button>
@@ -297,7 +307,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:14px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.9</div>
     </div>
   </div>
 </div>
@@ -426,9 +436,13 @@
       <div class="reviewPdfWrap">
         <div class="reviewPdfBar">
           <div style="font-weight:700;" id="reviewPdfLabel">PDF</div>
-          <div class="muted" style="font-size:12px;">(เลื่อนดูใน PDF ได้เลย)</div>
+          <div style="display:flex;gap:6px;align-items:center;" id="reviewPdfTabs">
+            <button id="reviewTabQuestion" class="btn" style="padding:5px 12px;font-size:12px;font-weight:700;background:#111;color:#fff;border-color:#111;">📄 โจทย์</button>
+            <button id="reviewTabAnswer"   class="btn" style="padding:5px 12px;font-size:12px;font-weight:700;display:none;">✅ เฉลย</button>
+          </div>
         </div>
-        <div id="reviewPdfViewer" style="width:100%;flex:1;min-height:400px;position:relative;"></div>
+        <div id="reviewPdfViewer"       style="width:100%;flex:1;min-height:400px;position:relative;"></div>
+        <div id="reviewAnswerPdfViewer" style="width:100%;flex:1;min-height:400px;position:relative;display:none;"></div>
       </div>
       <div class="reviewSide" style="position:sticky;top:12px;">
         <div class="reviewCard">
@@ -853,6 +867,12 @@
         <input id="newPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
         <span class="muted">ไฟล์จะอัปโหลดขึ้น Firebase Storage — ใช้ได้ทุกเครื่อง</span>
       </label>
+      <label style="display:grid;gap:6px;">
+        <span style="font-weight:900;">PDF เฉลย <span class="muted" style="font-weight:400;font-size:12px;">(ไม่บังคับ — แสดงใน tab เฉลยหน้าทบทวน)</span></span>
+        <input id="newAnswerPdfUrl" placeholder="วาง URL หรืออัปโหลดด้านล่าง" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        <input id="newAnswerPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
+        <span class="muted">อัปโหลดขึ้น Firebase Storage เช่นเดียวกับ PDF หลัก</span>
+      </label>
       <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">จำนวนข้อ</span>
         <input id="newQCount" type="number" min="1" max="999" value="50" style="width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
@@ -943,6 +963,22 @@
                 </label>
               </div>
               <div id="editorPdfStatus" class="muted" style="font-size:12px;"></div>
+            </div>
+          </div>
+          <!-- Answer PDF -->
+          <div class="ctrls" style="gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:13px;font-weight:800;">PDF เฉลย <span style="font-weight:400;color:#9ca3af;font-size:12px;">(ไม่บังคับ)</span></div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input id="editorAnswerPdfUrl" class="titleInput" type="text" placeholder="วาง URL หรืออัปโหลด" style="min-width:260px;" />
+                <button class="btn" id="editorAnswerPdfUrlBtn" type="button">ยืนยัน URL</button>
+                <span style="color:#9ca3af;font-size:12px;">หรือ</span>
+                <label class="btn" style="cursor:pointer;">
+                  📎 อัปโหลด PDF เฉลย
+                  <input id="editorAnswerPdfFile" type="file" accept="application/pdf" style="display:none;" />
+                </label>
+              </div>
+              <div id="editorAnswerPdfStatus" class="muted" style="font-size:12px;"></div>
             </div>
           </div>
           <div class="ctrls" style="gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
@@ -2433,41 +2469,78 @@ function initReview(attemptId){
     nav.appendChild(b);
   });
 
-  // Question list
+  // Question list — compact row design
   const list=document.getElementById('reviewQList');
   list.innerHTML='';
+  const KEYS=['ก','ข','ค','ง'];
+  const KEY_TO_LETTER={ก:'A',ข:'B',ค:'C',ง:'D'};
   qs.forEach((q)=>{
     const chosen=(answers[q.id]??answers[String(q.id)]??null);
     const correct=(q.correct==null)?null:String(q.correct).trim();
     const isCorrect=isCorrectQ(q);
     const isFree=!!(q.isFree||(Array.isArray(att.perQuestion)&&att.perQuestion.find(p=>Number(p.no)===Number(q.no))?.isFree));
+    const hasText=KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
+
     const wrap=document.createElement('div');
-    wrap.className='qItem';wrap.id=`rq-${q.no}`;
+    wrap.className='qItem';
+    wrap.id=`rq-${q.no}`;
+
+    // ── pills row ──
+    const pillsHtml=KEYS.map(key=>{
+      const letter=KEY_TO_LETTER[key];
+      const isCorr=correct===letter||correct===key;
+      const isChosen=chosen===letter||chosen===key;
+      let cls='qPill';
+      if(isCorr&&isChosen) cls+=' chosen-correct';
+      else if(isChosen&&!isCorr) cls+=' chosen-wrong';
+      else if(isCorr) cls+=' correct';
+      return `<div class="${cls}" title="${isCorr?'เฉลย':''}${isChosen?'  คุณเลือก':''}">${key}</div>`;
+    }).join('');
+
+    // badge
+    const badgeCls = isFree?'skip':isCorrect?'good':'bad';
+    const badgeTxt = isFree?'ฟรี':isCorrect?'✓ ถูก':(chosen?'✗ ผิด':'— ไม่ตอบ');
+
+    // answer summary (shown in row)
+    let answerTxt='';
+    if(!isFree){
+      const correctThai=KEYS.find(k=>KEY_TO_LETTER[k]===correct||k===correct)||correct||'-';
+      const chosenThai=chosen?KEYS.find(k=>KEY_TO_LETTER[k]===chosen||k===chosen)||chosen:'-';
+      answerTxt=`<span style="font-size:11px;color:#6b7280;white-space:nowrap;">เฉลย <b style="color:#16a34a;">${correctThai}</b>${chosen&&!isCorrect?` · เลือก <b style="color:#dc2626;">${chosenThai}</b>`:''}</span>`;
+    }
+
     wrap.innerHTML=`
-      <div class="qHead">
-        <div style="font-weight:800;">ข้อ ${q.no} <span class="muted">(หน้า ${q.page||1})</span>${isFree?' <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:4px;">ฟรี</span>':''}</div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span class="qBadge ${isCorrect?'good':'bad'}">${isCorrect?'ถูก':(chosen?'ผิด':'ยังไม่ตอบ')}</span>
-          ${(!_reviewIsGDrive && q.page) ? '<button class="btn" data-page="'+q.page+'">หน้า '+q.page+'</button>' : ''}
-        </div>
+      <div class="qRow">
+        <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}</span>
+        <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}</span>
+        <div class="qRowPills">${pillsHtml}</div>
+        ${answerTxt}
+        <span class="qBadge ${badgeCls}" style="margin-left:8px;">${badgeTxt}</span>
+        ${hasText?'<span style="font-size:11px;color:#9ca3af;margin-left:4px;">▾</span>':''}
       </div>
-      <div class="muted" style="margin-top:6px;">${isFree?'<span style="color:#d97706;font-weight:700;">★ ข้อฟรี — ทุกคนได้คะแนนข้อนี้</span>':('เฉลย: <b>'+(correct||'-')+'</b> • คำตอบของคุณ: <b>'+(chosen==null?'-':String(chosen).trim())+'</b>')}</div>
-      <div class="opts"></div>
+      <div class="qExpand">
+        ${isFree?'<div style="font-size:12px;color:#d97706;font-weight:700;padding:2px 0;">★ ข้อฟรี — ทุกคนได้คะแนนข้อนี้</div>':''}
+        ${KEYS.map(key=>{
+          const letter=KEY_TO_LETTER[key];
+          const text=(q.choices&&(q.choices[letter]||q.choices[key]))||(q.options&&(q.options[letter]||q.options[key]))||'';
+          if(!text.trim()) return '';
+          const isCorr=correct===letter||correct===key;
+          const isChosen=chosen===letter||chosen===key;
+          let keyCls='qExpandKey';
+          if(isCorr&&isChosen) keyCls+=' correct';
+          else if(isChosen&&!isCorr) keyCls+=' chosen-wrong';
+          else if(isCorr) keyCls+=' correct';
+          return `<div class="qExpandRow"><div class="${keyCls}">${key}</div><div class="qExpandText">${escHtml(text)}${isCorr?' <b style="color:#16a34a;">(เฉลย)</b>':''}${isChosen&&!isCorr?' <b style="color:#dc2626;">(คุณเลือก)</b>':''}</div></div>`;
+        }).join('')}
+      </div>
     `;
-    const pageBtn=wrap.querySelector('button[data-page]'); if(pageBtn) pageBtn.onclick=(e)=>{e.stopPropagation();setPdfPage(Number(pageBtn.dataset.page)||1);};
-    const opts=wrap.querySelector('.opts');
-    ['ก','ข','ค','ง'].forEach(key=>{
-      const text=(q.choices&&q.choices[key])?q.choices[key]:((q.options&&q.options[key])?q.options[key]:'');
-      const div=document.createElement('div');
-      const isChosen=chosen===key;
-      const isCorr=correct===key;
-      let cls='opt';
-      if(isCorr) cls+=' correct';
-      if(isChosen){cls+=' chosen '+(isCorr?'good':'bad');}
-      div.className=cls;
-      div.innerHTML=`<div class="optKey">${key}</div><div style="flex:1;min-width:0;">${text?escHtml(text):'<span class="muted">(ว่าง)</span>'}</div>${isCorr?'<div class="tag">เฉลย</div>':(isChosen?'<div class="tag">เลือก</div>':'')}`;
-      opts.appendChild(div);
+
+    // click to scroll PDF + toggle expand if has text
+    wrap.addEventListener('click',()=>{
+      if(!_reviewIsGDrive && q.page) setPdfPage(q.page||1);
+      if(hasText) wrap.classList.toggle('expanded');
     });
+
     list.appendChild(wrap);
   });
 
@@ -2536,6 +2609,61 @@ function initReview(attemptId){
   const firstPage = (qs[0] && qs[0].page) ? qs[0].page : 1;
   _reviewCurrentPage = firstPage;
 
+  // ── Answer PDF Tab ──
+  const _answerPdfUrl = exam ? (exam.answerPdfUrl || '') : '';
+  const _tabQ  = document.getElementById('reviewTabQuestion');
+  const _tabA  = document.getElementById('reviewTabAnswer');
+  const _viewQ = document.getElementById('reviewPdfViewer');
+  const _viewA = document.getElementById('reviewAnswerPdfViewer');
+
+  if(_answerPdfUrl && _tabA) {
+    _tabA.style.display = '';  // show answer tab
+    let _answerLoaded = false;
+
+    async function loadAnswerPdf() {
+      if(_answerLoaded) return;
+      _answerLoaded = true;
+      try {
+        const isGDrive = !!_answerPdfUrl.match(/drive\.google\.com/);
+        if(isGDrive) {
+          const m = _answerPdfUrl.match(/drive\.google\.com\/file\/d\/([^/?#]+)/);
+          const gid = m ? m[1] : (_answerPdfUrl.match(/[?&]id=([^&]+)/)||[])[1];
+          if(gid) {
+            _viewA.style.cssText = 'width:100%;height:70vh;min-height:400px;position:relative;';
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://drive.google.com/file/d/${gid}/preview`;
+            iframe.allow = 'autoplay';
+            iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+            _viewA.appendChild(iframe);
+          }
+        } else {
+          _viewA.innerHTML = '';
+          const apv = PdfViewer.create('reviewAnswerPdfViewer');
+          let url = _answerPdfUrl;
+          if(url.startsWith('localpdf:')) {
+            const blob = await PdfDB.get(url.slice('localpdf:'.length));
+            if(!blob){ toast('ไม่พบไฟล์ PDF เฉลย'); return; }
+            url = URL.createObjectURL(blob);
+          } else if(url.startsWith('./') || url.startsWith('../')) {
+            url = new URL(url, window.location.href).href;
+          }
+          await apv.loadUrl(url, 1);
+        }
+      } catch(err) { toast('โหลด PDF เฉลยไม่สำเร็จ: '+(err?.message||err)); }
+    }
+
+    function setReviewTab(tab) {
+      const isQ = tab === 'question';
+      _viewQ.style.display  = isQ ? '' : 'none';
+      _viewA.style.display  = isQ ? 'none' : '';
+      if(_tabQ){ _tabQ.style.background=isQ?'#111':'#fff'; _tabQ.style.color=isQ?'#fff':'#111'; _tabQ.style.borderColor=isQ?'#111':'var(--border)'; }
+      if(_tabA){ _tabA.style.background=isQ?'#fff':'#111'; _tabA.style.color=isQ?'#111':'#fff'; _tabA.style.borderColor=isQ?'var(--border)':'#111'; }
+      if(!isQ) loadAnswerPdf();
+    }
+
+    if(_tabQ) _tabQ.onclick = () => setReviewTab('question');
+    if(_tabA) _tabA.onclick = () => setReviewTab('answer');
+  }
 }
 
 // ===================== STATS PAGE =====================
@@ -3100,6 +3228,30 @@ function initAdminNew(){
     }
   });
 
+  // answer PDF upload
+  const answerPdfFileEl = document.getElementById('newAnswerPdfFile');
+  const answerPdfUrlEl  = document.getElementById('newAnswerPdfUrl');
+  const newAnswerPdfFileEl = answerPdfFileEl.cloneNode(true);
+  answerPdfFileEl.parentNode.replaceChild(newAnswerPdfFileEl, answerPdfFileEl);
+  newAnswerPdfFileEl.addEventListener('change', async(e)=>{
+    try{
+      const f=e.target.files&&e.target.files[0];
+      if(!f) return;
+      if(f.type&&f.type!=='application/pdf'){toast('กรุณาเลือกไฟล์ PDF');return;}
+      toast('⏳ กำลังอัปโหลด PDF เฉลย...');
+      answerPdfUrlEl.placeholder='กำลังอัปโหลด...';
+      const url = await FirebaseSync.uploadPdf(f, pct=>{
+        answerPdfUrlEl.placeholder=`อัปโหลด ${pct}%...`;
+      });
+      answerPdfUrlEl.value = url;
+      answerPdfUrlEl.placeholder='';
+      toast('✅ อัปโหลด PDF เฉลยสำเร็จ');
+    }catch(err){
+      answerPdfUrlEl.placeholder='';
+      toast('อัปโหลดไม่สำเร็จ: '+(err?.message||err));
+    }
+  });
+
   const createBtn=document.getElementById('newCreateBtn');
   const newCreateBtn=createBtn.cloneNode(true);
   createBtn.parentNode.replaceChild(newCreateBtn,createBtn);
@@ -3117,7 +3269,8 @@ function initAdminNew(){
     if(!subject) return toast('กรุณาเลือกหรือระบุวิชา');
     const maxOrder=Math.max(0,...(s.exams||[]).map(e=>(typeof e.order==='number'?e.order:0)));
     const id='exam_'+Math.random().toString(16).slice(2);
-    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
+    const answerPdfUrl=(document.getElementById('newAnswerPdfUrl')?.value||'').trim();
+    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>({id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),choices:{A:'',B:'',C:'',D:''},correct:'A'})):[];
     // apply excel data ถ้ามี
     if(window._newExcelData && window._newExcelData.length > 0){
@@ -3208,6 +3361,46 @@ function initEditor(examId){
     updateExamPdf(url);
     editorPdfStatusEl.textContent = '✅ บันทึก URL แล้ว';
   };
+
+  // ── Answer PDF ──
+  const editorAnswerPdfUrlEl = document.getElementById('editorAnswerPdfUrl');
+  const editorAnswerPdfStatusEl = document.getElementById('editorAnswerPdfStatus');
+  if(editorAnswerPdfUrlEl) editorAnswerPdfUrlEl.value = (exam.answerPdfUrl && !exam.answerPdfUrl.startsWith('localpdf:')) ? exam.answerPdfUrl : '';
+
+  function updateAnswerPdf(newUrl) {
+    exam.answerPdfUrl = newUrl;
+    Store.save(s);
+    toast('✅ อัปเดต PDF เฉลยแล้ว');
+  }
+  const editorAnswerPdfUrlBtn = document.getElementById('editorAnswerPdfUrlBtn');
+  if(editorAnswerPdfUrlBtn) editorAnswerPdfUrlBtn.onclick = (e) => {
+    e.preventDefault();
+    const url = (editorAnswerPdfUrlEl?.value||'').trim();
+    if(!url){ toast('กรุณากรอก URL'); return; }
+    updateAnswerPdf(url);
+    if(editorAnswerPdfStatusEl) editorAnswerPdfStatusEl.textContent = '✅ บันทึก URL เฉลยแล้ว';
+  };
+  const editorAnswerPdfFileInput = document.getElementById('editorAnswerPdfFile');
+  if(editorAnswerPdfFileInput){
+    const clonedAnswerInput = editorAnswerPdfFileInput.cloneNode(true);
+    editorAnswerPdfFileInput.parentNode.replaceChild(clonedAnswerInput, editorAnswerPdfFileInput);
+    clonedAnswerInput.addEventListener('change', async(e) => {
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      if(f.type && f.type !== 'application/pdf'){ toast('กรุณาเลือกไฟล์ PDF'); return; }
+      try{
+        if(editorAnswerPdfStatusEl) editorAnswerPdfStatusEl.textContent = '⏳ กำลังอัปโหลด...';
+        const url = await FirebaseSync.uploadPdf(f, pct => {
+          if(editorAnswerPdfStatusEl) editorAnswerPdfStatusEl.textContent = `⏳ อัปโหลด ${pct}%...`;
+        });
+        if(editorAnswerPdfUrlEl) editorAnswerPdfUrlEl.value = url;
+        updateAnswerPdf(url);
+        if(editorAnswerPdfStatusEl) editorAnswerPdfStatusEl.textContent = '✅ อัปโหลด PDF เฉลยสำเร็จ';
+      }catch(err){
+        if(editorAnswerPdfStatusEl) editorAnswerPdfStatusEl.textContent = '❌ '+(err?.message||err);
+      }
+    });
+  }
 
   const editorPdfFileInput = document.getElementById('editorPdfFile');
   const clonedPdfInput = editorPdfFileInput.cloneNode(true);
