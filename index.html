@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v41.3 -->
+  <!-- APP_VERSION: v41.4 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -307,7 +307,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.3</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.4</div>
     </div>
   </div>
 </div>
@@ -809,6 +809,18 @@
           </thead>
           <tbody id="adminTbody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+  <!-- Delete exam confirm modal -->
+  <div id="adminDeleteModal" class="modal-overlay" role="dialog">
+    <div class="modal">
+      <h3>🗑️ ยืนยันการลบข้อสอบ</h3>
+      <p id="adminDeleteModalText">ต้องการลบข้อสอบนี้ใช่ไหม?</p>
+      <div id="adminDeleteModalFiles" style="margin:-6px 0 10px;font-size:12px;color:#6b7280;display:grid;gap:4px;"></div>
+      <div class="mrow">
+        <button id="adminDeleteModalCancel" class="btn-ghost">ยกเลิก</button>
+        <button id="adminDeleteModalOk" class="btn-danger">🗑️ ลบ</button>
       </div>
     </div>
   </div>
@@ -3095,12 +3107,36 @@ function initAdmin(){
     tb.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click',()=>{
         const id=btn.getAttribute('data-del');const exam=s.exams.find(x=>x.id===id);if(!exam) return;
-        if(!confirm(`ต้องการลบ "${exam.title}"?`)) return;
-        // Delete PDF from Firebase Storage if it's a Storage URL
-        FirebaseSync.deleteStoragePdf(exam.pdfUrl);
-        s.exams=s.exams.filter(x=>x.id!==id);
-        if(s.questions&&s.questions[id]) delete s.questions[id];
-        Store.save(s);toast('ลบชุดข้อสอบแล้ว');renderAdmin();
+        // แสดง modal ยืนยัน
+        const modal=document.getElementById('adminDeleteModal');
+        const modalText=document.getElementById('adminDeleteModalText');
+        const modalFiles=document.getElementById('adminDeleteModalFiles');
+        const modalOk=document.getElementById('adminDeleteModalOk');
+        const modalCancel=document.getElementById('adminDeleteModalCancel');
+        if(!modal) return; // fallback ถ้าไม่มี modal
+        modalText.textContent=`ต้องการลบ "${exam.title}" ใช่ไหม?`;
+        // แสดงไฟล์ที่จะถูกลบจาก Firebase Storage
+        const isStorage=(url)=>url&&!url.startsWith('localpdf:')&&!url.startsWith('./')&&!url.includes('drive.google.com')&&url.startsWith('https://firebasestorage');
+        const filesToDelete=[];
+        if(isStorage(exam.pdfUrl)) filesToDelete.push('📄 PDF โจทย์ (Firebase Storage)');
+        if(isStorage(exam.answerPdfUrl)) filesToDelete.push('✅ PDF เฉลย (Firebase Storage)');
+        modalFiles.innerHTML=filesToDelete.length
+          ?'<div style="padding:6px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#c2410c;">⚠️ ไฟล์ต่อไปนี้จะถูกลบถาวรจาก Firebase Storage:<br>'+filesToDelete.map(f=>`• ${f}`).join('<br>')+'</div>'
+          :'';
+        modal.classList.add('show');
+        // clone ปุ่ม ok เพื่อ reset listener เดิม
+        const newOk=modalOk.cloneNode(true);
+        modalOk.parentNode.replaceChild(newOk,modalOk);
+        newOk.onclick=async()=>{
+          modal.classList.remove('show');
+          // ลบไฟล์จาก Firebase Storage
+          if(exam.pdfUrl) FirebaseSync.deleteStoragePdf(exam.pdfUrl);
+          if(exam.answerPdfUrl) FirebaseSync.deleteStoragePdf(exam.answerPdfUrl);
+          s.exams=s.exams.filter(x=>x.id!==id);
+          if(s.questions&&s.questions[id]) delete s.questions[id];
+          Store.save(s);toast('ลบชุดข้อสอบแล้ว');renderAdmin();
+        };
+        modalCancel.onclick=()=>modal.classList.remove('show');
       });
     });
     tb.querySelectorAll('[data-edit]').forEach(btn=>{
