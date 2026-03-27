@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v40.9 -->
+  <!-- APP_VERSION: v41.0 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -142,7 +142,7 @@
     }
 
     /* review page */
-    .reviewLayout{display:grid;grid-template-columns:1fr 420px;gap:14px;align-items:start;}
+    .reviewLayout{display:grid;grid-template-columns:1fr 400px;gap:14px;height:calc(100vh - 130px);align-items:start;}
     .examGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px;}
     .examCard{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:8px;}
     .examCard:hover{border-color:#6b7280;box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-1px);}
@@ -150,10 +150,10 @@
     .examCard .title{font-weight:900;font-size:15px;line-height:1.4;}
     .examCard .meta{display:flex;gap:12px;font-size:12px;color:var(--muted);margin-top:2px;}
     .examCard .score-badge{margin-top:6px;padding:6px 10px;background:#f9fafb;border-radius:8px;font-size:12px;border:1px solid var(--border);}
-    @media(max-width:980px){.reviewLayout{grid-template-columns:1fr;}.reviewSide{position:static!important;}}
-    .reviewPdfWrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:#fff;display:flex;flex-direction:column;height:90vh;}
+    @media(max-width:980px){.reviewLayout{grid-template-columns:1fr;height:auto;}.reviewSide{height:auto;overflow-y:visible;}}
+    .reviewPdfWrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:#fff;display:flex;flex-direction:column;height:100%;}
     .reviewPdfBar{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);}
-    .reviewSide{position:sticky;top:12px;}
+    .reviewSide{height:100%;overflow-y:auto;}
     .reviewCard{border:1px solid var(--border);border-radius:16px;background:#fff;padding:12px;}
     .chips{display:flex;flex-wrap:wrap;gap:6px;}
     .chip{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer;font-family:inherit;}
@@ -170,7 +170,7 @@
     .qRow{display:flex;align-items:center;gap:10px;min-height:32px;}
     .qRowNum{font-weight:800;font-size:13px;min-width:46px;color:#111;}
     .qRowPage{font-size:11px;color:#9ca3af;min-width:38px;}
-    .qRowPills{display:flex;gap:5px;flex:1;}
+    .qRowPills{display:flex;gap:5px;}
     .qPill{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;transition:all .1s;}
     .qPill.correct{border-color:#22c55e;background:#dcfce7;color:#166534;}
     .qPill.wrong{border-color:#ef4444;background:#fee2e2;color:#b91c1c;}
@@ -307,7 +307,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.9</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.0</div>
     </div>
   </div>
 </div>
@@ -444,7 +444,7 @@
         <div id="reviewPdfViewer"       style="width:100%;flex:1;min-height:400px;position:relative;"></div>
         <div id="reviewAnswerPdfViewer" style="width:100%;flex:1;min-height:400px;position:relative;display:none;"></div>
       </div>
-      <div class="reviewSide" style="position:sticky;top:12px;">
+      <div class="reviewSide">
         <div class="reviewCard">
           <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
             <div>
@@ -2506,7 +2506,7 @@ function initReview(attemptId){
     if(!isFree){
       const correctThai=KEYS.find(k=>KEY_TO_LETTER[k]===correct||k===correct)||correct||'-';
       const chosenThai=chosen?KEYS.find(k=>KEY_TO_LETTER[k]===chosen||k===chosen)||chosen:'-';
-      answerTxt=`<span style="font-size:11px;color:#6b7280;white-space:nowrap;">เฉลย <b style="color:#16a34a;">${correctThai}</b>${chosen&&!isCorrect?` · เลือก <b style="color:#dc2626;">${chosenThai}</b>`:''}</span>`;
+      answerTxt=`<span style="font-size:11px;color:#6b7280;white-space:nowrap;padding-left:4px;">เฉลย <b style="color:#16a34a;">${correctThai}</b>${chosen&&!isCorrect?` · เลือก <b style="color:#dc2626;">${chosenThai}</b>`:''}</span>`;
     }
 
     wrap.innerHTML=`
@@ -2515,7 +2515,7 @@ function initReview(attemptId){
         <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}</span>
         <div class="qRowPills">${pillsHtml}</div>
         ${answerTxt}
-        <span class="qBadge ${badgeCls}" style="margin-left:8px;">${badgeTxt}</span>
+        <span class="qBadge ${badgeCls}" style="margin-left:auto;">${badgeTxt}</span>
         ${hasText?'<span style="font-size:11px;color:#9ca3af;margin-left:4px;">▾</span>':''}
       </div>
       <div class="qExpand">
