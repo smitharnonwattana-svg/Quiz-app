@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v40.3 -->
+  <!-- APP_VERSION: v40.6 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -297,7 +297,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:14px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.3</div>
+      <div style="text-align:right;margin-top:14px;font-size:11px;color:#9ca3af;opacity:0.6;">v40.2</div>
     </div>
   </div>
 </div>
@@ -945,6 +945,16 @@
               <div id="editorPdfStatus" class="muted" style="font-size:12px;"></div>
             </div>
           </div>
+          <div class="ctrls" style="gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:13px;font-weight:800;">จำนวนข้อ</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="editorQCount" type="number" min="1" max="999" style="width:80px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;" />
+                <button class="btn" id="editorQCountBtn" type="button">ยืนยันจำนวนข้อ</button>
+                <span id="editorQCountStatus" class="muted" style="font-size:12px;"></span>
+              </div>
+            </div>
+          </div>
           <div class="ctrls">
             <!-- hidden: ยังใช้ใน JS อยู่ -->
             <input id="editorFast" type="checkbox" checked style="display:none;" />
@@ -1401,7 +1411,7 @@ const Store = {
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
         navigate(pg, window._currentParams||{});
-      } else if(pg && adminPages.includes(pg) && pg !== 'login'){
+      } else if(pg && pg === 'admin'){
         let banner = document.getElementById('_syncConflictBanner');
         if(!banner){
           banner = document.createElement('div');
@@ -1535,12 +1545,12 @@ const MemeScore = (() => {
     ],
     // 🔥 80–100% เทพ — stonks + celebration
     goat: [
-      ['https://media.tenor.com/FLBmfkn2QJ0AAAAM/im-good.gif',           'PLUS ULTRA!!! 🔥🔥🔥'],
       ['https://media.tenor.com/yfZLNsORj3EAAAAM/sobbing-tecazzz.gif',   'STONKS ↑↑↑ คะแนนพุ่ง!'],
       ['https://media.tenor.com/9PR5loGMyLQAAAAM/shocked-wow.gif',       'OMG เทพมากกกก!!!'],
-      ['https://media.tenor.com/FBEhcibcCO8AAAAM/kitty.gif',             'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
-      ['https://media.tenor.com/wAOPu8jgUTkAAAAM/cat-thumbs-up.gif',     'GIGACHAD MODE 🗿'],
-      ['https://media.tenor.com/ZyqhFIPi2OgAAAAM/cat-crying-cat.gif',    'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
+      ['https://media.tenor.com/FLBmfkn2QJ0AAAAM/im-good.gif',           'PLUS ULTRA!!! 🔥🔥🔥'],
+      ['https://media.tenor.com/NZiI52eqVPgAAAAM/cat.gif',               'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
+      ['https://media.tenor.com/bpMxTi1JUy4AAAAM/cat.gif',               'GIGACHAD MODE 🗿'],
+      ['https://media.tenor.com/Jybgy6OTwfkAAAAM/crying-hug.gif',        'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
     ],
   };
 
@@ -1615,7 +1625,6 @@ const MemeScore = (() => {
   }
 
   function showResult(score, total) {
-    try {
     const pct   = total > 0 ? Math.round(score/total*100) : 0;
     const tier  = getTier(pct);
     const [img, caption] = randMeme(tier.key);
@@ -1623,52 +1632,42 @@ const MemeScore = (() => {
     const loading = document.getElementById('memeLoading');
     const result  = document.getElementById('memeResult');
     const memeBox = document.getElementById('memeBox');
+    if(!loading || !result || !memeBox) { close(); return; }
 
     const memeImgEl = document.getElementById('memeImg');
-    memeImgEl.src = img;
-    // fallback emoji in wrapper if no GIF loads
+    if(memeImgEl) memeImgEl.src = img;
     const wrap = document.getElementById('memeImgWrap');
     if(wrap) wrap.style.background = tier.bg;
-    document.getElementById('memeEmoji').textContent  = tier.emoji;
-    document.getElementById('memeTitle').textContent  = tier.title;
-    document.getElementById('memeTitle').style.color  = tier.color;
-    document.getElementById('memeScore').textContent  = `${score}/${total}`;
-    document.getElementById('memeScore').style.color  = tier.color;
-    document.getElementById('memePct').textContent    = `คิดเป็น ${pct}%`;
-    document.getElementById('memePct').style.color    = tier.color;
-    document.getElementById('memeCaption').textContent = caption;
-    // Plus Ultra cheer speech bubble
-    let cheerEl = document.getElementById('memeCheer');
-    if(!cheerEl){
-      cheerEl = document.createElement('div');
-      cheerEl.id = 'memeCheer';
-      document.getElementById('memeCaption').after(cheerEl);
+
+    const _set = (id, prop, val) => { const el=document.getElementById(id); if(el) el[prop]=val; };
+    const _style = (id, prop, val) => { const el=document.getElementById(id); if(el) el.style[prop]=val; };
+    _set('memeEmoji','textContent', tier.emoji);
+    _set('memeTitle','textContent', tier.title);  _style('memeTitle','color', tier.color);
+    _set('memeScore','textContent', `${score}/${total}`);  _style('memeScore','color', tier.color);
+    _set('memePct',  'textContent', `คิดเป็น ${pct}%`);   _style('memePct','color', tier.color);
+    _set('memeCaption','textContent', caption);
+
+    // cheer bubble — ใช้ rgba แทน 8-digit hex ที่ Safari ไม่รองรับ
+    const cheerEl = document.getElementById('memeCheer');
+    if(cheerEl) {
+      cheerEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.04);border-top:1px solid rgba(0,0,0,.08);">
+          <div style="font-size:22px;flex-shrink:0;">💪😁</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:900;color:${tier.color};letter-spacing:.05em;">💬 ${tier.speaker}</div>
+            <div style="font-size:12px;font-weight:700;color:${tier.color};line-height:1.5;">${tier.cheer}</div>
+          </div>
+        </div>`;
     }
-    cheerEl.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${tier.color}15;border-top:1px solid ${tier.color}30;">
-        <div style="font-size:22px;flex-shrink:0;">💪😁</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:11px;font-weight:900;color:${tier.color};letter-spacing:.05em;">💬 ${tier.speaker}</div>
-          <div style="font-size:12px;font-weight:700;color:${tier.color};line-height:1.5;">${tier.cheer}</div>
-        </div>
-      </div>
-    `;
-    // also set fallback emoji in image area
     const fe = document.getElementById('memeFallbackEmoji');
     if(fe) fe.textContent = tier.emoji;
     memeBox.style.background = tier.bg;
 
     loading.style.display = 'none';
     result.style.display  = 'block';
-    // re-trigger animation
     memeBox.style.animation = 'none';
-    memeBox.offsetHeight; // reflow
+    void memeBox.offsetHeight;
     memeBox.style.animation = 'memePop .4s cubic-bezier(.34,1.56,.64,1)';
-    } catch(err) {
-      // If anything fails, skip meme and go straight to review
-      console.warn('MemeScore showResult error:', err);
-      close();
-    }
   }
 
   function close() {
@@ -1717,7 +1716,7 @@ function renderHome(){
         </div>` : ''}
       </div>
       <div class="hr"></div>
-      <div class="muted" style="font-size:11px;">☁️ ข้อมูล sync กับ Firebase อัตโนมัติ &nbsp;·&nbsp; v40.3</div>
+      <div class="muted" style="font-size:11px;">☁️ ข้อมูล sync กับ Firebase อัตโนมัติ</div>
     </div>
   `;
 }
@@ -1842,7 +1841,7 @@ document.addEventListener('keydown', function(e){
 function doLogin() {
   const pin = _pinVal || document.getElementById('loginPinInput').value.trim();
   const errEl = document.getElementById('loginError');
-  if (pin.length < 1) { return; }
+  if (pin.length < 6) { return; }
   const role = Auth.login(pin);
   if (!role) {
     errEl.textContent = '❌ รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง';
@@ -1924,6 +1923,34 @@ function initExams(){
   const subjects=Array.from(new Set(published.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
   subjFilterEl.innerHTML=`<option value="">ทุกวิชา</option>${subjects.map(sub=>`<option value="${esc(sub)}">${esc(sub)}</option>`).join('')}`;
 
+  // interval สำหรับอัปเดตเวลาใน resume badge — cleanup เมื่อออกจากหน้า
+  let _resumeBadgeInterval = null;
+  function _startResumeBadgeTick() {
+    if(_resumeBadgeInterval) clearInterval(_resumeBadgeInterval);
+    _resumeBadgeInterval = setInterval(() => {
+      document.querySelectorAll('.resume-badge[data-startedAt]').forEach(badge => {
+        const examDur = Number(badge.dataset.dur) || 0;
+        const startedAt = Number(badge.dataset.startedAt) || 0;
+        if(!startedAt) return;
+        const pauseOff = Number(badge.dataset.pauseoffset) || 0;
+        const pausedAt = Number(badge.dataset.pausedat) || Date.now();
+        const pausedAtOff = Math.floor((Date.now() - pausedAt) / 1000);
+        const rem = Math.max(0, examDur - Math.floor((Date.now() - startedAt) / 1000) + pauseOff + Math.max(0, pausedAtOff));
+        const el = badge.querySelector('.resume-time');
+        if(el) el.textContent = 'เวลาเหลือ ' + String(Math.floor(rem/60)).padStart(2,'0') + ':' + String(rem%60).padStart(2,'0');
+      });
+    }, 250);
+  }
+  // cleanup เมื่อออกจากหน้า exams
+  const _origNav2 = window.navigate;
+  window.navigate = function(p, params) {
+    if(_resumeBadgeInterval){ clearInterval(_resumeBadgeInterval); _resumeBadgeInterval = null; }
+    window.navigate = _origNav2; // restore
+    navigate = window.navigate;
+    _origNav2(p, params);
+  };
+  navigate = window.navigate;
+
   function renderExams(){
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
@@ -1932,8 +1959,12 @@ function initExams(){
     const list=document.getElementById('examsList');
     list.className='examGrid';
     list.innerHTML='';
+
+    // โหลด resume ของ user คนนี้เท่านั้น
+    const _myName = Auth.getName ? Auth.getName() : '';
+    const _myResume = typeof loadTakeResume === 'function' ? loadTakeResume(_myName) : null;
+
     exams.forEach(e=>{
-      // หาคะแนนล่าสุด
       const myAttempts=allAttempts.filter(a=>a.examId===e.id);
       const last=myAttempts[0];
       const bestScore=myAttempts.length?Math.max(...myAttempts.map(a=>a.score)):null;
@@ -1942,6 +1973,23 @@ function initExams(){
       const scoreHtml=last
         ?`<div class="score-badge">🏆 สูงสุด <b>${bestScore}/${e.questionCount}</b> &nbsp;•&nbsp; ล่าสุด <b>${last.score}/${last.total}</b> (${Math.round(last.score/last.total*100)}%) &nbsp;•&nbsp; ทำแล้ว ${myAttempts.length} ครั้ง</div>`
         :`<div class="score-badge" style="color:var(--muted);">ยังไม่เคยทำ</div>`;
+
+      const _hasResume = _myResume && _myResume.examId === e.id && _myResume.startedAt;
+      let resumeHtml = '';
+      if (_hasResume) {
+        const _pauseOff0 = _myResume.pauseOffset || 0;
+        const _pausedAt0 = _myResume.pausedAt || Date.now();
+        const _pausedAtOff0 = Math.floor((Date.now() - _pausedAt0) / 1000);
+        const _rem0 = Math.max(0, e.durationSeconds - Math.floor((Date.now() - _myResume.startedAt) / 1000) + _pauseOff0 + Math.max(0, _pausedAtOff0));
+        const _fmt0 = String(Math.floor(_rem0/60)).padStart(2,'0') + ':' + String(_rem0%60).padStart(2,'0');
+        resumeHtml = `<div class="resume-badge" data-resumeid="${e.id}" data-startedAt="${_myResume.startedAt}" data-dur="${e.durationSeconds}" data-pauseoffset="${_pauseOff0}" data-pausedat="${_pausedAt0}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;cursor:pointer;">
+          <span style="font-size:13px;">⏸️</span>
+          <span style="font-size:13px;font-weight:700;color:#92400e;">ทำค้างอยู่</span>
+          <span class="resume-time" style="font-size:12px;color:#b45309;">เวลาเหลือ ${_fmt0}</span>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;color:#111827;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;">▶ ทำต่อ</span>
+        </div>`;
+      }
+
       card.innerHTML=`
         <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
         <div class="title">${esc(e.title)}</div>
@@ -1950,11 +1998,22 @@ function initExams(){
           <span>⏱ ${Math.round(e.durationSeconds/60)} นาที</span>
         </div>
         ${scoreHtml}
+        ${resumeHtml}
       `;
-      card.onclick=()=>navigate('exam',{id:e.id});
+
+      card.onclick=(ev)=>{
+        if(ev.target.closest('.resume-badge')){
+          navigate('take',{id:e.id, takerName:_myName});
+          return;
+        }
+        navigate('exam',{id:e.id});
+      };
       list.appendChild(card);
     });
     if(!list.children.length) list.innerHTML=`<div class="muted" style="padding:20px;">ยังไม่มีข้อสอบที่เผยแพร่</div>`;
+
+    // เริ่ม tick หลัง render เสร็จ
+    if(_myResume && _myResume.startedAt) _startResumeBadgeTick();
   }
 
   subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderExams();};
@@ -1999,42 +2058,7 @@ function initExamDetail(id){
   document.getElementById('examStartBtn').onclick=()=>{
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
-    // Check if there's a pending resume for a DIFFERENT exam
-    const _pendingResume = typeof loadTakeResume === 'function' ? loadTakeResume() : null;
-    if (_pendingResume && _pendingResume.examId && _pendingResume.examId !== exam.id && _pendingResume.startedAt) {
-      const _s2 = Store.load();
-      const _pendingExam = _s2.exams.find(e => e.id === _pendingResume.examId);
-      const _pendingTitle = _pendingExam ? _pendingExam.title : 'ข้อสอบที่ทำค้างไว้';
-      const _elapsed = Math.floor((Date.now() - _pendingResume.startedAt) / 1000);
-      const _remaining = _pendingExam ? Math.max(0, _pendingExam.durationSeconds - _elapsed) : 0;
-      const _mm = String(Math.floor(_remaining/60)).padStart(2,'0');
-      const _ss = String(_remaining%60).padStart(2,'0');
-
-      const _ov = document.createElement('div');
-      _ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
-      const _box = document.createElement('div');
-      _box.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
-      _box.innerHTML = `
-        <div style="font-size:32px;margin-bottom:8px;">📝</div>
-        <div style="font-size:17px;font-weight:800;margin-bottom:6px;">มีข้อสอบค้างอยู่</div>
-        <div style="font-size:13px;color:#6b7280;margin-bottom:4px;">${_pendingTitle}</div>
-        <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">เวลาเหลือ <strong style="color:#111;">${_mm}:${_ss}</strong></div>
-      `;
-      const _bContinue = document.createElement('button');
-      _bContinue.textContent = '▶ ทำข้อสอบค้างต่อ';
-      _bContinue.style.cssText = 'width:100%;padding:13px;background:#111827;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;';
-      const _bNew = document.createElement('button');
-      _bNew.textContent = 'ทิ้งและเริ่มชุดใหม่';
-      _bNew.style.cssText = 'width:100%;padding:11px;background:transparent;color:#dc2626;border:1.5px solid #fca5a5;border-radius:12px;font-size:14px;cursor:pointer;';
-      _bContinue.onclick = () => { _ov.remove(); navigate('take', {id: _pendingResume.examId}); };
-      _bNew.onclick = () => { clearTakeResume(); _ov.remove(); navigate('take', {id:exam.id, takerName:name}); };
-      _box.appendChild(_bContinue);
-      _box.appendChild(_bNew);
-      _ov.appendChild(_box);
-      document.body.appendChild(_ov);
-    } else {
-      navigate('take', {id:exam.id, takerName:name});
-    }
+    navigate('take', {id:exam.id, takerName:name});
   };
   // กด Enter ก็เริ่มได้เลย
   takerEl.addEventListener('keydown', (e)=>{
@@ -2197,7 +2221,7 @@ function initTake(id){
     const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
     const savedS=Store.load();
     savedS.attempts.unshift({id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion});
-    if(typeof clearTakeResume === 'function') clearTakeResume();
+    if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
     const ok=Store.save(savedS);
     // 🎉 Show meme popup before going to review
     MemeScore.show(score, total, () => {
@@ -2228,41 +2252,55 @@ function initTake(id){
   }
   setTimerDisplay(exam.durationSeconds);
 
-  function doStart(restoredStartedAt){
+  // _pauseOffset: จำนวนวินาทีที่หยุดนับสะสม (pause-resume offset)
+  let _pauseOffset = 0;
+  let _pausedAt = null; // timestamp ที่กด pause (ms)
+
+  function _calcRemaining() {
+    const pauseGap = _pausedAt ? Math.floor((Date.now() - _pausedAt) / 1000) : 0;
+    const elapsed = Math.floor((Date.now() - st.startedAt) / 1000) - _pauseOffset - pauseGap;
+    return Math.max(0, exam.durationSeconds - elapsed);
+  }
+
+  function doStart(restoredStartedAt, restoredOffset){
     if(st.started) return;
     st.started=true;
     st.startedAt = restoredStartedAt || Date.now();
+    if(restoredOffset) _pauseOffset = restoredOffset;
+    _pausedAt = null;
     newSubmitBtn.disabled=false;
     render();
     _takeInterval=setInterval(()=>{
-      const elapsed=Math.floor((Date.now()-st.startedAt)/1000);
-      const remaining=Math.max(0,exam.durationSeconds-elapsed);
+      const remaining = _calcRemaining();
       setTimerDisplay(remaining);
+      st._pauseOffset = _pauseOffset; // sync to state for saveTakeResume
       if(typeof saveTakeResume === 'function') saveTakeResume(st);
-      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;clearTakeResume();submit();}
+      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;clearTakeResume(st.takerName);submit();}
     },250);
   }
 
-  // Check resume data — show popup if exists
-  const _resume = typeof loadTakeResume === 'function' ? loadTakeResume() : null;
+  // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
+  const _resume = typeof loadTakeResume === 'function' ? loadTakeResume(_takerName) : null;
   if (_resume && _resume.examId === id && _resume.startedAt) {
-    // Pause timer display at remaining time while waiting for user
-    const _pausedElapsed = Math.floor((Date.now() - _resume.startedAt) / 1000);
-    const _pausedRemaining = Math.max(0, exam.durationSeconds - _pausedElapsed);
-    setTimerDisplay(_pausedRemaining);
+
+    // คำนวณเวลาเหลือ ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
+    // pausedAt = เวลาที่ save ล่าสุด — เวลาจาก pausedAt ถึงตอนนี้คือ offset เพิ่มเติม
+    const _pausedAtOffset = _resume.pausedAt ? Math.floor((Date.now() - _resume.pausedAt) / 1000) : 0;
+    const _totalFrozenOffset = (_resume.pauseOffset || 0) + Math.max(0, _pausedAtOffset);
+    const _frozenRem = Math.max(0, exam.durationSeconds - Math.floor((Date.now() - _resume.startedAt) / 1000) + _totalFrozenOffset);
+    const _frozenFmt = String(Math.floor(_frozenRem/60)).padStart(2,'0') + ':' + String(_frozenRem%60).padStart(2,'0');
+    setTimerDisplay(_frozenRem); // แสดงค่า freeze บน take page ด้วย (ไม่เดิน)
 
     // Show resume popup
     const _resumeOverlay = document.createElement('div');
     _resumeOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
-    const _mm = String(Math.floor(_pausedRemaining/60)).padStart(2,'0');
-    const _ss = String(_pausedRemaining%60).padStart(2,'0');
     _resumeBox.innerHTML = `
       <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
-      <div style="font-size:18px;font-weight:800;margin-bottom:6px;">มีข้อสอบค้างอยู่</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:6px;">ทำค้างอยู่</div>
       <div style="font-size:14px;color:#6b7280;margin-bottom:4px;">${exam.title}</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">เวลาเหลือ <strong style="color:#111;">${_mm}:${_ss}</strong></div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">เวลาเหลือ <strong style="color:#111;">${_frozenFmt}</strong></div>
     `;
     const _btnContinue = document.createElement('button');
     _btnContinue.textContent = '▶ ทำต่อ';
@@ -2270,28 +2308,30 @@ function initTake(id){
     const _btnRestart = document.createElement('button');
     _btnRestart.textContent = 'เริ่มใหม่';
     _btnRestart.style.cssText = 'width:100%;padding:11px;background:transparent;color:#6b7280;border:1.5px solid #e5e7eb;border-radius:12px;font-size:14px;cursor:pointer;';
+    _resumeBox.appendChild(_btnContinue);
+    _resumeBox.appendChild(_btnRestart);
+    _resumeOverlay.appendChild(_resumeBox);
+    document.body.appendChild(_resumeOverlay);
 
     _btnContinue.onclick = () => {
       _resumeOverlay.remove();
-      // Restore all state from resume
       st.answers = _resume.answers || {};
       st.unsure = _resume.unsure || {};
       st.currentIndex = _resume.currentIndex || 0;
       if (_resume.takerName) st.takerName = _resume.takerName;
       if (_resume.attemptId) st.attemptId = _resume.attemptId;
       render();
-      doStart(_resume.startedAt); // pass original startedAt — timer continues
+      // offset รวม = pauseOffset เดิม + เวลาตั้งแต่ save ล่าสุดจนถึงตอนกด "ทำต่อ"
+      const _resumeExtra = _resume.pausedAt ? Math.floor((Date.now() - _resume.pausedAt) / 1000) : 0;
+      const totalOffset = (_resume.pauseOffset || 0) + Math.max(0, _resumeExtra);
+      doStart(_resume.startedAt, totalOffset);
     };
     _btnRestart.onclick = () => {
-      clearTakeResume();
+      clearTakeResume(_takerName);
       _resumeOverlay.remove();
-      doStart(); // fresh start
+      doStart();
     };
 
-    _resumeBox.appendChild(_btnContinue);
-    _resumeBox.appendChild(_btnRestart);
-    _resumeOverlay.appendChild(_resumeBox);
-    document.body.appendChild(_resumeOverlay);
   } else {
     // No resume — auto-start normally
     setTimeout(doStart, 300);
@@ -2607,7 +2647,7 @@ function initStats(){
     const emptyEl=document.getElementById('statsChartEmpty');
     if(!canvas) return;
     // เรียงเก่า→ใหม่ เอาแค่ 20 ครั้งล่าสุด
-    const sorted=[...attempts].sort((a,b)=>(a.startedAt||0)-(b.startedAt||0)).slice(-20).filter(a=>a.total>0);
+    const sorted=[...attempts].sort((a,b)=>new Date(a.startedAt||0)-new Date(b.startedAt||0)).slice(-20).filter(a=>a.total>0);
     const pts=sorted.map((a,i)=>({
       pct:Math.round((a.score/a.total)*100),
       date:a.startedAt?new Date(a.startedAt):null,
@@ -2790,7 +2830,7 @@ function initStats(){
         rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,'','','','']);
       } else {
         a.perQuestion.forEach(p=>{
-          rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,p.no,p.isCorrect?1:0,p.correct||'',p.answered||'']);
+          rows2.push([a.id,a.examId,a.examTitle,a.examSubject,a.takerName,a.startedAt,a.submittedAt,a.usedSeconds,a.score,a.total,p.no,p.isCorrect?1:0,p.correct||'',p.chosen||'']);
         });
       }
     });
@@ -3065,13 +3105,16 @@ function initAdminNew(){
   createBtn.parentNode.replaceChild(newCreateBtn,createBtn);
   newCreateBtn.addEventListener('click',()=>{
     const title=document.getElementById('newTitle').value.trim()||'Exam ใหม่';
-    const subject=document.getElementById('newSubject').value.trim();
+    const _selVal=document.getElementById('newSubjectSelect')?.value||'';
+    const subject=(_selVal==='อื่นๆ'||!_selVal)
+      ?(document.getElementById('newSubjectOther')?.value?.trim()||document.getElementById('newSubject')?.value?.trim()||'')
+      :(_selVal||document.getElementById('newSubject')?.value?.trim()||'');
     const minutes=Math.max(1,Number(document.getElementById('newMinutes').value||45));
     const published=document.getElementById('newPublished').value==='true';
     const pdfUrl=document.getElementById('newPdfUrl').value.trim();
     const createPlaceholder=document.getElementById('newCreatePlaceholder').checked;
     const qCount=Math.min(999,Math.max(1,Math.floor(Number(document.getElementById('newQCount').value||50))));
-    if(!subject){ const other=document.getElementById('newSubjectOther')?.value?.trim(); if(!other) return toast('กรุณาเลือกหรือระบุวิชา'); }
+    if(!subject) return toast('กรุณาเลือกหรือระบุวิชา');
     const maxOrder=Math.max(0,...(s.exams||[]).map(e=>(typeof e.order==='number'?e.order:0)));
     const id='exam_'+Math.random().toString(16).slice(2);
     s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
@@ -3254,8 +3297,41 @@ function initEditor(examId){
   }
   renderTable();
 
+  // ── แก้จำนวนข้อ ──
+  const qCountInput = document.getElementById('editorQCount');
+  const qCountBtn = document.getElementById('editorQCountBtn');
+  const qCountStatus = document.getElementById('editorQCountStatus');
+  if(qCountInput) qCountInput.value = list.length || exam.questionCount || 0;
+
+  function applyQCount(){
+    const newCount = Math.max(1, Math.min(999, parseInt(qCountInput?.value||'0')));
+    const oldCount = list.length;
+    if(newCount === oldCount){ qCountStatus.textContent = 'จำนวนข้อเท่าเดิม'; return; }
+    if(newCount < oldCount){
+      if(!confirm(`ลดจาก ${oldCount} เหลือ ${newCount} ข้อ?
+
+ข้อที่ ${newCount+1}–${oldCount} จะถูกลบออก`)) return;
+      list.splice(newCount);
+    } else {
+      // เพิ่มข้อใหม่ต่อจากของเดิม
+      const lastPage = list.length ? (list[list.length-1].page || 1) : 1;
+      for(let i = oldCount; i < newCount; i++){
+        list.push({ id:'q'+(i+1), number:i+1, no:i+1, page:lastPage, correct:'A', choices:{A:'',B:'',C:'',D:''} });
+      }
+    }
+    exam.questionCount = newCount;
+    Store.save(s);
+    renderTable();
+    qCountStatus.textContent = newCount > oldCount
+      ? `✅ เพิ่มเป็น ${newCount} ข้อแล้ว (ข้อ ${oldCount+1}–${newCount} ใช้หน้า PDF เดิม)`
+      : `✅ ลดเหลือ ${newCount} ข้อแล้ว`;
+    document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
+  }
+  if(qCountBtn) qCountBtn.onclick = (e) => { e.preventDefault(); applyQCount(); };
+  if(qCountInput) qCountInput.onkeydown = (e) => { if(e.key==='Enter'){ e.preventDefault(); applyQCount(); } };
+
   document.getElementById('editorSave').onclick=()=>{
-    s.questions[examId]=list;Store.save(s);toast('บันทึกแล้ว');
+    s.questions[examId]=list;exam.questionCount=list.length;Store.save(s);toast('บันทึกแล้ว');
   };
 
   // bind excel import สำหรับ editor
@@ -3716,34 +3792,62 @@ window.navigate = function(page, params) {
 navigate = window.navigate;
 
 // ── Take state persistence: save answers + timer across refresh ──
-const _TAKE_PERSIST_KEY = 'nanont:takeResume';
+// Key แยกตาม takerName เพื่อให้ resume รายคน
+function _takeResumeKey(takerName) {
+  const user = (takerName || '').trim() || '_guest';
+  return 'nanont:takeResume:' + user;
+}
 
 function saveTakeResume(state) {
   try {
-    sessionStorage.setItem(_TAKE_PERSIST_KEY, JSON.stringify({
+    const key = _takeResumeKey(state.takerName);
+    localStorage.setItem(key, JSON.stringify({
       examId: state.exam.id,
       answers: state.answers,
       unsure: state.unsure,
-      startedAt: state.startedAt,
+      startedAt: state.startedAt,   // เวลาเริ่มจริง (ms) — ไม่เปลี่ยนแม้ refresh
+      savedAt: Date.now(),           // เวลาที่ save
+      pausedAt: Date.now(),          // เวลาที่ save ล่าสุด — popup คำนวณ offset ต่อจากนี้
+      pauseOffset: state._pauseOffset || 0, // offset สะสมจากการ pause ก่อนหน้า
       currentIndex: state.currentIndex,
       takerName: state.takerName,
       attemptId: state.attemptId,
-      ts: Date.now()
     }));
   } catch(e) {}
 }
 
-function loadTakeResume() {
-  try { return JSON.parse(sessionStorage.getItem(_TAKE_PERSIST_KEY) || 'null'); } catch { return null; }
+// โหลด resume ของผู้ใช้คนนั้นๆ
+function loadTakeResume(takerName) {
+  try {
+    const key = _takeResumeKey(takerName);
+    return JSON.parse(localStorage.getItem(key) || 'null');
+  } catch { return null; }
 }
 
-function clearTakeResume() {
-  sessionStorage.removeItem(_TAKE_PERSIST_KEY);
+// โหลดทุก resume ที่มีอยู่ (สำหรับแสดงในหน้า exams)
+function loadAllTakeResumes() {
+  const results = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('nanont:takeResume:')) {
+        try {
+          const v = JSON.parse(localStorage.getItem(k) || 'null');
+          if (v) results.push(v);
+        } catch(e) {}
+      }
+    }
+  } catch(e) {}
+  return results;
+}
+
+function clearTakeResume(takerName) {
+  try { localStorage.removeItem(_takeResumeKey(takerName)); } catch(e) {}
 }
 
 // Show login page on startup — but restore previous page if session still valid
 const _savedState = loadPageState();
-const _takeResume = loadTakeResume();
+const _takeResume = loadTakeResume(Auth.getName());
 
 if (_savedState && Auth.isLoggedIn()) {
   if (_savedState.page === 'take' && _takeResume) {
@@ -4662,7 +4766,7 @@ function initEntranceCompare(params) {
 </script>
 
 <!-- ===================== MEME SCORE OVERLAY ===================== -->
-<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;flex-direction:row;">
+<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;">
   <div id="memeBox" style="background:#fff;border-radius:16px;width:min(440px,92vw);overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
 
     <!-- Loading -->
@@ -4711,7 +4815,6 @@ function initEntranceCompare(params) {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
-
 </body>
 </html>
 
