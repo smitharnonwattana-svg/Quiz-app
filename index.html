@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v41.2 -->
+  <!-- APP_VERSION: v41.3 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -307,7 +307,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.3</div>
     </div>
   </div>
 </div>
@@ -883,7 +883,7 @@
       <div style="border:2px dashed var(--border);border-radius:12px;padding:16px;background:#f9fafb;display:grid;gap:8px;">
         <div style="font-weight:900;">📊 อัปโหลดเฉลยจาก Excel <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ)</span></div>
         <div class="muted" style="font-size:12px;line-height:1.7;">
-          รูปแบบ: คอลัมน์ <b>A = ข้อที่</b> · <b>B = หน้า PDF</b> · <b>C = เฉลย</b> (ก/ข/ค/ง หรือ A/B/C/D)<br>
+          รูปแบบ: คอลัมน์ <b>A = ข้อที่</b> · <b>B = หน้า PDF</b> · <b>C = เฉลย</b> (1/2/3/4 หรือ ก/ข/ค/ง หรือ A/B/C/D)<br>
           แถวแรกจะถูกตรวจว่าเป็น header หรือเปล่า ถ้าใช่จะข้ามให้อัตโนมัติ
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -994,7 +994,7 @@
             <!-- hidden: ยังใช้ใน JS อยู่ -->
             <input id="editorFast" type="checkbox" checked style="display:none;" />
             <button type="button" class="btn" id="editorDownloadTemplate">⬇️ Template Excel</button>
-            <label class="btn" style="cursor:pointer;" title="คอลัมน์: A=ข้อ, B=หน้าPDF, C=เฉลย(ก/ข/ค/ง)">
+            <label class="btn" style="cursor:pointer;" title="คอลัมน์: A=ข้อ, B=หน้าPDF, C=เฉลย(1/2/3/4)">
               📊 นำเข้าเฉลย Excel
               <input id="editorExcelFile" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
             </label>
@@ -3542,11 +3542,11 @@ function downloadExcelTemplate(qCount, filename) {
   if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
 
   // header row
-  const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (ก/ข/ค/ง)', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
+  const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (1/2/3/4)', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
 
   // data rows — ใส่ตัวอย่าง ก ไว้ทุกข้อ หน้า PDF เพิ่มทีละ 5 ข้อ
   for (let i = 1; i <= qCount; i++) {
-    rows.push([i, Math.max(1, Math.ceil(i / 5)), 'ก', '']);
+    rows.push([i, Math.max(1, Math.ceil(i / 5)), 1, '']);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -3573,12 +3573,14 @@ function downloadExcelTemplate(qCount, filename) {
 
 // ===================== EXCEL IMPORT =====================
 
-// แปลง ก/ข/ค/ง หรือ A/B/C/D → A/B/C/D
+// แปลง 1/2/3/4 หรือ ก/ข/ค/ง หรือ A/B/C/D → A/B/C/D
 function normalizeAnswer(v) {
   if (!v) return null;
   const s = String(v).trim().toUpperCase();
-  const map = {'ก':'A','ข':'B','ค':'C','ง':'D'};
-  if (map[String(v).trim()]) return map[String(v).trim()];
+  const numMap = {'1':'A','2':'B','3':'C','4':'D'};
+  if (numMap[String(v).trim()]) return numMap[String(v).trim()];
+  const thaiMap = {'ก':'A','ข':'B','ค':'C','ง':'D'};
+  if (thaiMap[String(v).trim()]) return thaiMap[String(v).trim()];
   if (['A','B','C','D'].includes(s)) return s;
   return null;
 }
