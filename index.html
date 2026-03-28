@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v41.6 -->
+  <!-- APP_VERSION: v41.7 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -312,7 +312,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.6</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.7</div>
     </div>
   </div>
 </div>
@@ -1977,7 +1977,7 @@ function initExams(){
   const editBtn = document.getElementById('examsEditBtn');
   const editBar = document.getElementById('examEditBar');
   const editDoneBtn = document.getElementById('examsEditDoneBtn');
-  if(isTeacher && editBtn){ editBtn.style.display=''; }
+  if(isTeacher && editBtn){ editBtn.style.display=''; } // student ไม่เห็นปุ่มนี้
   let _dragSrcId = null; // scope บน — ไม่ reset ตอน re-render
   if(editBtn) editBtn.onclick = ()=>{ if(!isTeacher) return; _editMode=true; editBar?.classList.add('show'); editBtn.style.display='none'; renderExams(); };
   if(editDoneBtn) editDoneBtn.onclick = ()=>{ _editMode=false; _dragSrcId=null; editBar?.classList.remove('show'); if(editBtn) editBtn.style.display=''; renderExams(); };
@@ -2035,8 +2035,13 @@ function initExams(){
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
     const KNOWN=['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'];
-    // sort by order field
-    const allPublished = (s2.exams||[]).filter(e=>e.published).sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
+    // sort by displayOrder (exams page) — แยกจาก order (admin page)
+    // ถ้ายังไม่มี displayOrder ให้ fallback ไป order เดิม
+    const allPublished = (s2.exams||[]).filter(e=>e.published).sort((a,b)=>{
+      const da = a.displayOrder??a.order??0;
+      const db = b.displayOrder??b.order??0;
+      return (da-db)||((a.uploadedAt??0)-(b.uploadedAt??0));
+    });
     const exams=!subjectFilter?allPublished:subjectFilter==='อื่นๆ'?allPublished.filter(e=>!KNOWN.includes(e.subject||'')):allPublished.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
     const list=document.getElementById('examsList');
     list.className='examGrid';
@@ -2093,7 +2098,7 @@ function initExams(){
           card.classList.add('dragging');
           ev.dataTransfer.effectAllowed='move';
         });
-        card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+        card.addEventListener('dragend',()=>{ card.classList.remove('dragging'); /* _dragSrcId reset เมื่อ drop สำเร็จ หรือเมื่อ drag ถูก cancel */ });
         card.addEventListener('dragover',ev=>{
           ev.preventDefault();
           ev.dataTransfer.dropEffect='move';
@@ -2104,14 +2109,25 @@ function initExams(){
           ev.preventDefault();
           card.classList.remove('drag-over');
           if(!_dragSrcId||_dragSrcId===e.id) return;
-          // swap order values
+          // หา card DOM elements
+          const srcCard = list.querySelector(`[data-examid="${_dragSrcId}"]`);
+          const dstCard = card;
+          if(!srcCard||!dstCard) return;
+          // DOM reorder in-place — ไม่ re-render ทั้งหมด
+          const allCards = [...list.children];
+          const si = allCards.indexOf(srcCard);
+          const di = allCards.indexOf(dstCard);
+          if(si<0||di<0) return;
+          if(si<di) dstCard.after(srcCard); else dstCard.before(srcCard);
+          // บันทึก displayOrder ตาม DOM order ปัจจุบัน
           const s3=Store.load();
-          const src=s3.exams.find(x=>x.id===_dragSrcId);
-          const dst=s3.exams.find(x=>x.id===e.id);
-          if(!src||!dst) return;
-          const tmp=src.order; src.order=dst.order; dst.order=tmp;
+          [...list.children].forEach((c,idx)=>{
+            const eid=c.dataset.examid;
+            const ex=s3.exams.find(x=>x.id===eid);
+            if(ex) ex.displayOrder=idx+1;
+          });
           Store.save(s3);
-          renderExams();
+          _dragSrcId=null;
         });
       }
 
