@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v42.5 -->
+  <!-- APP_VERSION: v42.8 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -43,7 +43,7 @@
     .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
     .takeRight{overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
     .stickyBar{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border);padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;}
-    .choice{display:flex;align-items:center;justify-content:center;gap:0;border:2px solid var(--border);border-radius:10px;padding:8px 0;cursor:pointer;transition:all .15s;background:#fff;font-weight:900;font-size:15px;min-width:0;}
+    .choice{display:flex;align-items:center;justify-content:center;gap:0;border:2px solid var(--border);border-radius:12px;padding:14px 0;cursor:pointer;transition:all .15s;background:#fff;font-weight:900;font-size:18px;min-width:0;}
     .choice:hover{border-color:#9ca3af;background:#f9fafb;}
     .choice.active{border-color:var(--black);background:var(--black);color:#fff;}
     .gridNums{display:flex;flex-wrap:wrap;gap:6px;}
@@ -64,80 +64,97 @@
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
       .takeRight{overflow:auto;}
+      /* ก ข ค ง แนวตั้ง desktop */
+      #takeChoices{display:grid;grid-template-columns:1fr !important;gap:8px !important;}
+      .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;}
+      /* nav buttons ใหญ่ขึ้น */
+      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;flex:1 !important;}
+      .takeMobileNav{display:flex !important;flex-direction:row !important;gap:8px !important;width:100% !important;flex-wrap:nowrap !important;}
     }
 
-    /* ══ MOBILE: PDF 80% top, controls 20% bottom ══ */
+    /* ══ MOBILE: PDF 70% top, controls 30% bottom ══ */
     @media (max-width: 900px) {
-      /* takeRoot เต็มหน้าจอ */
       .takeRoot{height:100vh;overflow:hidden;}
       .takeGrid{height:100%;display:flex;flex-direction:column;}
 
-      /* PDF zone: 80% */
+      /* PDF zone: 70% */
       .takeLeft{
-        flex:0 0 80vh;
-        height:80vh;
+        flex:0 0 70vh;
+        height:70vh;
         border-right:none;
         border-bottom:2px solid var(--border);
         overflow:hidden;
         display:flex;flex-direction:column;
       }
-      /* ซ่อน title bar ซ้าย (ชื่อ exam + เวลา) — ประหยัดพื้นที่ */
       .takeLeft .stickyBar{display:none;}
 
-      /* Controls zone: 20vh fixed — แสดงแค่ ก ข ค ง + prev/unsure/next */
+      /* Controls zone: 30vh */
       .takeRight{
-        flex:0 0 20vh;
-        height:20vh;
+        flex:0 0 30vh;
+        height:30vh;
         overflow:hidden;
         background:#fff;
         border-top:1px solid var(--border);
       }
 
-      /* ซ่อน stickyBar (ข้อ/เวลา/ออก/ส่งคำตอบ) */
       .takeRight .stickyBar{display:none !important;}
-
-      /* ซ่อน label "เลือกคำตอบ" และ grid ข้ามข้อ */
       .takeNumsWrap { display:none !important; }
       .takeRight > div > .muted { display:none !important; }
 
-      /* content wrapper — flex column จัดกลาง */
+      /* content wrapper — flex row: ก ข ค ง ซ้าย | nav ขวา */
       .takeRight > div {
-        padding:6px 10px !important;
-        gap:5px !important;
+        padding:8px 10px !important;
+        gap:8px !important;
         display:flex !important;
-        flex-direction:column !important;
-        justify-content:center !important;
+        flex-direction:row !important;
+        align-items:stretch !important;
         height:100%;
         box-sizing:border-box;
       }
 
-      /* choice grid 2x2 สูงพอดี */
+      /* ก ข ค ง — แนวตั้ง 1 คอลัมน์ ซ้ายมือ */
       #takeChoices{
-        gap:4px !important;
+        display:flex !important;
+        flex-direction:column !important;
+        gap:5px !important;
         flex:1;
-        min-height:0;
+        min-width:0;
       }
       .choice{
-        padding:0 4px !important;
-        font-size:15px !important;
-        border-radius:10px !important;
+        padding:0 8px !important;
+        font-size:17px !important;
+        font-weight:900 !important;
+        border-radius:12px !important;
         min-height:0 !important;
-        height:100%;
+        flex:1;
+        align-items:center;
+        justify-content:flex-start;
+        gap:10px;
+      }
+
+      /* nav column ขวา — prev/unsure/next แนวตั้ง */
+      .takeMobileNav{
+        display:flex !important;
+        flex-direction:column !important;
+        gap:5px;
+        width:80px;
+        flex-shrink:0;
+      }
+      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{
+        flex:1;
+        padding:0 !important;
+        font-size:12px !important;
+        font-weight:700 !important;
+        border-radius:10px !important;
+        text-align:center;
+        display:flex;
         align-items:center;
         justify-content:center;
+        min-height:0;
       }
+      #takeUnsureBtn{ font-size:11px !important; }
 
-      /* ปุ่ม prev/unsure/next */
-      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{
-        padding:3px 10px !important;
-        font-size:11px !important;
-        border-radius:8px !important;
-      }
-
-      /* pdfOverlay เต็มจอ */
       .pdfOverlay{position:fixed;inset:0;z-index:200;}
-
-      /* review page */
       #reviewPdfViewer{min-height:300px;}
     }
 
@@ -312,7 +329,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.5</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.8</div>
     </div>
   </div>
 </div>
@@ -412,13 +429,13 @@
             <button class="btn btnPrimary" id="takeSubmitBtn" disabled>ส่งคำตอบ</button>
           </div>
         </div>
-        <div style="padding:12px;display:grid;gap:10px;">
+        <div style="padding:16px;display:grid;gap:12px;">
           <div class="muted">เลือกคำตอบ</div>
           <div id="takeChoices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-            <button class="btn" id="takePrevBtn" style="padding:6px 10px;font-size:12px;">ก่อนหน้า</button>
-            <button class="btn" id="takeUnsureBtn" style="padding:6px 10px;font-size:12px;">ไม่แน่ใจ</button>
-            <button class="btn" id="takeNextBtn" style="padding:6px 10px;font-size:12px;">ถัดไป</button>
+          <div class="takeMobileNav" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn" id="takePrevBtn" style="padding:10px 14px;font-size:14px;flex:1;">ก่อนหน้า</button>
+            <button class="btn" id="takeUnsureBtn" style="padding:10px 14px;font-size:14px;flex:1;">ไม่แน่ใจ</button>
+            <button class="btn" id="takeNextBtn" style="padding:10px 14px;font-size:14px;flex:1;">ถัดไป</button>
           </div>
           <div class="takeNumsWrap" style="margin-top:6px;">
             <div class="muted" style="margin-bottom:8px;">ข้ามไปข้อ</div>
