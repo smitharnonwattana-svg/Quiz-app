@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v42.2 -->
+  <!-- APP_VERSION: v42.5 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -312,7 +312,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.5</div>
     </div>
   </div>
 </div>
@@ -1323,19 +1323,23 @@ const FirebaseSync = (() => {
     } catch(e) { console.warn('[FB] migrate err', e); }
   }
 
-  // ── Active Session Token — used to force-logout other devices ──
+  // ── Active Session Token — per-user (PIN-based) ──
   const _mySessionToken = 'sess_' + Date.now() + '_' + Math.random().toString(16).slice(2);
-  let _sessionListenerActive = false;
+  const _sessionListeners = {}; // key = pin → unsubscribe fn
 
-  async function claimSession() {
+  // doc key ต่อ user — ป้องกัน A kick B
+  function _sessionDocId(pin) { return 'session_' + String(pin).replace(/[^a-zA-Z0-9]/g,'_'); }
+
+  async function claimSession(pin) {
     if (!_ready) return;
-    try { await saveDoc('activeSession', { token: _mySessionToken, ts: Date.now() }); } catch(e) {}
+    const docId = pin ? _sessionDocId(pin) : 'activeSession';
+    try { await saveDoc(docId, { token: _mySessionToken, ts: Date.now() }); } catch(e) {}
   }
 
-  function listenSession(onKicked) {
-    if (_sessionListenerActive) return;
-    _sessionListenerActive = true;
-    listenDoc('activeSession', (data) => {
+  function listenSession(onKicked, pin) {
+    const docId = pin ? _sessionDocId(pin) : 'activeSession';
+    if (_sessionListeners[docId]) return; // already listening
+    _sessionListeners[docId] = listenDoc(docId, (data) => {
       if (data && data.token && data.token !== _mySessionToken) {
         onKicked();
       }
@@ -1405,13 +1409,13 @@ const Store = {
       if(seen.has(e.order)){maxOrder+=1;e.order=maxOrder;changed=true;}
       seen.add(e.order);
     });
-    if(changed) this.save(s);
+    if(changed) this.saveLocalOnly(s);
     // migrate: benchmarks
     if(!Array.isArray(s.benchmarks)) s.benchmarks=[];
     // inject preset benchmarks ถ้ายังไม่มีเลย
     if(s.benchmarks.length===0 && typeof PRESET_BENCHMARKS!=='undefined'){
       s.benchmarks=JSON.parse(JSON.stringify(PRESET_BENCHMARKS));
-      this.save(s);
+      this.saveLocalOnly(s);
     } else if(typeof PRESET_BENCHMARKS!=='undefined') {
       // อัปเดต preset benchmarks เสมอ — rows หรือ subjects อาจมีการอัปเดต
       let bmChanged=false;
@@ -1428,11 +1432,15 @@ const Store = {
           }
         }
       });
-      if(bmChanged) this.save(s);
+      if(bmChanged) this.saveLocalOnly(s);
     }
     return s;
   },
   load(){try{return JSON.parse(localStorage.getItem(this.key)||"{}");}catch{return {};}},
+  // บันทึกเฉพาะ localStorage ไม่ sync Firebase — ใช้ใน migrate() และ seed
+  saveLocalOnly(data){
+    try{ localStorage.setItem(this.key, JSON.stringify(data)); }catch(e){}
+  },
   save(data){
     try{
       this.lastError=null;
@@ -1494,7 +1502,8 @@ const Store = {
             b3.textContent = '🔒 logout เครื่องอื่น';
             b3.style.cssText = 'background:#dc2626;color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
             b3.onclick = async () => {
-              await FirebaseSync.claimSession();
+              const _adminPin = typeof Auth !== 'undefined' ? Auth.ADMIN_PIN : null;
+              await FirebaseSync.claimSession(_adminPin);
               dismiss();
               toast('✅ เครื่องนี้เป็น session ล่าสุดแล้ว — เครื่องอื่นถูก logout แล้ว');
             };
@@ -1512,21 +1521,15 @@ const Store = {
     });
     const s=this.load();
     if(!s.exams){
-      const examId="exam1";
-      s.exams=[{id:examId,subject:"วิทยาศาสตร์",title:"วิทยาศาสตร์ A Level 5 ชุดที่ 1 (Demo)",durationSeconds:2700,published:true,pdfUrl:"./pdfs/science_sample.pdf",questionCount:50,uploadedAt:Date.now(),order:1}];
+      // init fields จำเป็น — ไม่มี Demo exam
+      // syncFromCloud() จะ overwrite ด้วยข้อมูลจริงจาก Firebase ทันที
+      s.exams=[];
       s.questions={};
-      const pageFor=(n)=>{
-        if(n<=4)return 1;if(n<=9)return 2;if(n<=14)return 3;if(n<=19)return 4;
-        if(n<=24)return 5;if(n<=27)return 6;if(n<=32)return 7;if(n<=36)return 8;
-        if(n<=40)return 9;if(n<=46)return 10;return 11;
-      };
-      s.questions[examId]=Array.from({length:50}).map((_,i)=>({id:"q"+(i+1),number:i+1,no:i+1,page:pageFor(i+1),choices:{A:"",B:"",C:"",D:""},correct:"A"}));
       s.attempts=[];
       s.benchmarks=[];
-      s.members=[{pin:'311257',name:'ณนนท์'}];
+      s.members=s.members||[];
       s.adminLoggedIn=false;
       // บันทึกเฉพาะ localStorage — ไม่ sync ขึ้น Firebase
-      // เพราะ syncFromCloud() จะ overwrite ด้วยข้อมูลจริงจาก cloud หลังจากนี้
       try{ localStorage.setItem(this.key, JSON.stringify(s)); }catch(e){}
     }
     // Ensure no field is missing from the seed data
@@ -1858,10 +1861,11 @@ const Auth = (() => {
     const found = findByPin(pin);
     if (!found) return false;
     setSession(found.role, found.name);
-    // Claim session token so other devices know this is the latest active session
+    // Claim session per-user (PIN) — A login เครื่อง 2 จะ kick เครื่อง 1 ของ A เท่านั้น
+    const _loginPin = found.pin;
     setTimeout(() => {
       if (FirebaseSync.ready()) {
-        FirebaseSync.claimSession();
+        FirebaseSync.claimSession(_loginPin);
         FirebaseSync.listenSession(() => {
           if (isLoggedIn()) {
             logout();
@@ -1870,7 +1874,7 @@ const Auth = (() => {
               if (err) err.textContent = '⚠️ มีการ login จากอุปกรณ์อื่น — กรุณา login ใหม่';
             }, 100);
           }
-        });
+        }, _loginPin);
       }
     }, 1000);
     return found.role;
