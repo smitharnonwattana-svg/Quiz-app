@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v41.4 -->
+  <!-- APP_VERSION: v41.5 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -150,6 +150,14 @@
     .examCard .title{font-weight:900;font-size:15px;line-height:1.4;}
     .examCard .meta{display:flex;gap:12px;font-size:12px;color:var(--muted);margin-top:2px;}
     .examCard .score-badge{margin-top:6px;padding:6px 10px;background:#f9fafb;border-radius:8px;font-size:12px;border:1px solid var(--border);}
+    .examCard.drag-over{border-color:#6366f1;background:#eef2ff;transform:scale(1.01);}
+    .examCard.dragging{opacity:.4;cursor:grabbing;}
+    .examCard[draggable="true"]{cursor:grab;}
+    .starRow{display:flex;gap:3px;margin-top:6px;}
+    .starBtn{background:none;border:none;cursor:pointer;font-size:18px;padding:0;line-height:1;transition:transform .1s;}
+    .starBtn:hover{transform:scale(1.2);}
+    .examEditBar{display:none;align-items:center;gap:10px;padding:8px 12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;margin-top:12px;font-size:13px;font-weight:700;color:#4338ca;}
+    .examEditBar.show{display:flex;}
     @media(max-width:980px){.reviewLayout{grid-template-columns:1fr;height:auto;}.reviewSide{height:auto;overflow-y:visible;}}
     .reviewPdfWrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:#fff;display:flex;flex-direction:column;height:100%;}
     .reviewPdfBar{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);}
@@ -307,7 +315,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.4</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v41.5</div>
     </div>
   </div>
 </div>
@@ -351,7 +359,14 @@
         <h1 class="h1">เลือกชุดข้อสอบ</h1>
         <div class="muted" style="margin-top:6px;">กดเพื่อไปหน้ารายละเอียดและเริ่มทำ</div>
       </div>
-      <button class="btn" onclick="navigate('home')">กลับหน้าแรก</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button id="examsEditBtn" class="btn" style="display:none;">✏️ จัดลำดับ</button>
+        <button class="btn" onclick="navigate('home')">กลับหน้าแรก</button>
+      </div>
+    </div>
+    <div id="examEditBar" class="examEditBar">
+      <span>🖱️ ลากเพื่อเรียงลำดับ</span>
+      <button id="examsEditDoneBtn" class="btn btnPrimary" style="padding:6px 14px;font-size:12px;">✅ เสร็จแล้ว</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;" id="examsSubjPills">
       <button id="examPill_0" onclick="ecSetSubjFilter('ทั้งหมด')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ทั้งหมด</button><button id="examPill_1" onclick="ecSetSubjFilter('คณิตศาสตร์')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">คณิตศาสตร์</button><button id="examPill_2" onclick="ecSetSubjFilter('วิทยาศาสตร์')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">วิทยาศาสตร์</button><button id="examPill_3" onclick="ecSetSubjFilter('ภาษาไทย')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ภาษาไทย</button><button id="examPill_4" onclick="ecSetSubjFilter('ภาษาอังกฤษ')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ภาษาอังกฤษ</button><button id="examPill_5" onclick="ecSetSubjFilter('สังคมศึกษา')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">สังคมศึกษา</button><button id="examPill_6" onclick="ecSetSubjFilter('อื่นๆ')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">อื่นๆ</button>
@@ -1957,6 +1972,26 @@ function initExams(){
   const published=(s.exams||[]).filter(e=>e.published);
   const subjFilterEl=document.getElementById('examsSubjFilter');
   let subjectFilter='';
+  const _myName = Auth.getName ? Auth.getName() : '';
+  const isTeacher = Auth.isTeacher();
+  let _editMode = false;
+
+  // ── Favorites (per student, localStorage) ──
+  const FAV_KEY = 'nanont:favorites:' + _myName;
+  function loadFavs(){ try{ return JSON.parse(localStorage.getItem(FAV_KEY)||'{}'); }catch{ return {}; } }
+  function saveFavs(obj){ try{ localStorage.setItem(FAV_KEY, JSON.stringify(obj)); }catch{} }
+  function getFavStars(examId){ return Number(loadFavs()[examId]||0); }
+  function setFavStars(examId, stars){
+    const f=loadFavs(); f[examId]=stars; saveFavs(f); renderExams();
+  }
+
+  // ── Edit mode (admin only) ──
+  const editBtn = document.getElementById('examsEditBtn');
+  const editBar = document.getElementById('examEditBar');
+  const editDoneBtn = document.getElementById('examsEditDoneBtn');
+  if(isTeacher && editBtn){ editBtn.style.display=''; }
+  if(editBtn) editBtn.onclick = ()=>{ _editMode=true; editBar?.classList.add('show'); editBtn.style.display='none'; renderExams(); };
+  if(editDoneBtn) editDoneBtn.onclick = ()=>{ _editMode=false; editBar?.classList.remove('show'); if(editBtn) editBtn.style.display=''; renderExams(); };
 
   // pill button subject filter
   const FIXED_SUBJS = ['ทั้งหมด','คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','อื่นๆ'];
@@ -2011,14 +2046,17 @@ function initExams(){
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
     const KNOWN=['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'];
-    const exams=!subjectFilter?published:subjectFilter==='อื่นๆ'?published.filter(e=>!KNOWN.includes(e.subject||'')):published.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
+    // sort by order field
+    const allPublished = (s2.exams||[]).filter(e=>e.published).sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
+    const exams=!subjectFilter?allPublished:subjectFilter==='อื่นๆ'?allPublished.filter(e=>!KNOWN.includes(e.subject||'')):allPublished.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
     const list=document.getElementById('examsList');
     list.className='examGrid';
     list.innerHTML='';
 
-    // โหลด resume ของ user คนนี้เท่านั้น
-    const _myName = Auth.getName ? Auth.getName() : '';
     const _myResume = typeof loadTakeResume === 'function' ? loadTakeResume(_myName) : null;
+
+    // drag state
+    let _dragSrcId = null;
 
     exams.forEach(e=>{
       const myAttempts=allAttempts.filter(a=>a.examId===e.id);
@@ -2046,18 +2084,70 @@ function initExams(){
         </div>`;
       }
 
+      // stars
+      const favStars = getFavStars(e.id);
+      const starsHtml = `<div class="starRow">${[1,2,3].map(n=>`<button class="starBtn" data-examid="${e.id}" data-star="${n}" title="${n} ดาว">${favStars>=n?'⭐':'☆'}</button>`).join('')}</div>`;
+
       card.innerHTML=`
-        <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+          <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
+          ${_editMode?'<span style="font-size:18px;color:#9ca3af;cursor:grab;flex-shrink:0;">⠿</span>':''}
+        </div>
         <div class="title">${esc(e.title)}</div>
         <div class="meta">
           <span>📝 ${e.questionCount} ข้อ</span>
           <span>⏱ ${Math.round(e.durationSeconds/60)} นาที</span>
         </div>
         ${scoreHtml}
+        ${starsHtml}
         ${resumeHtml}
       `;
 
+      // star click
+      card.querySelectorAll('.starBtn').forEach(btn=>{
+        btn.addEventListener('click',(ev)=>{
+          ev.stopPropagation();
+          const examId=btn.dataset.examid;
+          const n=Number(btn.dataset.star);
+          const cur=getFavStars(examId);
+          setFavStars(examId, cur===n?0:n); // click same star = clear
+        });
+      });
+
+      // drag (edit mode only)
+      if(_editMode){
+        card.draggable=true;
+        card.dataset.examid=e.id;
+        card.addEventListener('dragstart',ev=>{
+          _dragSrcId=e.id;
+          card.classList.add('dragging');
+          ev.dataTransfer.effectAllowed='move';
+        });
+        card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+        card.addEventListener('dragover',ev=>{
+          ev.preventDefault();
+          ev.dataTransfer.dropEffect='move';
+          card.classList.add('drag-over');
+        });
+        card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
+        card.addEventListener('drop',ev=>{
+          ev.preventDefault();
+          card.classList.remove('drag-over');
+          if(!_dragSrcId||_dragSrcId===e.id) return;
+          // swap order values
+          const s3=Store.load();
+          const src=s3.exams.find(x=>x.id===_dragSrcId);
+          const dst=s3.exams.find(x=>x.id===e.id);
+          if(!src||!dst) return;
+          const tmp=src.order; src.order=dst.order; dst.order=tmp;
+          Store.save(s3);
+          renderExams();
+        });
+      }
+
       card.onclick=(ev)=>{
+        if(_editMode) return; // ไม่ navigate ตอน edit mode
+        if(ev.target.closest('.starBtn')) return;
         if(ev.target.closest('.resume-badge')){
           navigate('take',{id:e.id, takerName:_myName});
           return;
