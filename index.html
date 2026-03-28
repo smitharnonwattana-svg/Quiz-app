@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v42.1 -->
+  <!-- APP_VERSION: v42.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -312,7 +312,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.1</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.2</div>
     </div>
   </div>
 </div>
@@ -1525,7 +1525,9 @@ const Store = {
       s.benchmarks=[];
       s.members=[{pin:'311257',name:'ณนนท์'}];
       s.adminLoggedIn=false;
-      this.save(s);
+      // บันทึกเฉพาะ localStorage — ไม่ sync ขึ้น Firebase
+      // เพราะ syncFromCloud() จะ overwrite ด้วยข้อมูลจริงจาก cloud หลังจากนี้
+      try{ localStorage.setItem(this.key, JSON.stringify(s)); }catch(e){}
     }
     // Ensure no field is missing from the seed data
     (s.questions||{});
