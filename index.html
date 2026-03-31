@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v43.2 -->
+  <!-- APP_VERSION: v43.3 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -342,7 +342,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.3</div>
     </div>
   </div>
 </div>
@@ -503,6 +503,16 @@
         <div class="reviewCard" style="margin-top:12px;">
           <div class="muted" style="margin-bottom:6px;">ไปที่ข้อ</div>
           <div class="chips" id="reviewNavChips"></div>
+        </div>
+        <!-- พัฒนาการ + TOP5 ของชุดนี้ -->
+        <div class="reviewCard" style="margin-top:12px;display:none;" id="reviewChartCard">
+          <div style="font-weight:800;font-size:13px;margin-bottom:10px;color:#374151;">📈 พัฒนาการชุดนี้</div>
+          <canvas id="reviewChart" height="110" style="width:100%;display:block;"></canvas>
+          <div id="reviewChartEmpty" class="muted" style="display:none;text-align:center;padding:12px 0;font-size:12px;">ทำแค่ครั้งเดียว</div>
+        </div>
+        <div class="reviewCard" style="margin-top:12px;display:none;" id="reviewWrongCard">
+          <div style="font-weight:800;font-size:13px;margin-bottom:10px;color:#374151;">❌ ข้อที่ผิดบ่อย TOP 5</div>
+          <div id="reviewWrongTop" style="display:grid;gap:5px;"></div>
         </div>
         <div class="qListReview" id="reviewQList" style="margin-top:10px;"></div>
       </div>
@@ -727,24 +737,7 @@
     <!-- ② progress bar แยกวิชา -->
     <div id="statsSubjAvg" style="margin-top:12px;"></div>
 
-    <!-- ③ กราฟ + TOP10 -->
-    <div style="display:grid;grid-template-columns:1fr 280px;gap:12px;margin-top:12px;align-items:start;" id="statsChartsRow">
-      <div class="card" style="padding:14px;">
-        <div style="font-weight:800;font-size:13px;margin-bottom:10px;color:#374151;">📈 พัฒนาการคะแนน</div>
-        <canvas id="statsChart" height="130" style="width:100%;display:block;"></canvas>
-        <div id="statsChartEmpty" class="muted" style="display:none;text-align:center;padding:20px 0;font-size:13px;">ยังไม่มีข้อมูล</div>
-      </div>
-      <div class="card" style="padding:14px;">
-        <div style="font-weight:800;font-size:13px;margin-bottom:10px;color:#374151;">❌ ข้อที่ผิดบ่อย TOP 10</div>
-        <div id="statsWrongTop" style="display:grid;gap:5px;"></div>
-        <div id="statsWrongTopEmpty" class="muted" style="display:none;text-align:center;padding:20px 0;font-size:13px;">ยังไม่มีข้อมูล</div>
-      </div>
-    </div>
-    <style>
-      @media(max-width:760px){ #statsChartsRow{grid-template-columns:1fr;} }
-    </style>
-
-    <!-- ⑤ filter วิชา + รายการ -->
+    <!-- ③ filter วิชา + รายการ -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px;">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <span class="muted" style="font-size:13px;">วิชา</span>
@@ -2809,6 +2802,90 @@ function initReview(attemptId){
     if(_tabQ) _tabQ.onclick = () => setReviewTab('question');
     if(_tabA) _tabA.onclick = () => setReviewTab('answer');
   }
+
+  // ── พัฒนาการ + TOP 5 ข้อผิดบ่อย ของชุดนี้ ──
+  const _allExamAttempts = (s.attempts||[])
+    .filter(a=>a.examId===att.examId)
+    .sort((a,b)=>new Date(a.startedAt||0)-new Date(b.startedAt||0));
+
+  // TOP 5 ข้อผิดบ่อย (สะสมทุก attempt ของชุดนี้)
+  const wrongCard = document.getElementById('reviewWrongCard');
+  const wrongTopEl = document.getElementById('reviewWrongTop');
+  if(wrongCard && wrongTopEl && _allExamAttempts.length>=1){
+    const wrongCount={};
+    _allExamAttempts.forEach(a=>{
+      (a.perQuestion||[]).forEach(p=>{ if(!p.isCorrect&&p.no) wrongCount[p.no]=(wrongCount[p.no]||0)+1; });
+    });
+    const sorted=Object.entries(wrongCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    if(sorted.length){
+      wrongCard.style.display='';
+      const maxV=sorted[0][1];
+      wrongTopEl.innerHTML=sorted.map(([no,cnt],i)=>`
+        <div class="wrong-row">
+          <div class="wrong-rank${i<3?' top3':''}">${i+1}</div>
+          <span style="font-size:13px;min-width:42px;">ข้อ ${no}</span>
+          <div class="wrong-bar-wrap"><div class="wrong-bar-fill" style="width:${Math.round(cnt/maxV*100)}%;"></div></div>
+          <span style="font-size:12px;color:#6b7280;min-width:52px;text-align:right;">${cnt}/${_allExamAttempts.length} ครั้ง</span>
+        </div>`).join('');
+    }
+  }
+
+  // กราฟพัฒนาการชุดนี้
+  const chartCard = document.getElementById('reviewChartCard');
+  const chartCanvas = document.getElementById('reviewChart');
+  const chartEmpty = document.getElementById('reviewChartEmpty');
+  if(chartCard && chartCanvas && _allExamAttempts.length>=2){
+    chartCard.style.display='';
+    chartEmpty.style.display='none';
+    chartCanvas.style.display='block';
+    requestAnimationFrame(()=>{
+      const pts=_allExamAttempts.filter(a=>a.total>0).map((a,i)=>({
+        pct:Math.round((a.score/a.total)*100), idx:i+1
+      }));
+      if(pts.length<2){ chartCanvas.style.display='none'; chartEmpty.style.display='block'; return; }
+      const W=chartCanvas.offsetWidth||280; const H=110;
+      chartCanvas.width=W; chartCanvas.height=H;
+      const ctx=chartCanvas.getContext('2d');
+      ctx.clearRect(0,0,W,H);
+      const PAD={t:8,r:8,b:24,l:36};
+      const gW=W-PAD.l-PAD.r, gH=H-PAD.t-PAD.b;
+      // grid
+      ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1;
+      [0,50,100].forEach(v=>{
+        const y=PAD.t+gH*(1-v/100);
+        ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+gW,y);ctx.stroke();
+        ctx.fillStyle='#9ca3af';ctx.font='10px sans-serif';ctx.textAlign='right';
+        ctx.fillText(v+'%',PAD.l-4,y+3);
+      });
+      // line
+      ctx.beginPath();ctx.strokeStyle='#6366f1';ctx.lineWidth=2;
+      pts.forEach((p,i)=>{
+        const x=PAD.l+(i/(pts.length-1))*gW;
+        const y=PAD.t+gH*(1-p.pct/100);
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+      // dots
+      pts.forEach((p,i)=>{
+        const x=PAD.l+(i/(pts.length-1))*gW;
+        const y=PAD.t+gH*(1-p.pct/100);
+        const c=p.pct>=80?'#16a34a':p.pct>=60?'#f59e0b':'#ef4444';
+        ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();
+        ctx.fillStyle='#374151';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+        ctx.fillText(p.pct+'%',x,y-7);
+      });
+      // x labels
+      ctx.fillStyle='#9ca3af';ctx.font='10px sans-serif';ctx.textAlign='center';
+      pts.forEach((p,i)=>{
+        const x=PAD.l+(i/(pts.length-1))*gW;
+        ctx.fillText('ครั้ง'+p.idx,x,H-4);
+      });
+    });
+  } else if(chartCard && _allExamAttempts.length===1){
+    chartCard.style.display='';
+    chartEmpty.style.display='block';
+    chartCanvas.style.display='none';
+  }
 }
 
 // ===================== STATS PAGE =====================
@@ -3073,8 +3150,6 @@ function initStats(){
 
     // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น)
     renderSummaryCards(timeFiltered);
-    renderChart(attempts.length?attempts:bySubject);
-    renderWrongTop(attempts.length?attempts:bySubject);
 
     // ── progress bar แยกวิชา ──
     const subjAvgEl = document.getElementById('statsSubjAvg');
@@ -3149,8 +3224,7 @@ function initStats(){
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
 
-    // render chart after DOM settled
-    requestAnimationFrame(()=>renderChart(attempts.length?attempts:bySubject));
+
   }
 
   document.getElementById('statsBtnExport').onclick=()=>{
