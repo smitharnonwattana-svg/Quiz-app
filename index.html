@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v42.9 -->
+  <!-- APP_VERSION: v43.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -249,6 +249,19 @@
     .btn-ghost{border:1px solid #e5e7eb;background:#fff;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700;}
     .btn-danger{border:1px solid rgba(239,68,68,.55);background:#ef4444;color:#fff;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:800;}
 
+    /* attempt cards */
+    .attempt-card{border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:#fff;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s;}
+    .attempt-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.07);}
+    .attempt-card .ac-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+    .attempt-card .ac-title{font-weight:800;font-size:14px;color:#111;line-height:1.3;}
+    .attempt-card .ac-meta{font-size:12px;color:#6b7280;margin-top:2px;}
+    .attempt-card .ac-score{font-size:22px;font-weight:900;line-height:1;}
+    .attempt-card .ac-pct{font-size:13px;font-weight:700;margin-top:1px;}
+    .attempt-card .ac-bar{height:6px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin-top:4px;}
+    .attempt-card .ac-bar-fill{height:100%;border-radius:99px;transition:width .4s ease;}
+    .attempt-card .ac-btns{display:flex;gap:8px;margin-top:2px;}
+    .subj-avg-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+    .subj-avg-chip{padding:5px 12px;border-radius:99px;background:#f3f4f6;font-size:12px;font-weight:700;color:#374151;border:1px solid #e5e7eb;}
     /* admin editor */
     textarea{width:100%;min-height:64px;resize:vertical;font-family:inherit;}
     input[type="number"]{width:72px;}
@@ -329,7 +342,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v42.9</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.2</div>
     </div>
   </div>
 </div>
@@ -348,7 +361,7 @@
         <div class="muted" style="margin-top:6px;">เลือกชุดข้อสอบ → เริ่มทำ (PDF + timer)</div>
       </div>
       <div class="linkCard" onclick="navigate('stats')">
-        <div style="font-weight:900;">2) สถิติการทำข้อสอบ</div>
+        <div style="font-weight:900;">2) ผลการฝึกซ้อม</div>
         <div class="muted" style="margin-top:6px;">ดูคะแนน/วันที่ทำ (เก็บใน localStorage)</div>
       </div>
       <div class="linkCard" onclick="navigate('admin')">
@@ -457,7 +470,7 @@
         <div class="muted" style="font-size:12px;" id="reviewSub"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn" onclick="navigate('stats')">ไปหน้าสถิติ</button>
+        <button class="btn" onclick="navigate('stats')">ผลการฝึกซ้อม</button>
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
       </div>
     </div>
@@ -692,70 +705,59 @@
     <!-- header -->
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
-        <h1 class="h1">สถิติการทำข้อสอบ</h1>
-        <div class="muted">เก็บใน Cloud (sync ทุก device อัตโนมัติ)</div>
+        <h1 class="h1">📊 ผลการฝึกซ้อม</h1>
+        <div class="muted" id="statsUserLabel">บันทึกอัตโนมัติ · sync ทุกเครื่อง</div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
         <button class="btn btnPrimary" onclick="navigate('exams')">ไปทำข้อสอบ</button>
       </div>
     </div>
 
-    <!-- ① Summary cards -->
-    <div id="statsSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:20px;"></div>
+    <!-- time filter pills -->
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;" id="statsTimePills">
+      <button class="btn" id="statsPillWeek" onclick="window.statsSetTime('week')" style="border-radius:99px;padding:6px 16px;font-size:13px;">สัปดาห์นี้</button>
+      <button class="btn" id="statsPillMonth" onclick="window.statsSetTime('month')" style="border-radius:99px;padding:6px 16px;font-size:13px;">เดือนนี้</button>
+      <button class="btn" id="statsPillAll" onclick="window.statsSetTime('all')" style="border-radius:99px;padding:6px 16px;font-size:13px;background:#111;color:#fff;border-color:#111;">ทั้งหมด</button>
+    </div>
 
-    <!-- ② กราฟ + TOP10 -->
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;margin-top:16px;align-items:start;" id="statsChartsRow">
-      <div class="card" style="padding:16px;">
-        <div style="font-weight:800;font-size:14px;margin-bottom:12px;">📈 พัฒนาการคะแนน</div>
-        <canvas id="statsChart" height="160" style="width:100%;display:block;"></canvas>
-        <div id="statsChartEmpty" class="muted" style="display:none;text-align:center;padding:24px 0;">ยังไม่มีข้อมูล</div>
+    <!-- ① Summary cards -->
+    <div id="statsSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px;"></div>
+
+    <!-- ② progress bar แยกวิชา -->
+    <div id="statsSubjAvg" style="margin-top:12px;"></div>
+
+    <!-- ③ กราฟ + TOP10 -->
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:12px;margin-top:12px;align-items:start;" id="statsChartsRow">
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:800;font-size:13px;margin-bottom:10px;color:#374151;">📈 พัฒนาการคะแนน</div>
+        <canvas id="statsChart" height="130" style="width:100%;display:block;"></canvas>
+        <div id="statsChartEmpty" class="muted" style="display:none;text-align:center;padding:20px 0;font-size:13px;">ยังไม่มีข้อมูล</div>
       </div>
-      <div class="card" style="padding:16px;">
-        <div style="font-weight:800;font-size:14px;margin-bottom:12px;">❌ ข้อที่ผิดบ่อยสะสม TOP 10</div>
-        <div id="statsWrongTop" style="display:grid;gap:6px;"></div>
-        <div id="statsWrongTopEmpty" class="muted" style="display:none;text-align:center;padding:24px 0;">ยังไม่มีข้อมูล</div>
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:800;font-size:13px;margin-bottom:10px;color:#374151;">❌ ข้อที่ผิดบ่อย TOP 10</div>
+        <div id="statsWrongTop" style="display:grid;gap:5px;"></div>
+        <div id="statsWrongTopEmpty" class="muted" style="display:none;text-align:center;padding:20px 0;font-size:13px;">ยังไม่มีข้อมูล</div>
       </div>
     </div>
     <style>
       @media(max-width:760px){ #statsChartsRow{grid-template-columns:1fr;} }
     </style>
 
-    <!-- ③ ตาราง -->
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="muted" style="white-space:nowrap;">วิชา</span>
-          <select id="statsFilterSubject" class="btn" style="padding:10px 12px;min-width:200px;"><option value="all">ทั้งหมด</option></select>
-          <span class="muted" style="white-space:nowrap;">ชุดข้อสอบ</span>
-          <select id="statsFilterExam" class="btn" style="padding:10px 12px;min-width:240px;"><option value="all">ทั้งหมด</option></select>
-        </div>
-        <div id="statsTeacherBtns" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-          <button id="statsBtnExport" class="btn btnPrimary">ดาวน์โหลดสถิติ</button>
-          <label class="btn">นำเข้าสถิติ<input id="statsFileImport" type="file" accept=".xlsx" style="display:none;" /></label>
-          <button id="statsBtnClear" class="btn">ล้างสถิติ</button>
-        </div>
+    <!-- ⑤ filter วิชา + รายการ -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="muted" style="font-size:13px;">วิชา</span>
+        <select id="statsFilterSubject" class="btn" style="padding:7px 10px;font-size:13px;"><option value="all">ทั้งหมด</option></select>
+        <select id="statsFilterExam" class="btn" style="padding:7px 10px;font-size:13px;min-width:160px;"><option value="all">ทุกชุด</option></select>
       </div>
-      <div style="overflow:auto;">
-        <table class="stats-table" style="min-width:860px;">
-          <thead>
-            <tr>
-              <th style="width:50px;">ครั้งที่</th>
-              <th style="width:180px;">วันที่ทำ</th>
-              <th style="width:140px;">ผู้ทำ</th>
-              <th style="width:120px;">วิชา</th>
-              <th>ชุด</th>
-              <th style="width:160px;">คะแนน</th>
-              <th style="width:100px;">เวลา</th>
-              <th style="width:110px;"></th>
-            </tr>
-          </thead>
-          <tbody id="statsRows">
-            <tr><td colspan="8" class="muted">ยังไม่มีสถิติ</td></tr>
-          </tbody>
-        </table>
+      <div id="statsTeacherBtns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button id="statsBtnExport" class="btn btnPrimary" style="font-size:13px;">⬇️ ดาวน์โหลด</button>
+        <label class="btn" style="font-size:13px;">นำเข้า<input id="statsFileImport" type="file" accept=".xlsx" style="display:none;" /></label>
+        <button id="statsBtnClear" class="btn" style="font-size:13px;">ล้างสถิติ</button>
       </div>
     </div>
+    <div id="statsRows" style="display:grid;gap:10px;margin-top:12px;margin-bottom:24px;"></div>
   </div>
   <div id="statsConfirmOverlay" class="modal-overlay" role="dialog">
     <div class="modal">
@@ -1809,7 +1811,7 @@ function renderHome(){
           <div class="muted" style="margin-top:6px;">เลือกชุดข้อสอบ → เริ่มทำ (PDF + timer)</div>
         </div>
         <div class="linkCard" onclick="navigate('stats')">
-          <div style="font-weight:900;">📊 สถิติการทำข้อสอบ</div>
+          <div style="font-weight:900;">📊 ผลการฝึกซ้อม</div>
           <div class="muted" style="margin-top:6px;">ดูคะแนน/วันที่ทำ</div>
         </div>
         <div class="linkCard" onclick="navigate('entrance_stats')">
@@ -2811,15 +2813,46 @@ function initReview(attemptId){
 
 // ===================== STATS PAGE =====================
 function initStats(){
-  // Show/hide teacher-only controls based on role
   const teacherBtns = document.getElementById('statsTeacherBtns');
   if(teacherBtns) teacherBtns.style.display = Auth.isTeacher() ? 'flex' : 'none';
+
+  // ── user label ──
+  const userLabelEl = document.getElementById('statsUserLabel');
+  const _myName = Auth.getName();
+  if(userLabelEl && _myName) userLabelEl.textContent = '👤 ' + _myName + ' · sync ทุกเครื่อง';
 
   let pendingDeleteAttemptId=null;
   let currentExamFilter='all';
   let currentSubjectFilter='all';
+  let currentTimeFilter='all'; // '7d' | 'month' | 'all'
   const filterEl=document.getElementById('statsFilterExam');
   const subjectEl=document.getElementById('statsFilterSubject');
+
+  // ── time filter ──
+  function setTimePills(t){
+    ['week','month','all'].forEach(k=>{
+      const btn=document.getElementById(k==='week'?'statsPillWeek':k==='month'?'statsPillMonth':'statsPillAll');
+      if(!btn) return;
+      const active=t===k;
+      btn.style.background=active?'#111':'#fff';
+      btn.style.color=active?'#fff':'#374151';
+      btn.style.borderColor=active?'#111':'#e5e7eb';
+    });
+  }
+  function filterByTime(attempts){
+    if(currentTimeFilter==='all') return attempts;
+    const now=Date.now();
+    const today=new Date(); const dow=today.getDay();
+    const weekStart=new Date(today); weekStart.setDate(today.getDate()-(dow===0?6:dow-1)); weekStart.setHours(0,0,0,0);
+    const monthStart=new Date(today.getFullYear(),today.getMonth(),1).getTime();
+    const cutoff=currentTimeFilter==='week'?weekStart.getTime():monthStart;
+    return attempts.filter(a=>{
+      const t=a.startedAt?new Date(a.startedAt).getTime():0;
+      return t>=cutoff;
+    });
+  }
+  window.statsSetTime=(t)=>{ currentTimeFilter=t; setTimePills(t); render(); };
+  setTimePills(currentTimeFilter);
 
   function getExamSubjectById(s,examId){
     if(!examId) return 'ไม่ระบุ';
@@ -3034,46 +3067,89 @@ function initStats(){
     const s=Store.load();
     rebuildSubjectOptions(s);rebuildFilterOptions(s);
     const allAttempts=(s.attempts||[]).slice().sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
-    const bySubject=currentSubjectFilter==='all'?allAttempts:allAttempts.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
+    const timeFiltered=filterByTime(allAttempts);
+    const bySubject=currentSubjectFilter==='all'?timeFiltered:timeFiltered.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
 
-    // render panels (ใช้ filtered attempts ยกเว้น summary ใช้ทั้งหมด)
-    renderSummaryCards(bySubject);
+    // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น)
+    renderSummaryCards(timeFiltered);
     renderChart(attempts.length?attempts:bySubject);
     renderWrongTop(attempts.length?attempts:bySubject);
 
+    // ── progress bar แยกวิชา ──
+    const subjAvgEl = document.getElementById('statsSubjAvg');
+    if(subjAvgEl){
+      const subjMap={};
+      timeFiltered.forEach(a=>{
+        const subj=a.examSubject||'ไม่ระบุ';
+        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0};
+        if(a.total){ subjMap[subj].sum+=(a.score||0); subjMap[subj].total+=a.total; subjMap[subj].cnt++; }
+      });
+      const entries=Object.entries(subjMap).sort((a,b)=>a[0].localeCompare(b[0],'th'));
+      if(entries.length){
+        const bars=entries.map(([subj,v])=>{
+          const avg=v.total?Math.round(v.sum/v.total*100):0;
+          const c=scoreColor(avg);
+          return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="min-width:80px;font-size:13px;font-weight:700;color:#374151;">${esc(subj)}</div>
+            <div style="flex:1;height:10px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
+              <div style="height:100%;width:${avg}%;background:${c};border-radius:99px;transition:width .4s;"></div>
+            </div>
+            <div style="min-width:44px;text-align:right;font-size:13px;font-weight:800;color:${c};">${avg}%</div>
+            <div style="min-width:40px;text-align:right;font-size:11px;color:#9ca3af;">${v.cnt} ครั้ง</div>
+          </div>`;
+        }).join('');
+        subjAvgEl.innerHTML=`<div class="card" style="padding:14px 16px;">
+          <div style="font-weight:800;font-size:13px;margin-bottom:12px;color:#374151;">📚 คะแนนเฉลี่ยแยกวิชา</div>
+          ${bars}
+        </div>`;
+      } else { subjAvgEl.innerHTML=''; }
+    }
+
+    // Parental Advice removed
+
+    // ── attempt cards ──
     const rowsEl=document.getElementById('statsRows');
-    if(!attempts.length){rowsEl.innerHTML=`<tr><td colspan="8" class="muted" style="padding:20px;">ยังไม่มีสถิติ</td></tr>`;return;}
-    rowsEl.innerHTML=attempts.map((a,idx)=>{
+    if(!attempts.length){
+      rowsEl.innerHTML=`<div class="muted" style="padding:24px;text-align:center;border:1px solid var(--border);border-radius:14px;">ยังไม่มีสถิติ</div>`;
+      return;
+    }
+    rowsEl.innerHTML='';
+    attempts.forEach((a,idx)=>{
       const exam=(s.exams||[]).find(e=>e.id===a.examId);
       const examTitle=exam?.title||a.examTitle||'—';
       const examSubject=a.examSubject||exam?.subject||'ไม่ระบุ';
       const takerName=a.takerName||'—';
       const started=a.startedAt?new Date(a.startedAt):null;
-      const dateStr=started?started.toLocaleString('th-TH'):'—';
+      const dateStr=started?started.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}):'—';
+      const timeStr=started?started.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):'';
       const usedSec=Number.isFinite(a.usedSeconds)?a.usedSeconds:0;
       const pct=a.total?Math.round((a.score||0)/a.total*100):0;
       const barColor=scoreColor(pct);
-      return `<tr>
-        <td><b>${idx+1}</b></td>
-        <td>${dateStr}<small>${a.id||''}</small></td>
-        <td>${esc(takerName)}</td>
-        <td>${esc(examSubject)}</td>
-        <td>${esc(examTitle)}</td>
-        <td>
-          <div class="score-cell">
-            <div><b>${a.score||0}/${a.total||0}</b> <span style="color:${barColor};font-weight:700;font-size:12px;">(${pct}%)</span></div>
-            <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+      const card=document.createElement('div');
+      card.className='attempt-card';
+      card.innerHTML=`
+        <div class="ac-top">
+          <div style="flex:1;min-width:0;">
+            <div class="ac-title">${esc(examTitle)}</div>
+            <div class="ac-meta">${esc(takerName)} · ${esc(examSubject)} · ${dateStr} ${timeStr} · ⏱ ${formatDuration(usedSec)}</div>
           </div>
-        </td>
-        <td>${formatDuration(usedSec)}</td>
-        <td>${Auth.isTeacher()?`<button class="btn-delete" data-del="${a.id}">ลบ</button> `:''}<button class="btn" style="padding:6px 10px;font-size:12px;" data-review="${a.id}">ดูเฉลย</button></td>
-      </tr>`;
-    }).join('');
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="ac-score" style="color:${barColor};">${a.score||0}<span style="font-size:14px;font-weight:700;color:#9ca3af;">/${a.total||0}</span></div>
+            <div class="ac-pct" style="color:${barColor};">${pct}%</div>
+          </div>
+        </div>
+        <div class="ac-bar"><div class="ac-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+        <div class="ac-btns">
+          <button class="btn" style="padding:6px 12px;font-size:12px;" data-review="${a.id}">📋 ดูเฉลย</button>
+          ${Auth.isTeacher()?`<button class="btn-delete" style="padding:6px 12px;" data-del="${a.id}">ลบ</button>`:''}
+        </div>`;
+      rowsEl.appendChild(card);
+    });
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
 
-    // render chart after DOM settled (ต้องรู้ width)
+    // render chart after DOM settled
     requestAnimationFrame(()=>renderChart(attempts.length?attempts:bySubject));
   }
 
