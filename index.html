@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v43.6 -->
+  <!-- APP_VERSION: v43.7 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -342,7 +342,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.6</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.7</div>
     </div>
   </div>
 </div>
@@ -867,7 +867,7 @@
       </label>
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">วิชา</span>
-        <select id="newSubjectSelect" onchange="document.getElementById('newSubjectOther').style.display=this.value==='อื่นๆ'?'block':'none';document.getElementById('newSubject').value=this.value!=='อื่นๆ'?this.value:'';" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+        <select id="newSubjectSelect" onchange="window._onNewSubjectChange(this.value)" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
             <option value="">-- เลือกวิชา --</option>
             <option value="คณิตศาสตร์">คณิตศาสตร์</option>
             <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
@@ -876,9 +876,19 @@
             <option value="สังคมศึกษา">สังคมศึกษา</option>
             <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
         </select>
-        <input id="newSubjectOther" style="display:none;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;margin-top:6px;" placeholder="ระบุชื่อวิชา" oninput="document.getElementById('newSubject').value=this.value" />
+        <input id="newSubjectOther" style="display:none;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;margin-top:6px;" placeholder="ระบุชื่อวิชา" oninput="document.getElementById('newSubject').value=this.value;window._onNewSubjectChange(this.value)" />
         <input id="newSubject" type="hidden" value="" />
       </label>
+      <!-- เนื้อหาวิชา — แสดงเมื่อเลือกวิชาแล้ว -->
+      <div id="newTopicsWrap" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;display:grid;gap:8px;">
+        <div style="font-weight:900;font-size:13px;">📚 เนื้อหาวิชา <span id="newTopicsSubjLabel" style="color:#3b82f6;"></span></div>
+        <div class="muted" style="font-size:12px;">topics เหล่านี้จะใช้ได้กับทุกชุดข้อสอบวิชาเดียวกัน และจะเป็น dropdown ใน Excel template</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="newTopicInput" style="padding:8px 12px;border:1px solid #bfdbfe;border-radius:10px;font-family:inherit;flex:1;min-width:160px;" placeholder="ชื่อเนื้อหา เช่น เศษส่วน (Enter เพื่อเพิ่ม)" />
+          <button type="button" class="btn" id="newTopicAddBtn">+ เพิ่ม</button>
+        </div>
+        <div id="newTopicTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
+      </div>
       <div class="grid2">
         <label style="display:grid;gap:6px;">
           <span style="font-weight:900;">เวลา (นาที)</span>
@@ -919,7 +929,7 @@
       <div style="border:2px dashed var(--border);border-radius:12px;padding:16px;background:#f9fafb;display:grid;gap:8px;">
         <div style="font-weight:900;">📊 อัปโหลดเฉลยจาก Excel <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ)</span></div>
         <div class="muted" style="font-size:12px;line-height:1.7;">
-          รูปแบบ: คอลัมน์ <b>A = ข้อที่</b> · <b>B = หน้า PDF</b> · <b>C = เฉลย</b> (1/2/3/4 หรือ ก/ข/ค/ง หรือ A/B/C/D)<br>
+          รูปแบบ: <b>A = ข้อที่</b> · <b>B = หน้า PDF</b> · <b>C = เฉลย</b> · <b>D = เนื้อหา</b> (dropdown จากที่ตั้งไว้) · <b>E = ฟรี</b><br>
           แถวแรกจะถูกตรวจว่าเป็น header หรือเปล่า ถ้าใช่จะข้ามให้อัตโนมัติ
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -3611,6 +3621,65 @@ function initAdminNew(){
     }
   });
 
+  // ── topics per subject ──
+  if(!s.subjectTopics) s.subjectTopics={};
+
+  function getNewTopics(subj){ return Array.isArray(s.subjectTopics[subj])?[...s.subjectTopics[subj]]:[]; }
+
+  function renderNewTopicTags(subj){
+    const el=document.getElementById('newTopicTags');
+    if(!el) return;
+    const topics=getNewTopics(subj);
+    el.innerHTML=topics.length
+      ? topics.map((t,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#dbeafe;border:1px solid #93c5fd;border-radius:99px;font-size:12px;font-weight:700;color:#1d4ed8;">${esc(t)}<button type="button" onclick="window._removeNewTopic('${subj}',${i})" style="background:none;border:none;cursor:pointer;color:#60a5fa;font-size:14px;line-height:1;padding:0 2px;">×</button></span>`).join('')
+      : '<span class="muted" style="font-size:12px;">ยังไม่มีเนื้อหา — เพิ่มได้เลย</span>';
+  }
+
+  window._removeNewTopic=(subj,i)=>{
+    if(!s.subjectTopics[subj]) return;
+    s.subjectTopics[subj].splice(i,1);
+    Store.save(s);
+    renderNewTopicTags(subj);
+  };
+
+  window._onNewSubjectChange=(val)=>{
+    const subjOther=document.getElementById('newSubjectOther');
+    const subjHidden=document.getElementById('newSubject');
+    const wrap=document.getElementById('newTopicsWrap');
+    const label=document.getElementById('newTopicsSubjLabel');
+    if(subjOther) subjOther.style.display=val==='อื่นๆ'?'block':'none';
+    if(val&&val!=='อื่นๆ'){
+      if(subjHidden) subjHidden.value=val;
+      if(wrap){ wrap.style.display='grid'; }
+      if(label) label.textContent='('+val+')';
+      renderNewTopicTags(val);
+    } else if(val==='อื่นๆ'){
+      if(wrap) wrap.style.display='none';
+    } else {
+      if(wrap) wrap.style.display='none';
+      if(subjHidden) subjHidden.value='';
+    }
+  };
+
+  const _ntAddBtn=document.getElementById('newTopicAddBtn');
+  const _ntInput=document.getElementById('newTopicInput');
+  if(_ntAddBtn&&_ntInput){
+    function addNewTopic(){
+      const subj=document.getElementById('newSubjectSelect')?.value||'';
+      if(!subj||subj==='อื่นๆ') return toast('กรุณาเลือกวิชาก่อน');
+      const v=_ntInput.value.trim(); if(!v) return;
+      if(!s.subjectTopics[subj]) s.subjectTopics[subj]=[];
+      v.split(/[,،،、]/).map(x=>x.trim()).filter(Boolean).forEach(t=>{
+        if(!s.subjectTopics[subj].includes(t)) s.subjectTopics[subj].push(t);
+      });
+      _ntInput.value='';
+      Store.save(s);
+      renderNewTopicTags(subj);
+    }
+    _ntAddBtn.onclick=addNewTopic;
+    _ntInput.onkeydown=(e)=>{ if(e.key==='Enter'){e.preventDefault();addNewTopic();} };
+  }
+
   const createBtn=document.getElementById('newCreateBtn');
   const newCreateBtn=createBtn.cloneNode(true);
   createBtn.parentNode.replaceChild(newCreateBtn,createBtn);
@@ -3934,22 +4003,45 @@ function initEditor(examId){
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
-function downloadExcelTemplate(qCount, filename) {
+function downloadExcelTemplate(qCount, filename, topics) {
   if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
 
-  // header row
   const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (1/2/3/4)', 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
-
   for (let i = 1; i <= qCount; i++) {
     rows.push([i, Math.max(1, Math.ceil(i / 5)), 1, '', '']);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 16 }, { wch: 20 }];
-
-  // style header (SheetJS community ทำได้แค่ basic)
   const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 18 }, { wch: 16 }];
+
+  // dropdown validation สำหรับคอลัมน์ D (เนื้อหา)
+  if(topics && topics.length > 0){
+    const topicFormula = '"'+topics.join(',')+'"';
+    if(!ws['!dataValidation']) ws['!dataValidation'] = [];
+    for(let r=1; r<=qCount; r++){
+      ws['!dataValidation'].push({
+        sqref: 'D'+(r+1),
+        type: 'list',
+        formula1: topicFormula,
+        showDropDown: false,
+        showErrorMessage: true,
+        error: 'กรุณาเลือกจาก dropdown',
+        errorTitle: 'เนื้อหาไม่ถูกต้อง'
+      });
+    }
+    // Sheet2: รายการ topics สำหรับ reference
+    const wsTopics = XLSX.utils.aoa_to_sheet([['เนื้อหาที่ใช้ได้'],...topics.map(t=>[t])]);
+    wsTopics['!cols'] = [{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsTopics, 'เนื้อหา');
+  }
+
   XLSX.utils.book_append_sheet(wb, ws, 'เฉลย');
+  // ย้าย sheet เฉลยมาเป็นแรก
+  wb.SheetNames = topics && topics.length > 0
+    ? ['เฉลย', 'เนื้อหา']
+    : ['เฉลย'];
+
   XLSX.writeFile(wb, filename || 'template_เฉลย.xlsx');
 }
 
@@ -3960,7 +4052,10 @@ function downloadExcelTemplate(qCount, filename) {
   btn.addEventListener('click', () => {
     const qCount = Math.max(1, parseInt(document.getElementById('newQCount')?.value || 50));
     const title = (document.getElementById('newTitle')?.value || 'exam').trim().replace(/\s+/g, '_');
-    downloadExcelTemplate(qCount, `template_${title}.xlsx`);
+    const subj = document.getElementById('newSubjectSelect')?.value || '';
+    const s2 = Store.load();
+    const topics = (s2.subjectTopics&&subj&&s2.subjectTopics[subj]) ? s2.subjectTopics[subj] : [];
+    downloadExcelTemplate(qCount, `template_${title}.xlsx`, topics);
   });
 })();
 
@@ -4064,7 +4159,8 @@ function bindEditorExcel(examId, list, renderFn) {
     const newDlBtn = dlBtn.cloneNode(true);
     dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
     newDlBtn.addEventListener('click', () => {
-      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`);
+      const _s2=Store.load(); const _topics=(_s2.subjectTopics&&exam.subject&&_s2.subjectTopics[exam.subject])||[];
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics);
     });
   }
 
