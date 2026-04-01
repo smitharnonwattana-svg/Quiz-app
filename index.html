@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v43.9 -->
+  <!-- APP_VERSION: v44.0 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.9</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.0</div>
     </div>
   </div>
 </div>
@@ -2438,8 +2438,8 @@ function initTake(id){
       const correct=q.correct||null;
       const isFree=!!q.isFree;
       const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
-      const _qtags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
-      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_qtags,topic:_qtags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
+      const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
+      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
     });
     const usedSeconds=st.startedAt?Math.min(Math.floor((Date.now()-st.startedAt)/1000),exam.durationSeconds):0;
     const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
@@ -2960,8 +2960,8 @@ function initReview(attemptId){
 
   window.saveTagModal = function(){
     if(!_tmQ) return;
-    // sync topic → tags array
-    _tmQ.tags = _tmQ.topic ? [_tmQ.topic] : [];
+    if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
+    _tmQ.topic=_tmQ.tags[0]||'';
     if(_tmRenderFn) _tmRenderFn();
     Store.save(_tmS);
     window.closeTagModal();
@@ -2977,27 +2977,29 @@ function initReview(attemptId){
     const el=document.getElementById('tagModalPalette');
     if(!el) return;
     const topics=getSubjTopics();
-    const current=_tmQ.topic||'';
+    if(!Array.isArray(_tmQ.tags)) _tmQ.tags=(_tmQ.topic?[_tmQ.topic]:[]);
     if(topics.length===0){
       el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0;">ยังไม่มีเนื้อหาในวิชานี้ — เพิ่มด้านล่างได้เลย</div>';
       return;
     }
     el.innerHTML=topics.map(t=>{
-      const sel=current===t;
+      const sel=_tmQ.tags.includes(t);
       const safe=encodeURIComponent(t);
-      return `<button type="button" onclick="window._selectTag(decodeURIComponent('${safe}'))"
+      return `<button type="button" onclick="window._toggleTag(decodeURIComponent('${safe}'))"
         style="padding:7px 16px;border-radius:99px;border:2px solid ${sel?'#16a34a':'#e5e7eb'};
         background:${sel?'#dcfce7':'#f9fafb'};color:${sel?'#15803d':'#374151'};
         font-weight:700;font-size:13px;cursor:pointer;transition:all .12s;">
-        ${sel?'<b>✓</b> ':''}${esc(t)}
+        ${sel?'✓ ':''}${esc(t)}
       </button>`;
     }).join('');
   }
 
-  window._selectTag = function(t){
+  window._toggleTag = function(t){
     if(!_tmQ) return;
-    _tmQ.topic=(_tmQ.topic===t)?'':t;
-    _tmQ.tags=_tmQ.topic?[_tmQ.topic]:[];
+    if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
+    const i=_tmQ.tags.indexOf(t);
+    if(i>=0) _tmQ.tags.splice(i,1); else _tmQ.tags.push(t);
+    _tmQ.topic=_tmQ.tags[0]||''; // compat
     renderTagPalette();
   };
 
@@ -3009,12 +3011,10 @@ function initReview(attemptId){
     const newTopics=v.split(/[,،،、]/).map(x=>x.trim()).filter(Boolean);
     newTopics.forEach(t=>{
       if(!_tmS.subjectTopics[_tmSubj].includes(t)) _tmS.subjectTopics[_tmSubj].push(t);
+      if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
+      if(!_tmQ.tags.includes(t)) _tmQ.tags.push(t);
     });
-    // select ตัวล่าสุดที่เพิ่ม
-    if(newTopics.length>0){
-      _tmQ.topic=newTopics[newTopics.length-1];
-      _tmQ.tags=[_tmQ.topic];
-    }
+    if(!_tmQ.topic && _tmQ.tags.length>0) _tmQ.topic=_tmQ.tags[0];
     inp.value='';
     Store.save(_tmS);
     renderTagPalette();
@@ -3409,10 +3409,12 @@ function initStats(){
         const subj=a.examSubject||'ไม่ระบุ';
         if(!topicStats[subj]) topicStats[subj]={};
         (a.perQuestion||[]).forEach(p=>{
-          const t=p.topic||'ไม่ระบุ';
-          if(!topicStats[subj][t]) topicStats[subj][t]={right:0,total:0};
-          topicStats[subj][t].total++;
-          if(p.isCorrect) topicStats[subj][t].right++;
+          const ptags=Array.isArray(p.tags)&&p.tags.length?p.tags:(p.topic?[p.topic]:[]);
+          ptags.forEach(t=>{
+            if(!topicStats[subj][t]) topicStats[subj][t]={right:0,total:0};
+            topicStats[subj][t].total++;
+            if(p.isCorrect) topicStats[subj][t].right++;
+          });
         });
       });
       const subjects=Object.keys(topicStats).filter(subj=>Object.values(topicStats[subj]).some(v=>v.total>0));
