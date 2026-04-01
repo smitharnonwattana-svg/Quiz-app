@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v43.7 -->
+  <!-- APP_VERSION: v43.9 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -287,6 +287,7 @@
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -342,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.7</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v43.9</div>
     </div>
   </div>
 </div>
@@ -736,6 +737,7 @@
 
     <!-- ② progress bar แยกวิชา -->
     <div id="statsSubjAvg" style="margin-top:12px;"></div>
+    <div id="statsRadarWrap"></div>
 
     <!-- ③ filter วิชา + รายการ -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px;">
@@ -948,6 +950,28 @@
   </div>
 </div>
 
+<!-- ===================== TAG MODAL ===================== -->
+<div id="tagModal" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:16px;width:min(480px,96vw);padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-weight:900;font-size:16px;">🏷️ เลือกเนื้อหา <span id="tagModalQNo" style="color:#6b7280;font-size:13px;font-weight:600;"></span></div>
+      <button onclick="window.closeTagModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;">×</button>
+    </div>
+    <div id="tagModalPalette" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;"></div>
+    <div style="border-top:1px solid #e5e7eb;padding-top:12px;">
+      <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">เพิ่มเนื้อหาใหม่ให้วิชานี้:</div>
+      <div style="display:flex;gap:8px;">
+        <input id="tagModalNewInput" style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:13px;" placeholder="ชื่อเนื้อหา แล้วกด Enter" />
+        <button id="tagModalAddBtn" class="btn">+ เพิ่ม</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button onclick="window.closeTagModal()" class="btn">ปิด</button>
+      <button onclick="window.saveTagModal()" class="btn btnPrimary">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== PAGE: ADMIN EDITOR ===================== -->
 <div id="page-admin_editor" class="page">
   <div class="container" style="max-width:1400px;">
@@ -1066,8 +1090,8 @@
                 <th style="width:56px;">ข้อ</th>
                 <th style="width:100px;">หน้า PDF</th>
                 <th style="width:120px;">เฉลย</th>
-                <th>เนื้อหา</th>
                 <th style="width:60px;">ฟรี</th>
+                <th style="width:100px;">Tag</th>
               </tr>
             </thead>
             <tbody id="editorTbody"></tbody>
@@ -1077,6 +1101,7 @@
     </div>
   </div>
 </div>
+
 
 <script>
 // ===================== PDF VIEWER (PDF.js) =====================
@@ -2413,7 +2438,8 @@ function initTake(id){
       const correct=q.correct||null;
       const isFree=!!q.isFree;
       const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
-      return{qid:q.id,no:q.no||q.number,page:q.page,topic:q.topic||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
+      const _qtags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
+      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_qtags,topic:_qtags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
     });
     const usedSeconds=st.startedAt?Math.min(Math.floor((Date.now()-st.startedAt)/1000),exam.durationSeconds):0;
     const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
@@ -2667,7 +2693,7 @@ function initReview(attemptId){
     wrap.innerHTML=`
       <div class="qRow">
         <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}</span>
-        <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${q.topic?` · <span style='color:#6366f1;font-size:10px;'>${esc(q.topic)}</span>`:''}</span>
+        <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${(Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[])).map(t=>`<span style='color:#6366f1;font-size:10px;background:#ede9fe;border-radius:4px;padding:0 3px;margin-left:2px;'>${esc(t)}</span>`).join('')}</span>
         <div class="qRowPills">${pillsHtml}</div>
         <span class="qBadge ${badgeCls}">${badgeTxt}</span>
         ${hasText?'<span style="font-size:11px;color:#9ca3af;margin-left:2px;">▾</span>':''}
@@ -2909,6 +2935,96 @@ function initReview(attemptId){
     chartCanvas.style.display='none';
   }
 }
+
+// ===================== TAG MODAL =====================
+(function(){
+  let _tmQ=null, _tmSubj='', _tmS=null, _tmRenderFn=null, _tmIdx=-1;
+
+  window.openTagModal = function(q, idx, subj, s, renderFn){
+    _tmQ=q; _tmSubj=subj; _tmS=s; _tmRenderFn=renderFn; _tmIdx=idx;
+    if(!_tmS.subjectTopics) _tmS.subjectTopics={};
+    const modal=document.getElementById('tagModal');
+    const qNoEl=document.getElementById('tagModalQNo');
+    if(qNoEl) qNoEl.textContent='ข้อ '+(q.number||q.no);
+    modal.style.display='flex';
+    renderTagPalette();
+    const inp=document.getElementById('tagModalNewInput');
+    if(inp){ inp.value=''; inp.focus(); inp.onkeydown=(e)=>{ if(e.key==='Enter'){e.preventDefault();addTagFromModal();} }; }
+    document.getElementById('tagModalAddBtn').onclick=addTagFromModal;
+  };
+
+  window.closeTagModal = function(){
+    document.getElementById('tagModal').style.display='none';
+    _tmQ=null;
+  };
+
+  window.saveTagModal = function(){
+    if(!_tmQ) return;
+    // sync topic → tags array
+    _tmQ.tags = _tmQ.topic ? [_tmQ.topic] : [];
+    if(_tmRenderFn) _tmRenderFn();
+    Store.save(_tmS);
+    window.closeTagModal();
+    toast('บันทึกเนื้อหาแล้ว');
+  };
+
+  function getSubjTopics(){
+    if(!_tmSubj||!_tmS) return [];
+    return Array.isArray(_tmS.subjectTopics[_tmSubj])?_tmS.subjectTopics[_tmSubj]:[];
+  }
+
+  function renderTagPalette(){
+    const el=document.getElementById('tagModalPalette');
+    if(!el) return;
+    const topics=getSubjTopics();
+    const current=_tmQ.topic||'';
+    if(topics.length===0){
+      el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0;">ยังไม่มีเนื้อหาในวิชานี้ — เพิ่มด้านล่างได้เลย</div>';
+      return;
+    }
+    el.innerHTML=topics.map(t=>{
+      const sel=current===t;
+      const safe=encodeURIComponent(t);
+      return `<button type="button" onclick="window._selectTag(decodeURIComponent('${safe}'))"
+        style="padding:7px 16px;border-radius:99px;border:2px solid ${sel?'#16a34a':'#e5e7eb'};
+        background:${sel?'#dcfce7':'#f9fafb'};color:${sel?'#15803d':'#374151'};
+        font-weight:700;font-size:13px;cursor:pointer;transition:all .12s;">
+        ${sel?'<b>✓</b> ':''}${esc(t)}
+      </button>`;
+    }).join('');
+  }
+
+  window._selectTag = function(t){
+    if(!_tmQ) return;
+    _tmQ.topic=(_tmQ.topic===t)?'':t;
+    _tmQ.tags=_tmQ.topic?[_tmQ.topic]:[];
+    renderTagPalette();
+  };
+
+  function addTagFromModal(){
+    if(!_tmS||!_tmSubj) return;
+    const inp=document.getElementById('tagModalNewInput');
+    const v=(inp?.value||'').trim(); if(!v) return;
+    if(!_tmS.subjectTopics[_tmSubj]) _tmS.subjectTopics[_tmSubj]=[];
+    const newTopics=v.split(/[,،،、]/).map(x=>x.trim()).filter(Boolean);
+    newTopics.forEach(t=>{
+      if(!_tmS.subjectTopics[_tmSubj].includes(t)) _tmS.subjectTopics[_tmSubj].push(t);
+    });
+    // select ตัวล่าสุดที่เพิ่ม
+    if(newTopics.length>0){
+      _tmQ.topic=newTopics[newTopics.length-1];
+      _tmQ.tags=[_tmQ.topic];
+    }
+    inp.value='';
+    Store.save(_tmS);
+    renderTagPalette();
+  }
+
+  // ปิด modal เมื่อคลิก backdrop
+  document.addEventListener('click', e=>{
+    if(e.target.id==='tagModal') window.closeTagModal();
+  });
+})();
 
 // ===================== STATS PAGE =====================
 function initStats(){
@@ -3174,60 +3290,180 @@ function initStats(){
     renderSummaryCards(timeFiltered);
 
     // ── progress bar แยกวิชา ──
+    // ── Subject + Tag Dashboard ──
     const subjAvgEl = document.getElementById('statsSubjAvg');
     if(subjAvgEl){
       const subjMap={};
       timeFiltered.forEach(a=>{
         const subj=a.examSubject||'ไม่ระบุ';
-        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0};
+        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0,tagMap:{}};
         if(a.total){ subjMap[subj].sum+=(a.score||0); subjMap[subj].total+=a.total; subjMap[subj].cnt++; }
+        (a.perQuestion||[]).forEach(p=>{
+          const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
+          _pt.forEach(t=>{
+            if(!subjMap[subj].tagMap[t]) subjMap[subj].tagMap[t]={right:0,total:0};
+            subjMap[subj].tagMap[t].total++;
+            if(p.isCorrect) subjMap[subj].tagMap[t].right++;
+          });
+        });
       });
       const entries=Object.entries(subjMap).sort((a,b)=>a[0].localeCompare(b[0],'th'));
-      if(entries.length){
-        const bars=entries.map(([subj,v])=>{
+      if(!entries.length){ subjAvgEl.innerHTML=''; }
+      else {
+        let html='';
+        entries.forEach(([subj,v],si)=>{
           const avg=v.total?Math.round(v.sum/v.total*100):0;
           const c=scoreColor(avg);
-          // topic breakdown
-          const topicMap={};
-          timeFiltered.filter(a=>(a.examSubject||'ไม่ระบุ')===subj).forEach(a=>{
-            (a.perQuestion||[]).forEach(p=>{
-              const t=p.topic||'ไม่ระบุ';
-              if(!topicMap[t]) topicMap[t]={right:0,total:0};
-              topicMap[t].total++;
-              if(p.isCorrect) topicMap[t].right++;
+          const tagEntries=Object.entries(v.tagMap).filter(([,tv])=>tv.total>0);
+          const tagsSorted=[...tagEntries].sort((a,b)=>{
+            const pa=Math.round(a[1].right/a[1].total*100), pb=Math.round(b[1].right/b[1].total*100);
+            return pa-pb; // อ่อนสุดขึ้นก่อน
+          });
+          // ── Radar Chart ──
+          const radarId='radarChart_'+si;
+          // ── Topic Performance List ──
+          const perfRows=tagsSorted.map(([t,tv])=>{
+            const pct=Math.round(tv.right/tv.total*100);
+            const bc=pct>=80?'#16a34a':pct>=50?'#f59e0b':'#ef4444';
+            const bg=pct>=80?'#f0fdf4':pct>=50?'#fffbeb':'#fef2f2';
+            const label=pct>=80?'ผ่าน':pct>=50?'ควรฝึกเพิ่ม':'วิกฤต';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">
+              <div style="flex:1;font-size:13px;font-weight:700;color:#374151;">${esc(t)}</div>
+              <div style="flex:2;height:8px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:${bc};border-radius:99px;transition:width .5s;"></div>
+              </div>
+              <div style="min-width:38px;text-align:right;font-size:13px;font-weight:800;color:${bc};">${pct}%</div>
+              <div style="min-width:36px;text-align:right;font-size:10px;color:#9ca3af;">${tv.total}ข้อ</div>
+              <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bg};color:${bc};border:1px solid ${bc}33;white-space:nowrap;">${label}</span>
+            </div>`;
+          }).join('');
+          html+=`<div class="card" style="padding:16px;margin-bottom:12px;">
+            <div style="font-weight:900;font-size:14px;margin-bottom:12px;color:#111;">${esc(subj)}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+              <div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                  <div style="flex:1;height:10px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
+                    <div style="height:100%;width:${avg}%;background:${c};border-radius:99px;"></div>
+                  </div>
+                  <div style="font-size:15px;font-weight:900;color:${c};">${avg}%</div>
+                  <div style="font-size:11px;color:#9ca3af;">${v.cnt}ครั้ง</div>
+                </div>
+                ${tagsSorted.length?`<div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">เรียงจากอ่อนสุด</div>${perfRows}`:'<div class="muted" style="font-size:12px;">ยังไม่มีข้อมูล tags<br>เพิ่ม tags ใน Editor ก่อนนะครับ</div>'}
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;">
+                <canvas id="${radarId}" style="max-width:180px;max-height:180px;"></canvas>
+                ${!tagsSorted.length?'<div class="muted" style="font-size:11px;text-align:center;">Radar chart จะแสดงเมื่อมี tags</div>':''}
+              </div>
+            </div>
+          </div>`;
+        });
+        subjAvgEl.innerHTML=html;
+        // ── วาด Radar Charts ──
+        if(typeof Chart!=='undefined'){
+          entries.forEach(([subj,v],si)=>{
+            const tagEntries=Object.entries(v.tagMap).filter(([,tv])=>tv.total>0);
+            if(tagEntries.length<3) return;
+            const canvas=document.getElementById('radarChart_'+si);
+            if(!canvas) return;
+            const labels=tagEntries.map(([t])=>t);
+            const data=tagEntries.map(([,tv])=>Math.round(tv.right/tv.total*100));
+            if(canvas._chartInst) canvas._chartInst.destroy();
+            canvas._chartInst=new Chart(canvas,{
+              type:'radar',
+              data:{
+                labels,
+                datasets:[{
+                  label:'% ความถูกต้อง',
+                  data,
+                  backgroundColor:'rgba(99,102,241,.15)',
+                  borderColor:'#6366f1',
+                  pointBackgroundColor:'#6366f1',
+                  pointRadius:4,
+                  borderWidth:2
+                }]
+              },
+              options:{
+                responsive:true,
+                plugins:{legend:{display:false}},
+                scales:{r:{
+                  min:0,max:100,
+                  ticks:{stepSize:25,font:{size:9}},
+                  pointLabels:{font:{size:10,weight:'bold'}},
+                  grid:{color:'#e5e7eb'},
+                  angleLines:{color:'#e5e7eb'}
+                }}
+              }
             });
           });
-          const topicEntries=Object.entries(topicMap).filter(([,v])=>v.total>0).sort((a,b)=>a[0].localeCompare(b[0],'th'));
-          const topicBars=topicEntries.length?topicEntries.map(([t,tv])=>{
-            const tpct=Math.round(tv.right/tv.total*100);
-            const tc=scoreColor(tpct);
-            return `<div style="display:flex;align-items:center;gap:8px;margin-top:4px;padding-left:12px;">
-              <div style="min-width:90px;font-size:11px;color:#6b7280;">└ ${esc(t)}</div>
-              <div style="flex:1;height:7px;background:#f3f4f6;border-radius:99px;overflow:hidden;"><div style="height:100%;width:${tpct}%;background:${tc};border-radius:99px;"></div></div>
-              <div style="min-width:36px;text-align:right;font-size:11px;font-weight:700;color:${tc};">${tpct}%</div>
-              <div style="min-width:36px;text-align:right;font-size:10px;color:#9ca3af;">${tv.total}ข้อ</div>
+        }
+      }
+    }
+    // Parental Advice removed
+
+    // ── Radar Chart + Weakness TOP3 per วิชา ──
+    const radarEl=document.getElementById('statsRadarWrap');
+    if(radarEl && timeFiltered.length>0){
+      // คำนวณ mastery per topic จาก perQuestion
+      const topicStats={}; // {subj: {topic: {right, total}}}
+      timeFiltered.forEach(a=>{
+        const subj=a.examSubject||'ไม่ระบุ';
+        if(!topicStats[subj]) topicStats[subj]={};
+        (a.perQuestion||[]).forEach(p=>{
+          const t=p.topic||'ไม่ระบุ';
+          if(!topicStats[subj][t]) topicStats[subj][t]={right:0,total:0};
+          topicStats[subj][t].total++;
+          if(p.isCorrect) topicStats[subj][t].right++;
+        });
+      });
+      const subjects=Object.keys(topicStats).filter(subj=>Object.values(topicStats[subj]).some(v=>v.total>0));
+      if(subjects.length===0){ radarEl.innerHTML=''; }
+      else {
+        radarEl.innerHTML=subjects.map(subj=>{
+          const tMap=topicStats[subj];
+          const entries=Object.entries(tMap).filter(([,v])=>v.total>0).sort((a,b)=>a[0].localeCompare(b[0],'th'));
+          if(entries.length<2) return '';
+          const masteries=entries.map(([t,v])=>({t,pct:Math.round(v.right/v.total*100),right:v.right,total:v.total}));
+          // weakness TOP3
+          const weak=[...masteries].sort((a,b)=>a.pct-b.pct).slice(0,3);
+          const weakHTML=weak.map((w,i)=>{
+            const c=w.pct<50?'#dc2626':w.pct<80?'#f97316':'#16a34a';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;">
+              <div style="width:20px;height:20px;border-radius:99px;background:${c};color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;">${i+1}</div>
+              <div style="flex:1;font-size:13px;font-weight:700;">${esc(w.t)}</div>
+              <div style="font-size:13px;font-weight:900;color:${c};">${w.pct}%</div>
+              <div style="font-size:11px;color:#9ca3af;">${w.right}/${w.total}</div>
             </div>`;
-          }).join(''):'';
-          return `<div style="margin-bottom:${topicEntries.length?'4px':'8px'};">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="min-width:80px;font-size:13px;font-weight:700;color:#374151;">${esc(subj)}</div>
-              <div style="flex:1;height:10px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
-                <div style="height:100%;width:${avg}%;background:${c};border-radius:99px;transition:width .4s;"></div>
+          }).join('');
+          // Radar SVG
+          const N=entries.length; const R=80; const cx=100; const cy=100;
+          function ptX(i,r){return cx+r*Math.sin(2*Math.PI*i/N);}
+          function ptY(i,r){return cy-r*Math.cos(2*Math.PI*i/N);}
+          const gridPts=[25,50,75,100].map(pct=>`<polygon points="${Array.from({length:N},(_,i)=>`${ptX(i,R*pct/100)},${ptY(i,R*pct/100)}`).join(' ')}" fill="none" stroke="#e5e7eb" stroke-width="1"/>`).join('');
+          const axes=Array.from({length:N},(_,i)=>`<line x1="${cx}" y1="${cy}" x2="${ptX(i,R)}" y2="${ptY(i,R)}" stroke="#e5e7eb" stroke-width="1"/>`).join('');
+          const dataPts=masteries.map(({pct},i)=>`${ptX(i,R*pct/100)},${ptY(i,R*pct/100)}`).join(' ');
+          const labels=masteries.map(({t,pct},i)=>{
+            const lx=ptX(i,R+20); const ly=ptY(i,R+20);
+            const c=pct<50?'#dc2626':pct<80?'#f97316':'#16a34a';
+            return `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="700" fill="${c}">${esc(t)}</text>`;
+          }).join('');
+          return `<div class="card" style="padding:16px;margin-top:12px;">
+            <div style="font-weight:900;font-size:14px;margin-bottom:12px;">🕸️ ${esc(subj)} — วิเคราะห์จุดอ่อน</div>
+            <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start;">
+              <svg viewBox="0 0 200 200" width="200" height="200">
+                ${gridPts}${axes}
+                <polygon points="${dataPts}" fill="rgba(99,102,241,.15)" stroke="#6366f1" stroke-width="2"/>
+                ${masteries.map(({pct},i)=>`<circle cx="${ptX(i,R*pct/100)}" cy="${ptY(i,R*pct/100)}" r="4" fill="${pct<50?'#dc2626':pct<80?'#f97316':'#16a34a'}"/>`).join('')}
+                ${labels}
+              </svg>
+              <div>
+                <div style="font-weight:800;font-size:13px;margin-bottom:8px;color:#374151;">⚠️ จุดอ่อน TOP 3</div>
+                ${weakHTML}
               </div>
-              <div style="min-width:44px;text-align:right;font-size:13px;font-weight:800;color:${c};">${avg}%</div>
-              <div style="min-width:40px;text-align:right;font-size:11px;color:#9ca3af;">${v.cnt} ครั้ง</div>
             </div>
-            ${topicBars}
           </div>`;
         }).join('');
-        subjAvgEl.innerHTML=`<div class="card" style="padding:14px 16px;">
-          <div style="font-weight:800;font-size:13px;margin-bottom:12px;color:#374151;">📚 คะแนนเฉลี่ยแยกวิชา</div>
-          ${bars}
-        </div>`;
-      } else { subjAvgEl.innerHTML=''; }
+      }
     }
-
-    // Parental Advice removed
 
     // ── attempt cards ──
     const rowsEl=document.getElementById('statsRows');
@@ -3911,9 +4147,9 @@ function initEditor(examId){
     list.forEach((q,idx)=>{
       const tr=document.createElement('tr');
       tr.addEventListener('click',()=>select(idx));
-      const _subjTopics=getTopicsForSubject(exam.subject||'');
-      const _topicOpts='<option value="">—</option>'+_subjTopics.map(t=>`<option value="${t}"${q.topic===t?' selected':''}>${t}</option>`).join('');
-      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td><td><select data-field="topic" style="padding:3px 6px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;max-width:120px;">${_topicOpts}</select></td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td>`;
+      const _qTags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
+      const _tagPreview=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'<span style="font-size:11px;color:#9ca3af;">—</span>';
+      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
       const correctVal = q.correct||'A';
       tr.querySelectorAll('.correctBtn').forEach(btn=>{
         if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
@@ -3942,8 +4178,8 @@ function initEditor(examId){
           if(el) el.value=newPage;
         }
       });
-      const topicSel=tr.querySelector('select[data-field="topic"]');
-      if(topicSel){ topicSel.addEventListener('click',e=>e.stopPropagation()); topicSel.addEventListener('change',()=>{q.topic=topicSel.value||'';}); }
+      const tagsBtn=tr.querySelector('button[data-field="tags"]');
+      if(tagsBtn){ tagsBtn.addEventListener('click',e=>{ e.stopPropagation(); window.openTagModal(q, idx, exam.subject||'', s, renderTable); }); }
       const freeBtn = tr.querySelector('.freeBtn');
       refs[`${idx}:free`]=freeBtn;
       freeBtn.addEventListener('focus',()=>select(idx));
