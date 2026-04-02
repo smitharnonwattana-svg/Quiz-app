@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v44.1 -->
+  <!-- APP_VERSION: v44.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.1</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.2</div>
     </div>
   </div>
 </div>
@@ -3180,14 +3180,14 @@ function initStats(){
     const avgSec=Math.round(attempts.reduce((s,a)=>s+(a.usedSeconds||0),0)/total);
     const cards=[
       {label:'ทำทั้งหมด',value:total+' ครั้ง',sub:'ทุกชุดรวมกัน',accent:false},
-      {label:'คะแนนเฉลี่ย',value:avgPct+'%',sub:`${attempts.reduce((s,a)=>s+(a.score||0),0)} / ${attempts.reduce((s,a)=>s+(a.total||0),0)} คะแนน`,accent:true},
+      {label:'คะแนนเฉลี่ย',value:avgPct+'%',sub:`${attempts.reduce((s,a)=>s+(a.score||0),0)} / ${attempts.reduce((s,a)=>s+(a.total||0),0)} คะแนน`,accent:false,color:scoreColor(avgPct)},
       {label:'ทำดีที่สุด',value:best?(Math.round((best.score/best.total)*100))+'%':'—',sub:best?esc(best.examTitle||'—'):'',accent:false},
       {label:'เวลาเฉลี่ย',value:formatDuration(avgSec),sub:'ต่อครั้ง',accent:false},
     ];
     el.innerHTML=cards.map(c=>`
-      <div class="stat-card${c.accent?' accent':''}">
+      <div class="stat-card" style="${c.color?`border-top:3px solid ${c.color};`:''}">
         <div class="sc-label">${c.label}</div>
-        <div class="sc-value">${c.value}</div>
+        <div class="sc-value" style="${c.color?`color:${c.color};`:''}">${c.value}</div>
         <div class="sc-sub">${c.sub}</div>
       </div>`).join('');
   }
@@ -3313,6 +3313,26 @@ function initStats(){
   function render(){
     const s=Store.load();
     rebuildSubjectOptions(s);rebuildFilterOptions(s);
+
+    // ── Backfill tags จาก questions ปัจจุบัน → attempts เก่าที่ยังไม่มี tags ──
+    let backfilled=false;
+    (s.attempts||[]).forEach(a=>{
+      if(!Array.isArray(a.perQuestion)||!a.perQuestion.length) return;
+      const qs=s.questions[a.examId]||[];
+      if(!qs.length) return;
+      let changed=false;
+      a.perQuestion.forEach(p=>{
+        // ถ้า perQuestion ยังไม่มี tags ให้หาจาก question ปัจจุบัน
+        if(Array.isArray(p.tags)&&p.tags.length) return;
+        const q=qs.find(x=>(x.no||x.number)===p.no);
+        if(!q) return;
+        const qtags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
+        if(qtags.length){ p.tags=[...qtags]; p.topic=qtags[0]||''; changed=true; }
+      });
+      if(changed) backfilled=true;
+    });
+    if(backfilled) Store.save(s); // save backfilled data กลับขึ้น cloud
+
     const allAttempts=(s.attempts||[]).slice().sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
     const timeFiltered=filterByTime(allAttempts);
     const bySubject=currentSubjectFilter==='all'?timeFiltered:timeFiltered.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
