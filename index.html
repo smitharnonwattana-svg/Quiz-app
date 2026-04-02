@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v44.3 -->
+  <!-- APP_VERSION: v44.4 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.3</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.4</div>
     </div>
   </div>
 </div>
@@ -3089,13 +3089,16 @@ function initStats(){
   function filterByTime(attempts){
     if(currentTimeFilter==='all') return attempts;
     const now=Date.now();
-    const today=new Date(); const dow=today.getDay();
+    const today=new Date();
+    // สัปดาห์นี้: จันทร์ของสัปดาห์ปัจจุบัน
+    const dow=today.getDay();
     const weekStart=new Date(today); weekStart.setDate(today.getDate()-(dow===0?6:dow-1)); weekStart.setHours(0,0,0,0);
-    const monthStart=new Date(today.getFullYear(),today.getMonth(),1).getTime();
-    const cutoff=currentTimeFilter==='week'?weekStart.getTime():monthStart;
+    // เดือนนี้: วันที่ 1 ของเดือนปัจจุบัน
+    const monthStart=new Date(today.getFullYear(),today.getMonth(),1,0,0,0,0);
+    const cutoff=currentTimeFilter==='week'?weekStart.getTime():monthStart.getTime();
     return attempts.filter(a=>{
       const t=a.startedAt?new Date(a.startedAt).getTime():0;
-      return t>=cutoff;
+      return t>0 && t>=cutoff;
     });
   }
   window.statsSetTime=(t)=>{ currentTimeFilter=t; setTimePills(t); render(); };
@@ -3187,7 +3190,7 @@ function initStats(){
     el.innerHTML=cards.map(c=>`
       <div class="stat-card" style="${c.color?`border-top:3px solid ${c.color};`:''}">
         <div class="sc-label">${c.label}</div>
-        <div class="sc-value" style="${c.color?`color:${c.color};`:''}">${c.value}</div>
+        <div class="sc-value">${c.value}</div>
         <div class="sc-sub">${c.sub}</div>
       </div>`).join('');
   }
