@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v44.0 -->
+  <!-- APP_VERSION: v44.1 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.0</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.1</div>
     </div>
   </div>
 </div>
@@ -957,17 +957,23 @@
       <div style="font-weight:900;font-size:16px;">🏷️ เลือกเนื้อหา <span id="tagModalQNo" style="color:#6b7280;font-size:13px;font-weight:600;"></span></div>
       <button onclick="window.closeTagModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;">×</button>
     </div>
+    <!-- chip palette: เลือก tag -->
     <div id="tagModalPalette" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;"></div>
-    <div style="border-top:1px solid #e5e7eb;padding-top:12px;">
-      <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">เพิ่มเนื้อหาใหม่ให้วิชานี้:</div>
+    <!-- edit mode: จัดการ topics ของวิชา -->
+    <div id="tagModalEditWrap" style="display:none;border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#f9fafb;">
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">✏️ จัดการเนื้อหาวิชา</div>
+      <div id="tagModalEditList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:24px;"></div>
       <div style="display:flex;gap:8px;">
-        <input id="tagModalNewInput" style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:13px;" placeholder="ชื่อเนื้อหา แล้วกด Enter" />
+        <input id="tagModalNewInput" style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:13px;" placeholder="ชื่อเนื้อหาใหม่ แล้วกด Enter" />
         <button id="tagModalAddBtn" class="btn">+ เพิ่ม</button>
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button onclick="window.closeTagModal()" class="btn">ปิด</button>
-      <button onclick="window.saveTagModal()" class="btn btnPrimary">บันทึก</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <button onclick="window.toggleTagEdit()" class="btn" id="tagModalEditBtn" style="font-size:12px;">✏️ แก้ไขเนื้อหา</button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="window.closeTagModal()" class="btn">ปิด</button>
+        <button onclick="window.saveTagModal()" class="btn btnPrimary">บันทึก</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1015,17 +1021,6 @@
                 <button class="btn" id="editorSubjectBtn" type="button">ยืนยันวิชา</button>
               </div>
               <div class="muted" style="font-size:12px;">ใช้สำหรับจัดกลุ่ม/กรองรายวิชา</div>
-            </div>
-          </div>
-          <!-- Subject Topics -->
-          <div class="ctrls" style="gap:14px;flex-wrap:wrap;align-items:flex-start;margin-top:8px;">
-            <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:260px;">
-              <div style="font-size:13px;font-weight:800;">📚 เนื้อหาวิชา <span id="editorTopicsSubjLabel" style="font-weight:400;color:#9ca3af;font-size:12px;"></span></div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input id="editorTopicInput" class="titleInput" type="text" placeholder="เช่น เศษส่วน, เซลล์" style="min-width:150px;" />
-                <button class="btn" id="editorTopicAddBtn" type="button">+ เพิ่ม</button>
-              </div>
-              <div id="editorTopicTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:24px;"></div>
             </div>
           </div>
           <!-- PDF Change Section -->
@@ -3020,6 +3015,43 @@ function initReview(attemptId){
     renderTagPalette();
   }
 
+  // ── Edit mode: จัดการ topics ──
+  let _tagEditMode=false;
+
+  function renderTagEditList(){
+    const el=document.getElementById('tagModalEditList');
+    if(!el) return;
+    const topics=getSubjTopics();
+    el.innerHTML=topics.length
+      ? topics.map((t,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:99px;font-size:12px;font-weight:700;color:#b91c1c;">${esc(t)}<button type="button" onclick="window._deleteSubjTopic(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:14px;line-height:1;padding:0 2px;">×</button></span>`).join('')
+      : '<span style="color:#9ca3af;font-size:12px;">ยังไม่มีเนื้อหา</span>';
+  }
+
+  window._deleteSubjTopic=function(i){
+    if(!_tmS||!_tmSubj) return;
+    if(!_tmS.subjectTopics[_tmSubj]) return;
+    const t=_tmS.subjectTopics[_tmSubj][i];
+    _tmS.subjectTopics[_tmSubj].splice(i,1);
+    // ถ้า tag ที่ลบอยู่ใน _tmQ ให้เอาออกด้วย
+    if(_tmQ&&Array.isArray(_tmQ.tags)){
+      const qi=_tmQ.tags.indexOf(t);
+      if(qi>=0) _tmQ.tags.splice(qi,1);
+      _tmQ.topic=_tmQ.tags[0]||'';
+    }
+    Store.save(_tmS);
+    renderTagEditList();
+    renderTagPalette();
+  };
+
+  window.toggleTagEdit=function(){
+    _tagEditMode=!_tagEditMode;
+    const wrap=document.getElementById('tagModalEditWrap');
+    const btn=document.getElementById('tagModalEditBtn');
+    if(wrap) wrap.style.display=_tagEditMode?'block':'none';
+    if(btn) btn.textContent=_tagEditMode?'✅ เสร็จแล้ว':'✏️ แก้ไขเนื้อหา';
+    if(_tagEditMode) renderTagEditList();
+  };
+
   // ปิด modal เมื่อคลิก backdrop
   document.addEventListener('click', e=>{
     if(e.target.id==='tagModal') window.closeTagModal();
@@ -3297,7 +3329,7 @@ function initStats(){
       timeFiltered.forEach(a=>{
         const subj=a.examSubject||'ไม่ระบุ';
         if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0,tagMap:{}};
-        if(a.total){ subjMap[subj].sum+=(a.score||0); subjMap[subj].total+=a.total; subjMap[subj].cnt++; }
+        subjMap[subj].sum+=(a.score||0); subjMap[subj].total+=(a.total||0); subjMap[subj].cnt++;
         (a.perQuestion||[]).forEach(p=>{
           const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
           _pt.forEach(t=>{
@@ -3308,7 +3340,7 @@ function initStats(){
         });
       });
       const entries=Object.entries(subjMap).sort((a,b)=>a[0].localeCompare(b[0],'th'));
-      if(!entries.length){ subjAvgEl.innerHTML=''; }
+      if(!entries.length){ subjAvgEl.innerHTML='<div class="muted" style="padding:12px;font-size:13px;">ยังไม่มีข้อมูลในช่วงเวลานี้</div>'; }
       else {
         let html='';
         entries.forEach(([subj,v],si)=>{
@@ -3983,42 +4015,10 @@ function initEditor(examId){
   const subjectBtn=document.getElementById('editorSubjectBtn');
   const KNOWN_SUBJS=['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ', 'สังคมศึกษา'];
 
-  // ── Subject Topics (ผูกกับวิชา ไม่ใช่ชุด) ──
+  // ── Subject Topics helpers (ใช้โดย Tag Modal) ──
   if(!s.subjectTopics) s.subjectTopics={};
   function getTopicsForSubject(subj){ return Array.isArray(s.subjectTopics[subj]) ? s.subjectTopics[subj] : []; }
   function saveTopics(subj, topics){ s.subjectTopics[subj]=[...topics]; Store.save(s); }
-
-  function renderEditorTopicTags(){
-    const subj=exam.subject||'';
-    const topics=getTopicsForSubject(subj);
-    const labelEl=document.getElementById('editorTopicsSubjLabel');
-    const tagsEl=document.getElementById('editorTopicTags');
-    if(labelEl) labelEl.textContent=subj?`(วิชา: ${subj})`:'(เลือกวิชาก่อน)';
-    if(!tagsEl) return;
-    tagsEl.innerHTML=topics.map((t,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:99px;font-size:12px;font-weight:700;color:#1d4ed8;">${esc(t)}<button type="button" onclick="window._removeSubjTopic('${subj}',${i})" style="background:none;border:none;cursor:pointer;color:#93c5fd;font-size:14px;line-height:1;padding:0 2px;">×</button></span>`).join('')||'<span class="muted" style="font-size:12px;">ยังไม่มีเนื้อหา — เพิ่มได้เลย</span>';
-  }
-  window._removeSubjTopic=(subj,i)=>{
-    const topics=getTopicsForSubject(subj);
-    topics.splice(i,1); saveTopics(subj,topics);
-    renderEditorTopicTags(); renderTable(); toast('ลบหัวข้อแล้ว');
-  };
-  const _edTopicAddBtn=document.getElementById('editorTopicAddBtn');
-  const _edTopicInput=document.getElementById('editorTopicInput');
-  if(_edTopicAddBtn&&_edTopicInput){
-    function addEdTopic(){
-      const subj=exam.subject||'';
-      if(!subj) return toast('กรุณาเลือกวิชาก่อน');
-      const v=_edTopicInput.value.trim(); if(!v) return;
-      const topics=getTopicsForSubject(subj);
-      v.split(/[,،،]/).map(x=>x.trim()).filter(Boolean).forEach(t=>{ if(!topics.includes(t)) topics.push(t); });
-      _edTopicInput.value='';
-      saveTopics(subj,topics);
-      renderEditorTopicTags(); renderTable(); toast('เพิ่มเนื้อหาแล้ว');
-    }
-    _edTopicAddBtn.onclick=addEdTopic;
-    _edTopicInput.onkeydown=(e)=>{ if(e.key==='Enter'){e.preventDefault();addEdTopic();} };
-  }
-  renderEditorTopicTags();
 
 
 
