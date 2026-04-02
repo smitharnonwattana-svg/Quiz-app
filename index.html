@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v44.2 -->
+  <!-- APP_VERSION: v44.3 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.3</div>
     </div>
   </div>
 </div>
@@ -3341,9 +3341,10 @@ function initStats(){
     // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น)
     renderSummaryCards(timeFiltered);
 
-    // ── progress bar แยกวิชา ──
-    // ── Subject + Tag Dashboard ──
+    // ── Subject + Tag Dashboard (unified) ──
     const subjAvgEl = document.getElementById('statsSubjAvg');
+    const radarEl = document.getElementById('statsRadarWrap');
+    if(radarEl) radarEl.innerHTML=''; // clear old radar section
     if(subjAvgEl){
       const subjMap={};
       timeFiltered.forEach(a=>{
@@ -3363,159 +3364,58 @@ function initStats(){
       if(!entries.length){ subjAvgEl.innerHTML='<div class="muted" style="padding:12px;font-size:13px;">ยังไม่มีข้อมูลในช่วงเวลานี้</div>'; }
       else {
         let html='';
-        entries.forEach(([subj,v],si)=>{
+        entries.forEach(([subj,v])=>{
           const avg=v.total?Math.round(v.sum/v.total*100):0;
           const c=scoreColor(avg);
-          const tagEntries=Object.entries(v.tagMap).filter(([,tv])=>tv.total>0);
-          const tagsSorted=[...tagEntries].sort((a,b)=>{
-            const pa=Math.round(a[1].right/a[1].total*100), pb=Math.round(b[1].right/b[1].total*100);
-            return pa-pb; // อ่อนสุดขึ้นก่อน
-          });
-          // ── Radar Chart ──
-          const radarId='radarChart_'+si;
-          // ── Topic Performance List ──
-          const perfRows=tagsSorted.map(([t,tv])=>{
+          const tagsSorted=Object.entries(v.tagMap)
+            .filter(([,tv])=>tv.total>0)
+            .sort((a,b)=>Math.round(a[1].right/a[1].total*100)-Math.round(b[1].right/b[1].total*100));
+
+          // TOP 3 จุดอ่อน
+          const top3=tagsSorted.slice(0,3);
+          const top3HTML=top3.length?`
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+              ${top3.map(([t,tv],i)=>{
+                const pct=Math.round(tv.right/tv.total*100);
+                const bc=pct<50?'#dc2626':pct<80?'#f97316':'#16a34a';
+                const nums=['①','②','③'][i];
+                return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;background:${bc}18;color:${bc};border:1px solid ${bc}44;">${nums} ${esc(t)} ${pct}%</span>`;
+              }).join('')}
+            </div>`:'';
+
+          // tag rows ทุก tag
+          const tagRows=tagsSorted.map(([t,tv])=>{
             const pct=Math.round(tv.right/tv.total*100);
             const bc=pct>=80?'#16a34a':pct>=50?'#f59e0b':'#ef4444';
-            const bg=pct>=80?'#f0fdf4':pct>=50?'#fffbeb':'#fef2f2';
-            const label=pct>=80?'ผ่าน':pct>=50?'ควรฝึกเพิ่ม':'วิกฤต';
-            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">
-              <div style="flex:1;font-size:13px;font-weight:700;color:#374151;">${esc(t)}</div>
-              <div style="flex:2;height:8px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
+            const label=pct>=80?'ผ่าน':pct>=50?'ควรฝึก':'วิกฤต';
+            return `<div style="display:grid;grid-template-columns:1fr 2fr 44px 36px 60px;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f9fafb;">
+              <div style="font-size:13px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t)}</div>
+              <div style="height:8px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
                 <div style="height:100%;width:${pct}%;background:${bc};border-radius:99px;transition:width .5s;"></div>
               </div>
-              <div style="min-width:38px;text-align:right;font-size:13px;font-weight:800;color:${bc};">${pct}%</div>
-              <div style="min-width:36px;text-align:right;font-size:10px;color:#9ca3af;">${tv.total}ข้อ</div>
-              <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bg};color:${bc};border:1px solid ${bc}33;white-space:nowrap;">${label}</span>
+              <div style="text-align:right;font-size:13px;font-weight:900;color:${bc};">${pct}%</div>
+              <div style="text-align:right;font-size:10px;color:#9ca3af;">${tv.right}/${tv.total}</div>
+              <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;text-align:center;white-space:nowrap;">${label}</span>
             </div>`;
           }).join('');
+
           html+=`<div class="card" style="padding:16px;margin-bottom:12px;">
-            <div style="font-weight:900;font-size:14px;margin-bottom:12px;color:#111;">${esc(subj)}</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
-              <div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                  <div style="flex:1;height:10px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
-                    <div style="height:100%;width:${avg}%;background:${c};border-radius:99px;"></div>
-                  </div>
-                  <div style="font-size:15px;font-weight:900;color:${c};">${avg}%</div>
-                  <div style="font-size:11px;color:#9ca3af;">${v.cnt}ครั้ง</div>
-                </div>
-                ${tagsSorted.length?`<div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">เรียงจากอ่อนสุด</div>${perfRows}`:'<div class="muted" style="font-size:12px;">ยังไม่มีข้อมูล tags<br>เพิ่ม tags ใน Editor ก่อนนะครับ</div>'}
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+              <div style="font-weight:900;font-size:15px;color:#111;">${esc(subj)}</div>
+              <div style="flex:1;height:8px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
+                <div style="height:100%;width:${avg}%;background:${c};border-radius:99px;"></div>
               </div>
-              <div style="display:flex;flex-direction:column;align-items:center;">
-                <canvas id="${radarId}" style="max-width:180px;max-height:180px;"></canvas>
-                ${!tagsSorted.length?'<div class="muted" style="font-size:11px;text-align:center;">Radar chart จะแสดงเมื่อมี tags</div>':''}
-              </div>
+              <div style="font-size:16px;font-weight:900;color:${c};white-space:nowrap;">${avg}%</div>
+              <div style="font-size:11px;color:#9ca3af;white-space:nowrap;">${v.cnt}ครั้ง</div>
             </div>
+            ${top3HTML}
+            ${tagsSorted.length
+              ? `<div style="border-top:1px solid #f3f4f6;padding-top:4px;">${tagRows}</div>`
+              : '<div class="muted" style="font-size:12px;padding:8px 0;">ยังไม่มีข้อมูล tags — เพิ่ม tags ใน Editor แล้วเปิดหน้านี้ใหม่</div>'
+            }
           </div>`;
         });
         subjAvgEl.innerHTML=html;
-        // ── วาด Radar Charts ──
-        if(typeof Chart!=='undefined'){
-          entries.forEach(([subj,v],si)=>{
-            const tagEntries=Object.entries(v.tagMap).filter(([,tv])=>tv.total>0);
-            if(tagEntries.length<3) return;
-            const canvas=document.getElementById('radarChart_'+si);
-            if(!canvas) return;
-            const labels=tagEntries.map(([t])=>t);
-            const data=tagEntries.map(([,tv])=>Math.round(tv.right/tv.total*100));
-            if(canvas._chartInst) canvas._chartInst.destroy();
-            canvas._chartInst=new Chart(canvas,{
-              type:'radar',
-              data:{
-                labels,
-                datasets:[{
-                  label:'% ความถูกต้อง',
-                  data,
-                  backgroundColor:'rgba(99,102,241,.15)',
-                  borderColor:'#6366f1',
-                  pointBackgroundColor:'#6366f1',
-                  pointRadius:4,
-                  borderWidth:2
-                }]
-              },
-              options:{
-                responsive:true,
-                plugins:{legend:{display:false}},
-                scales:{r:{
-                  min:0,max:100,
-                  ticks:{stepSize:25,font:{size:9}},
-                  pointLabels:{font:{size:10,weight:'bold'}},
-                  grid:{color:'#e5e7eb'},
-                  angleLines:{color:'#e5e7eb'}
-                }}
-              }
-            });
-          });
-        }
-      }
-    }
-    // Parental Advice removed
-
-    // ── Radar Chart + Weakness TOP3 per วิชา ──
-    const radarEl=document.getElementById('statsRadarWrap');
-    if(radarEl && timeFiltered.length>0){
-      // คำนวณ mastery per topic จาก perQuestion
-      const topicStats={}; // {subj: {topic: {right, total}}}
-      timeFiltered.forEach(a=>{
-        const subj=a.examSubject||'ไม่ระบุ';
-        if(!topicStats[subj]) topicStats[subj]={};
-        (a.perQuestion||[]).forEach(p=>{
-          const ptags=Array.isArray(p.tags)&&p.tags.length?p.tags:(p.topic?[p.topic]:[]);
-          ptags.forEach(t=>{
-            if(!topicStats[subj][t]) topicStats[subj][t]={right:0,total:0};
-            topicStats[subj][t].total++;
-            if(p.isCorrect) topicStats[subj][t].right++;
-          });
-        });
-      });
-      const subjects=Object.keys(topicStats).filter(subj=>Object.values(topicStats[subj]).some(v=>v.total>0));
-      if(subjects.length===0){ radarEl.innerHTML=''; }
-      else {
-        radarEl.innerHTML=subjects.map(subj=>{
-          const tMap=topicStats[subj];
-          const entries=Object.entries(tMap).filter(([,v])=>v.total>0).sort((a,b)=>a[0].localeCompare(b[0],'th'));
-          if(entries.length<2) return '';
-          const masteries=entries.map(([t,v])=>({t,pct:Math.round(v.right/v.total*100),right:v.right,total:v.total}));
-          // weakness TOP3
-          const weak=[...masteries].sort((a,b)=>a.pct-b.pct).slice(0,3);
-          const weakHTML=weak.map((w,i)=>{
-            const c=w.pct<50?'#dc2626':w.pct<80?'#f97316':'#16a34a';
-            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;">
-              <div style="width:20px;height:20px;border-radius:99px;background:${c};color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;">${i+1}</div>
-              <div style="flex:1;font-size:13px;font-weight:700;">${esc(w.t)}</div>
-              <div style="font-size:13px;font-weight:900;color:${c};">${w.pct}%</div>
-              <div style="font-size:11px;color:#9ca3af;">${w.right}/${w.total}</div>
-            </div>`;
-          }).join('');
-          // Radar SVG
-          const N=entries.length; const R=80; const cx=100; const cy=100;
-          function ptX(i,r){return cx+r*Math.sin(2*Math.PI*i/N);}
-          function ptY(i,r){return cy-r*Math.cos(2*Math.PI*i/N);}
-          const gridPts=[25,50,75,100].map(pct=>`<polygon points="${Array.from({length:N},(_,i)=>`${ptX(i,R*pct/100)},${ptY(i,R*pct/100)}`).join(' ')}" fill="none" stroke="#e5e7eb" stroke-width="1"/>`).join('');
-          const axes=Array.from({length:N},(_,i)=>`<line x1="${cx}" y1="${cy}" x2="${ptX(i,R)}" y2="${ptY(i,R)}" stroke="#e5e7eb" stroke-width="1"/>`).join('');
-          const dataPts=masteries.map(({pct},i)=>`${ptX(i,R*pct/100)},${ptY(i,R*pct/100)}`).join(' ');
-          const labels=masteries.map(({t,pct},i)=>{
-            const lx=ptX(i,R+20); const ly=ptY(i,R+20);
-            const c=pct<50?'#dc2626':pct<80?'#f97316':'#16a34a';
-            return `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="700" fill="${c}">${esc(t)}</text>`;
-          }).join('');
-          return `<div class="card" style="padding:16px;margin-top:12px;">
-            <div style="font-weight:900;font-size:14px;margin-bottom:12px;">🕸️ ${esc(subj)} — วิเคราะห์จุดอ่อน</div>
-            <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start;">
-              <svg viewBox="0 0 200 200" width="200" height="200">
-                ${gridPts}${axes}
-                <polygon points="${dataPts}" fill="rgba(99,102,241,.15)" stroke="#6366f1" stroke-width="2"/>
-                ${masteries.map(({pct},i)=>`<circle cx="${ptX(i,R*pct/100)}" cy="${ptY(i,R*pct/100)}" r="4" fill="${pct<50?'#dc2626':pct<80?'#f97316':'#16a34a'}"/>`).join('')}
-                ${labels}
-              </svg>
-              <div>
-                <div style="font-weight:800;font-size:13px;margin-bottom:8px;color:#374151;">⚠️ จุดอ่อน TOP 3</div>
-                ${weakHTML}
-              </div>
-            </div>
-          </div>`;
-        }).join('');
       }
     }
 
