@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.5 -->
+  <!-- APP_VERSION: v45.6 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.5</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.6</div>
     </div>
   </div>
 </div>
@@ -3396,7 +3396,7 @@ function initStats(){
               <div style="font-size:28px;font-weight:900;color:${c};line-height:1;">${avg}%</div>
               <div style="font-size:12px;color:#9ca3af;">${v.cnt} ครั้ง</div>
             </div>
-            ${hasTagData?`<button onclick="(function(){const d=document.getElementById('${collapseId}');const btn=document.getElementById('${collapseId}_btn');if(d){const open=d.style.display!=='none';d.style.display=open?'none':'block';btn.textContent=open?'▸ เนื้อหา':'▾ ซ่อน';}})()" id="${collapseId}_btn" style="margin-top:8px;font-size:11px;font-weight:700;color:#6366f1;background:#ede9fe;border:none;border-radius:8px;padding:3px 10px;cursor:pointer;">▸ เนื้อหา</button>`:''}
+            ${hasTagData?`<button onclick="(function(){const d=document.getElementById('${collapseId}');const btn=document.getElementById('${collapseId}_btn');if(!d) return;const open=d.style.display!=='none';document.querySelectorAll('[id^=subj_]:not([id$=_btn])').forEach(function(el){el.style.display='none';});document.querySelectorAll('[id$=_btn]').forEach(function(b){b.textContent='▸ เนื้อหา';});if(!open){d.style.display='block';btn.textContent='▾ ซ่อน';}})()" id="${collapseId}_btn" style="margin-top:8px;font-size:11px;font-weight:700;color:#6366f1;background:#ede9fe;border:none;border-radius:8px;padding:3px 10px;cursor:pointer;">▸ เนื้อหา</button>`:''}
           </div>`;
 
           // tag rows (collapse) — แยกออกมาข้างล่าง
