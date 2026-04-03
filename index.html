@@ -3383,21 +3383,22 @@ function initStats(){
               }).join('')}
             </div>`:'';
 
-          // tag rows ทุก tag
-          const tagRows=tagsSorted.map(([t,tv])=>{
-            const pct=Math.round(tv.right/tv.total*100);
-            const bc=pct>=80?'#16a34a':pct>=50?'#f59e0b':'#ef4444';
-            const label=pct>=80?'ผ่าน':pct>=50?'ควรฝึก':'วิกฤต';
-            return `<div style="display:grid;grid-template-columns:1fr 2fr 44px 36px 60px;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f9fafb;">
-              <div style="font-size:13px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t)}</div>
-              <div style="height:8px;background:#f3f4f6;border-radius:99px;overflow:hidden;">
-                <div style="height:100%;width:${pct}%;background:${bc};border-radius:99px;transition:width .5s;"></div>
-              </div>
-              <div style="text-align:right;font-size:13px;font-weight:900;color:${bc};">${pct}%</div>
-              <div style="text-align:right;font-size:10px;color:#9ca3af;">${tv.right}/${tv.total}</div>
-              <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;text-align:center;white-space:nowrap;">${label}</span>
-            </div>`;
-          }).join('');
+          // tag rows ทุก tag — 2 คอลัมน์ ไม่มี progress bar
+          const tagRows=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:4px;">${
+            tagsSorted.map(([t,tv])=>{
+              const pct=Math.round(tv.right/tv.total*100);
+              const bc=pct>=80?'#16a34a':pct>=50?'#f59e0b':'#ef4444';
+              const label=pct>=80?'ผ่าน':pct>=50?'ควรฝึก':'วิกฤต';
+              return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:10px;background:#f9fafb;border:1px solid #f3f4f6;">
+                <div style="font-size:13px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${esc(t)}</div>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                  <span style="font-size:13px;font-weight:900;color:${bc};">${pct}%</span>
+                  <span style="font-size:11px;color:#9ca3af;">${tv.right}/${tv.total}</span>
+                  <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;white-space:nowrap;">${label}</span>
+                </div>
+              </div>`;
+            }).join('')
+          }</div>`;
 
           const collapseId='subj_'+si;
           const hasTagData=tagsSorted.length>0;
