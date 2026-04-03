@@ -12,9 +12,9 @@ All logic lives in one self-contained HTML file — no build step, no server.
 2. **Update both version locations** in the HTML:
    - `<head>` comment: `<!-- APP_VERSION: v{new_version} -->`
    - Login page display (near bottom of `#page-login`): `>v{new_version}</div>`
-3. **Rename the file** to `index_v{new_version}.html` (e.g. `index_v45.3.html`)
+3. **Save a local versioned copy** named `index_v{new_version}.html` (e.g. `index_v45.3.html`)
    - Keep `index.html` as the main working file (update it in place)
-   - Also save a copy named `index_v{new_version}.html`
+   - Save a local copy named `index_v{new_version}.html` — ไฟล์นี้ถูก .gitignore ไว้ ไม่ push ขึ้น GitHub
 
 ### Version locations in index.html
 - Line ~7: `<!-- APP_VERSION: v45.2 -->`
