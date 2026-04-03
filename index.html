@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.12 -->
+  <!-- APP_VERSION: v45.13 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.12</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.13</div>
     </div>
   </div>
 </div>
@@ -3495,9 +3495,11 @@ function initStats(){
             </div>
           </div>
         </div>
-        <div class="ac-btns" style="margin-top:6px;">
-          <button class="btn" style="padding:6px 12px;font-size:12px;" data-review="${a.id}">📋 ดูเฉลย</button>
-          ${_tagsSorted.length?`<button class="btn" id="${_tagCollapseId}_btn" style="padding:6px 12px;font-size:12px;color:#6366f1;border-color:#a5b4fc;">▸ เนื้อหา</button>`:''}
+        <div class="ac-btns" style="margin-top:6px;justify-content:space-between;">
+          <div style="display:flex;gap:8px;">
+            <button class="btn" style="padding:6px 12px;font-size:12px;" data-review="${a.id}">📋 ดูเฉลย</button>
+            ${_tagsSorted.length?`<button class="btn" id="${_tagCollapseId}_btn" style="padding:6px 12px;font-size:12px;color:#6366f1;border-color:#a5b4fc;">▸ เนื้อหา</button>`:''}
+          </div>
           ${Auth.isTeacher()?`<button class="btn-delete" style="padding:6px 12px;" data-del="${a.id}">ลบ</button>`:''}
         </div>
         ${_tagPanel}`;
