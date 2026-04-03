@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.11 -->
+  <!-- APP_VERSION: v45.12 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.11</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.12</div>
     </div>
   </div>
 </div>
@@ -359,19 +359,15 @@
     <div class="list">
       <div class="linkCard" onclick="navigate('exams')">
         <div style="font-weight:900;">1) ทำข้อสอบ</div>
-        <div class="muted" style="margin-top:6px;">เลือกชุดข้อสอบ → เริ่มทำ (PDF + timer)</div>
       </div>
       <div class="linkCard" onclick="navigate('stats')">
         <div style="font-weight:900;">2) ผลการฝึกซ้อม</div>
-        <div class="muted" style="margin-top:6px;">ดูคะแนน/วันที่ทำ (เก็บใน localStorage)</div>
       </div>
       <div class="linkCard" onclick="navigate('admin')">
         <div style="font-weight:900;">3) Admin</div>
-        <div class="muted" style="margin-top:6px;">สร้าง/แก้ข้อสอบ + preview PDF + โหมดกรอกเร็ว</div>
       </div>
       <div class="linkCard" onclick="navigate('entrance_stats')">
         <div style="font-weight:900;">4) สถิติการสอบเข้า ม.1</div>
-        <div class="muted" style="margin-top:6px;">ข้อมูลคะแนนสวนกุหลาบ GATE/EPLUS · เปรียบเทียบผลสอบ</div>
       </div>
     </div>
     <div class="hr"></div>
@@ -1871,20 +1867,16 @@ function renderHome(){
       <div class="list" style="margin-top:20px;">
         <div class="linkCard" onclick="navigate('exams')">
           <div style="font-weight:900;">📝 ทำข้อสอบ</div>
-          <div class="muted" style="margin-top:6px;">เลือกชุดข้อสอบ → เริ่มทำ (PDF + timer)</div>
         </div>
         <div class="linkCard" onclick="navigate('stats')">
           <div style="font-weight:900;">📊 ผลการฝึกซ้อม</div>
-          <div class="muted" style="margin-top:6px;">ดูคะแนน/วันที่ทำ</div>
         </div>
         <div class="linkCard" onclick="navigate('entrance_stats')">
           <div style="font-weight:900;">🎯 สถิติการสอบเข้า ม.1</div>
-          <div class="muted" style="margin-top:6px;">ข้อมูลคะแนน GATE/EPLUS · เปรียบเทียบผลสอบ</div>
         </div>
         ${isTeacher ? `
         <div class="linkCard" onclick="navigate('admin')">
           <div style="font-weight:900;">⚙️ Admin</div>
-          <div class="muted" style="margin-top:6px;">สร้าง/แก้ข้อสอบ + preview PDF</div>
         </div>` : ''}
       </div>
       <div class="hr"></div>
@@ -3471,6 +3463,24 @@ function initStats(){
       // หา tier ของ attempt นี้
       const _tier = MemeScore.getTierByPct ? MemeScore.getTierByPct(pct) : null;
       const _tierBadge = _tier ? `<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:${_tier.bg};color:${_tier.color};border:1px solid ${_tier.color}22;white-space:nowrap;">${_tier.emoji} ${_tier.title}</span>` : '';
+      // tag breakdown for this attempt
+      const _tagMap={};
+      (a.perQuestion||[]).forEach(p=>{
+        const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
+        _pt.forEach(t=>{
+          if(!_tagMap[t]) _tagMap[t]={right:0,total:0};
+          _tagMap[t].total++;
+          if(p.isCorrect) _tagMap[t].right++;
+        });
+      });
+      const _tagsSorted=Object.entries(_tagMap).filter(([,v])=>v.total>0).sort((a,b)=>Math.round(a[1].right/a[1].total*100)-Math.round(b[1].right/b[1].total*100));
+      const _tagCollapseId='atag_'+idx;
+      const _tagPanel=_tagsSorted.length?`
+        <div id="${_tagCollapseId}" style="display:none;margin-top:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;">
+            ${_tagsSorted.map(([t,tv])=>{const p2=Math.round(tv.right/tv.total*100);const bc=p2>=80?'#16a34a':p2>=50?'#f59e0b':'#ef4444';const lbl=p2>=80?'ผ่าน':p2>=50?'ควรฝึก':'วิกฤต';return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;background:#f9fafb;border:1px solid #f3f4f6;"><div style="font-size:12px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${esc(t)}</div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><span style="font-size:12px;font-weight:900;color:${bc};">${p2}%</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;">${lbl}</span></div></div>`;}).join('')}
+          </div>
+        </div>`:'';
       card.innerHTML=`
         <div class="ac-top">
           <div style="flex:1;min-width:0;">
@@ -3487,14 +3497,24 @@ function initStats(){
         </div>
         <div class="ac-btns" style="margin-top:6px;">
           <button class="btn" style="padding:6px 12px;font-size:12px;" data-review="${a.id}">📋 ดูเฉลย</button>
+          ${_tagsSorted.length?`<button class="btn" id="${_tagCollapseId}_btn" style="padding:6px 12px;font-size:12px;color:#6366f1;border-color:#a5b4fc;">▸ เนื้อหา</button>`:''}
           ${Auth.isTeacher()?`<button class="btn-delete" style="padding:6px 12px;" data-del="${a.id}">ลบ</button>`:''}
-        </div>`;
+        </div>
+        ${_tagPanel}`;
       rowsEl.appendChild(card);
     });
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
-
-
+    attempts.forEach((_,idx)=>{
+      const btn=rowsEl.querySelector(`#atag_${idx}_btn`);
+      const panel=rowsEl.querySelector(`#atag_${idx}`);
+      if(!btn||!panel) return;
+      btn.addEventListener('click',()=>{
+        const open=panel.style.display!=='none';
+        panel.style.display=open?'none':'block';
+        btn.textContent=open?'▸ เนื้อหา':'▾ ซ่อน';
+      });
+    });
   }
 
   document.getElementById('statsBtnExport').onclick=()=>{
