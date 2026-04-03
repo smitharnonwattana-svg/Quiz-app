@@ -3364,7 +3364,7 @@ function initStats(){
       if(!entries.length){ subjAvgEl.innerHTML='<div class="muted" style="padding:12px;font-size:13px;">ยังไม่มีข้อมูลในช่วงเวลานี้</div>'; }
       else {
         let html='';
-        entries.forEach(([subj,v])=>{
+        entries.forEach(([subj,v], si)=>{
           const avg=v.total?Math.round(v.sum/v.total*100):0;
           const c=scoreColor(avg);
           const tagsSorted=Object.entries(v.tagMap)
