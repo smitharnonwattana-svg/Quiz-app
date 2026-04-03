@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.17 -->
+  <!-- APP_VERSION: v45.18 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.17</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.18</div>
     </div>
   </div>
 </div>
@@ -895,6 +895,7 @@
             <option value="ภาษาไทย">ภาษาไทย</option>
             <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
             <option value="สังคมศึกษา">สังคมศึกษา</option>
+            <option value="สอบเข้า ม.1">สอบเข้า ม.1</option>
             <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
         </select>
         <input id="newSubjectOther" style="display:none;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;margin-top:6px;" placeholder="ระบุชื่อวิชา" oninput="document.getElementById('newSubject').value=this.value;window._onNewSubjectChange(this.value)" />
@@ -1032,6 +1033,7 @@
                   <option value="ภาษาไทย">ภาษาไทย</option>
                   <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
                   <option value="สังคมศึกษา">สังคมศึกษา</option>
+                  <option value="สอบเข้า ม.1">สอบเข้า ม.1</option>
                   <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
                 </select>
                 <span id="editorSubjectOtherWrap" style="display:none;align-items:center;gap:6px;">
@@ -4038,7 +4040,7 @@ function initEditor(examId){
   const subjectInput=document.getElementById('editorExamSubject');
   const subjectSelect=document.getElementById('editorExamSubjectSelect');
   const subjectBtn=document.getElementById('editorSubjectBtn');
-  const KNOWN_SUBJS=['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ', 'สังคมศึกษา'];
+  const KNOWN_SUBJS=['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ', 'สังคมศึกษา', 'สอบเข้า ม.1'];
 
   // ── Subject Topics helpers (ใช้โดย Tag Modal) ──
   if(!s.subjectTopics) s.subjectTopics={};
