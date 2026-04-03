@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.14 -->
+  <!-- APP_VERSION: v45.15 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.14</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.15</div>
     </div>
   </div>
 </div>
@@ -1002,7 +1002,7 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1" id="editorTitle">Editor</h1>
-        <div class="muted" id="editorMeta" style="margin-top:6px;"></div>
+        <div id="editorMeta" style="display:none;"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
@@ -1013,7 +1013,7 @@
       <div class="card">
         <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
           <!-- Row 1: ชื่อ / วิชา / จำนวนข้อ -->
-          <div style="display:grid;grid-template-columns:2fr 1.5fr auto;gap:12px;align-items:end;flex-wrap:wrap;">
+          <div style="display:grid;grid-template-columns:2fr 1.5fr auto auto;gap:12px;align-items:end;flex-wrap:wrap;">
             <div style="display:flex;flex-direction:column;gap:4px;">
               <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">ชื่อชุดข้อสอบ</div>
               <div style="display:flex;gap:6px;">
@@ -1046,6 +1046,14 @@
                 <input id="editorQCount" type="number" min="1" max="999" style="width:72px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;" />
                 <button class="btn" id="editorQCountBtn" type="button" title="ยืนยันจำนวนข้อ" style="padding:8px 14px;font-weight:700;">✓</button>
                 <span id="editorQCountStatus" class="muted" style="font-size:12px;"></span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">เวลา (นาที)</div>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input id="editorDurationMin" type="number" min="1" max="999" style="width:72px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;" />
+                <button class="btn" id="editorDurationBtn" type="button" title="ยืนยันเวลา" style="padding:8px 14px;font-weight:700;">✓</button>
+                <span id="editorDurationStatus" class="muted" style="font-size:12px;"></span>
               </div>
             </div>
           </div>
@@ -4024,6 +4032,22 @@ function initEditor(examId){
   }
   subjectBtn.onclick=(e)=>{e.preventDefault();applySubject();};
   if(subjectInput) subjectInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applySubject();}};
+
+  // ── Duration ──
+  const durationInput=document.getElementById('editorDurationMin');
+  const durationBtn=document.getElementById('editorDurationBtn');
+  const durationStatus=document.getElementById('editorDurationStatus');
+  if(durationInput) durationInput.value=Math.round((exam.durationSeconds||0)/60)||60;
+  function applyDuration(){
+    const mins=parseInt(durationInput?.value||'0',10);
+    if(!mins||mins<1){toast('กรุณากรอกเวลาอย่างน้อย 1 นาที');durationInput?.focus?.();return;}
+    exam.durationSeconds=mins*60;Store.save(s);
+    if(durationStatus) durationStatus.textContent='✅';
+    setTimeout(()=>{ if(durationStatus) durationStatus.textContent=''; },2000);
+    toast('บันทึกเวลาแล้ว');
+  }
+  if(durationBtn) durationBtn.onclick=(e)=>{e.preventDefault();applyDuration();};
+  if(durationInput) durationInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applyDuration();}};
 
   // ── PDF Change ──
   const editorPdfUrlEl = document.getElementById('editorPdfUrl');
