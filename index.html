@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.7 -->
+  <!-- APP_VERSION: v45.8 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.7</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.8</div>
     </div>
   </div>
 </div>
@@ -785,37 +785,16 @@
     <div id="adminContent" style="display:none;">
       <div class="list" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="linkCard" onclick="navigate('admin_new')">
-          <div style="font-weight:900;">สร้างชุดข้อสอบใหม่</div>
-          <div class="muted" style="margin-top:6px;">ใส่ชื่อ/เวลา/pdfUrl</div>
+          <div style="font-weight:900;">➕ สร้างชุดข้อสอบใหม่</div>
         </div>
         <div class="linkCard" onclick="navigate('admin_benchmark')">
           <div style="font-weight:900;">📊 จัดการ Benchmark</div>
-          <div class="muted" style="margin-top:6px;">อัปโหลดข้อมูลเปรียบเทียบจากกลุ่ม</div>
+        </div>
+        <div class="linkCard" onclick="navigate('admin_members')">
+          <div style="font-weight:900;">👥 จัดการสมาชิก</div>
         </div>
       </div>
 
-      <!-- Member Management -->
-      <h2 class="h2" style="margin-top:20px;">👥 จัดการสมาชิก</h2>
-      <div class="card" style="margin-top:10px;padding:16px;">
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
-          <div style="display:flex;flex-direction:column;gap:4px;">
-            <div style="font-size:12px;font-weight:700;color:#6b7280;">ชื่อสมาชิก</div>
-            <input id="memberNameInput" class="titleInput" type="text" placeholder="เช่น สมใจ" style="width:160px;" />
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px;">
-            <div style="font-size:12px;font-weight:700;color:#6b7280;">รหัส 6 หลัก</div>
-            <input id="memberPinInput" class="titleInput" type="tel" maxlength="6" placeholder="xxxxxx" style="width:120px;" />
-          </div>
-          <button class="btn btnPrimary" id="memberAddBtn" type="button">+ เพิ่มสมาชิก</button>
-        </div>
-        <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
-        <div class="tableWrap">
-          <table>
-            <thead><tr><th>ชื่อ</th><th style="width:140px;">รหัส</th><th style="width:120px;">แก้ไข</th><th style="width:80px;">ลบ</th></tr></thead>
-            <tbody id="memberTbody"></tbody>
-          </table>
-        </div>
-      </div>
       <h2 class="h2" style="margin-top:16px;">รายการข้อสอบ</h2>
       <div class="card" style="padding:12px;margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <span class="muted">วิชา</span>
@@ -850,6 +829,38 @@
       <div class="mrow">
         <button id="adminDeleteModalCancel" class="btn-ghost">ยกเลิก</button>
         <button id="adminDeleteModalOk" class="btn-danger">🗑️ ลบ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ADMIN MEMBERS ===================== -->
+<div id="page-admin_members" class="page">
+  <div class="container" style="max-width:700px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1">👥 จัดการสมาชิก</h1>
+      </div>
+      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+    </div>
+    <div class="card" style="margin-top:16px;padding:16px;">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="font-size:12px;font-weight:700;color:#6b7280;">ชื่อสมาชิก</div>
+          <input id="memberNameInput" class="titleInput" type="text" placeholder="เช่น สมใจ" style="width:160px;" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="font-size:12px;font-weight:700;color:#6b7280;">รหัส 6 หลัก</div>
+          <input id="memberPinInput" class="titleInput" type="tel" maxlength="6" placeholder="xxxxxx" style="width:120px;" />
+        </div>
+        <button class="btn btnPrimary" id="memberAddBtn" type="button">+ เพิ่มสมาชิก</button>
+      </div>
+      <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
+      <div class="tableWrap">
+        <table>
+          <thead><tr><th>ชื่อ</th><th style="width:140px;">รหัส</th><th style="width:120px;">แก้ไข</th><th style="width:80px;">ลบ</th></tr></thead>
+          <tbody id="memberTbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -2042,6 +2053,7 @@ function navigate(page, params={}){
   else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
   else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
   else if(page==='admin_benchmark'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBenchmark(); }
+  else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
@@ -3681,7 +3693,12 @@ function initAdmin(){
 
   renderAdmin();
 
-  // ── Member Management ──
+}
+
+// ===================== ADMIN MEMBERS PAGE =====================
+function initAdminMembers(){
+  if(!Auth.isTeacher()){navigate('home');return;}
+
   function renderMembers() {
     const s = Store.load();
     const members = s.members || [{pin:'311257',name:'ณนนท์'}];
