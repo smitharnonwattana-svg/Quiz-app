@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v44.6 -->
+  <!-- APP_VERSION: v44.7 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.6</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.7</div>
     </div>
   </div>
 </div>
@@ -727,8 +727,8 @@
 
     <!-- time filter pills -->
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;" id="statsTimePills">
-      <button class="btn" id="statsPillWeek" onclick="window.statsSetTime('week')" style="border-radius:99px;padding:6px 16px;font-size:13px;">สัปดาห์นี้</button>
-      <button class="btn" id="statsPillMonth" onclick="window.statsSetTime('month')" style="border-radius:99px;padding:6px 16px;font-size:13px;">เดือนนี้</button>
+      <button class="btn" id="statsPillWeek" onclick="window.statsSetTime('week')" style="border-radius:99px;padding:6px 16px;font-size:13px;">7 วันล่าสุด</button>
+      <button class="btn" id="statsPillMonth" onclick="window.statsSetTime('month')" style="border-radius:99px;padding:6px 16px;font-size:13px;">30 วันล่าสุด</button>
       <button class="btn" id="statsPillAll" onclick="window.statsSetTime('all')" style="border-radius:99px;padding:6px 16px;font-size:13px;background:#111;color:#fff;border-color:#111;">ทั้งหมด</button>
     </div>
 
@@ -3089,13 +3089,9 @@ function initStats(){
   function filterByTime(attempts){
     if(currentTimeFilter==='all') return attempts;
     const now=Date.now();
-    const today=new Date();
-    // สัปดาห์นี้: จันทร์ของสัปดาห์ปัจจุบัน
-    const dow=today.getDay();
-    const weekStart=new Date(today); weekStart.setDate(today.getDate()-(dow===0?6:dow-1)); weekStart.setHours(0,0,0,0);
-    // เดือนนี้: วันที่ 1 ของเดือนปัจจุบัน
-    const monthStart=new Date(today.getFullYear(),today.getMonth(),1,0,0,0,0);
-    const cutoff=currentTimeFilter==='week'?weekStart.getTime():monthStart.getTime();
+    const now2=Date.now();
+    // 7 วันย้อนหลัง / 30 วันย้อนหลัง
+    const cutoff=currentTimeFilter==='week'?now2-7*86400000:now2-30*86400000;
     return attempts.filter(a=>{
       const t=a.startedAt?new Date(a.startedAt).getTime():0;
       return t>0 && t>=cutoff;
@@ -3325,16 +3321,18 @@ function initStats(){
       if(!qs.length) return;
       let changed=false;
       a.perQuestion.forEach(p=>{
-        // ถ้า perQuestion ยังไม่มี tags ให้หาจาก question ปัจจุบัน
-        if(Array.isArray(p.tags)&&p.tags.length) return;
-        const q=qs.find(x=>(x.no||x.number)===p.no);
+        const q=qs.find(x=>(x.no||x.number||0)===p.no);
         if(!q) return;
         const qtags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
-        if(qtags.length){ p.tags=[...qtags]; p.topic=qtags[0]||''; changed=true; }
+        if(!qtags.length) return;
+        // อัปเดตเสมอ ถ้า question มี tags ใหม่กว่า
+        const currentTags=Array.isArray(p.tags)?p.tags:[];
+        const same=qtags.length===currentTags.length&&qtags.every((t,i)=>t===currentTags[i]);
+        if(!same){ p.tags=[...qtags]; p.topic=qtags[0]||''; changed=true; }
       });
       if(changed) backfilled=true;
     });
-    if(backfilled) Store.save(s); // save backfilled data กลับขึ้น cloud
+    if(backfilled){ Store.save(s); console.log('[Stats] backfilled tags into attempts'); }
 
     const allAttempts=(s.attempts||[]).slice().sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
     const timeFiltered=filterByTime(allAttempts);
