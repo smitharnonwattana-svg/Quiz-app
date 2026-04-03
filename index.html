@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.3 -->
+  <!-- APP_VERSION: v45.4 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.3</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.4</div>
     </div>
   </div>
 </div>
@@ -3335,8 +3335,7 @@ function initStats(){
         const q=qs.find(x=>(x.no||x.number||0)===p.no);
         if(!q) return;
         const qtags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
-        if(!qtags.length) return;
-        // อัปเดตเสมอ ถ้า question มี tags ใหม่กว่า
+        // sync tags เสมอ รวมถึงกรณีลบ tag ออกหมด (qtags=[]) เพื่อ clear ข้อมูลเก่าใน attempt
         const currentTags=Array.isArray(p.tags)?p.tags:[];
         const same=qtags.length===currentTags.length&&qtags.every((t,i)=>t===currentTags[i]);
         if(!same){ p.tags=[...qtags]; p.topic=qtags[0]||''; changed=true; }
