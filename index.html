@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.9 -->
+  <!-- APP_VERSION: v45.10 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.9</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.10</div>
     </div>
   </div>
 </div>
@@ -793,31 +793,44 @@
         <div class="linkCard" onclick="navigate('admin_members')">
           <div style="font-weight:900;">👥 จัดการสมาชิก</div>
         </div>
+        <div class="linkCard" onclick="navigate('admin_exams')">
+          <div style="font-weight:900;">📋 รายการข้อสอบ</div>
+        </div>
       </div>
+    </div>
+  </div>
+</div>
 
-      <h2 class="h2" style="margin-top:16px;">รายการข้อสอบ</h2>
-      <div class="card" style="padding:12px;margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <span class="muted">วิชา</span>
-        <select id="adminSubjFilter" class="btn" style="padding:10px 12px;min-width:240px;"></select>
+<!-- ===================== PAGE: ADMIN EXAMS ===================== -->
+<div id="page-admin_exams" class="page">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1">📋 รายการข้อสอบ</h1>
       </div>
-      <div class="tableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ชื่อชุด</th>
-              <th style="width:160px;">วิชา</th>
-              <th style="width:120px;">จัดลำดับ</th>
-              <th style="width:160px;">สถานะ</th>
-              <th style="width:70px;">ข้อ</th>
-              <th style="width:150px;">อัพโหลด</th>
-              <th>PDF URL</th>
-              <th style="width:110px;">แก้ไข</th>
-              <th style="width:70px;">ลบ</th>
-            </tr>
-          </thead>
-          <tbody id="adminTbody"></tbody>
-        </table>
-      </div>
+      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+    </div>
+    <div class="card" style="padding:12px;margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <span class="muted">วิชา</span>
+      <select id="adminSubjFilter" class="btn" style="padding:10px 12px;min-width:240px;"></select>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ชื่อชุด</th>
+            <th style="width:160px;">วิชา</th>
+            <th style="width:120px;">จัดลำดับ</th>
+            <th style="width:160px;">สถานะ</th>
+            <th style="width:70px;">ข้อ</th>
+            <th style="width:150px;">อัพโหลด</th>
+            <th style="width:60px;">PDF</th>
+            <th style="width:110px;">แก้ไข</th>
+            <th style="width:70px;">ลบ</th>
+          </tr>
+        </thead>
+        <tbody id="adminTbody"></tbody>
+      </table>
     </div>
   </div>
   <!-- Delete exam confirm modal -->
@@ -2048,6 +2061,7 @@ function navigate(page, params={}){
   else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
   else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
   else if(page==='admin_benchmark'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBenchmark(); }
+  else if(page==='admin_exams'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminExams(); }
   else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
@@ -3593,18 +3607,20 @@ function initStats(){
 // ===================== ADMIN PAGE =====================
 function initAdmin(){
   const s=Store.init();
-  s.adminLoggedIn = Auth.isTeacher(); // sync with PIN auth
+  s.adminLoggedIn = Auth.isTeacher();
+  document.getElementById('adminGate').innerHTML='';
+  document.getElementById('adminContent').style.display='block';
+}
+
+// ===================== ADMIN EXAMS PAGE =====================
+function initAdminExams(){
+  if(!Auth.isTeacher()){navigate('home');return;}
+  const s=Store.init();
   let subjectFilter='';
   const subjFilterEl=document.getElementById('adminSubjFilter');
-
-  // Admin login/logout handled by Auth PIN system — these buttons hidden for teacher role
   if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderAdmin();};
 
   function renderAdmin(){
-    // Auth is handled by PIN system — teacher role already verified in navigate()
-    document.getElementById('adminGate').innerHTML='';
-    document.getElementById('adminContent').style.display='block';
-
     const all=(s.exams||[]).slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
     const subjects=Array.from(new Set(all.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
     if(subjFilterEl){
@@ -3616,6 +3632,7 @@ function initAdmin(){
     const tb=document.getElementById('adminTbody');tb.innerHTML='';
     list.forEach((e,idx)=>{
       const tr=document.createElement('tr');
+      const hasPdf=!!(e.pdfUrl);
       tr.innerHTML=`
         <td style="font-weight:900;">${esc(e.title)}</td>
         <td>${esc(e.subject||'ไม่ระบุ')}</td>
@@ -3623,11 +3640,17 @@ function initAdmin(){
         <td><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span class="badge ${e.published?'ok':'warn'}">${e.published?'เผยแพร่':'ซ่อน'}</span><select class="statusSel" data-status="${e.id}" style="padding:6px 10px;border:1px solid var(--border);border-radius:12px;background:#fff;"><option value="published" ${e.published?'selected':''}>เผยแพร่</option><option value="hidden" ${!e.published?'selected':''}>ซ่อน</option></select></div></td>
         <td>${e.questionCount}</td>
         <td class="muted">${fmtDate(e.uploadedAt)}</td>
-        <td class="muted" style="max-width:260px;word-break:break-all;">${esc(e.pdfUrl)}</td>
+        <td style="text-align:center;">${hasPdf?`<button class="btn" style="padding:4px 10px;font-size:13px;" data-copy="${esc(e.pdfUrl)}" title="${esc(e.pdfUrl)}">📋</button>`:'<span class="muted">-</span>'}</td>
         <td><button class="btn" data-edit="${e.id}">เปิด Editor</button></td>
         <td><button class="btn" style="border-color:#ef4444;color:#b91c1c;" data-del="${e.id}">ลบ</button></td>
       `;
       tb.appendChild(tr);
+    });
+    tb.querySelectorAll('[data-copy]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const url=btn.getAttribute('data-copy');
+        navigator.clipboard.writeText(url).then(()=>toast('คัดลอก PDF URL แล้ว')).catch(()=>toast('ไม่สามารถคัดลอกได้'));
+      });
     });
     tb.querySelectorAll('[data-status]').forEach(sel=>{
       sel.addEventListener('change',()=>{
@@ -3638,15 +3661,13 @@ function initAdmin(){
     tb.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click',()=>{
         const id=btn.getAttribute('data-del');const exam=s.exams.find(x=>x.id===id);if(!exam) return;
-        // แสดง modal ยืนยัน
         const modal=document.getElementById('adminDeleteModal');
         const modalText=document.getElementById('adminDeleteModalText');
         const modalFiles=document.getElementById('adminDeleteModalFiles');
         const modalOk=document.getElementById('adminDeleteModalOk');
         const modalCancel=document.getElementById('adminDeleteModalCancel');
-        if(!modal) return; // fallback ถ้าไม่มี modal
+        if(!modal) return;
         modalText.textContent=`ต้องการลบ "${exam.title}" ใช่ไหม?`;
-        // แสดงไฟล์ที่จะถูกลบจาก Firebase Storage
         const isStorage=(url)=>url&&!url.startsWith('localpdf:')&&!url.startsWith('./')&&!url.includes('drive.google.com')&&url.startsWith('https://firebasestorage');
         const filesToDelete=[];
         if(isStorage(exam.pdfUrl)) filesToDelete.push('📄 PDF โจทย์ (Firebase Storage)');
@@ -3655,12 +3676,10 @@ function initAdmin(){
           ?'<div style="padding:6px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#c2410c;">⚠️ ไฟล์ต่อไปนี้จะถูกลบถาวรจาก Firebase Storage:<br>'+filesToDelete.map(f=>`• ${f}`).join('<br>')+'</div>'
           :'';
         modal.classList.add('show');
-        // clone ปุ่ม ok เพื่อ reset listener เดิม
         const newOk=modalOk.cloneNode(true);
         modalOk.parentNode.replaceChild(newOk,modalOk);
         newOk.onclick=async()=>{
           modal.classList.remove('show');
-          // ลบไฟล์จาก Firebase Storage
           if(exam.pdfUrl) FirebaseSync.deleteStoragePdf(exam.pdfUrl);
           if(exam.answerPdfUrl) FirebaseSync.deleteStoragePdf(exam.answerPdfUrl);
           s.exams=s.exams.filter(x=>x.id!==id);
@@ -3687,7 +3706,6 @@ function initAdmin(){
   }
 
   renderAdmin();
-
 }
 
 // ===================== ADMIN MEMBERS PAGE =====================
