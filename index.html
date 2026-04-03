@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.1 -->
+  <!-- APP_VERSION: v45.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.1</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.2</div>
     </div>
   </div>
 </div>
@@ -2376,12 +2376,12 @@ function initTake(id){
       const markUnsure=!!st.unsure[q.id];
       const active=idx===st.currentIndex;
       b.style.fontWeight=active?900:800;
-      b.style.borderColor=active?'#2563eb':'var(--border)';
-      b.style.background='#fff';b.style.color='#111';
+      b.style.background='#fff';b.style.color='#111';b.style.borderColor='var(--border)';b.style.boxShadow='none';
       if(done){b.style.background='var(--black)';b.style.borderColor='var(--black)';b.style.color='#fff';}
       if(markUnsure){b.style.background='var(--warn)';b.style.borderColor='var(--warn)';b.style.color='#111';}
-      if(active){b.style.background='#2563eb';b.style.borderColor='#2563eb';b.style.color='#fff';b.style.boxShadow='0 0 0 3px rgba(37,99,235,.25)';}
-      else b.style.boxShadow='none';
+      if(active){b.style.borderColor='#2563eb';b.style.boxShadow='0 0 0 2px rgba(37,99,235,.25)';}
+      if(active&&!done&&!markUnsure){b.style.background='#fff';b.style.color='#111';}
+      if(active&&done){b.style.borderColor='#2563eb';}
     });
   }
 
