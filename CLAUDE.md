@@ -20,8 +20,8 @@ All logic lives in one self-contained HTML file — no build step, no server.
 - Line ~7: `<!-- APP_VERSION: v45.2 -->`
 - Line ~346: `<div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.2</div>`
 
-### Current version: v45.6
-When making the next change, bump to v45.7.
+### Current version: v45.7
+When making the next change, bump to v45.8.
 
 ## Architecture Notes
 - Navigation: `navigate('page-name')` function

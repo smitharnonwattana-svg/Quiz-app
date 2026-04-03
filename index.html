@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.6 -->
+  <!-- APP_VERSION: v45.7 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.6</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.7</div>
     </div>
   </div>
 </div>
@@ -774,6 +774,7 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">Admin</h1>
+        <div id="fbSyncStatus" class="muted" style="font-size:12px;margin-top:4px;"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
@@ -2587,8 +2588,7 @@ function initReview(attemptId){
   const exam=(s.exams||[]).find(e=>e.id===att.examId);
   const _reviewIsGDrive = !!(exam && (exam.pdfUrl||'').match(/drive\.google\.com/));
 
-  // *** FIX: use correct key s.questions (not s.questionsByExam) ***
-  const qMap=s.questions||s.questionsByExam||{};
+  const qMap=s.questions||{};
   let qs=qMap[att.examId]||[];
 
   // Fallback: rebuild from perQuestion saved in attempt
@@ -4679,23 +4679,6 @@ function loadTakeResume(takerName) {
     const key = _takeResumeKey(takerName);
     return JSON.parse(localStorage.getItem(key) || 'null');
   } catch { return null; }
-}
-
-// โหลดทุก resume ที่มีอยู่ (สำหรับแสดงในหน้า exams)
-function loadAllTakeResumes() {
-  const results = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('nanont:takeResume:')) {
-        try {
-          const v = JSON.parse(localStorage.getItem(k) || 'null');
-          if (v) results.push(v);
-        } catch(e) {}
-      }
-    }
-  } catch(e) {}
-  return results;
 }
 
 function clearTakeResume(takerName) {
