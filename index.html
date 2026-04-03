@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.8 -->
+  <!-- APP_VERSION: v45.9 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.8</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.9</div>
     </div>
   </div>
 </div>
@@ -856,12 +856,7 @@
         <button class="btn btnPrimary" id="memberAddBtn" type="button">+ เพิ่มสมาชิก</button>
       </div>
       <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
-      <div class="tableWrap">
-        <table>
-          <thead><tr><th>ชื่อ</th><th style="width:140px;">รหัส</th><th style="width:120px;">แก้ไข</th><th style="width:80px;">ลบ</th></tr></thead>
-          <tbody id="memberTbody"></tbody>
-        </table>
-      </div>
+      <div id="memberTbody"></div>
     </div>
   </div>
 </div>
@@ -3706,13 +3701,26 @@ function initAdminMembers(){
     if (!tbody) return;
     tbody.innerHTML = '';
     members.forEach((m, idx) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td><input class="titleInput" style="width:140px;" value="' + m.name + '" id="mname_' + idx + '" /></td>' +
-        '<td><input class="titleInput" type="tel" maxlength="6" style="width:100px;" value="' + m.pin + '" id="mpin_' + idx + '" /></td>' +
-        '<td><button class="btn" data-save="' + idx + '">ยืนยัน</button></td>' +
-        '<td><button class="btn" style="border-color:#ef4444;color:#b91c1c;" data-del="' + idx + '">ลบ</button></td>';
-      tbody.appendChild(tr);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #e5e7eb;';
+      row.innerHTML =
+        '<input class="titleInput" style="flex:1;min-width:120px;" value="' + m.name.replace(/"/g,'&quot;') + '" id="mname_' + idx + '" />' +
+        '<div style="display:flex;gap:4px;align-items:center;">' +
+          '<input class="titleInput" type="password" maxlength="6" style="width:90px;letter-spacing:3px;" value="' + m.pin + '" id="mpin_' + idx + '" />' +
+          '<button type="button" class="btn" style="padding:4px 8px;min-width:32px;" data-eye="' + idx + '" title="แสดง/ซ่อนรหัส">👁</button>' +
+        '</div>' +
+        '<button class="btn" data-save="' + idx + '" style="white-space:nowrap;">ยืนยัน</button>' +
+        '<button class="btn" style="border-color:#ef4444;color:#b91c1c;white-space:nowrap;" data-del="' + idx + '">ลบ</button>';
+      tbody.appendChild(row);
+    });
+    tbody.querySelectorAll('[data-eye]').forEach(btn => {
+      btn.onclick = () => {
+        const i = Number(btn.getAttribute('data-eye'));
+        const inp = document.getElementById('mpin_' + i);
+        if (!inp) return;
+        inp.type = inp.type === 'password' ? 'tel' : 'password';
+        btn.style.opacity = inp.type === 'tel' ? '1' : '0.5';
+      };
     });
     tbody.querySelectorAll('[data-save]').forEach(btn => {
       btn.onclick = () => {
