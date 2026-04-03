@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.15 -->
+  <!-- APP_VERSION: v45.16 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.15</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.16</div>
     </div>
   </div>
 </div>
@@ -381,7 +381,6 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">เลือกชุดข้อสอบ</h1>
-        <div class="muted" style="margin-top:6px;">กดเพื่อไปหน้ารายละเอียดและเริ่มทำ</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button id="examsEditBtn" class="btn" style="display:none;">✏️ จัดลำดับ</button>
@@ -392,8 +391,10 @@
       <span>🖱️ ลากเพื่อเรียงลำดับ</span>
       <button id="examsEditDoneBtn" class="btn btnPrimary" style="padding:6px 14px;font-size:12px;">✅ เสร็จแล้ว</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;" id="examsSubjPills">
-      <button id="examPill_0" onclick="ecSetSubjFilter('ทั้งหมด')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ทั้งหมด</button><button id="examPill_1" onclick="ecSetSubjFilter('คณิตศาสตร์')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">คณิตศาสตร์</button><button id="examPill_2" onclick="ecSetSubjFilter('วิทยาศาสตร์')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">วิทยาศาสตร์</button><button id="examPill_3" onclick="ecSetSubjFilter('ภาษาไทย')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ภาษาไทย</button><button id="examPill_4" onclick="ecSetSubjFilter('ภาษาอังกฤษ')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">ภาษาอังกฤษ</button><button id="examPill_5" onclick="ecSetSubjFilter('สังคมศึกษา')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">สังคมศึกษา</button><button id="examPill_6" onclick="ecSetSubjFilter('อื่นๆ')" style="padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;transition:.15s;">อื่นๆ</button>
+    <div id="examsSubjGrid"></div>
+    <div id="examsBackToSubj" style="display:none;margin-top:14px;display:none;align-items:center;gap:10px;">
+      <button class="btn" id="examsBackToSubjBtn">← วิชา</button>
+      <span id="examsSelectedSubjLabel" style="font-weight:900;font-size:16px;"></span>
     </div>
     <select id="examsSubjFilter" style="display:none;"></select>
     <div id="examsList" class="list"></div>
@@ -2083,23 +2084,56 @@ function initExams(){
   if(editBtn) editBtn.onclick = ()=>{ if(!isTeacher) return; _editMode=true; window._examsEditMode=true; editBar?.classList.add('show'); editBtn.style.display='none'; renderExams(); };
   if(editDoneBtn) editDoneBtn.onclick = ()=>{ _editMode=false; window._examsEditMode=false; _dragSrcId=null; editBar?.classList.remove('show'); if(editBtn && isTeacher) editBtn.style.display=''; renderExams(); };
 
-  // pill button subject filter
-  const FIXED_SUBJS = ['ทั้งหมด','คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','อื่นๆ'];
-  function updatePills(){
-    FIXED_SUBJS.forEach((s,i)=>{
-      const btn=document.getElementById('examPill_'+i);
-      if(!btn) return;
-      const active = (i===0&&!subjectFilter)||(s===subjectFilter);
-      btn.style.background = active ? '#111827' : '#fff';
-      btn.style.color = active ? '#fff' : '#374151';
-      btn.style.borderColor = active ? '#111827' : '#e5e7eb';
-    });
-  }
-  window.ecSetSubjFilter = (s)=>{
-    subjectFilter = (s==='ทั้งหมด') ? '' : s;
-    updatePills(); renderExams();
+  const KNOWN_SUBJS = ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'];
+  const SUBJ_EMOJI = {'คณิตศาสตร์':'🔢','วิทยาศาสตร์':'🔬','ภาษาไทย':'📖','ภาษาอังกฤษ':'🌐','สังคมศึกษา':'🌍'};
+
+  const subjectGrid = document.getElementById('examsSubjGrid');
+  const backRow = document.getElementById('examsBackToSubj');
+  const subjLabel = document.getElementById('examsSelectedSubjLabel');
+  const backBtn = document.getElementById('examsBackToSubjBtn');
+  if(backBtn) backBtn.onclick = () => {
+    subjectFilter = '';
+    if(backRow){ backRow.style.display='none'; }
+    renderSubjectGrid();
   };
-  updatePills();
+
+  function renderSubjectGrid() {
+    const s2 = Store.load();
+    const allPub = (s2.exams||[]).filter(e=>e.published);
+    const subjCounts = {};
+    allPub.forEach(e=>{ const subj=e.subject||'ไม่ระบุ'; subjCounts[subj]=(subjCounts[subj]||0)+1; });
+    const subjList = Object.entries(subjCounts).sort((a,b)=>{
+      const ia=KNOWN_SUBJS.indexOf(a[0]),ib=KNOWN_SUBJS.indexOf(b[0]);
+      if(ia>=0&&ib>=0) return ia-ib; if(ia>=0) return -1; if(ib>=0) return 1;
+      return a[0].localeCompare(b[0],'th');
+    });
+    if(subjectGrid){
+      subjectGrid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:16px;">`+
+        subjList.map(([subj,cnt])=>
+          `<div class="linkCard" data-subj="${esc(subj)}" style="text-align:center;padding:24px 16px;cursor:pointer;">
+            <div style="font-size:32px;margin-bottom:8px;">${SUBJ_EMOJI[subj]||'📚'}</div>
+            <div style="font-weight:900;font-size:15px;">${esc(subj)}</div>
+            <div class="muted" style="font-size:12px;margin-top:4px;">${cnt} ชุด</div>
+          </div>`).join('')+
+        `<div class="linkCard" onclick="navigate('entrance_stats')" style="text-align:center;padding:24px 16px;cursor:pointer;">
+          <div style="font-size:32px;margin-bottom:8px;">🎯</div>
+          <div style="font-weight:900;font-size:15px;">สอบเข้า ม.1</div>
+          <div class="muted" style="font-size:12px;margin-top:4px;">สถิติ GATE/EPLUS</div>
+        </div>`+
+        `</div>`;
+      subjectGrid.querySelectorAll('[data-subj]').forEach(card=>{
+        card.addEventListener('click',()=>{
+          subjectFilter = card.getAttribute('data-subj');
+          if(subjLabel) subjLabel.textContent = subjectFilter;
+          if(backRow){ backRow.style.display='flex'; }
+          subjectGrid.innerHTML = '';
+          renderExams();
+        });
+      });
+    }
+    const listEl = document.getElementById('examsList');
+    if(listEl) listEl.innerHTML = '';
+  }
 
   const subjects=Array.from(new Set(published.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
   subjFilterEl.innerHTML=`<option value="">ทุกวิชา</option>${subjects.map(sub=>`<option value="${esc(sub)}">${esc(sub)}</option>`).join('')}`;
@@ -2133,6 +2167,7 @@ function initExams(){
   navigate = window.navigate;
 
   function renderExams(){
+    if(!subjectFilter){ renderSubjectGrid(); return; }
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
     const KNOWN=['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'];
@@ -2254,7 +2289,7 @@ function initExams(){
   }
 
   subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderExams();};
-  renderExams();
+  renderSubjectGrid();
 }
 
 // ===================== EXAM DETAIL PAGE =====================
