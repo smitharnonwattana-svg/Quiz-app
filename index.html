@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v44.7 -->
+  <!-- APP_VERSION: v44.8 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.7</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v44.8</div>
     </div>
   </div>
 </div>
@@ -3089,9 +3089,8 @@ function initStats(){
   function filterByTime(attempts){
     if(currentTimeFilter==='all') return attempts;
     const now=Date.now();
-    const now2=Date.now();
     // 7 วันย้อนหลัง / 30 วันย้อนหลัง
-    const cutoff=currentTimeFilter==='week'?now2-7*86400000:now2-30*86400000;
+    const cutoff=currentTimeFilter==='week'?now-7*86400000:now-30*86400000;
     return attempts.filter(a=>{
       const t=a.startedAt?new Date(a.startedAt).getTime():0;
       return t>0 && t>=cutoff;
@@ -3332,9 +3331,9 @@ function initStats(){
       });
       if(changed) backfilled=true;
     });
-    if(backfilled){ Store.save(s); console.log('[Stats] backfilled tags into attempts'); }
+    if(backfilled){ Store.saveLocalOnly(s); console.log('[Stats] backfilled tags into attempts (local only)'); }
 
-    const allAttempts=(s.attempts||[]).slice().sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
+    const allAttempts=(s.attempts||[]).slice().sort((a,b)=>new Date(b.startedAt||0).getTime()-new Date(a.startedAt||0).getTime());
     const timeFiltered=filterByTime(allAttempts);
     const bySubject=currentSubjectFilter==='all'?timeFiltered:timeFiltered.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
