@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.21 -->
+  <!-- APP_VERSION: v45.22 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.21</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.22</div>
     </div>
   </div>
 </div>
@@ -877,7 +877,6 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">สร้างชุดข้อสอบใหม่</h1>
-        <div class="muted" style="margin-top:6px;">สร้างและแก้ใน localStorage</div>
       </div>
       <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
     </div>
@@ -904,7 +903,6 @@
       <!-- เนื้อหาวิชา — แสดงเมื่อเลือกวิชาแล้ว -->
       <div id="newTopicsWrap" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;display:grid;gap:8px;">
         <div style="font-weight:900;font-size:13px;">📚 เนื้อหาวิชา <span id="newTopicsSubjLabel" style="color:#3b82f6;"></span></div>
-        <div class="muted" style="font-size:12px;">topics เหล่านี้จะใช้ได้กับทุกชุดข้อสอบวิชาเดียวกัน และจะเป็น dropdown ใน Excel template</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input id="newTopicInput" style="padding:8px 12px;border:1px solid #bfdbfe;border-radius:10px;font-family:inherit;flex:1;min-width:160px;" placeholder="ชื่อเนื้อหา เช่น เศษส่วน (Enter เพื่อเพิ่ม)" />
           <button type="button" class="btn" id="newTopicAddBtn">+ เพิ่ม</button>
@@ -927,33 +925,25 @@
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">PDF URL</span>
         <input id="newPdfUrl" value="./pdfs/science_sample.pdf" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-        <span class="muted">หรือใส่ Google Drive /preview link</span>
       </label>
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">หรืออัปโหลด PDF จากเครื่อง</span>
         <input id="newPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
-        <span class="muted">ไฟล์จะอัปโหลดขึ้น Firebase Storage — ใช้ได้ทุกเครื่อง</span>
       </label>
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">PDF เฉลย <span class="muted" style="font-weight:400;font-size:12px;">(ไม่บังคับ — แสดงใน tab เฉลยหน้าทบทวน)</span></span>
         <input id="newAnswerPdfUrl" placeholder="วาง URL หรืออัปโหลดด้านล่าง" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
         <input id="newAnswerPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
-        <span class="muted">อัปโหลดขึ้น Firebase Storage เช่นเดียวกับ PDF หลัก</span>
       </label>
       <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">จำนวนข้อ</span>
         <input id="newQCount" type="number" min="1" max="999" value="50" style="width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-        <span class="muted">แก้หน้า PDF / เฉลยได้ใน Editor</span>
       </div>
       <!-- hidden: ยังใช้ใน JS อยู่ -->
       <input id="newCreatePlaceholder" type="checkbox" checked style="display:none;" />
       <!-- อัปโหลดเฉลยจาก Excel -->
       <div style="border:2px dashed var(--border);border-radius:12px;padding:16px;background:#f9fafb;display:grid;gap:8px;">
         <div style="font-weight:900;">📊 อัปโหลดเฉลยจาก Excel <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ)</span></div>
-        <div class="muted" style="font-size:12px;line-height:1.7;">
-          รูปแบบ: <b>A = ข้อที่</b> · <b>B = หน้า PDF</b> · <b>C = เฉลย</b> · <b>D = เนื้อหา</b> (dropdown จากที่ตั้งไว้) · <b>E = ฟรี</b><br>
-          แถวแรกจะถูกตรวจว่าเป็น header หรือเปล่า ถ้าใช่จะข้ามให้อัตโนมัติ
-        </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <button type="button" class="btn" id="newDownloadTemplate" style="gap:6px;">⬇️ ดาวน์โหลด Template</button>
           <label class="btn" style="cursor:pointer;">
