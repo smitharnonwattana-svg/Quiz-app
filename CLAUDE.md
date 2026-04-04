@@ -23,7 +23,21 @@ All logic lives in one self-contained HTML file — no build step, no server.
 ### Current version: v45.18
 When making the next change, bump to v45.19.
 
-## Architecture Notes
+## GitHub Push (Deploy)
+
+Token และข้อมูล deploy เก็บอยู่ใน `.claude-local` (gitignored — ไม่ push ขึ้น GitHub)
+
+วิธี push ทุกครั้ง:
+```bash
+# อ่าน token จาก .claude-local แล้ว push
+PAT=$(grep GITHUB_PAT /home/user/Quiz-app/.claude-local | cut -d= -f2)
+git remote set-url origin https://${PAT}@github.com/smitharnonwattana-svg/Quiz-app.git
+git push origin claude/review-webapp-structure-gaY4S:main
+git push -u origin claude/review-webapp-structure-gaY4S
+git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
+```
+
+
 - Navigation: `navigate('page-name')` function
 - All pages: `div.page` elements, shown via `.page.active` CSS class
 - Data storage: localStorage (no backend)
