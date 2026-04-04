@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.18 -->
+  <!-- APP_VERSION: v45.19 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.18</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.19</div>
     </div>
   </div>
 </div>
@@ -1641,6 +1641,17 @@ const PdfDB=(()=>{
   return{put,get,del,getPdfBlobUrl,revokePdfBlobUrl};
 })();
 
+// ===================== LINE NOTIFICATION =====================
+const LINE_NOTIFY_URL = 'REPLACE_WITH_FUNCTION_URL'; // ← ใส่ URL หลัง deploy Cloud Function
+function lineNotify(payload) {
+  if (!LINE_NOTIFY_URL || LINE_NOTIFY_URL.startsWith('REPLACE')) return;
+  fetch(LINE_NOTIFY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {}); // silent fail — ไม่กระทบการทำข้อสอบ
+}
+
 function toast(msg){
   const el=document.getElementById("toast");
   if(!el) return alert(msg);
@@ -2364,6 +2375,8 @@ function initTake(id){
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
   const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||'').trim();
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
+  // LINE notification — เริ่มทำข้อสอบ
+  lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
 
   _takeState={s,exam,qsList,total,attemptId,
     currentIndex:0,answers:{},unsure:{},
@@ -2500,6 +2513,8 @@ function initTake(id){
     if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
     const ok=Store.save(savedS);
     // 🎉 Show meme popup before going to review
+    // LINE notification — ส่งข้อสอบแล้ว
+    lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total });
     MemeScore.show(score, total, () => {
       navigate('review', {attemptId: st.attemptId});
       if(!ok) setTimeout(()=>toast('⚠️ บันทึกสถิติไม่สำเร็จ — ลองเปิดผ่านลิงก์ https'),300);
