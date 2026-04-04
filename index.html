@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.19 -->
+  <!-- APP_VERSION: v45.20 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.19</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.20</div>
     </div>
   </div>
 </div>
@@ -1642,7 +1642,7 @@ const PdfDB=(()=>{
 })();
 
 // ===================== LINE NOTIFICATION =====================
-const LINE_NOTIFY_URL = 'REPLACE_WITH_FUNCTION_URL'; // ← ใส่ URL หลัง deploy Cloud Function
+const LINE_NOTIFY_URL = 'https://asia-southeast1-nanont-exam.cloudfunctions.net/lineNotify';
 function lineNotify(payload) {
   if (!LINE_NOTIFY_URL || LINE_NOTIFY_URL.startsWith('REPLACE')) return;
   fetch(LINE_NOTIFY_URL, {
