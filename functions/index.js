@@ -44,7 +44,7 @@ exports.lineNotify = onRequest(
       return;
     }
 
-    const { type, name, examTitle, score, total } = req.body || {};
+    const { type, name, examTitle, score, total, usedSeconds } = req.body || {};
     if (!type || !name || !examTitle) {
       res.status(400).json({ error: 'Missing fields' });
       return;
@@ -56,7 +56,9 @@ exports.lineNotify = onRequest(
     } else if (type === 'finish') {
       const pct = total ? Math.round((score / total) * 100) : 0;
       const star = pct >= 80 ? '🏆' : pct >= 60 ? '✅' : '⚠️';
-      message = `${star} ส่งข้อสอบแล้ว\n👤 ${name}\n📋 ${examTitle}\n📊 ${score}/${total} คะแนน (${pct}%)`;
+      const sec = Math.max(0, Math.floor(usedSeconds || 0));
+      const timeStr = String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+      message = `${star} ส่งข้อสอบแล้ว\n👤 ${name}\n📋 ${examTitle}\n📊 ${score}/${total} คะแนน (${pct}%)\n⏱ เวลาที่ใช้ ${timeStr} นาที`;
     } else {
       res.status(400).json({ error: 'Invalid type' });
       return;

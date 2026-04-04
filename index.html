@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.20 -->
+  <!-- APP_VERSION: v45.21 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -343,7 +343,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.20</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.21</div>
     </div>
   </div>
 </div>
@@ -2514,7 +2514,7 @@ function initTake(id){
     const ok=Store.save(savedS);
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
-    lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total });
+    lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
     MemeScore.show(score, total, () => {
       navigate('review', {attemptId: st.attemptId});
       if(!ok) setTimeout(()=>toast('⚠️ บันทึกสถิติไม่สำเร็จ — ลองเปิดผ่านลิงก์ https'),300);
