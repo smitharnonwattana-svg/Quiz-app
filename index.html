@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.26 -->
+  <!-- APP_VERSION: v45.27 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.26</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.27</div>
     </div>
   </div>
 </div>
@@ -1666,41 +1666,41 @@ let _pageParams={};
 const MemeScore = (() => {
   // Giphy IDs — embed via giphy.com/embed/{ID} (iframe, no hotlink block)
   const MEMES = {
-    // 💀 0–49% หายนะ — crying cat memes
+    // 💀 0–49% หายนะ — crying jordan / sad pepe / wojak
     disaster: [
-      ['3o6Zt7StAisetJ7ntC', 'สมองไปเที่ยวไหนมาครับ?'],
-      ['TjS7u7yoMC2KubI5wE', 'น้ำตาจะไหลออกมาเองเลย'],
-      ['l4FGk7QngyoLUbnm8',  'ขอกลับบ้านได้ไหมครับ 😭'],
-      ['9tJfy6FpyQ4PQ4fXTQ', 'ยังมีวันพรุ่งนี้นะ... บางที'],
-      ['qxRMbqPKaXbUYB28Eu', 'ข้อสอบ 1 - ฉัน 0'],
-      ['GwskZm1jXg8cDvuZJ6', 'ตัวตลกแห่งวันนี้คือ...'],
+      ['7HMiotS0zfMsyMefkU', 'คะแนนออกมาแล้ว... ร้องให้เลยดีกว่า 😭'],
+      ['Ke2Jwsjv7MhIWNuZhe', 'Crying Jordan ของแท้ 100%'],
+      ['opRAG6bNFdA36fpGJS', 'Sad Pepe รู้สึกแทนเลย...'],
+      ['wA7JI5LRuqbIQYck3N', 'Pepe ร้องให้แทนเธอเลย 🐸😭'],
+      ['ERdc3B6TMgkND4fhBH', 'Wojak รู้สึก... ไม่โอเคมากเลย'],
+      ['pIlVCyHWQKEDebaJhK', 'ร้องได้เลย ไม่ตัดสิน 🌅😭'],
     ],
-    // 😬 50–69% พอผ่าน — this is fine + hide pain harold
+    // 😬 50–69% พอผ่าน — this is fine / meh / shrug
     meh: [
-      ['B01UhEnqUO1QXV062I', 'This is fine. 🔥'],
-      ['3jbR27OLT5YJv0ewvN', 'ผ่านก็คือผ่าน ไม่ต้องพูดมาก'],
-      ['SFJDkCE9wefecClpL6', 'ยิ้มทน... ก็ได้'],
-      ['1NTmCiaP4KCATiKJHS', 'อย่างน้อยก็ยังไม่ตาย'],
-      ['d5Fbtoj47ROk0J9IgW', 'OK... ก็โอเคนะ'],
-      ['WFmNqHlHumQoOn7Nsj', 'โอเค (โกหก)'],
+      ['B01UhEnqUO1QXV062I', 'ไฟไหม้รอบข้าง แต่โอเคนะ 🐶🔥'],
+      ['3jbR27OLT5YJv0ewvN', 'ผ่านแล้ว! (แต่แค่พอผ่าน)'],
+      ['UWEP6CXjvmZxfUBUeu', 'Not great, not terrible — แบบนั้นแหละ'],
+      ['l0Iy0QMOGQmoWntpm',  'Meh... ไม่แย่ แต่ก็ไม่ดี'],
+      ['guoU4K4C2nBkPCRTIH', 'The Simpsons shrug — ก็ได้วะ 🤷'],
+      ['l1J3HdnZLet0oQaA0',  'Great Success! (จริงๆ แค่พออยู่รอด)'],
     ],
-    // 😎 70–84% ดี — stonks + success
+    // 😎 70–84% ดี — stonks / nailed it / galaxy brain
     good: [
-      ['xThuWpoG470Q0stGmI', 'wow. such score. very nice.'],
-      ['ny3EbSkfGuuOHIcRNM', 'STONKS ↑↑↑ คะแนนพุ่ง!'],
-      ['XgFo77hQvSVyUzLVSh', 'ไม่เลวเลยนะเนี่ย!'],
-      ['26xBNmDKgH5Z6yBck',  'กำลังดีมาก ไปต่อได้!'],
-      ['kDa9o3H2qsKmF2JXl4', 'สมองทำงานแล้ว! 🧠'],
-      ['hwiP2EdgJdqwmeJF9h', 'เก่งขึ้นทุกวันเลยนะ'],
+      ['XDWguh1BM1LdOuL6Lc', 'STONKS 📈 คะแนนขึ้นสูงเลย!'],
+      ['bzWW5589KIccDHEeM7', 'GameStonks! คะแนนพุ่งแรงมาก 🚀'],
+      ['cOQSc9wAHifk1LlQBM', 'NAILED IT! ทำได้แล้วววว 🎯'],
+      ['05eOQMLvQDvB6wVo4I', 'Nailed It — เฉียบมาก!'],
+      ['TYmReKrevWMHXSIfWb', 'Galaxy Brain เปิดสมองได้เต็มๆ 🧠✨'],
+      ['3oEhmCNXgCrL3d1Aw8', 'YES! Dog บอกว่าทำได้ดีมาก 🐶'],
     ],
-    // 🔥 85–100% เทพ — gigachad + celebration
+    // 🔥 85–100% เทพ — gigachad / we are the champions / limitless
     goat: [
-      ['HzshGTcQLgFcOiiykn', 'GIGACHAD MODE 🗿'],
-      ['9Ex8DYmuJGaHFMDvWu', 'SIGMA GRINDSET 😤'],
-      ['8iA90QlHUONNVtQdTX', 'OMG เทพมากกกก!!!'],
-      ['3oEduLyQaF5JoKnuM0', 'PLUS ULTRA!!! 🔥🔥🔥'],
-      ['gSST5BJ4dY24LJxn49', 'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
-      ['weDE9y2Rv99GyAFw2G',  'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
+      ['HzshGTcQLgFcOiiykn', 'GIGACHAD เข้าร่างแล้ว 💪😤'],
+      ['2yiCkWOziRVCvo3tYK', 'Legend. Yes. นั่นคือเธอแหละ 👑'],
+      ['zmQjxv7M5XvMq7Eckx', 'Gigachad ภูมิใจในตัวเธอมาก 🏆'],
+      ['jwQyCxjOfxSH8IMrrz', 'We Are The Champions! 🎸👑'],
+      ['1yjZXySg7tSohpcmUM', 'Queen confirmed GOAT 🏆🎶'],
+      ['l41lJnxoGHcS3glhu',  'Limitless mode activated ✨🧠'],
     ],
   };
 
