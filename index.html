@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.32 -->
+  <!-- APP_VERSION: v45.33 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.32</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.33</div>
     </div>
   </div>
 </div>
@@ -1909,15 +1909,30 @@ async function generateMemeCanvas() {
   ctx.textAlign='right';
   ctx.fillText(tier.title||'',S-24,35);
 
-  // ── emoji circle (70–248, 178px) ───────────────────
+  // ── image area (70–248, 178px) — snap or emoji ──────
   const EMOJ_CY=160;
-  // white circle bg
-  ctx.fillStyle='rgba(255,255,255,.7)';
-  ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,78,0,Math.PI*2); ctx.fill();
-  // emoji
-  ctx.font='80px serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(tier.emoji||'🎯',S/2,EMOJ_CY);
+  const snap = img ? localStorage.getItem(`meme_snap_${img}`) : null;
+  if (snap) {
+    const snapImg = new Image();
+    await new Promise(r => { snapImg.onload=r; snapImg.onerror=r; snapImg.src=snap; });
+    if (snapImg.naturalWidth > 0) {
+      // draw snap centered square
+      const SZ=178;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,SZ/2,0,Math.PI*2); ctx.clip();
+      const scale=Math.max(SZ/snapImg.naturalWidth,SZ/snapImg.naturalHeight);
+      const sw=snapImg.naturalWidth*scale, sh=snapImg.naturalHeight*scale;
+      ctx.drawImage(snapImg,S/2-sw/2,EMOJ_CY-sh/2,sw,sh);
+      ctx.restore();
+    }
+  } else {
+    // emoji circle fallback
+    ctx.fillStyle='rgba(255,255,255,.7)';
+    ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,78,0,Math.PI*2); ctx.fill();
+    ctx.font='80px serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(tier.emoji||'🎯',S/2,EMOJ_CY);
+  }
 
   // ── score (248–360, 112px) ─────────────────────────
   ctx.fillStyle=C;
@@ -3867,7 +3882,12 @@ function initAdminMemes() {
     for (let i = 0; i < 6; i++) {
       const [id, cap] = slots[i] || ['', ''];
       const previewSrc = id ? `https://giphy.com/embed/${id}` : '';
-      html += `<div style="display:grid;grid-template-columns:1fr 1fr 100px;gap:8px;align-items:center;">
+      const snap = id ? localStorage.getItem(`meme_snap_${id}`) : null;
+      const snapBadge = snap ? `<div title="มี snap แล้ว" style="position:absolute;top:2px;right:2px;background:#16a34a;color:#fff;font-size:9px;font-weight:900;padding:1px 4px;border-radius:4px;z-index:1;">✓ snap</div>` : '';
+      const previewContent = previewSrc
+        ? `<iframe src="${previewSrc}" frameborder="0" style="width:200px;height:120px;transform:scale(0.5);transform-origin:0 0;pointer-events:none;"></iframe>`
+        : '';
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr 36px 100px;gap:8px;align-items:center;">
         <input type="text" placeholder="ชื่อ/caption" value="${cap.replace(/"/g,'&quot;')}"
           style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;"
           id="meme_cap_${tier.key}_${i}" />
@@ -3875,15 +3895,78 @@ function initAdminMemes() {
           style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;"
           id="meme_url_${tier.key}_${i}"
           oninput="updateMemePreview('${tier.key}',${i},this.value)" />
+        <button title="บันทึก snap รูปมีม" onclick="snapMeme('${tier.key}',${i})"
+          style="border:1px solid #e5e7eb;background:#fff;border-radius:8px;cursor:pointer;font-size:16px;height:38px;padding:0;">📸</button>
         <div id="meme_preview_${tier.key}_${i}"
-          style="width:100px;height:60px;border-radius:8px;overflow:hidden;background:#f3f4f6;border:1px solid #e5e7eb;">
-          ${previewSrc ? `<iframe src="${previewSrc}" frameborder="0" style="width:200px;height:120px;transform:scale(0.5);transform-origin:0 0;pointer-events:none;"></iframe>` : ''}
+          style="position:relative;width:100px;height:60px;border-radius:8px;overflow:hidden;background:#f3f4f6;border:1px solid #e5e7eb;">
+          ${snapBadge}${previewContent}
         </div>
       </div>`;
     }
     html += `</div></div>`;
   });
   container.innerHTML = html;
+}
+
+async function snapMeme(tierKey, idx) {
+  const idEl = document.getElementById(`meme_url_${tierKey}_${idx}`);
+  const giphyId = (idEl?.value || '').trim();
+  if (!giphyId) { alert('ใส่ URL ก่อนนะครับ'); return; }
+
+  const previewEl = document.getElementById(`meme_preview_${tierKey}_${idx}`);
+  if (!previewEl) return;
+
+  // scroll preview into view so it's visible before capture
+  previewEl.scrollIntoView({ behavior:'smooth', block:'center' });
+  await new Promise(r => setTimeout(r, 600));
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      preferCurrentTab: true,
+    });
+  } catch(e) {
+    if (e.name !== 'AbortError') alert('ไม่สามารถ snap ได้: ' + e.message);
+    return;
+  }
+
+  const video = document.createElement('video');
+  video.srcObject = stream;
+  await new Promise(r => { video.onloadedmetadata = r; });
+  await video.play();
+  await new Promise(r => setTimeout(r, 300)); // wait for frame
+
+  const full = document.createElement('canvas');
+  full.width = video.videoWidth; full.height = video.videoHeight;
+  full.getContext('2d').drawImage(video, 0, 0);
+  stream.getTracks().forEach(t => t.stop());
+
+  // crop to preview iframe element area
+  const rect = previewEl.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const cw = Math.round(rect.width * dpr), ch = Math.round(rect.height * dpr);
+  const crop = document.createElement('canvas');
+  // store at 3x size for quality
+  crop.width = cw * 3; crop.height = ch * 3;
+  const cctx = crop.getContext('2d');
+  cctx.drawImage(full,
+    Math.round(rect.left * dpr), Math.round(rect.top * dpr), cw, ch,
+    0, 0, cw * 3, ch * 3);
+
+  localStorage.setItem(`meme_snap_${giphyId}`, crop.toDataURL('image/jpeg', 0.88));
+
+  // refresh badge
+  const badge = previewEl.querySelector('[title="มี snap แล้ว"]');
+  if (badge) { badge.style.background='#16a34a'; }
+  else {
+    const b = document.createElement('div');
+    b.title = 'มี snap แล้ว';
+    b.style.cssText = 'position:absolute;top:2px;right:2px;background:#16a34a;color:#fff;font-size:9px;font-weight:900;padding:1px 4px;border-radius:4px;z-index:1;';
+    b.textContent = '✓ snap'; previewEl.appendChild(b);
+  }
+  previewEl.style.outline = '2px solid #16a34a';
+  setTimeout(() => previewEl.style.outline = '', 2500);
 }
 
 function updateMemePreview(tierKey, idx, rawUrl) {
