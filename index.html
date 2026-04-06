@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.31 -->
+  <!-- APP_VERSION: v45.32 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.31</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.32</div>
     </div>
   </div>
 </div>
@@ -1880,104 +1880,93 @@ function closeMemeOverlay() { MemeScore.close(); }
 
 async function generateMemeCanvas() {
   const d = window._memeCardData || {};
-  const { score=0, total=0, pct=0, tier={}, caption='', img='', cheer=null } = d;
-  const W = 600, H = 720; // taller to fit cheer
+  const { score=0, total=0, pct=0, tier={}, caption='', cheer=null } = d;
+  const S = 600;
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = S; canvas.height = S;
   const ctx = canvas.getContext('2d');
   const C = tier.color||'#6366f1';
+  const BG = tier.bg||'#f9fafb';
 
-  // ── background ──
-  const grad = ctx.createLinearGradient(0,0,W,H);
-  grad.addColorStop(0, tier.bg||'#f9fafb');
-  grad.addColorStop(1,'#fff');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+  // ── background ──────────────────────────────────────
+  const grad = ctx.createLinearGradient(0,0,S,S);
+  grad.addColorStop(0,BG); grad.addColorStop(1,'#fff');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,S,S);
 
-  // decorative circles
-  ctx.globalAlpha=.08; ctx.fillStyle=C;
-  ctx.beginPath(); ctx.arc(-50,-50,230,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(W+50,H+50,210,0,Math.PI*2); ctx.fill();
+  // deco circles (subtle)
+  ctx.globalAlpha=.09; ctx.fillStyle=C;
+  ctx.beginPath(); ctx.arc(-60,-60,240,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(S+60,S+60,220,0,Math.PI*2); ctx.fill();
   ctx.globalAlpha=1;
 
-  // ── top bar ──
-  ctx.fillStyle=C; ctx.fillRect(0,0,W,68);
-  ctx.fillStyle='rgba(255,255,255,.92)';
+  // ── header bar (0–70) ──────────────────────────────
+  ctx.fillStyle=C; ctx.fillRect(0,0,S,70);
+  ctx.fillStyle='rgba(255,255,255,.95)';
   ctx.font='bold 22px ui-sans-serif,system-ui,sans-serif';
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillText('My Exam Academia',24,34);
-  ctx.textAlign='right'; ctx.font='bold 16px ui-sans-serif,system-ui,sans-serif';
-  ctx.fillText(tier.title||'',W-24,34);
+  ctx.fillText('My Exam Academia',24,35);
+  ctx.font='bold 15px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign='right';
+  ctx.fillText(tier.title||'',S-24,35);
 
-  // ── meme image (300x300 square, centered) ──
-  const GIF_Y=68, GIF_H=W; // full width square
-  let gifLoaded=false;
-  if(img) {
-    const proxyUrl=`https://corsproxy.io/?url=${encodeURIComponent(`https://media.giphy.com/media/${img}/giphy.gif`)}`;
-    gifLoaded = await new Promise(resolve=>{
-      const i=new Image(); i.crossOrigin='anonymous';
-      i.onload=()=>{ ctx.drawImage(i,0,GIF_Y,W,GIF_H); resolve(true); };
-      i.onerror=()=>resolve(false);
-      setTimeout(()=>resolve(false),6000);
-      i.src=proxyUrl;
-    });
-  }
-  if(!gifLoaded) {
-    // fallback: emoji tile background
-    ctx.fillStyle=tier.bg||'#f3f4f6'; ctx.fillRect(0,GIF_Y,W,GIF_H);
-    ctx.font='90px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.globalAlpha=.18;
-    const emj=(tier.emoji||'🎯').replace(/\s/g,'')[0];
-    for(let r=0;r<4;r++) for(let c=0;c<4;c++)
-      ctx.fillText(emj,75+c*150,GIF_Y+75+r*150);
-    ctx.globalAlpha=1;
-    ctx.font='100px serif';
-    ctx.fillText(tier.emoji||'',W/2,GIF_Y+GIF_H/2);
-  }
-
-  // ── score card overlay (bottom of gif area) ──
-  const CARD_Y=GIF_Y+GIF_H-130;
-  ctx.fillStyle='rgba(255,255,255,.92)';
-  ctx.beginPath();
-  ctx.roundRect(0,CARD_Y,W,130,0);
-  ctx.fill();
-  ctx.fillStyle=C;
-  ctx.font='bold 72px ui-sans-serif,system-ui,sans-serif';
+  // ── emoji circle (70–248, 178px) ───────────────────
+  const EMOJ_CY=160;
+  // white circle bg
+  ctx.fillStyle='rgba(255,255,255,.7)';
+  ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,78,0,Math.PI*2); ctx.fill();
+  // emoji
+  ctx.font='80px serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(`${score}/${total}`,W/2,CARD_Y+45);
-  ctx.font='bold 28px ui-sans-serif,system-ui,sans-serif';
-  ctx.fillText(`คิดเป็น ${pct}%`,W/2,CARD_Y+92);
+  ctx.fillText(tier.emoji||'🎯',S/2,EMOJ_CY);
+
+  // ── score (248–360, 112px) ─────────────────────────
+  ctx.fillStyle=C;
+  ctx.font='bold 96px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText(`${score}/${total}`,S/2,252);
+  ctx.font='bold 30px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText(`คิดเป็น ${pct}%`,S/2,356);
+
+  // ── caption (390) ──────────────────────────────────
   if(caption){
-    ctx.fillStyle='#6b7280'; ctx.font='italic 18px ui-sans-serif,system-ui,sans-serif';
-    ctx.fillText(caption,W/2,CARD_Y+118);
+    ctx.fillStyle='#6b7280';
+    ctx.font='italic 18px ui-sans-serif,system-ui,sans-serif';
+    ctx.textBaseline='top';
+    ctx.fillText(caption,S/2,394);
   }
 
-  // ── cheer section ──
-  const CHEER_Y=GIF_Y+GIF_H+8;
+  // ── divider ────────────────────────────────────────
+  ctx.strokeStyle=C; ctx.globalAlpha=.2; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(40,424); ctx.lineTo(S-40,424); ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // ── cheer (430–560) ───────────────────────────────
   if(cheer){
-    ctx.fillStyle='rgba(0,0,0,.04)'; ctx.fillRect(0,CHEER_Y,W,H-CHEER_Y-36);
-    ctx.fillStyle=C; ctx.font='bold 15px ui-sans-serif,system-ui,sans-serif';
-    ctx.textAlign='left'; ctx.textBaseline='top';
-    ctx.fillText(`💬 ${cheer.speaker}`,20,CHEER_Y+14);
-    ctx.fillStyle='#374151'; ctx.font='16px ui-sans-serif,system-ui,sans-serif';
-    _wrapText(ctx,cheer.cheer,20,CHEER_Y+36,W-40,22);
+    ctx.fillStyle=C; ctx.font='bold 14px ui-sans-serif,system-ui,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(`💬 ${cheer.speaker}`,S/2,432);
+    ctx.fillStyle='#374151'; ctx.font='15px ui-sans-serif,system-ui,sans-serif';
+    _wrapTextCenter(ctx,cheer.cheer,S/2,456,S-60,20);
   }
 
-  // ── watermark ──
-  ctx.fillStyle='#d1d5db'; ctx.font='13px ui-sans-serif,system-ui,sans-serif';
+  // ── watermark ─────────────────────────────────────
+  ctx.fillStyle='#d1d5db';
+  ctx.font='13px ui-sans-serif,system-ui,sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='bottom';
-  ctx.fillText('smitharnonwattana-svg.github.io/Quiz-app',W/2,H-6);
+  ctx.fillText('smitharnonwattana-svg.github.io/Quiz-app',S/2,S-8);
 
   return canvas;
 }
 
-function _wrapText(ctx,text,x,y,maxW,lh){
-  const words=text.split(' '); let line='';
-  for(let n=0;n<words.length;n++){
-    const test=line+words[n]+' ';
-    if(ctx.measureText(test).width>maxW && n>0){ ctx.fillText(line,x,y); line=words[n]+' '; y+=lh; }
+function _wrapTextCenter(ctx,text,cx,y,maxW,lh){
+  const words=text.split(' '); let line=''; const lines=[];
+  for(let i=0;i<words.length;i++){
+    const test=line+words[i]+' ';
+    if(ctx.measureText(test).width>maxW && i>0){ lines.push(line.trim()); line=words[i]+' '; }
     else line=test;
   }
-  ctx.fillText(line,x,y);
+  if(line.trim()) lines.push(line.trim());
+  lines.forEach((l,i)=>ctx.fillText(l,cx,y+i*lh));
 }
 
 async function shareMemeCard() {
