@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.33 -->
+  <!-- APP_VERSION: v45.34 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.33</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.34</div>
     </div>
   </div>
 </div>
@@ -1471,7 +1471,22 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
+  async function uploadBlob(path, blob) {
+    if (!_ready || !storage) throw new Error('Firebase Storage ยังไม่พร้อม');
+    const ref = storage.ref(path);
+    return new Promise((resolve, reject) => {
+      const task = ref.put(blob);
+      task.on('state_changed', null, reject, async () => {
+        try { resolve(await task.snapshot.ref.getDownloadURL()); } catch(e) { reject(e); }
+      });
+    });
+  }
+  async function deleteBlob(path) {
+    if (!_ready || !storage) return;
+    try { await storage.ref(path).delete(); } catch(e) { /* not found is OK */ }
+  }
+
+  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, uploadBlob, deleteBlob, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
 })();
 
 // ===================== STORE =====================
@@ -1880,7 +1895,7 @@ function closeMemeOverlay() { MemeScore.close(); }
 
 async function generateMemeCanvas() {
   const d = window._memeCardData || {};
-  const { score=0, total=0, pct=0, tier={}, caption='', cheer=null } = d;
+  const { score=0, total=0, pct=0, tier={}, caption='', cheer=null, img='' } = d;
   const S = 600;
   const canvas = document.createElement('canvas');
   canvas.width = S; canvas.height = S;
@@ -1910,22 +1925,27 @@ async function generateMemeCanvas() {
   ctx.fillText(tier.title||'',S-24,35);
 
   // ── image area (70–248, 178px) — snap or emoji ──────
-  const EMOJ_CY=160;
-  const snap = img ? localStorage.getItem(`meme_snap_${img}`) : null;
-  if (snap) {
-    const snapImg = new Image();
-    await new Promise(r => { snapImg.onload=r; snapImg.onerror=r; snapImg.src=snap; });
-    if (snapImg.naturalWidth > 0) {
-      // draw snap centered square
-      const SZ=178;
-      ctx.save();
-      ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,SZ/2,0,Math.PI*2); ctx.clip();
-      const scale=Math.max(SZ/snapImg.naturalWidth,SZ/snapImg.naturalHeight);
-      const sw=snapImg.naturalWidth*scale, sh=snapImg.naturalHeight*scale;
-      ctx.drawImage(snapImg,S/2-sw/2,EMOJ_CY-sh/2,sw,sh);
-      ctx.restore();
+  const EMOJ_CY=160, SZ=180;
+  let snapDrawn=false;
+  if (img) {
+    // try Firebase Storage URL first (synced across devices)
+    const snapUrl = localStorage.getItem(`meme_snap_url_${img}`) || localStorage.getItem(`meme_snap_${img}`);
+    if (snapUrl) {
+      const snapImg = new Image();
+      if (snapUrl.startsWith('http')) snapImg.crossOrigin = 'anonymous';
+      await new Promise(r => { snapImg.onload=r; snapImg.onerror=r; snapImg.src=snapUrl; });
+      if (snapImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,SZ/2,0,Math.PI*2); ctx.clip();
+        const scale=Math.max(SZ/snapImg.naturalWidth,SZ/snapImg.naturalHeight);
+        const sw=snapImg.naturalWidth*scale, sh=snapImg.naturalHeight*scale;
+        ctx.drawImage(snapImg,S/2-sw/2,EMOJ_CY-sh/2,sw,sh);
+        ctx.restore();
+        snapDrawn=true;
+      }
     }
-  } else {
+  }
+  if (!snapDrawn) {
     // emoji circle fallback
     ctx.fillStyle='rgba(255,255,255,.7)';
     ctx.beginPath(); ctx.arc(S/2,EMOJ_CY,78,0,Math.PI*2); ctx.fill();
@@ -1985,28 +2005,35 @@ function _wrapTextCenter(ctx,text,cx,y,maxW,lh){
 }
 
 async function shareMemeCard() {
-  const canvas = await generateMemeCanvas();
-  canvas.toBlob(async blob => {
-    const file = new File([blob],'exam-score.png',{type:'image/png'});
-    const d = window._memeCardData||{};
-    try {
-      if(navigator.canShare?.({files:[file]})){
-        await navigator.share({files:[file],title:'ผลคะแนนสอบ',
-          text:`ทำข้อสอบได้ ${d.score}/${d.total} (${d.pct}%) — ${d.tier?.title||''}`});
-        return;
-      }
-    } catch(e){}
-    _downloadCanvas(canvas);
-  },'image/png');
+  try {
+    const canvas = await generateMemeCanvas();
+    canvas.toBlob(async blob => {
+      const file = new File([blob],'exam-score.png',{type:'image/png'});
+      const d = window._memeCardData||{};
+      try {
+        if(navigator.canShare?.({files:[file]})){
+          await navigator.share({files:[file],title:'ผลคะแนนสอบ',
+            text:`ทำข้อสอบได้ ${d.score}/${d.total} (${d.pct}%) — ${d.tier?.title||''}`});
+          return;
+        }
+      } catch(e){}
+      _downloadCanvas(canvas);
+    },'image/png');
+  } catch(e) { console.error('shareMemeCard error',e); alert('แชร์ไม่สำเร็จ: '+e.message); }
 }
 
-async function saveMemeCard() { _downloadCanvas(await generateMemeCanvas()); }
+async function saveMemeCard() {
+  try {
+    const canvas = await generateMemeCanvas();
+    _downloadCanvas(canvas);
+  } catch(e) { console.error('saveMemeCard error',e); alert('บันทึกไม่สำเร็จ: '+e.message); }
+}
 
 function _downloadCanvas(canvas) {
   const a=document.createElement('a');
   a.download=`exam-score-${Date.now()}.png`;
   a.href=canvas.toDataURL('image/png');
-  a.click();
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 // ── Home page render (role-aware) ──
@@ -3954,7 +3981,23 @@ async function snapMeme(tierKey, idx) {
     Math.round(rect.left * dpr), Math.round(rect.top * dpr), cw, ch,
     0, 0, cw * 3, ch * 3);
 
-  localStorage.setItem(`meme_snap_${giphyId}`, crop.toDataURL('image/jpeg', 0.88));
+  // store locally first (instant feedback)
+  const dataUrl = crop.toDataURL('image/jpeg', 0.88);
+  localStorage.setItem(`meme_snap_${giphyId}`, dataUrl);
+
+  // upload to Firebase Storage → sync across devices
+  try {
+    const fb = FirebaseDB.init();
+    if (fb && fb.ready()) {
+      const blob = await new Promise(r => crop.toBlob(r, 'image/jpeg', 0.88));
+      const url = await fb.uploadBlob(`meme-snaps/${giphyId}.jpg`, blob);
+      localStorage.setItem(`meme_snap_url_${giphyId}`, url);
+      // save URL to Firestore for other devices
+      const snaps = (await fb.loadDoc('_memeSnaps')) || {};
+      snaps[giphyId] = url;
+      await fb.saveDoc('_memeSnaps', snaps);
+    }
+  } catch(e) { console.warn('snap upload error', e); }
 
   // refresh badge
   const badge = previewEl.querySelector('[title="มี snap แล้ว"]');
@@ -3980,7 +4023,8 @@ function updateMemePreview(tierKey, idx, rawUrl) {
     : '';
 }
 
-function saveMemeConfig() {
+async function saveMemeConfig() {
+  const oldConfig = getMemeConfig() || {};
   const config = { titles: {} };
   MEME_TIER_META.forEach(tier => {
     config.titles[tier.key] = (document.getElementById(`meme_title_${tier.key}`)?.value || '').trim();
@@ -3991,13 +4035,44 @@ function saveMemeConfig() {
       if (id) config[tier.key].push([id, cap || '']);
     }
   });
+
+  // find IDs that were removed or changed → delete their snaps
+  const newIds = new Set(MEME_TIER_META.flatMap(t => (config[t.key]||[]).map(([id])=>id)));
+  const removedIds = MEME_TIER_META.flatMap(t => (oldConfig[t.key]||[]).map(([id])=>id))
+    .filter(id => id && !newIds.has(id));
+  if (removedIds.length) {
+    _deleteMemeSnaps(removedIds); // fire-and-forget
+  }
+
   localStorage.setItem('meme_config', JSON.stringify(config));
   const btns = document.querySelectorAll('#page-admin_memes .btn[onclick="saveMemeConfig()"]');
   btns.forEach(btn => { const t=btn.textContent; btn.textContent='✓ บันทึกแล้ว'; setTimeout(()=>btn.textContent=t,1500); });
 }
 
-function resetMemeConfig() {
+async function _deleteMemeSnaps(ids) {
+  try {
+    const fb = FirebaseDB.init();
+    let snaps = fb?.ready() ? ((await fb.loadDoc('_memeSnaps')) || {}) : null;
+    for (const id of ids) {
+      localStorage.removeItem(`meme_snap_${id}`);
+      localStorage.removeItem(`meme_snap_url_${id}`);
+      if (fb?.ready()) {
+        await fb.deleteBlob(`meme-snaps/${id}.jpg`).catch(()=>{});
+        if (snaps) delete snaps[id];
+      }
+    }
+    if (fb?.ready() && snaps) await fb.saveDoc('_memeSnaps', snaps);
+  } catch(e) { console.warn('delete snaps error', e); }
+}
+
+async function resetMemeConfig() {
   if (!confirm('รีเซ็ตมีมกลับเป็นค่าเริ่มต้น?')) return;
+  // delete all snaps
+  const old = getMemeConfig();
+  if (old) {
+    const ids = MEME_TIER_META.flatMap(t => (old[t.key]||[]).map(([id])=>id)).filter(Boolean);
+    if (ids.length) _deleteMemeSnaps(ids);
+  }
   localStorage.removeItem('meme_config');
   initAdminMemes();
 }
