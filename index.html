@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.24 -->
+  <!-- APP_VERSION: v45.25 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.24</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.25</div>
     </div>
   </div>
 </div>
@@ -1801,7 +1801,12 @@ const MemeScore = (() => {
     if(!loading || !result || !memeBox) { close(); return; }
 
     const memeImgEl = document.getElementById('memeImg');
-    if(memeImgEl) memeImgEl.src = img;
+    if(memeImgEl) {
+      fetch(img, { referrerPolicy: 'no-referrer' })
+        .then(r => r.blob())
+        .then(blob => { memeImgEl.src = URL.createObjectURL(blob); })
+        .catch(() => { memeImgEl.src = img; });
+    }
     const wrap = document.getElementById('memeImgWrap');
     if(wrap) wrap.style.background = tier.bg;
 
@@ -5744,7 +5749,7 @@ function initEntranceCompare(params) {
       <div style="display:flex;align-items:stretch;height:170px;">
         <!-- รูป meme ซ้าย -->
         <div id="memeImgWrap" style="width:143px;min-width:143px;background:#f3f4f6;flex-shrink:0;overflow:hidden;">
-          <img id="memeImg" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;"
+          <img id="memeImg" src="" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block;"
             onerror="this.parentElement.innerHTML='<div style=&quot;display:flex;align-items:center;justify-content:center;height:100%;font-size:40px;&quot; id=&quot;memeFallbackEmoji&quot;></div>'" />
         </div>
         <!-- ข้อมูลขวา -->
