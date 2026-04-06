@@ -4,12 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.22 -->
+  <!-- APP_VERSION: v45.23 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
     html,body{margin:0;padding:0;}
-    body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans Thai","Noto Sans","Liberation Sans";color:#111;background:#fff;}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans Thai","Noto Sans","Liberation Sans";color:#111;background:#fff;user-select:none;-webkit-user-select:none;}
+    input,textarea,select,[contenteditable]{user-select:text;-webkit-user-select:text;}
     a{color:inherit;text-decoration:none;}
     .container{max-width:1200px;margin:0 auto;padding:24px;}
     .h1{font-size:22px;font-weight:900;margin:0;}
@@ -343,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.22</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.23</div>
     </div>
   </div>
 </div>
