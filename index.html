@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.25 -->
+  <!-- APP_VERSION: v45.26 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.25</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.26</div>
     </div>
   </div>
 </div>
@@ -1664,43 +1664,43 @@ let _pageParams={};
 
 // ===================== MEME SCORE POPUP =====================
 const MemeScore = (() => {
-  // Giphy GIF URLs — hotlink OK, CDN: media.giphy.com
+  // Giphy IDs — embed via giphy.com/embed/{ID} (iframe, no hotlink block)
   const MEMES = {
     // 💀 0–49% หายนะ — crying cat memes
     disaster: [
-      ['https://media.giphy.com/media/3o6Zt7StAisetJ7ntC/giphy.gif',    'สมองไปเที่ยวไหนมาครับ?'],
-      ['https://media.giphy.com/media/TjS7u7yoMC2KubI5wE/giphy.gif',    'น้ำตาจะไหลออกมาเองเลย'],
-      ['https://media.giphy.com/media/l4FGk7QngyoLUbnm8/giphy.gif',     'ขอกลับบ้านได้ไหมครับ 😭'],
-      ['https://media.giphy.com/media/9tJfy6FpyQ4PQ4fXTQ/giphy.gif',    'ยังมีวันพรุ่งนี้นะ... บางที'],
-      ['https://media.giphy.com/media/qxRMbqPKaXbUYB28Eu/giphy.gif',    'ข้อสอบ 1 - ฉัน 0'],
-      ['https://media.giphy.com/media/GwskZm1jXg8cDvuZJ6/giphy.gif',    'ตัวตลกแห่งวันนี้คือ...'],
+      ['3o6Zt7StAisetJ7ntC', 'สมองไปเที่ยวไหนมาครับ?'],
+      ['TjS7u7yoMC2KubI5wE', 'น้ำตาจะไหลออกมาเองเลย'],
+      ['l4FGk7QngyoLUbnm8',  'ขอกลับบ้านได้ไหมครับ 😭'],
+      ['9tJfy6FpyQ4PQ4fXTQ', 'ยังมีวันพรุ่งนี้นะ... บางที'],
+      ['qxRMbqPKaXbUYB28Eu', 'ข้อสอบ 1 - ฉัน 0'],
+      ['GwskZm1jXg8cDvuZJ6', 'ตัวตลกแห่งวันนี้คือ...'],
     ],
     // 😬 50–69% พอผ่าน — this is fine + hide pain harold
     meh: [
-      ['https://media.giphy.com/media/B01UhEnqUO1QXV062I/giphy.gif',    'This is fine. 🔥'],
-      ['https://media.giphy.com/media/3jbR27OLT5YJv0ewvN/giphy.gif',    'ผ่านก็คือผ่าน ไม่ต้องพูดมาก'],
-      ['https://media.giphy.com/media/SFJDkCE9wefecClpL6/giphy.gif',    'ยิ้มทน... ก็ได้'],
-      ['https://media.giphy.com/media/1NTmCiaP4KCATiKJHS/giphy.gif',    'อย่างน้อยก็ยังไม่ตาย'],
-      ['https://media.giphy.com/media/d5Fbtoj47ROk0J9IgW/giphy.gif',    'OK... ก็โอเคนะ'],
-      ['https://media.giphy.com/media/WFmNqHlHumQoOn7Nsj/giphy.gif',    'โอเค (โกหก)'],
+      ['B01UhEnqUO1QXV062I', 'This is fine. 🔥'],
+      ['3jbR27OLT5YJv0ewvN', 'ผ่านก็คือผ่าน ไม่ต้องพูดมาก'],
+      ['SFJDkCE9wefecClpL6', 'ยิ้มทน... ก็ได้'],
+      ['1NTmCiaP4KCATiKJHS', 'อย่างน้อยก็ยังไม่ตาย'],
+      ['d5Fbtoj47ROk0J9IgW', 'OK... ก็โอเคนะ'],
+      ['WFmNqHlHumQoOn7Nsj', 'โอเค (โกหก)'],
     ],
     // 😎 70–84% ดี — stonks + success
     good: [
-      ['https://media.giphy.com/media/xThuWpoG470Q0stGmI/giphy.gif',    'wow. such score. very nice.'],
-      ['https://media.giphy.com/media/ny3EbSkfGuuOHIcRNM/giphy.gif',    'STONKS ↑↑↑ คะแนนพุ่ง!'],
-      ['https://media.giphy.com/media/XgFo77hQvSVyUzLVSh/giphy.gif',    'ไม่เลวเลยนะเนี่ย!'],
-      ['https://media.giphy.com/media/26xBNmDKgH5Z6yBck/giphy.gif',     'กำลังดีมาก ไปต่อได้!'],
-      ['https://media.giphy.com/media/kDa9o3H2qsKmF2JXl4/giphy.gif',    'สมองทำงานแล้ว! 🧠'],
-      ['https://media.giphy.com/media/hwiP2EdgJdqwmeJF9h/giphy.gif',    'เก่งขึ้นทุกวันเลยนะ'],
+      ['xThuWpoG470Q0stGmI', 'wow. such score. very nice.'],
+      ['ny3EbSkfGuuOHIcRNM', 'STONKS ↑↑↑ คะแนนพุ่ง!'],
+      ['XgFo77hQvSVyUzLVSh', 'ไม่เลวเลยนะเนี่ย!'],
+      ['26xBNmDKgH5Z6yBck',  'กำลังดีมาก ไปต่อได้!'],
+      ['kDa9o3H2qsKmF2JXl4', 'สมองทำงานแล้ว! 🧠'],
+      ['hwiP2EdgJdqwmeJF9h', 'เก่งขึ้นทุกวันเลยนะ'],
     ],
     // 🔥 85–100% เทพ — gigachad + celebration
     goat: [
-      ['https://media.giphy.com/media/HzshGTcQLgFcOiiykn/giphy.gif',    'GIGACHAD MODE 🗿'],
-      ['https://media.giphy.com/media/9Ex8DYmuJGaHFMDvWu/giphy.gif',    'SIGMA GRINDSET 😤'],
-      ['https://media.giphy.com/media/8iA90QlHUONNVtQdTX/giphy.gif',    'OMG เทพมากกกก!!!'],
-      ['https://media.giphy.com/media/3oEduLyQaF5JoKnuM0/giphy.gif',    'PLUS ULTRA!!! 🔥🔥🔥'],
-      ['https://media.giphy.com/media/gSST5BJ4dY24LJxn49/giphy.gif',    'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
-      ['https://media.giphy.com/media/weDE9y2Rv99GyAFw2G/giphy.gif',    'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
+      ['HzshGTcQLgFcOiiykn', 'GIGACHAD MODE 🗿'],
+      ['9Ex8DYmuJGaHFMDvWu', 'SIGMA GRINDSET 😤'],
+      ['8iA90QlHUONNVtQdTX', 'OMG เทพมากกกก!!!'],
+      ['3oEduLyQaF5JoKnuM0', 'PLUS ULTRA!!! 🔥🔥🔥'],
+      ['gSST5BJ4dY24LJxn49', 'ขอบคุณเทพเจ้าแห่งข้อสอบ'],
+      ['weDE9y2Rv99GyAFw2G',  'ทำไมเก่งขนาดนี้ ไม่แฟร์!!'],
     ],
   };
 
@@ -1801,12 +1801,7 @@ const MemeScore = (() => {
     if(!loading || !result || !memeBox) { close(); return; }
 
     const memeImgEl = document.getElementById('memeImg');
-    if(memeImgEl) {
-      fetch(img, { referrerPolicy: 'no-referrer' })
-        .then(r => r.blob())
-        .then(blob => { memeImgEl.src = URL.createObjectURL(blob); })
-        .catch(() => { memeImgEl.src = img; });
-    }
+    if(memeImgEl) memeImgEl.src = `https://giphy.com/embed/${img}`;
     const wrap = document.getElementById('memeImgWrap');
     if(wrap) wrap.style.background = tier.bg;
 
@@ -1832,8 +1827,6 @@ const MemeScore = (() => {
           </div>
         </div>`;
     }
-    const fe = document.getElementById('memeFallbackEmoji');
-    if(fe) fe.textContent = tier.emoji;
     memeBox.style.background = tier.bg;
 
     loading.style.display = 'none';
@@ -5749,8 +5742,8 @@ function initEntranceCompare(params) {
       <div style="display:flex;align-items:stretch;height:170px;">
         <!-- รูป meme ซ้าย -->
         <div id="memeImgWrap" style="width:143px;min-width:143px;background:#f3f4f6;flex-shrink:0;overflow:hidden;">
-          <img id="memeImg" src="" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="this.parentElement.innerHTML='<div style=&quot;display:flex;align-items:center;justify-content:center;height:100%;font-size:40px;&quot; id=&quot;memeFallbackEmoji&quot;></div>'" />
+          <iframe id="memeImg" src="" frameborder="0" allowfullscreen
+            style="width:143px;height:170px;border:none;display:block;pointer-events:none;"></iframe>
         </div>
         <!-- ข้อมูลขวา -->
         <div id="memeInfoCol" style="flex:1;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;">
