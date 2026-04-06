@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.29 -->
+  <!-- APP_VERSION: v45.30 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.29</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.30</div>
     </div>
   </div>
 </div>
@@ -1827,10 +1827,11 @@ const MemeScore = (() => {
     const memeBox = document.getElementById('memeBox');
     if(!loading || !result || !memeBox) { close(); return; }
 
+    // store for share/save
+    window._memeCardData = { score, total, pct, tier, caption, img };
+
     const memeImgEl = document.getElementById('memeImg');
     if(memeImgEl) memeImgEl.src = `https://giphy.com/embed/${img}`;
-    const wrap = document.getElementById('memeImgWrap');
-    if(wrap) wrap.style.background = tier.bg;
 
     const _set = (id, prop, val) => { const el=document.getElementById(id); if(el) el[prop]=val; };
     const _style = (id, prop, val) => { const el=document.getElementById(id); if(el) el.style[prop]=val; };
@@ -1839,6 +1840,8 @@ const MemeScore = (() => {
     _set('memeScore','textContent', `${score}/${total}`);  _style('memeScore','color', tier.color);
     _set('memePct',  'textContent', `คิดเป็น ${pct}%`);   _style('memePct','color', tier.color);
     _set('memeCaption','textContent', caption);
+    const hdr = document.getElementById('memeHeader');
+    if(hdr) hdr.style.background = tier.bg;
 
     // cheer bubble — ใช้ rgba แทน 8-digit hex ที่ Safari ไม่รองรับ
     const cheerEl = document.getElementById('memeCheer');
@@ -1873,6 +1876,101 @@ const MemeScore = (() => {
 })();
 
 function closeMemeOverlay() { MemeScore.close(); }
+
+function generateMemeCanvas() {
+  const d = window._memeCardData || {};
+  const { score=0, total=0, pct=0, tier={}, caption='' } = d;
+  const S = 600;
+  const canvas = document.createElement('canvas');
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  ctx.textBaseline = 'middle';
+
+  // bg gradient
+  const grad = ctx.createLinearGradient(0,0,S,S);
+  grad.addColorStop(0, tier.bg||'#f9fafb');
+  grad.addColorStop(1,'#ffffff');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,S,S);
+
+  // decorative circles
+  ctx.globalAlpha = .07;
+  ctx.fillStyle = tier.color||'#6366f1';
+  ctx.beginPath(); ctx.arc(-40,-40,220,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(S+40,S+40,200,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // top bar
+  ctx.fillStyle = tier.color||'#6366f1';
+  ctx.fillRect(0,0,S,68);
+
+  // app name
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.font = 'bold 22px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('My Exam Academia', 24, 34);
+
+  // tier name on bar right
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 16px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText(tier.title||'', S-24, 34);
+
+  // big emoji
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '100px serif';
+  ctx.fillText(tier.emoji||'', S/2, 210);
+
+  // score
+  ctx.fillStyle = tier.color||'#111';
+  ctx.font = `bold 110px ui-sans-serif,system-ui,sans-serif`;
+  ctx.fillText(`${score}/${total}`, S/2, 340);
+
+  // pct
+  ctx.font = 'bold 38px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText(`คิดเป็น ${pct}%`, S/2, 405);
+
+  // divider
+  ctx.strokeStyle = tier.color||'#e5e7eb';
+  ctx.globalAlpha = .25; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(60,440); ctx.lineTo(S-60,440); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // caption
+  ctx.fillStyle = '#6b7280';
+  ctx.font = 'italic 22px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText(caption, S/2, 468);
+
+  // watermark
+  ctx.fillStyle = '#d1d5db';
+  ctx.font = '15px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText('smitharnonwattana-svg.github.io/Quiz-app', S/2, S-22);
+
+  return canvas;
+}
+
+async function shareMemeCard() {
+  const canvas = generateMemeCanvas();
+  canvas.toBlob(async blob => {
+    const file = new File([blob], 'exam-score.png', { type:'image/png' });
+    const d = window._memeCardData || {};
+    try {
+      if (navigator.canShare?.({ files:[file] })) {
+        await navigator.share({ files:[file], title:'ผลคะแนนสอบ',
+          text:`ทำข้อสอบได้ ${d.score}/${d.total} (${d.pct}%) — ${d.tier?.title||''}` });
+        return;
+      }
+    } catch(e) {}
+    _downloadCanvas(canvas);
+  }, 'image/png');
+}
+
+function saveMemeCard() { _downloadCanvas(generateMemeCanvas()); }
+
+function _downloadCanvas(canvas) {
+  const a = document.createElement('a');
+  a.download = `exam-score-${Date.now()}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
 
 // ── Home page render (role-aware) ──
 function renderHome(){
@@ -5852,11 +5950,11 @@ function initEntranceCompare(params) {
 </script>
 
 <!-- ===================== MEME SCORE OVERLAY ===================== -->
-<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);z-index:99999;align-items:center;justify-content:center;padding:16px;">
-  <div id="memeBox" style="background:#fff;border-radius:16px;width:min(440px,92vw);overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4);animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
+<div id="memeOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,20,.85);z-index:99999;align-items:center;justify-content:center;padding:12px;">
+  <div id="memeBox" style="background:#fff;border-radius:20px;width:min(400px,92vw);overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.55);animation:memePop .4s cubic-bezier(.34,1.56,.64,1);">
 
     <!-- Loading -->
-    <div id="memeLoading" style="padding:30px 24px;text-align:center;">
+    <div id="memeLoading" style="padding:40px 24px;text-align:center;">
       <div style="font-size:30px;margin-bottom:10px;">⚙️</div>
       <div style="font-weight:900;font-size:17px;margin-bottom:8px;">ประมวลผลคำตอบ...</div>
       <div id="memeLoadingBar" style="height:6px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:0 auto 8px;max-width:180px;">
@@ -5865,38 +5963,49 @@ function initEntranceCompare(params) {
       <div id="memeLoadingTxt" style="font-size:11px;color:#6b7280;">🔍 ตรวจข้อ...</div>
     </div>
 
-    <!-- Result: แนวนอน รูปซ้าย ข้อมูลขวา -->
+    <!-- Result: IG square style -->
     <div id="memeResult" style="display:none;">
-      <div style="display:flex;align-items:stretch;height:170px;">
-        <!-- รูป meme ซ้าย -->
-        <div id="memeImgWrap" style="width:143px;min-width:143px;background:#f3f4f6;flex-shrink:0;overflow:hidden;">
-          <iframe id="memeImg" src="" frameborder="0" allowfullscreen
-            style="width:143px;height:170px;border:none;display:block;pointer-events:none;"></iframe>
-        </div>
-        <!-- ข้อมูลขวา -->
-        <div id="memeInfoCol" style="flex:1;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;">
-          <div>
-            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-              <span id="memeEmoji" style="font-size:20px;"></span>
-              <span id="memeTitle" style="font-weight:900;font-size:17px;line-height:1.2;"></span>
-            </div>
-            <div id="memeScore" style="font-size:28px;font-weight:900;line-height:1;margin:4px 0;"></div>
-            <div id="memePct" style="font-size:15px;font-weight:700;"></div>
-            <div id="memeCaption" style="font-size:12px;color:#6b7280;font-style:italic;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-          </div>
-          <button onclick="closeMemeOverlay()" class="btn"
-            style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:10px;align-self:flex-start;">ดูเฉลย →</button>
-        </div>
-      </div>
-      <!-- ออลไมท์ cheer แถบด้านล่าง -->
-      <div id="memeCheer"></div>
-    </div>
 
+      <!-- Header bar (tier color) -->
+      <div id="memeHeader" style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="memeEmoji" style="font-size:18px;"></span>
+          <span id="memeTitle" style="font-weight:900;font-size:15px;line-height:1.2;"></span>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.05em;">MY EXAM ACADEMIA</div>
+      </div>
+
+      <!-- GIF: square (full width) -->
+      <div id="memeImgWrap" style="width:100%;aspect-ratio:1/1;background:#f3f4f6;overflow:hidden;">
+        <iframe id="memeImg" src="" frameborder="0" allowfullscreen
+          style="width:100%;height:100%;border:none;display:block;pointer-events:none;"></iframe>
+      </div>
+
+      <!-- Score info -->
+      <div style="padding:14px 16px 10px;">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+          <div id="memeScore" style="font-size:36px;font-weight:900;line-height:1;"></div>
+          <div id="memePct" style="font-size:16px;font-weight:700;"></div>
+        </div>
+        <div id="memeCaption" style="font-size:13px;color:#6b7280;font-style:italic;margin-top:4px;"></div>
+      </div>
+
+      <!-- Buttons: Share / Save / Review -->
+      <div style="padding:0 12px 12px;display:flex;gap:8px;">
+        <button onclick="shareMemeCard()" class="btn" style="flex:1;font-size:13px;font-weight:700;padding:9px 8px;border-radius:12px;">📤 แชร์</button>
+        <button onclick="saveMemeCard()" class="btn" style="flex:1;font-size:13px;font-weight:700;padding:9px 8px;border-radius:12px;">💾 บันทึก</button>
+        <button onclick="closeMemeOverlay()" class="btn btnPrimary" style="flex:1;font-size:13px;font-weight:700;padding:9px 8px;border-radius:12px;">ดูเฉลย →</button>
+      </div>
+
+      <!-- Cheer bubble -->
+      <div id="memeCheer"></div>
+
+    </div>
   </div>
 </div>
 <style>
 @keyframes memePop {
-  from { opacity:0; transform:scale(.7) translateY(30px); }
+  from { opacity:0; transform:scale(.75) translateY(24px); }
   to   { opacity:1; transform:scale(1) translateY(0); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
