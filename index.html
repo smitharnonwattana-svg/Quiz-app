@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.30 -->
+  <!-- APP_VERSION: v45.31 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.30</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.31</div>
     </div>
   </div>
 </div>
@@ -1848,6 +1848,7 @@ const MemeScore = (() => {
     if(cheerEl) {
       const _cheerList = tier.cheers || [{speaker: tier.speaker||'', cheer: tier.cheer||''}];
       const _picked = _cheerList[Math.floor(Math.random()*_cheerList.length)];
+      window._memeCardData.cheer = _picked; // store for share card
       cheerEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.04);border-top:1px solid rgba(0,0,0,.08);">
           <div style="font-size:22px;flex-shrink:0;">💪😁</div>
@@ -1877,98 +1878,130 @@ const MemeScore = (() => {
 
 function closeMemeOverlay() { MemeScore.close(); }
 
-function generateMemeCanvas() {
+async function generateMemeCanvas() {
   const d = window._memeCardData || {};
-  const { score=0, total=0, pct=0, tier={}, caption='' } = d;
-  const S = 600;
+  const { score=0, total=0, pct=0, tier={}, caption='', img='', cheer=null } = d;
+  const W = 600, H = 720; // taller to fit cheer
   const canvas = document.createElement('canvas');
-  canvas.width = S; canvas.height = S;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.textBaseline = 'middle';
+  const C = tier.color||'#6366f1';
 
-  // bg gradient
-  const grad = ctx.createLinearGradient(0,0,S,S);
+  // ── background ──
+  const grad = ctx.createLinearGradient(0,0,W,H);
   grad.addColorStop(0, tier.bg||'#f9fafb');
-  grad.addColorStop(1,'#ffffff');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,S,S);
+  grad.addColorStop(1,'#fff');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
 
   // decorative circles
-  ctx.globalAlpha = .07;
-  ctx.fillStyle = tier.color||'#6366f1';
-  ctx.beginPath(); ctx.arc(-40,-40,220,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(S+40,S+40,200,0,Math.PI*2); ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha=.08; ctx.fillStyle=C;
+  ctx.beginPath(); ctx.arc(-50,-50,230,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(W+50,H+50,210,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
 
-  // top bar
-  ctx.fillStyle = tier.color||'#6366f1';
-  ctx.fillRect(0,0,S,68);
+  // ── top bar ──
+  ctx.fillStyle=C; ctx.fillRect(0,0,W,68);
+  ctx.fillStyle='rgba(255,255,255,.92)';
+  ctx.font='bold 22px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText('My Exam Academia',24,34);
+  ctx.textAlign='right'; ctx.font='bold 16px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText(tier.title||'',W-24,34);
 
-  // app name
-  ctx.fillStyle = 'rgba(255,255,255,.9)';
-  ctx.font = 'bold 22px ui-sans-serif,system-ui,sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText('My Exam Academia', 24, 34);
+  // ── meme image (300x300 square, centered) ──
+  const GIF_Y=68, GIF_H=W; // full width square
+  let gifLoaded=false;
+  if(img) {
+    const proxyUrl=`https://corsproxy.io/?url=${encodeURIComponent(`https://media.giphy.com/media/${img}/giphy.gif`)}`;
+    gifLoaded = await new Promise(resolve=>{
+      const i=new Image(); i.crossOrigin='anonymous';
+      i.onload=()=>{ ctx.drawImage(i,0,GIF_Y,W,GIF_H); resolve(true); };
+      i.onerror=()=>resolve(false);
+      setTimeout(()=>resolve(false),6000);
+      i.src=proxyUrl;
+    });
+  }
+  if(!gifLoaded) {
+    // fallback: emoji tile background
+    ctx.fillStyle=tier.bg||'#f3f4f6'; ctx.fillRect(0,GIF_Y,W,GIF_H);
+    ctx.font='90px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha=.18;
+    const emj=(tier.emoji||'🎯').replace(/\s/g,'')[0];
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++)
+      ctx.fillText(emj,75+c*150,GIF_Y+75+r*150);
+    ctx.globalAlpha=1;
+    ctx.font='100px serif';
+    ctx.fillText(tier.emoji||'',W/2,GIF_Y+GIF_H/2);
+  }
 
-  // tier name on bar right
-  ctx.textAlign = 'right';
-  ctx.font = 'bold 16px ui-sans-serif,system-ui,sans-serif';
-  ctx.fillText(tier.title||'', S-24, 34);
+  // ── score card overlay (bottom of gif area) ──
+  const CARD_Y=GIF_Y+GIF_H-130;
+  ctx.fillStyle='rgba(255,255,255,.92)';
+  ctx.beginPath();
+  ctx.roundRect(0,CARD_Y,W,130,0);
+  ctx.fill();
+  ctx.fillStyle=C;
+  ctx.font='bold 72px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(`${score}/${total}`,W/2,CARD_Y+45);
+  ctx.font='bold 28px ui-sans-serif,system-ui,sans-serif';
+  ctx.fillText(`คิดเป็น ${pct}%`,W/2,CARD_Y+92);
+  if(caption){
+    ctx.fillStyle='#6b7280'; ctx.font='italic 18px ui-sans-serif,system-ui,sans-serif';
+    ctx.fillText(caption,W/2,CARD_Y+118);
+  }
 
-  // big emoji
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = '100px serif';
-  ctx.fillText(tier.emoji||'', S/2, 210);
+  // ── cheer section ──
+  const CHEER_Y=GIF_Y+GIF_H+8;
+  if(cheer){
+    ctx.fillStyle='rgba(0,0,0,.04)'; ctx.fillRect(0,CHEER_Y,W,H-CHEER_Y-36);
+    ctx.fillStyle=C; ctx.font='bold 15px ui-sans-serif,system-ui,sans-serif';
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(`💬 ${cheer.speaker}`,20,CHEER_Y+14);
+    ctx.fillStyle='#374151'; ctx.font='16px ui-sans-serif,system-ui,sans-serif';
+    _wrapText(ctx,cheer.cheer,20,CHEER_Y+36,W-40,22);
+  }
 
-  // score
-  ctx.fillStyle = tier.color||'#111';
-  ctx.font = `bold 110px ui-sans-serif,system-ui,sans-serif`;
-  ctx.fillText(`${score}/${total}`, S/2, 340);
-
-  // pct
-  ctx.font = 'bold 38px ui-sans-serif,system-ui,sans-serif';
-  ctx.fillText(`คิดเป็น ${pct}%`, S/2, 405);
-
-  // divider
-  ctx.strokeStyle = tier.color||'#e5e7eb';
-  ctx.globalAlpha = .25; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(60,440); ctx.lineTo(S-60,440); ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  // caption
-  ctx.fillStyle = '#6b7280';
-  ctx.font = 'italic 22px ui-sans-serif,system-ui,sans-serif';
-  ctx.fillText(caption, S/2, 468);
-
-  // watermark
-  ctx.fillStyle = '#d1d5db';
-  ctx.font = '15px ui-sans-serif,system-ui,sans-serif';
-  ctx.fillText('smitharnonwattana-svg.github.io/Quiz-app', S/2, S-22);
+  // ── watermark ──
+  ctx.fillStyle='#d1d5db'; ctx.font='13px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText('smitharnonwattana-svg.github.io/Quiz-app',W/2,H-6);
 
   return canvas;
 }
 
-async function shareMemeCard() {
-  const canvas = generateMemeCanvas();
-  canvas.toBlob(async blob => {
-    const file = new File([blob], 'exam-score.png', { type:'image/png' });
-    const d = window._memeCardData || {};
-    try {
-      if (navigator.canShare?.({ files:[file] })) {
-        await navigator.share({ files:[file], title:'ผลคะแนนสอบ',
-          text:`ทำข้อสอบได้ ${d.score}/${d.total} (${d.pct}%) — ${d.tier?.title||''}` });
-        return;
-      }
-    } catch(e) {}
-    _downloadCanvas(canvas);
-  }, 'image/png');
+function _wrapText(ctx,text,x,y,maxW,lh){
+  const words=text.split(' '); let line='';
+  for(let n=0;n<words.length;n++){
+    const test=line+words[n]+' ';
+    if(ctx.measureText(test).width>maxW && n>0){ ctx.fillText(line,x,y); line=words[n]+' '; y+=lh; }
+    else line=test;
+  }
+  ctx.fillText(line,x,y);
 }
 
-function saveMemeCard() { _downloadCanvas(generateMemeCanvas()); }
+async function shareMemeCard() {
+  const canvas = await generateMemeCanvas();
+  canvas.toBlob(async blob => {
+    const file = new File([blob],'exam-score.png',{type:'image/png'});
+    const d = window._memeCardData||{};
+    try {
+      if(navigator.canShare?.({files:[file]})){
+        await navigator.share({files:[file],title:'ผลคะแนนสอบ',
+          text:`ทำข้อสอบได้ ${d.score}/${d.total} (${d.pct}%) — ${d.tier?.title||''}`});
+        return;
+      }
+    } catch(e){}
+    _downloadCanvas(canvas);
+  },'image/png');
+}
+
+async function saveMemeCard() { _downloadCanvas(await generateMemeCanvas()); }
 
 function _downloadCanvas(canvas) {
-  const a = document.createElement('a');
-  a.download = `exam-score-${Date.now()}.png`;
-  a.href = canvas.toDataURL('image/png');
+  const a=document.createElement('a');
+  a.download=`exam-score-${Date.now()}.png`;
+  a.href=canvas.toDataURL('image/png');
   a.click();
 }
 
