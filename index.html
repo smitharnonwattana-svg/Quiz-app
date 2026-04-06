@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.27 -->
+  <!-- APP_VERSION: v45.28 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -344,7 +344,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.27</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.28</div>
     </div>
   </div>
 </div>
@@ -794,6 +794,9 @@
         <div class="linkCard" onclick="navigate('admin_members')">
           <div style="font-weight:900;">👥 จัดการสมาชิก</div>
         </div>
+        <div class="linkCard" onclick="navigate('admin_memes')">
+          <div style="font-weight:900;">🎭 จัดการมีม</div>
+        </div>
       </div>
     </div>
   </div>
@@ -868,6 +871,26 @@
       </div>
       <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
       <div id="memberTbody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ADMIN MEMES ===================== -->
+<div id="page-admin_memes" class="page">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+      <h1 class="h1">🎭 จัดการมีม</h1>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="resetMemeConfig()" style="color:#dc2626;border-color:#fca5a5;">รีเซ็ตค่าเริ่มต้น</button>
+        <button class="btn" onclick="saveMemeConfig()" style="background:#111827;color:#fff;border-color:#111827;">💾 บันทึก</button>
+        <button class="btn" onclick="navigate('admin')">← กลับ</button>
+      </div>
+    </div>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 20px;">วางลิ้งจาก <strong>giphy.com/gifs/...</strong> ในช่อง URL ระบบจะดึง ID ให้อัตโนมัติ และแสดงตัวอย่างรูปด้านขวา</p>
+    <div id="memeTierList"></div>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="resetMemeConfig()" style="color:#dc2626;border-color:#fca5a5;">รีเซ็ตค่าเริ่มต้น</button>
+      <button class="btn" onclick="saveMemeConfig()" style="background:#111827;color:#fff;border-color:#111827;">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -1540,7 +1563,7 @@ const Store = {
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
       const safeSoftRefresh = ['home','stats'].concat(window._examsEditMode ? [] : ['exams']);
-      const adminPages = ['admin','admin_new','admin_editor','admin_benchmark'];
+      const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
         navigate(pg, window._currentParams||{});
@@ -1741,7 +1764,9 @@ const MemeScore = (() => {
     return TIERS.find(t => pct <= t.max) || TIERS[TIERS.length-1];
   }
   function randMeme(key) {
-    const arr = MEMES[key];
+    let pool;
+    try { const s=localStorage.getItem('meme_config'); if(s){ const c=JSON.parse(s); if(c[key]?.length) pool=c[key]; } } catch(e){}
+    const arr = pool || MEMES[key];
     return arr[Math.floor(Math.random()*arr.length)];
   }
 
@@ -1842,7 +1867,7 @@ const MemeScore = (() => {
     _onClose = null;
   }
 
-  return { show, close, getTierByPct: (pct) => getTier(pct) };
+  return { show, close, getTierByPct: (pct) => getTier(pct), getDefaults: () => MEMES };
 })();
 
 function closeMemeOverlay() { MemeScore.close(); }
@@ -2052,6 +2077,7 @@ function navigate(page, params={}){
   else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
   else if(page==='admin_benchmark'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBenchmark(); }
   else if(page==='admin_exams'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminExams(); }
+  else if(page==='admin_memes'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMemes(); }
   else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
@@ -3669,6 +3695,97 @@ function initAdmin(){
   s.adminLoggedIn = Auth.isTeacher();
   document.getElementById('adminGate').innerHTML='';
   document.getElementById('adminContent').style.display='block';
+}
+
+// ── Admin Memes ──────────────────────────────────────────────
+const MEME_TIER_META = [
+  { key:'disaster', label:'💀 Under Construction (0–49%)', color:'#dc2626' },
+  { key:'meh',      label:'😬 Risk Zone (50–69%)',         color:'#ea580c' },
+  { key:'good',     label:'😎 Potential Zone (70–84%)',    color:'#d97706' },
+  { key:'goat',     label:'🔥 Safety Zone (85–100%)',      color:'#16a34a' },
+];
+
+function extractGiphyId(url) {
+  if (!url) return '';
+  url = url.trim();
+  if (!url.includes('/')) return url; // already an ID
+  const m = url.match(/\/embed\/([a-zA-Z0-9]+)/);
+  if (m) return m[1];
+  const m2 = url.match(/\/gifs\/(?:[^/]*-)?([a-zA-Z0-9]+)$/);
+  if (m2) return m2[1];
+  return url.split('/').filter(Boolean).pop() || '';
+}
+
+function getMemeConfig() {
+  try {
+    const s = localStorage.getItem('meme_config');
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return null;
+}
+
+function initAdminMemes() {
+  const container = document.getElementById('memeTierList');
+  if (!container) return;
+  const saved = getMemeConfig() || MemeScore.getDefaults();
+  let html = '';
+  MEME_TIER_META.forEach(tier => {
+    const slots = saved[tier.key] || [];
+    html += `<div style="margin-bottom:28px;">
+      <div style="font-weight:900;font-size:15px;color:${tier.color};margin-bottom:12px;">${tier.label}</div>
+      <div style="display:grid;gap:10px;">`;
+    for (let i = 0; i < 6; i++) {
+      const [id, cap] = slots[i] || ['', ''];
+      const previewSrc = id ? `https://giphy.com/embed/${id}` : '';
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr 100px;gap:8px;align-items:center;">
+        <input type="text" placeholder="ชื่อ/caption" value="${cap.replace(/"/g,'&quot;')}"
+          style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;"
+          id="meme_cap_${tier.key}_${i}" />
+        <input type="text" placeholder="วาง URL จาก giphy.com/gifs/..." value="${id}"
+          style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;"
+          id="meme_url_${tier.key}_${i}"
+          oninput="updateMemePreview('${tier.key}',${i},this.value)" />
+        <div id="meme_preview_${tier.key}_${i}"
+          style="width:100px;height:60px;border-radius:8px;overflow:hidden;background:#f3f4f6;border:1px solid #e5e7eb;">
+          ${previewSrc ? `<iframe src="${previewSrc}" frameborder="0" style="width:200px;height:120px;transform:scale(0.5);transform-origin:0 0;pointer-events:none;"></iframe>` : ''}
+        </div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  });
+  container.innerHTML = html;
+}
+
+function updateMemePreview(tierKey, idx, rawUrl) {
+  const id = extractGiphyId(rawUrl);
+  const el = document.getElementById(`meme_url_${tierKey}_${idx}`);
+  if (el && id && id !== rawUrl) el.value = id;
+  const preview = document.getElementById(`meme_preview_${tierKey}_${idx}`);
+  if (!preview) return;
+  preview.innerHTML = id
+    ? `<iframe src="https://giphy.com/embed/${id}" frameborder="0" style="width:200px;height:120px;transform:scale(0.5);transform-origin:0 0;pointer-events:none;"></iframe>`
+    : '';
+}
+
+function saveMemeConfig() {
+  const config = {};
+  MEME_TIER_META.forEach(tier => {
+    config[tier.key] = [];
+    for (let i = 0; i < 6; i++) {
+      const id  = (document.getElementById(`meme_url_${tier.key}_${i}`)?.value || '').trim();
+      const cap = (document.getElementById(`meme_cap_${tier.key}_${i}`)?.value || '').trim();
+      if (id) config[tier.key].push([id, cap || '']);
+    }
+  });
+  localStorage.setItem('meme_config', JSON.stringify(config));
+  const btn = document.querySelector('#page-admin_memes .btn[onclick="saveMemeConfig()"]');
+  if (btn) { const t=btn.textContent; btn.textContent='✓ บันทึกแล้ว'; setTimeout(()=>btn.textContent=t,1500); }
+}
+
+function resetMemeConfig() {
+  if (!confirm('รีเซ็ตมีมกลับเป็นค่าเริ่มต้น?')) return;
+  localStorage.removeItem('meme_config');
+  initAdminMemes();
 }
 
 // ===================== ADMIN EXAMS PAGE =====================
