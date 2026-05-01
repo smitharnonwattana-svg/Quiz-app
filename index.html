@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.35 -->
+  <!-- APP_VERSION: v45.36 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -309,7 +309,12 @@
     <div style="width:100%;max-width:300px;text-align:center;">
       <div style="font-size:32px;margin-bottom:6px;">🎯</div>
       <div style="font-size:18px;font-weight:700;color:#1d1d1f;margin-bottom:2px;">My Exam Academia</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">กรอกรหัสผ่าน</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:12px;">กรอกรหัสผ่าน</div>
+
+      <!-- shared exam hint -->
+      <div id="loginExamHint" style="display:none;margin-bottom:14px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;font-size:13px;color:#1d4ed8;line-height:1.5;">
+        📚 มีข้อสอบรอคุณอยู่<br><span id="loginExamHintTitle" style="font-weight:700;"></span><br><span style="font-size:12px;color:#3b82f6;">เข้าสู่ระบบเพื่อเริ่มทำได้เลย</span>
+      </div>
 
       <!-- PIN dots -->
       <div id="pinDotsRow" style="display:flex;justify-content:center;gap:12px;margin-bottom:6px;">
@@ -344,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.35</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.36</div>
     </div>
   </div>
 </div>
@@ -2168,7 +2173,9 @@ function doLogin() {
   errEl.textContent = '';
   _pinVal = '';
   _updatePinDots(false);
-  navigate('home');
+  const _pendingId = window._pendingExamId || null;
+  window._pendingExamId = null;
+  navigate(_pendingId ? 'exam' : 'home', _pendingId ? {id: _pendingId} : {});
 }
 
 function navigate(page, params={}){
@@ -2368,7 +2375,13 @@ function initExams(){
       card.innerHTML=`
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
-          ${_editMode?'<span style="font-size:18px;color:#9ca3af;cursor:grab;flex-shrink:0;pointer-events:none;">⠿</span>':''}
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            ${_editMode?'<span style="font-size:18px;color:#9ca3af;cursor:grab;pointer-events:none;">⠿</span>':''}
+            <button title="คัดลอกลิ้งแชร์ข้อสอบนี้" onclick="copyExamLink('${e.id}',event)"
+              style="border:none;background:none;cursor:pointer;padding:2px 4px;font-size:16px;line-height:1;color:#9ca3af;border-radius:6px;"
+              onmouseover="this.style.background='#f3f4f6';this.style.color='#3b82f6'"
+              onmouseout="this.style.background='none';this.style.color='#9ca3af'">🔗</button>
+          </div>
         </div>
         <div class="title">${esc(e.title)}</div>
         <div class="meta">
@@ -5060,17 +5073,50 @@ function clearTakeResume(takerName) {
   try { localStorage.removeItem(_takeResumeKey(takerName)); } catch(e) {}
 }
 
+// ── Shared exam link: detect ?exam=ID in URL ──────────────
+(function() {
+  const p = new URLSearchParams(location.search);
+  const eid = p.get('exam');
+  if (eid) {
+    window._pendingExamId = eid;
+    // try to show exam title in login hint (from local store first)
+    const s = Store.load();
+    const ex = (s.exams||[]).find(e => e.id === eid);
+    const hint = document.getElementById('loginExamHint');
+    if (hint) {
+      hint.style.display = 'block';
+      const t = document.getElementById('loginExamHintTitle');
+      if (t && ex) t.textContent = ex.title;
+    }
+    // clean ?exam= from URL bar without reload
+    history.replaceState(null, '', location.pathname);
+  }
+})();
+
+function copyExamLink(examId, ev) {
+  ev.stopPropagation();
+  const url = `${location.origin}${location.pathname}?exam=${examId}`;
+  navigator.clipboard.writeText(url).then(() => {
+    toast('คัดลอกลิ้งแล้ว 🔗');
+  }).catch(() => {
+    prompt('คัดลอกลิ้งด้านล่าง:', url);
+  });
+}
+
 // Show login page on startup — but restore previous page if session still valid
 const _savedState = loadPageState();
 const _takeResume = loadTakeResume(Auth.getName());
 
-if (_savedState && Auth.isLoggedIn()) {
+if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   if (_savedState.page === 'take' && _takeResume) {
-    // Go back to take page — the resume popup inside initTake will handle pause/continue
     navigate('take', { id: _takeResume.examId });
   } else {
     navigate(_savedState.page, _savedState.params);
   }
+} else if (Auth.isLoggedIn() && window._pendingExamId) {
+  const _pid = window._pendingExamId;
+  window._pendingExamId = null;
+  navigate('exam', { id: _pid });
 } else {
   navigate('login');
   setTimeout(()=>document.getElementById('loginPinInput')?.focus(), 300);
