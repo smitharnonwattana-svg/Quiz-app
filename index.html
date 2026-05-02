@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.40 -->
+  <!-- APP_VERSION: v45.41 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.40</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.41</div>
     </div>
   </div>
 </div>
@@ -2111,6 +2111,28 @@ const Auth = (() => {
   return { login, logout, isLoggedIn, isTeacher, getRole, getName, getMembers, findByPin, ADMIN_PIN };
 })();
 
+// ── User isolation helpers ──────────────────────────────────
+function getCurrentUserId() { return Auth.isTeacher() ? null : (Auth.getName() || null); }
+function isAdminUser() { return Auth.isTeacher(); }
+function getVisibleAttemptsForCurrentUser(attempts) {
+  const uid = getCurrentUserId();
+  if (!uid) return attempts || [];
+  return (attempts || []).filter(a => (a.takerName || '') === uid);
+}
+function getAttemptsForUser(attempts, userId) {
+  return (attempts || []).filter(a => (a.takerName || '') === userId);
+}
+function getRecentAttemptUsersByExam(attempts, examId, limit) {
+  const sorted = (attempts || []).filter(a => a.examId === examId)
+    .slice().sort((a,b) => new Date(b.submittedAt||0) - new Date(a.submittedAt||0));
+  const seen = new Set(); const result = [];
+  for (const a of sorted) {
+    const n = a.takerName || '';
+    if (!seen.has(n)) { seen.add(n); result.push(a); if (result.length >= (limit||3)) break; }
+  }
+  return result;
+}
+
 // ===================== NUMPAD LOGIN =====================
 let _pinVal = '';
 function _updatePinDots(shake) {
@@ -2351,7 +2373,8 @@ function initExams(){
     const _myResume = typeof loadTakeResume === 'function' ? loadTakeResume(_myName) : null;
 
     exams.forEach(e=>{
-      const myAttempts=allAttempts.filter(a=>a.examId===e.id);
+      const _examAttempts=allAttempts.filter(a=>a.examId===e.id);
+      const myAttempts=isTeacher?_examAttempts:_examAttempts.filter(a=>(a.takerName||'')===_myName);
       const last=myAttempts[0];
       const bestScore=myAttempts.length?Math.max(...myAttempts.map(a=>a.score)):null;
       const card=document.createElement('div');
@@ -2359,6 +2382,10 @@ function initExams(){
       const scoreHtml=last
         ?`<div class="score-badge">🏆 สูงสุด <b>${bestScore}/${e.questionCount}</b> &nbsp;•&nbsp; ล่าสุด <b>${last.score}/${last.total}</b> (${Math.round(last.score/last.total*100)}%) &nbsp;•&nbsp; ทำแล้ว ${myAttempts.length} ครั้ง</div>`
         :`<div class="score-badge" style="color:var(--muted);">ยังไม่เคยทำ</div>`;
+      // Admin: recent users per exam
+      const _adminRecentHtml=isTeacher?(()=>{const r=getRecentAttemptUsersByExam(allAttempts,e.id,3);return r.length?`<div style="margin-top:4px;font-size:12px;color:#6b7280;">ล่าสุด: ${r.map(a=>`<b>${esc(a.takerName||'?')}</b> ${a.score}/${a.total}`).join(' &nbsp;•&nbsp; ')}</div>`:''})():'';
+      // Admin: per-student weakness counts
+      const _adminWeaknessHtml=isTeacher?(()=>{const pairs=Auth.getMembers().map(m=>({n:m.name,c:WeaknessTracker.countWeaknessesByExam(m.name,e.id)})).filter(x=>x.c>0);return pairs.length?`<div style="margin-top:3px;font-size:12px;color:#dc2626;">⚠️ จุดอ่อน: ${pairs.map(x=>`<b>${esc(x.n)}</b> ${x.c} ข้อ`).join(' &nbsp;•&nbsp; ')}</div>`:''})():'';
 
       const _hasResume = _myResume && _myResume.examId === e.id && _myResume.startedAt;
       let resumeHtml = '';
@@ -2377,7 +2404,7 @@ function initExams(){
       }
 
       const _wc = (!isTeacher && _myName) ? WeaknessTracker.countWeaknessesByExam(_myName, e.id) : 0;
-      const weaknessHtml = _wc > 0 ? `<div style="margin-top:4px;font-size:12px;color:#dc2626;font-weight:600;">⚠️ จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>` : '';
+      const weaknessHtml = (!isTeacher && _wc > 0) ? `<div style="margin-top:4px;font-size:12px;color:#dc2626;font-weight:600;">⚠️ จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>` : '';
       card.innerHTML=`
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
@@ -2395,7 +2422,9 @@ function initExams(){
           <span>⏱ ${Math.round(e.durationSeconds/60)} นาที</span>
         </div>
         ${scoreHtml}
+        ${_adminRecentHtml}
         ${weaknessHtml}
+        ${_adminWeaknessHtml}
         ${resumeHtml}
       `;
 
@@ -2808,6 +2837,12 @@ function initReview(attemptId){
   if(!attemptId||!att){
     document.getElementById('reviewTitle').textContent='ไม่พบข้อมูลการทำข้อสอบ';
     document.getElementById('reviewSub').textContent='ลองกลับไปหน้าสถิติ แล้วกดเข้าใหม่';
+    return;
+  }
+  // Ownership check: students may only review their own attempts
+  if (!Auth.isTeacher() && Auth.getName() && (att.takerName||'') !== Auth.getName()) {
+    document.getElementById('reviewTitle').textContent='ไม่มีสิทธิ์เข้าถึงข้อมูลนี้';
+    document.getElementById('reviewSub').textContent='';
     return;
   }
   const exam=(s.exams||[]).find(e=>e.id===att.examId);
@@ -3571,7 +3606,10 @@ function initStats(){
     });
     if(backfilled){ Store.saveLocalOnly(s); console.log('[Stats] backfilled tags into attempts (local only)'); }
 
-    const allAttempts=(s.attempts||[]).slice().sort((a,b)=>new Date(b.startedAt||0).getTime()-new Date(a.startedAt||0).getTime());
+    const _rawAttempts = Auth.isTeacher()
+      ? (s.attempts||[])
+      : (s.attempts||[]).filter(a => (a.takerName||'') === _myName);
+    const allAttempts=_rawAttempts.slice().sort((a,b)=>new Date(b.startedAt||0).getTime()-new Date(a.startedAt||0).getTime());
     const timeFiltered=filterByTime(allAttempts);
     const bySubject=currentSubjectFilter==='all'?timeFiltered:timeFiltered.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
