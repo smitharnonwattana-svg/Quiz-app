@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.39 -->
+  <!-- APP_VERSION: v45.40 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.39</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.40</div>
     </div>
   </div>
 </div>
@@ -2176,6 +2176,10 @@ function doLogin() {
   const _pendingId = window._pendingExamId || null;
   window._pendingExamId = null;
   navigate(_pendingId ? 'exam' : 'home', _pendingId ? {id: _pendingId} : {});
+  const _loginName = Auth.getName();
+  if (_loginName && !Auth.isTeacher()) {
+    setTimeout(() => WeaknessTracker.runBackfillIfNeeded(_loginName), 1500);
+  }
 }
 
 function navigate(page, params={}){
@@ -2372,6 +2376,8 @@ function initExams(){
         </div>`;
       }
 
+      const _wc = (!isTeacher && _myName) ? WeaknessTracker.countWeaknessesByExam(_myName, e.id) : 0;
+      const weaknessHtml = _wc > 0 ? `<div style="margin-top:4px;font-size:12px;color:#dc2626;font-weight:600;">⚠️ จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>` : '';
       card.innerHTML=`
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
@@ -2389,6 +2395,7 @@ function initExams(){
           <span>⏱ ${Math.round(e.durationSeconds/60)} นาที</span>
         </div>
         ${scoreHtml}
+        ${weaknessHtml}
         ${resumeHtml}
       `;
 
@@ -2662,9 +2669,11 @@ function initTake(id){
     const usedSeconds=st.startedAt?Math.min(Math.floor((Date.now()-st.startedAt)/1000),exam.durationSeconds):0;
     const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
     const savedS=Store.load();
-    savedS.attempts.unshift({id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion});
+    const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion};
+    savedS.attempts.unshift(_newAttempt);
     if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
     const ok=Store.save(savedS);
+    WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
     lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
@@ -5072,6 +5081,102 @@ function loadTakeResume(takerName) {
 function clearTakeResume(takerName) {
   try { localStorage.removeItem(_takeResumeKey(takerName)); } catch(e) {}
 }
+
+// ===================== WEAKNESS TRACKING =====================
+const WeaknessTracker = (() => {
+  const LS_PREFIX = 'nanont:weaknesses_';
+  const BACKFILL_FLAG = 'weaknessBackfillDone_v1_';
+
+  function _sanitize(s) { return (s||'').replace(/[^a-zA-Z0-9฀-๿]/g,'_').slice(0,60); }
+  function _lsKey(u) { return LS_PREFIX + _sanitize(u); }
+  function _fsDocId(u) { return 'weaknesses_' + _sanitize(u); }
+  function _itemKey(examId, no) { return examId + '__' + no; }
+
+  function _loadLocal(u) { try { return JSON.parse(localStorage.getItem(_lsKey(u))||'{}'); } catch { return {}; } }
+  function _saveLocal(u, d) { try { localStorage.setItem(_lsKey(u), JSON.stringify(d)); } catch(e) {} }
+
+  async function _saveToCloud(u, d) {
+    if (!FirebaseSync.ready()) return;
+    try { await FirebaseSync.saveDoc(_fsDocId(u), d); } catch(e) { console.warn('weakness sync err', e); }
+  }
+
+  function _processAttemptIntoItems(items, attempt) {
+    const { takerName, examId, examTitle, examSubject, submittedAt, perQuestion } = attempt;
+    if (!takerName || !examId || !Array.isArray(perQuestion)) return;
+    const ts = submittedAt || new Date().toISOString();
+    perQuestion.forEach(q => {
+      if (q.isFree) return;
+      const no = q.no ?? q.number;
+      if (no == null) return;
+      const key = _itemKey(examId, no);
+      const ex = items[key];
+      if (!q.isCorrect) {
+        items[key] = {
+          userId: takerName, examId, examTitle: examTitle||'', subject: examSubject||'',
+          questionNo: no, status: 'active', lastResult: 'wrong',
+          wrongCount: (ex?.wrongCount||0) + 1, correctCount: ex?.correctCount||0,
+          firstWrongAt: ex?.firstWrongAt||ts, lastAttemptAt: ts, resolvedAt: null, updatedAt: ts,
+        };
+      } else if (ex) {
+        items[key] = { ...ex, status: 'resolved', lastResult: 'correct',
+          correctCount: (ex.correctCount||0) + 1, lastAttemptAt: ts, resolvedAt: ts, updatedAt: ts };
+      }
+    });
+  }
+
+  function buildWeaknessItemsFromAttempts(attempts, userId) {
+    const sorted = (attempts||[])
+      .filter(a => a.takerName === userId && Array.isArray(a.perQuestion))
+      .sort((a,b) => (new Date(a.submittedAt||0).getTime()) - (new Date(b.submittedAt||0).getTime()));
+    const items = {};
+    sorted.forEach(att => _processAttemptIntoItems(items, att));
+    return items;
+  }
+
+  async function updateWeaknessAfterSubmit(attempt) {
+    const u = attempt.takerName;
+    if (!u) return;
+    const items = _loadLocal(u);
+    _processAttemptIntoItems(items, attempt);
+    _saveLocal(u, items);
+    _saveToCloud(u, items);
+  }
+
+  function getActiveWeaknessesForUser(userId) {
+    return Object.values(_loadLocal(userId)).filter(w => w.status === 'active');
+  }
+
+  function countWeaknessesByExam(userId, examId) {
+    return Object.values(_loadLocal(userId)).filter(w => w.status === 'active' && w.examId === examId).length;
+  }
+
+  function countWeaknessesBySubject(userId, subject) {
+    return Object.values(_loadLocal(userId)).filter(w => w.status === 'active' && w.subject === subject).length;
+  }
+
+  async function runBackfillIfNeeded(userId) {
+    if (!userId || Auth.isTeacher()) return;
+    if (localStorage.getItem(BACKFILL_FLAG + userId)) return;
+    const s = Store.load();
+    const items = buildWeaknessItemsFromAttempts(s.attempts||[], userId);
+    _saveLocal(userId, items);
+    await _saveToCloud(userId, items);
+    localStorage.setItem(BACKFILL_FLAG + userId, 'true');
+  }
+
+  async function rebuildWeaknessesForCurrentUser() {
+    const u = Auth.getName();
+    if (!u || Auth.isTeacher()) return;
+    const s = Store.load();
+    const items = buildWeaknessItemsFromAttempts(s.attempts||[], u);
+    _saveLocal(u, items);
+    await _saveToCloud(u, items);
+    localStorage.setItem(BACKFILL_FLAG + u, 'true');
+  }
+
+  return { updateWeaknessAfterSubmit, getActiveWeaknessesForUser, countWeaknessesByExam,
+    countWeaknessesBySubject, buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser };
+})();
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
 (function() {
