@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.43 -->
+  <!-- APP_VERSION: v45.44 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.43</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.44</div>
     </div>
   </div>
 </div>
@@ -459,6 +459,41 @@
             <div id="takeNums" class="gridNums"></div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: PRACTICE ===================== -->
+<div id="page-practice" class="page">
+  <div class="takeRoot">
+    <div class="takeGrid">
+      <div class="takeLeft">
+        <div class="stickyBar">
+          <div>
+            <div id="pracExamTitle" style="font-weight:900;">แก้จุดอ่อน</div>
+            <div class="muted" id="pracPdfPage">PDF หน้า -</div>
+          </div>
+          <div style="font-weight:900;">ข้อ <span id="pracQIdx">-</span> / <span id="pracQTotal">-</span></div>
+        </div>
+        <div class="pdfWrapTake">
+          <div id="pracPdfViewer" style="width:100%;height:100%;position:relative;flex:1;min-height:0;"></div>
+        </div>
+      </div>
+      <div class="takeRight">
+        <div class="stickyBar">
+          <div>
+            <div style="font-weight:900;">ข้อ <span id="pracQNo">-</span></div>
+            <div class="muted" id="pracProgress">0/0 ข้อเสร็จ</div>
+          </div>
+          <button class="btn" id="pracExitBtn" style="padding:8px 12px;">ออก</button>
+        </div>
+        <div style="padding:16px;display:grid;gap:12px;">
+          <div class="muted">เลือกคำตอบ</div>
+          <div id="pracChoices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+          <div id="pracFeedback" style="display:none;padding:14px 16px;border-radius:12px;margin-top:4px;"></div>
+          <button id="pracNextBtn" class="btn btnPrimary" style="display:none;padding:12px 16px;font-size:14px;margin-top:4px;">ข้อต่อไป →</button>
         </div>
       </div>
     </div>
@@ -761,7 +796,13 @@
     <div id="statsRadarWrap"></div>
 
     <!-- ④ รายการชุดข้อสอบ -->
-    <div id="statsRows" style="display:grid;gap:10px;margin-top:16px;margin-bottom:24px;"></div>
+    <div id="statsRows" style="display:grid;gap:10px;margin-top:16px;margin-bottom:8px;"></div>
+
+    <!-- ⑤ สถิติการแก้จุดอ่อน -->
+    <div id="statsPracticeSection" style="margin-top:16px;margin-bottom:24px;display:none;">
+      <h2 style="font-size:16px;font-weight:800;color:#374151;margin-bottom:10px;">🎯 สถิติการแก้จุดอ่อน</h2>
+      <div id="statsPracticeRows" style="display:grid;gap:10px;"></div>
+    </div>
   </div>
   <div id="statsConfirmOverlay" class="modal-overlay" role="dialog">
     <div class="modal">
@@ -2211,6 +2252,7 @@ function doLogin() {
 function navigate(page, params={}){
   // hide take page cleanup
   if(_currentPage==='take') cleanupTake();
+  if(_currentPage==='practice') cleanupPractice();
 
   // ── Auth guard: redirect to login if not logged in ──
   if(page !== 'login' && !Auth.isLoggedIn()){
@@ -2236,6 +2278,7 @@ function navigate(page, params={}){
   else if(page==='take') initTake(params.id);
   else if(page==='review') initReview(params.attemptId);
   else if(page==='stats') initStats();
+  else if(page==='practice'){ if(Auth.isTeacher()){navigate('exams');return;} initPractice(params); }
   else if(page==='admin'){ if(!Auth.isTeacher()){navigate('home');return;} initAdmin(); }
   else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
   else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
@@ -2410,6 +2453,7 @@ function initExams(){
         :`<div class="score-badge" style="color:var(--muted);">ยังไม่เคยทำ</div>`):'';
       const _wc=(!isTeacher&&_myName)?WeaknessTracker.countWeaknessesByExam(_myName,e.id):0;
       const weaknessHtml=(!isTeacher&&_wc>0)?`<div style="margin-top:4px;font-size:12px;color:#dc2626;font-weight:600;">⚠️ จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>`:'';
+      const practiceBtnHtml=(!isTeacher&&_wc>0)?`<button class="btn btnPrimary" data-practiceexam="${e.id}" style="margin-top:8px;padding:8px 14px;font-size:13px;width:100%;">🎯 แก้จุดอ่อนชุดนี้ (${_wc} ข้อ)</button>`:'';
       const _hasResume = _myResume && _myResume.examId === e.id && _myResume.startedAt;
       let resumeHtml = '';
       if (_hasResume) {
@@ -2444,6 +2488,7 @@ function initExams(){
         </div>
         ${isTeacher ? _adminBlocksHtml : scoreHtml}
         ${weaknessHtml}
+        ${practiceBtnHtml}
         ${resumeHtml}
       `;
 
@@ -2496,6 +2541,10 @@ function initExams(){
       card.onclick=(ev)=>{
         if(_editMode) return; // ไม่ navigate ตอน edit mode
 
+        if(ev.target.closest('[data-practiceexam]')){
+          navigate('practice',{examId:e.id});
+          return;
+        }
         if(ev.target.closest('.resume-badge')){
           navigate('take',{id:e.id, takerName:_myName});
           return;
@@ -2567,6 +2616,13 @@ let _takeState=null;
 function cleanupTake(){
   if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
   _takeState=null;
+}
+
+let _pracState=null;
+let _pracPdfViewer=null;
+function cleanupPractice(){
+  _pracState=null;
+  _pracPdfViewer=null;
 }
 
 function initTake(id){
@@ -3645,11 +3701,14 @@ function initStats(){
       ? (currentStudentFilter==='all'?(s.attempts||[]):(s.attempts||[]).filter(a=>(a.takerName||'')===currentStudentFilter))
       : (s.attempts||[]).filter(a=>(a.takerName||'')===_myName);
     const allAttempts=_rawAttempts.slice().sort((a,b)=>new Date(b.startedAt||0).getTime()-new Date(a.startedAt||0).getTime());
-    const timeFiltered=filterByTime(allAttempts);
+    // แยก normal กับ practice
+    const normalAttempts=allAttempts.filter(a=>a.mode!=='weakness_practice');
+    const practiceAttempts=allAttempts.filter(a=>a.mode==='weakness_practice');
+    const timeFiltered=filterByTime(normalAttempts);
     const bySubject=currentSubjectFilter==='all'?timeFiltered:timeFiltered.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
 
-    // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น)
+    // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น — normal only)
     renderSummaryCards(timeFiltered);
 
     // ── Subject + Tag Dashboard (unified) ──
@@ -3802,6 +3861,39 @@ function initStats(){
         btn.textContent=open?'▸ เนื้อหา':'▾ ซ่อน';
       });
     });
+    renderPracticeStats(practiceAttempts);
+  }
+
+  function renderPracticeStats(practiceAttempts){
+    const section=document.getElementById('statsPracticeSection');
+    const rowsEl=document.getElementById('statsPracticeRows');
+    if(!section||!rowsEl) return;
+    // แสดงเฉพาะนักเรียน หรือ admin ที่เลือกดูรายคน
+    const shouldShow=!Auth.isTeacher()||(currentStudentFilter!=='all');
+    if(!practiceAttempts.length||!shouldShow){section.style.display='none';return;}
+    section.style.display='block';
+    rowsEl.innerHTML='';
+    practiceAttempts.forEach(a=>{
+      const started=a.startedAt?new Date(a.startedAt):null;
+      const dateStr=started?started.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}):'—';
+      const timeStr=started?started.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):'';
+      const pct=a.total?Math.round((a.score||0)/a.total*100):0;
+      const barColor=pct>=80?'#16a34a':pct>=60?'#f59e0b':'#ef4444';
+      const card=document.createElement('div');
+      card.className='attempt-card';
+      card.innerHTML=`
+        <div class="ac-top">
+          <div style="flex:1;min-width:0;">
+            <div class="ac-title">🎯 ${esc(a.examTitle||'—')}</div>
+            <div class="ac-meta">${esc(a.takerName||'—')} · แก้จุดอ่อน · ${dateStr} ${timeStr} · ⏱ ${formatDuration(a.usedSeconds||0)}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="ac-score" style="color:${barColor};">${a.score||0}<span style="font-size:14px;font-weight:700;color:#9ca3af;">/${a.total||0}</span></div>
+            <div class="ac-pct" style="color:${barColor};">${pct}%</div>
+          </div>
+        </div>`;
+      rowsEl.appendChild(card);
+    });
   }
 
   document.getElementById('statsBtnExport').onclick=()=>{
@@ -3909,6 +4001,162 @@ function initStats(){
   };
 
   render();
+}
+
+// ===================== PRACTICE PAGE =====================
+function initPractice(params){
+  cleanupPractice();
+  const examId=params&&params.examId;
+  if(!examId){navigate('exams');return;}
+  const userId=Auth.getName();
+  if(!userId){navigate('exams');return;}
+
+  const s=Store.load();
+  const exam=s.exams.find(e=>e.id===examId);
+  if(!exam){navigate('exams');return;}
+
+  const weaknesses=WeaknessTracker.getActiveWeaknessesForUser(userId).filter(w=>w.examId===examId);
+  if(!weaknesses.length){toast('ไม่มีจุดอ่อนในชุดนี้แล้ว 🎉');navigate('exams');return;}
+
+  const allQs=(s.questions[examId]||[]).map(q=>({...q,no:q.no??q.number??0}));
+  const queue=[];
+  weaknesses.forEach(w=>{
+    const q=allQs.find(x=>(x.no||x.number||0)===w.questionNo);
+    if(q) queue.push({...q,_weakness:w});
+  });
+  if(!queue.length){toast('ไม่พบข้อคำถามสำหรับจุดอ่อนในชุดนี้');navigate('exams');return;}
+
+  const attemptId='prac_'+Math.random().toString(16).slice(2);
+  const startedAt=new Date().toISOString();
+
+  _pracState={exam,queue,userId,attemptId,startedAt,currentIdx:0,answers:[],answered:false,pdfLoaded:false};
+  const st=_pracState;
+
+  document.getElementById('pracExamTitle').textContent=exam.title;
+  document.getElementById('pracQTotal').textContent=queue.length;
+
+  document.getElementById('pracPdfViewer').innerHTML='';
+  _pracPdfViewer=PdfViewer.create('pracPdfViewer');
+
+  const isGDrive=!!(exam.pdfUrl||'').match(/drive\.google\.com/);
+
+  async function loadPdf(){
+    if(st.pdfLoaded) return;
+    st.pdfLoaded=true;
+    try{
+      let pdfUrl=exam.pdfUrl||'';
+      if(pdfUrl.startsWith('./')||pdfUrl.startsWith('../')) pdfUrl=new URL(pdfUrl,window.location.href).href;
+      if(pdfUrl.startsWith('localpdf:')){
+        const key=pdfUrl.slice('localpdf:'.length);
+        const blob=await PdfDB.get(key);
+        if(!blob) throw new Error('ไม่พบไฟล์ PDF');
+        pdfUrl=URL.createObjectURL(blob);
+      }
+      await _pracPdfViewer.loadUrl(pdfUrl,1);
+    }catch(err){toast(err?.message||String(err));}
+  }
+
+  async function renderPrac(){
+    if(!_pracState) return;
+    const q=st.queue[st.currentIdx];
+    st.answered=false;
+
+    document.getElementById('pracQNo').textContent=q.no||q.number;
+    document.getElementById('pracQIdx').textContent=st.currentIdx+1;
+    document.getElementById('pracProgress').textContent=`${st.answers.length}/${st.queue.length} ข้อเสร็จ`;
+    document.getElementById('pracPdfPage').textContent=isGDrive?'📄 Google Drive (scroll ด้วยนิ้ว)':'PDF หน้า '+(q.page||1);
+    document.getElementById('pracFeedback').style.display='none';
+    document.getElementById('pracNextBtn').style.display='none';
+
+    loadPdf().then(()=>{ if(_pracPdfViewer&&q.page) _pracPdfViewer.setPage(q.page); });
+
+    const labelMap={A:'ก',B:'ข',C:'ค',D:'ง'};
+    const wrap=document.getElementById('pracChoices');
+    wrap.innerHTML='';
+    ['A','B','C','D'].forEach(lab=>{
+      const div=document.createElement('label');
+      div.className='choice';
+      div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
+      div.addEventListener('click',()=>{
+        if(st.answered) return;
+        st.answered=true;
+        const isCorrect=lab===q.correct;
+
+        st.answers.push({questionNo:q.no||q.number,chosen:lab,correct:q.correct,isCorrect,
+          tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),topic:q.topic||''});
+
+        // Update WeaknessTracker immediately per answer
+        WeaknessTracker.updateWeaknessAfterSubmit({
+          examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'',takerName:userId,
+          perQuestion:[{no:q.no||q.number,isCorrect,chosen:lab,correct:q.correct,
+            tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),topic:q.topic||''}]
+        });
+
+        // Style choices
+        wrap.querySelectorAll('.choice').forEach(c=>{c.style.opacity='0.5';c.style.pointerEvents='none';});
+        div.style.opacity='1';
+        div.classList.add(isCorrect?'active':'');
+        if(!isCorrect) div.style.borderColor='#ef4444';
+
+        // Show feedback
+        const fb=document.getElementById('pracFeedback');
+        if(isCorrect){
+          fb.style.cssText='display:block;padding:14px 16px;border-radius:12px;margin-top:4px;background:#f0fdf4;border:1px solid #86efac;';
+          fb.innerHTML=`<div style="font-weight:800;color:#16a34a;font-size:15px;">✅ ถูกต้อง!</div>`;
+        }else{
+          fb.style.cssText='display:block;padding:14px 16px;border-radius:12px;margin-top:4px;background:#fef2f2;border:1px solid #fca5a5;';
+          fb.innerHTML=`<div style="font-weight:800;color:#dc2626;font-size:15px;">❌ ผิด — คำตอบที่ถูกคือ <b>${labelMap[q.correct]||q.correct}</b></div>`;
+          // Highlight correct choice
+          wrap.querySelectorAll('.choice').forEach((c,i)=>{
+            if(['A','B','C','D'][i]===q.correct){c.style.opacity='1';c.style.borderColor='#16a34a';}
+          });
+        }
+
+        const nextBtn=document.getElementById('pracNextBtn');
+        nextBtn.style.display='block';
+        nextBtn.textContent=(st.currentIdx>=st.queue.length-1)?'✅ เสร็จสิ้น':'ข้อต่อไป →';
+      });
+      wrap.appendChild(div);
+    });
+  }
+
+  async function savePracticeSession(){
+    if(!st||!st.answers.length) return;
+    const score=st.answers.filter(a=>a.isCorrect).length;
+    const total=st.answers.length;
+    const attempt={
+      id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'',
+      takerName:st.userId,score,total,
+      perQuestion:st.answers.map(a=>({no:a.questionNo,isCorrect:a.isCorrect,chosen:a.chosen,correct:a.correct,tags:a.tags,topic:a.topic})),
+      startedAt:st.startedAt,submittedAt:new Date().toISOString(),
+      usedSeconds:Math.round((Date.now()-new Date(st.startedAt).getTime())/1000),
+      mode:'weakness_practice',
+    };
+    const sv=Store.load();
+    sv.attempts=[attempt,...(sv.attempts||[])];
+    await Store.save(sv);
+  }
+
+  document.getElementById('pracExitBtn').onclick=()=>{
+    if(st.answers.length>0){if(!confirm('ต้องการออกจากการแก้จุดอ่อนใช่ไหม?')) return;}
+    if(st.answers.length>0) savePracticeSession();
+    cleanupPractice();navigate('exams');
+  };
+
+  document.getElementById('pracNextBtn').onclick=()=>{
+    if(!_pracState) return;
+    st.currentIdx++;
+    if(st.currentIdx>=st.queue.length){
+      savePracticeSession().then(()=>{
+        toast(`แก้จุดอ่อนเสร็จ ${st.answers.filter(a=>a.isCorrect).length}/${st.answers.length} ถูก 🎉`);
+        cleanupPractice();navigate('stats');
+      });
+      return;
+    }
+    renderPrac();
+  };
+
+  renderPrac();
 }
 
 // ===================== ADMIN PAGE =====================
