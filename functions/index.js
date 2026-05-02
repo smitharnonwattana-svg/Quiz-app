@@ -44,7 +44,8 @@ exports.lineNotify = onRequest(
       return;
     }
 
-    const { type, name, examTitle, score, total, usedSeconds } = req.body || {};
+    const { type, name, examTitle, score, total, usedSeconds,
+            subject, count, correct, answered, remaining, finished } = req.body || {};
     if (!type || !name || !examTitle) {
       res.status(400).json({ error: 'Missing fields' });
       return;
@@ -59,6 +60,14 @@ exports.lineNotify = onRequest(
       const sec = Math.max(0, Math.floor(usedSeconds || 0));
       const timeStr = String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
       message = `${star} ส่งข้อสอบแล้ว\n👤 ${name}\n📋 ${examTitle}\n📊 ${score}/${total} คะแนน (${pct}%)\n⏱ เวลาที่ใช้ ${timeStr} นาที`;
+    } else if (type === 'practice_start') {
+      const subj = subject || 'ไม่ระบุ';
+      message = `🎯 เริ่มแก้จุดอ่อน\n👤 ${name}\n📚 วิชา: ${subj}\n📋 ${examTitle}\n⚠️ มีจุดอ่อน ${count || 0} ข้อ`;
+    } else if (type === 'practice_end') {
+      const subj = subject || 'ไม่ระบุ';
+      const icon = finished ? '✅' : '📝';
+      const label = finished ? 'แก้จุดอ่อนเสร็จสิ้น' : 'ออกจากการแก้จุดอ่อน';
+      message = `${icon} ${label}\n👤 ${name}\n📚 วิชา: ${subj}\n📋 ${examTitle}\n✅ แก้ได้ ${correct || 0}/${answered || 0} ข้อ\n⚠️ เหลือจุดอ่อน ${remaining ?? '?'} ข้อ`;
     } else {
       res.status(400).json({ error: 'Invalid type' });
       return;

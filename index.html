@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.46 -->
+  <!-- APP_VERSION: v45.47 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.46</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.47</div>
     </div>
   </div>
 </div>
@@ -4101,6 +4101,9 @@ function initPractice(params){
   const attemptId='prac_'+Math.random().toString(16).slice(2);
   const startedAt=new Date().toISOString();
 
+  // LINE notification — เริ่มแก้จุดอ่อน
+  lineNotify({ type:'practice_start', name:userId, examTitle:exam.title, subject:exam.subject||'', count:queue.length });
+
   // selected = choice highlighted before confirm; confirmed = after confirm button pressed
   // results[idx] = 'correct'|'wrong' for number box coloring
   _pracState={exam,queue,userId,attemptId,startedAt,
@@ -4282,11 +4285,20 @@ function initPractice(params){
     nextBtn.style.display='block';
   };
 
+  function _pracLineEndNotify(finished){
+    const correct=Object.values(st.results).filter(r=>r==='correct').length;
+    const answered=Object.keys(st.results).length;
+    const remaining=WeaknessTracker.getActiveWeaknessesForUser(userId).filter(w=>w.examId===exam.id).length;
+    lineNotify({ type:'practice_end', name:userId, examTitle:exam.title, subject:exam.subject||'',
+      correct, answered, remaining, finished:!!finished });
+  }
+
   // Next/Done button
   document.getElementById('pracNextBtn').onclick=()=>{
     if(!_pracState) return;
     const allDone=Object.keys(st.results).length>=queue.length;
     if(allDone){
+      _pracLineEndNotify(true);
       savePracticeSession().then(()=>{
         const correct=Object.values(st.results).filter(r=>r==='correct').length;
         toast(`แก้จุดอ่อนเสร็จ ${correct}/${queue.length} ถูก 🎉`);
@@ -4299,6 +4311,7 @@ function initPractice(params){
     while(next<queue.length && (next in st.results)) next++;
     if(next>=queue.length){
       // All remaining before current are done too — all done
+      _pracLineEndNotify(true);
       savePracticeSession().then(()=>{
         const correct=Object.values(st.results).filter(r=>r==='correct').length;
         toast(`แก้จุดอ่อนเสร็จ ${correct}/${queue.length} ถูก 🎉`);
@@ -4313,7 +4326,10 @@ function initPractice(params){
   // Exit button
   document.getElementById('pracExitBtn').onclick=()=>{
     if(st.answers.length>0){if(!confirm('ต้องการออกจากการแก้จุดอ่อนใช่ไหม?')) return;}
-    if(st.answers.length>0) savePracticeSession();
+    if(st.answers.length>0){
+      _pracLineEndNotify(false);
+      savePracticeSession();
+    }
     cleanupPractice(); navigate('exams');
   };
 
