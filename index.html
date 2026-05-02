@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.45 -->
+  <!-- APP_VERSION: v45.46 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.45</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.46</div>
     </div>
   </div>
 </div>
@@ -804,9 +804,15 @@
     <div id="statsRows" style="display:grid;gap:10px;margin-top:16px;margin-bottom:8px;"></div>
 
     <!-- ⑤ สถิติการแก้จุดอ่อน -->
-    <div id="statsPracticeSection" style="margin-top:16px;margin-bottom:24px;display:none;">
+    <div id="statsPracticeSection" style="margin-top:16px;margin-bottom:8px;display:none;">
       <h2 style="font-size:16px;font-weight:800;color:#374151;margin-bottom:10px;">🎯 สถิติการแก้จุดอ่อน</h2>
       <div id="statsPracticeRows" style="display:grid;gap:10px;"></div>
+    </div>
+
+    <!-- ⑥ จุดอ่อนรายคน (admin only) -->
+    <div id="statsAdminWeaknessSection" style="margin-top:16px;margin-bottom:24px;display:none;">
+      <h2 style="font-size:16px;font-weight:800;color:#374151;margin-bottom:10px;">⚠️ จุดอ่อนรายคน</h2>
+      <div id="statsAdminWeaknessRows" style="display:grid;gap:10px;"></div>
     </div>
   </div>
   <div id="statsConfirmOverlay" class="modal-overlay" role="dialog">
@@ -974,9 +980,8 @@
             <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
             <option value="สังคมศึกษา">สังคมศึกษา</option>
             <option value="สอบเข้า ม.1">สอบเข้า ม.1</option>
-            <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
+            <option value="อื่นๆ">อื่นๆ</option>
         </select>
-        <input id="newSubjectOther" style="display:none;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;margin-top:6px;" placeholder="ระบุชื่อวิชา" oninput="document.getElementById('newSubject').value=this.value;window._onNewSubjectChange(this.value)" />
         <input id="newSubject" type="hidden" value="" />
       </label>
       <!-- เนื้อหาวิชา — แสดงเมื่อเลือกวิชาแล้ว -->
@@ -1095,7 +1100,7 @@
             <div style="display:flex;flex-direction:column;gap:4px;">
               <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">วิชา</div>
               <div style="display:flex;gap:6px;align-items:center;">
-                <select id="editorExamSubjectSelect" class="btn" onchange="(function(){const v=document.getElementById('editorExamSubjectSelect').value;document.getElementById('editorSubjectOtherWrap').style.display=v==='อื่นๆ'?'flex':'none';if(v!=='อื่นๆ')document.getElementById('editorExamSubject').value=v;})()" style="padding:8px 12px;border-radius:10px;font-size:13px;flex:1;">
+                <select id="editorExamSubjectSelect" class="btn" style="padding:8px 12px;border-radius:10px;font-size:13px;flex:1;">
                   <option value="">-- เลือกวิชา --</option>
                   <option value="คณิตศาสตร์">คณิตศาสตร์</option>
                   <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
@@ -1103,12 +1108,8 @@
                   <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
                   <option value="สังคมศึกษา">สังคมศึกษา</option>
                   <option value="สอบเข้า ม.1">สอบเข้า ม.1</option>
-                  <option value="อื่นๆ">อื่นๆ (กรอกเอง)</option>
+                  <option value="อื่นๆ">อื่นๆ</option>
                 </select>
-                <span id="editorSubjectOtherWrap" style="display:none;align-items:center;gap:6px;">
-                  <input id="editorExamSubject" class="titleInput" type="text" placeholder="ระบุวิชา" oninput="" />
-                </span>
-                <input id="editorExamSubjectHidden" type="hidden" />
                 <button class="btn" id="editorSubjectBtn" type="button" title="ยืนยันวิชา" style="padding:8px 14px;font-weight:700;">✓</button>
               </div>
             </div>
@@ -2348,7 +2349,7 @@ function initExams(){
     if(subjectGrid){
       const otherCount = allPub.filter(e=>!KNOWN_SUBJS.includes(e.subject||'')).length;
       subjectGrid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:16px;">`+
-        subjList.map(([subj,cnt])=>
+        subjList.filter(([subj])=>KNOWN_SUBJS.includes(subj)).map(([subj,cnt])=>
           `<div class="linkCard" data-subj="${esc(subj)}" style="text-align:center;padding:24px 16px;cursor:pointer;">
             <div style="font-size:32px;margin-bottom:8px;">${SUBJ_EMOJI[subj]||'📚'}</div>
             <div style="font-weight:900;font-size:15px;">${esc(subj)}</div>
@@ -2374,8 +2375,12 @@ function initExams(){
     if(listEl) listEl.innerHTML = '';
   }
 
-  const subjects=Array.from(new Set(published.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
-  subjFilterEl.innerHTML=`<option value="">ทุกวิชา</option>${subjects.map(sub=>`<option value="${esc(sub)}">${esc(sub)}</option>`).join('')}`;
+  // Only show KNOWN subjects + "อื่นๆ" bucket in the filter dropdown — no custom subject names
+  const _knownInUse=KNOWN_SUBJS.filter(subj=>published.some(e=>e.subject===subj));
+  const _hasOtherSubj=published.some(e=>!KNOWN_SUBJS.includes(e.subject||''));
+  subjFilterEl.innerHTML=`<option value="">ทุกวิชา</option>`+
+    _knownInUse.map(sub=>`<option value="${esc(sub)}">${esc(sub)}</option>`).join('')+
+    (_hasOtherSubj?`<option value="อื่นๆ">อื่นๆ</option>`:'');
 
   // interval สำหรับอัปเดตเวลาใน resume badge — cleanup เมื่อออกจากหน้า
   let _resumeBadgeInterval = null;
@@ -3867,6 +3872,7 @@ function initStats(){
       });
     });
     renderPracticeStats();
+    if(Auth.isTeacher()) renderAdminWeaknessSection();
   }
 
   function renderPracticeStats(){
@@ -3874,22 +3880,22 @@ function initStats(){
     const rowsEl=document.getElementById('statsPracticeRows');
     if(!section||!rowsEl) return;
 
-    // Collect weakness items for the relevant user(s)
+    // Collect weakness items from WeaknessTracker directly (not from practice attempts)
     const s=Store.load();
     let allWeaknesses=[];
     if(!Auth.isTeacher()){
+      // Student: always use own weaknesses regardless of practice history
+      if(!_myName){section.style.display='none';return;}
       allWeaknesses=WeaknessTracker.getAllWeaknessesForUser(_myName);
     } else if(currentStudentFilter!=='all'){
       allWeaknesses=WeaknessTracker.getAllWeaknessesForUser(currentStudentFilter);
     } else {
-      // Admin all-students: aggregate across all users seen in attempts
-      const users=[...new Set((s.attempts||[]).map(a=>a.takerName).filter(Boolean))];
-      users.forEach(u=>{ allWeaknesses.push(...WeaknessTracker.getAllWeaknessesForUser(u)); });
+      section.style.display='none'; return; // admin-all: use the admin section below instead
     }
 
     if(!allWeaknesses.length){section.style.display='none';return;}
 
-    // Group by subject
+    // Group by subject — show even if never practiced (active items always show)
     const bySubject={};
     allWeaknesses.forEach(w=>{
       const subj=w.subject||'ไม่ระบุ';
@@ -3897,10 +3903,13 @@ function initStats(){
       if(w.status==='active') bySubject[subj].active++;
       else bySubject[subj].resolved++;
     });
+    // Only show subjects with at least one active or resolved weakness
+    const entries=Object.entries(bySubject).filter(([,c])=>c.active>0||c.resolved>0).sort((a,b)=>a[0].localeCompare(b[0],'th'));
+    if(!entries.length){section.style.display='none';return;}
 
     section.style.display='block';
     rowsEl.innerHTML='';
-    Object.entries(bySubject).sort((a,b)=>a[0].localeCompare(b[0],'th')).forEach(([subj,counts])=>{
+    entries.forEach(([subj,counts])=>{
       const div=document.createElement('div');
       div.className='card';
       div.style.cssText='padding:14px 16px;';
@@ -3911,6 +3920,51 @@ function initStats(){
           <span style="color:#16a34a;font-weight:700;">แก้แล้ว: ${counts.resolved} ข้อ</span>
         </div>`;
       rowsEl.appendChild(div);
+    });
+  }
+
+  function renderAdminWeaknessSection(){
+    const section=document.getElementById('statsAdminWeaknessSection');
+    const rowsEl=document.getElementById('statsAdminWeaknessRows');
+    if(!section||!rowsEl||!Auth.isTeacher()) return;
+
+    const s=Store.load();
+    const allUsers=[...new Set((s.attempts||[]).map(a=>a.takerName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));
+    const userData=allUsers.map(u=>{
+      const activeW=WeaknessTracker.getActiveWeaknessesForUser(u);
+      if(!activeW.length) return null;
+      const bySubject={};
+      activeW.forEach(w=>{ const subj=w.subject||'ไม่ระบุ'; bySubject[subj]=(bySubject[subj]||0)+1; });
+      return {userId:u,bySubject,total:activeW.length};
+    }).filter(Boolean);
+
+    if(!userData.length){section.style.display='none';return;}
+    section.style.display='block';
+    rowsEl.innerHTML='';
+    userData.forEach(({userId,bySubject,total})=>{
+      const div=document.createElement('div');
+      div.className='card';
+      div.style.cssText='padding:14px 16px;';
+      const subjectLines=Object.entries(bySubject).sort((a,b)=>b[1]-a[1])
+        .map(([subj,cnt])=>`<div style="font-size:13px;color:#374151;">${esc(subj)}: <b>${cnt} ข้อ</b></div>`).join('');
+      div.innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:800;font-size:14px;color:#111827;margin-bottom:6px;">${esc(userId)}</div>
+            ${subjectLines}
+          </div>
+          <button class="btn" data-resetuser="${esc(userId)}" style="padding:6px 12px;font-size:12px;color:#dc2626;border-color:#fca5a5;white-space:nowrap;flex-shrink:0;">ลบจุดอ่อน</button>
+        </div>`;
+      rowsEl.appendChild(div);
+    });
+    rowsEl.querySelectorAll('[data-resetuser]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const u=btn.getAttribute('data-resetuser');
+        if(!confirm(`ต้องการลบจุดอ่อนของ ${u} ใช่หรือไม่?`)) return;
+        await WeaknessTracker.resetWeaknessesForUser(u);
+        toast(`ลบจุดอ่อนของ ${u} แล้ว`);
+        renderAdminWeaknessSection();
+      });
     });
   }
 
@@ -4666,21 +4720,20 @@ function initAdminNew(){
   };
 
   window._onNewSubjectChange=(val)=>{
-    const subjOther=document.getElementById('newSubjectOther');
     const subjHidden=document.getElementById('newSubject');
     const wrap=document.getElementById('newTopicsWrap');
     const label=document.getElementById('newTopicsSubjLabel');
-    if(subjOther) subjOther.style.display=val==='อื่นๆ'?'block':'none';
     if(val&&val!=='อื่นๆ'){
       if(subjHidden) subjHidden.value=val;
-      if(wrap){ wrap.style.display='grid'; }
+      if(wrap) wrap.style.display='grid';
       if(label) label.textContent='('+val+')';
       renderNewTopicTags(val);
     } else if(val==='อื่นๆ'){
+      if(subjHidden) subjHidden.value='อื่นๆ';
       if(wrap) wrap.style.display='none';
     } else {
-      if(wrap) wrap.style.display='none';
       if(subjHidden) subjHidden.value='';
+      if(wrap) wrap.style.display='none';
     }
   };
 
@@ -4709,9 +4762,7 @@ function initAdminNew(){
   newCreateBtn.addEventListener('click',()=>{
     const title=document.getElementById('newTitle').value.trim()||'Exam ใหม่';
     const _selVal=document.getElementById('newSubjectSelect')?.value||'';
-    const subject=(_selVal==='อื่นๆ'||!_selVal)
-      ?(document.getElementById('newSubjectOther')?.value?.trim()||document.getElementById('newSubject')?.value?.trim()||'')
-      :(_selVal||document.getElementById('newSubject')?.value?.trim()||'');
+    const subject=_selVal||'';
     const minutes=Math.max(1,Number(document.getElementById('newMinutes').value||45));
     const published=document.getElementById('newPublished').value==='true';
     const pdfUrl=document.getElementById('newPdfUrl').value.trim();
@@ -4763,7 +4814,6 @@ function initEditor(examId){
   renameBtn.onclick=(e)=>{e.preventDefault();applyRename();};
   titleInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applyRename();}};
 
-  const subjectInput=document.getElementById('editorExamSubject');
   const subjectSelect=document.getElementById('editorExamSubjectSelect');
   const subjectBtn=document.getElementById('editorSubjectBtn');
   const KNOWN_SUBJS=['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ', 'สังคมศึกษา', 'สอบเข้า ม.1'];
@@ -4779,23 +4829,18 @@ function initEditor(examId){
   if(subjectSelect && exam.subject){
     if(KNOWN_SUBJS.includes(exam.subject)){
       subjectSelect.value=exam.subject;
-      document.getElementById('editorSubjectOtherWrap').style.display='none';
     } else {
       subjectSelect.value='อื่นๆ';
-      document.getElementById('editorSubjectOtherWrap').style.display='flex';
-      if(subjectInput) subjectInput.value=exam.subject;
     }
   }
 
   function applySubject(){
-    const selVal=subjectSelect?.value||'';
-    const v=selVal==='อื่นๆ'?(subjectInput?.value||'').trim()||'ทั่วไป':selVal||'ทั่วไป';
-    exam.subject=v;Store.save(s);renderEditorTopicTags();renderTable();
-    document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
+    const selVal=subjectSelect?.value||'ไม่ระบุ';
+    exam.subject=selVal; Store.save(s); renderEditorTopicTags(); renderTable();
+    document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ไม่ระบุ'}`;
     toast('บันทึกวิชาแล้ว');
   }
   subjectBtn.onclick=(e)=>{e.preventDefault();applySubject();};
-  if(subjectInput) subjectInput.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();applySubject();}};
 
   // ── Duration ──
   const durationInput=document.getElementById('editorDurationMin');
@@ -5595,6 +5640,12 @@ const WeaknessTracker = (() => {
     return Object.values(_loadLocal(userId));
   }
 
+  async function resetWeaknessesForUser(userId) {
+    if (!userId) return;
+    _saveLocal(userId, {});
+    await _saveToCloud(userId, {});
+  }
+
   function countWeaknessesByExam(userId, examId) {
     return Object.values(_loadLocal(userId)).filter(w => w.status === 'active' && w.examId === examId).length;
   }
@@ -5624,8 +5675,8 @@ const WeaknessTracker = (() => {
   }
 
   return { updateWeaknessAfterSubmit, getActiveWeaknessesForUser, getAllWeaknessesForUser,
-    countWeaknessesByExam, countWeaknessesBySubject, buildWeaknessItemsFromAttempts,
-    runBackfillIfNeeded, rebuildWeaknessesForCurrentUser };
+    resetWeaknessesForUser, countWeaknessesByExam, countWeaknessesBySubject,
+    buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser };
 })();
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
