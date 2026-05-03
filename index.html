@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.65 -->
+  <!-- APP_VERSION: v45.66 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.65</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.66</div>
     </div>
   </div>
 </div>
@@ -2138,7 +2138,7 @@ function renderHome(){
       return `<div class="muted" style="padding:18px 4px;text-align:center;font-size:13px;">ยังไม่มีนักเรียนที่จะแสดงข้อมูล</div>`;
     }
     let m;
-    try { m = getDailyCoachMetricsStage3(userId); } catch(e){ m = null; }
+    try { m = getDailyCoachMetricsStage4(userId); } catch(e){ m = null; }
     const streakCount = (m && m.streak && m.streak.count) || 0;
     const streakEmoji = (m && m.streak && m.streak.emoji) || '';
     const activityVal = (m && m.activity && typeof m.activity.activity === 'number') ? m.activity.activity : 0;
@@ -2153,6 +2153,18 @@ function renderHome(){
     const activitySub = `${focusSetCount} ชุดวันนี้`;
     const scoreSub    = hasScoreToday ? `ต่ำสุด ${decisionScore}%` : 'ยังไม่มีข้อสอบวันนี้';
     const fixesSub    = `เหลือ ${remaining} ข้อ`;
+    const rec = m && m.recommendation;
+    const recEmojiMap = {
+      fix_weakness: '🎯', fix_mistakes: '🔧', review: '💤',
+      switch_subject: '🔄', start: '🚀', no_focus: '📌', 'default': '✨'
+    };
+    const recHtml = (rec && rec.message)
+      ? `
+      <div style="border-top:1px solid #e5e7eb;margin-top:4px;padding:8px 4px;display:flex;gap:8px;align-items:flex-start;">
+        <span style="font-size:16px;">${recEmojiMap[rec.type] || '✨'}</span>
+        <span style="font-size:13px;color:#374151;line-height:1.4;">${esc(rec.message)}</span>
+      </div>`
+      : '';
     return `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;">
         <div style="font-weight:800;font-size:15px;">${streakEmoji ? streakEmoji + ' ' : ''}${streakCount} วัน</div>
@@ -2163,6 +2175,7 @@ function renderHome(){
         ${ringSvg('แม่นยำ', scoreVal, scoreSub)}
         ${ringSvg('แก้จุด', fixesVal, fixesSub)}
       </div>
+      ${recHtml}
     `;
   }
   function tabStyle(active){
