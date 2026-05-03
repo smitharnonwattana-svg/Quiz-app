@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.73 -->
+  <!-- APP_VERSION: v45.74 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.73</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.74</div>
     </div>
   </div>
 </div>
@@ -2977,6 +2977,10 @@ function initTake(id){
     if (takerName && !Auth.isTeacher()) {
       updateCoachStreak(takerName);
     }
+    // Gamification G5: Stamp UI + Points Wiring
+    if (takerName && !Auth.isTeacher()) {
+      processGamificationAfterSubmit(takerName);
+    }
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
     lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
@@ -4541,6 +4545,10 @@ function initPractice(params){
     if (_practiceUserId && !Auth.isTeacher()) {
       updateCoachStreak(_practiceUserId);
     }
+    // Gamification G5: Stamp UI + Points Wiring
+    if (_practiceUserId && !Auth.isTeacher()) {
+      processGamificationAfterSubmit(_practiceUserId);
+    }
   }
 
   renderPrac();
@@ -5018,11 +5026,13 @@ function initAdminMembers(){
       host.style.cssText = 'background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:4px 0 14px;';
       tbody.parentNode.insertBefore(host, tbody);
     }
+    // Gamification G5: Stamp UI + Points Wiring
     const tiers = [
-      { key: '100',  label: '⚡ Scholar' },
-      { key: '300',  label: '🔥 Pro' },
-      { key: '600',  label: '💎 Elite' },
-      { key: '1000', label: '👑 Legend' }
+      { key: '100',    label: '⚡ Scholar' },
+      { key: '300',    label: '🔥 Pro' },
+      { key: '600',    label: '💎 Elite' },
+      { key: '1000',   label: '👑 Legend' },
+      { key: 'stamps', label: '🎫 Stamp Reward' }
     ];
     const rewards = getStudyRoadRewards();
     const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -5030,8 +5040,9 @@ function initAdminMembers(){
       '<div style="font-weight:800;font-size:14px;margin-bottom:8px;">🗺️ Study Road — รางวัลแต่ละระดับ</div>' +
       tiers.map(t => {
         const v = escAttr(rewards[t.key] || '');
+        const head = (t.key === 'stamps') ? t.label : (t.key + ' pt → ' + t.label);
         return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;">' +
-                 '<div style="min-width:130px;font-weight:700;font-size:13px;color:#374151;">' + t.key + ' pt → ' + t.label + '</div>' +
+                 '<div style="min-width:130px;font-weight:700;font-size:13px;color:#374151;">' + head + '</div>' +
                  '<input class="titleInput" type="text" placeholder="ชื่อรางวัล" style="flex:1;min-width:160px;" data-srtier="' + t.key + '" value="' + v + '" />' +
                  '<button type="button" class="btn" data-srsave="' + t.key + '">บันทึก</button>' +
                '</div>';
