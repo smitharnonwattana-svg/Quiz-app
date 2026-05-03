@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.48 -->
+  <!-- APP_VERSION: v45.49 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.48</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.49</div>
     </div>
   </div>
 </div>
@@ -5693,6 +5693,155 @@ const WeaknessTracker = (() => {
     resetWeaknessesForUser, countWeaknessesByExam, countWeaknessesBySubject,
     buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser };
 })();
+
+// ===================== STAGE 1: Focus Subjects + Daily Context =====================
+// Read-only data layer for upcoming Activity/Score/Fixes/Streak metrics.
+// Does not mutate existing exam/practice/weakness flows.
+
+// ── Focus Subjects (admin-controlled, max 2 per user) ─────────
+const FOCUS_MAX = 2;
+
+function _getValidSubjects() {
+  try {
+    const s = Store.load();
+    return [...new Set((s.exams || []).map(e => e && e.subject).filter(Boolean))];
+  } catch { return []; }
+}
+
+function getFocusSubjects(userId) {
+  if (!userId) return [];
+  try {
+    const s = Store.load();
+    const map = (s && s.focusSubjects) || {};
+    const arr = map[userId];
+    return Array.isArray(arr) ? arr.slice() : [];
+  } catch { return []; }
+}
+
+function setFocusSubjects(adminId, targetUserId, subjectsArray) {
+  if (typeof Auth === 'undefined' || !Auth.isTeacher()) {
+    return { ok: false, error: 'forbidden: admin only' };
+  }
+  if (!targetUserId) return { ok: false, error: 'missing targetUserId' };
+  if (!Array.isArray(subjectsArray)) return { ok: false, error: 'subjects must be an array' };
+
+  const cleaned = [...new Set(subjectsArray.map(x => (x == null ? '' : String(x).trim())).filter(Boolean))];
+  if (cleaned.length > FOCUS_MAX) {
+    return { ok: false, error: `max ${FOCUS_MAX} subjects` };
+  }
+  const valid = _getValidSubjects();
+  const unknown = cleaned.filter(x => !valid.includes(x));
+  if (unknown.length) {
+    return { ok: false, error: 'unknown subject(s): ' + unknown.join(', ') };
+  }
+
+  const s = Store.load();
+  if (!s.focusSubjects || typeof s.focusSubjects !== 'object') s.focusSubjects = {};
+  s.focusSubjects[targetUserId] = cleaned;
+  Store.save(s);
+  return { ok: true, focusSubjects: cleaned.slice() };
+}
+
+// ── Daily Data Helpers (today only, local timezone) ───────────
+function isToday(timestamp) {
+  if (timestamp == null) return false;
+  const d = (timestamp instanceof Date) ? timestamp : new Date(timestamp);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+}
+
+function getTodayAttempts(allAttempts, userId) {
+  if (!userId || !Array.isArray(allAttempts)) return [];
+  return allAttempts.filter(a =>
+    a && (a.takerName || '') === userId && isToday(a.submittedAt || a.startedAt)
+  );
+}
+
+function splitAttemptsByFocus(attempts, focusSubjects) {
+  const list = Array.isArray(attempts) ? attempts : [];
+  const focus = Array.isArray(focusSubjects) ? focusSubjects : [];
+  if (focus.length === 0) {
+    return { focusAttempts: list.slice(), nonFocusAttempts: [] };
+  }
+  const focusAttempts = [];
+  const nonFocusAttempts = [];
+  list.forEach(a => {
+    const subj = (a && a.examSubject) || '';
+    if (focus.includes(subj)) focusAttempts.push(a);
+    else nonFocusAttempts.push(a);
+  });
+  return { focusAttempts, nonFocusAttempts };
+}
+
+function getTodayPracticeLogs(practiceLogs, userId) {
+  if (!userId || !Array.isArray(practiceLogs)) return [];
+  return practiceLogs.filter(p =>
+    p && (p.takerName || '') === userId
+    && (p.mode === 'weakness_practice' || !p.mode)
+    && isToday(p.submittedAt || p.startedAt)
+  ).filter(p => p.mode === 'weakness_practice');
+}
+
+function getTodayWeaknessActivity(userId) {
+  if (!userId) return { resolvedToday: 0, remainingWeaknesses: 0, resolvedItems: [] };
+  const all = WeaknessTracker.getAllWeaknessesForUser(userId);
+  const resolvedItems = all.filter(w => w && w.status === 'resolved' && isToday(w.resolvedAt));
+  const remaining = all.filter(w => w && w.status === 'active').length;
+  return {
+    resolvedToday: resolvedItems.length,
+    remainingWeaknesses: remaining,
+    resolvedItems
+  };
+}
+
+function filterWeaknessByFocus(weaknessItems, focusSubjects) {
+  const list = Array.isArray(weaknessItems) ? weaknessItems : [];
+  const focus = Array.isArray(focusSubjects) ? focusSubjects : [];
+  if (focus.length === 0) return list.slice();
+  return list.filter(w => focus.includes((w && w.subject) || ''));
+}
+
+// ── Aggregated Daily Context ──────────────────────────────────
+function getTodayContext(userId) {
+  const empty = {
+    focusSubjects: [],
+    attempts: [], focusAttempts: [], nonFocusAttempts: [],
+    practiceLogs: [],
+    weakness: { resolvedToday: 0, remaining: 0, focusResolved: 0, focusRemaining: 0 }
+  };
+  if (!userId) return empty;
+
+  const focusSubjects = getFocusSubjects(userId);
+  const s = Store.load();
+  const allAttempts = (s && s.attempts) || [];
+
+  const todayAttempts = getTodayAttempts(allAttempts, userId);
+  const { focusAttempts, nonFocusAttempts } = splitAttemptsByFocus(todayAttempts, focusSubjects);
+  const practiceLogs = getTodayPracticeLogs(allAttempts, userId);
+
+  const wkAll = WeaknessTracker.getAllWeaknessesForUser(userId);
+  const wkResolvedToday = wkAll.filter(w => w && w.status === 'resolved' && isToday(w.resolvedAt));
+  const wkActive = wkAll.filter(w => w && w.status === 'active');
+  const wkResolvedFocus = filterWeaknessByFocus(wkResolvedToday, focusSubjects);
+  const wkActiveFocus = filterWeaknessByFocus(wkActive, focusSubjects);
+
+  return {
+    focusSubjects: focusSubjects.slice(),
+    attempts: todayAttempts,
+    focusAttempts,
+    nonFocusAttempts,
+    practiceLogs,
+    weakness: {
+      resolvedToday: wkResolvedToday.length,
+      remaining: wkActive.length,
+      focusResolved: wkResolvedFocus.length,
+      focusRemaining: wkActiveFocus.length
+    }
+  };
+}
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
 (function() {
