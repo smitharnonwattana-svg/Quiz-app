@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.51 -->
+  <!-- APP_VERSION: v45.52 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.51</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.52</div>
     </div>
   </div>
 </div>
@@ -5953,6 +5953,159 @@ function getDailyCoachMetricsStage2(userId) {
   const score = calculateScore(userId);
   const scoreBand = getScoreBand(score.score);
   return { userId: userId || null, focusSubjects, activity, score, scoreBand };
+}
+
+// ===================== STAGE 3: Fixes + Streak Engines =====================
+// Pure additive helpers. No UI, no recommendation, no reward.
+
+// ── Fixes Engine ──────────────────────────────────────────────
+function calculateFixesFromResolvedCount(resolvedToday, remaining) {
+  const r = Math.max(0, Number(resolvedToday) || 0);
+  const rem = Math.max(0, Number(remaining) || 0);
+  if (r === 0 && rem === 0) return 100;
+  if (r === 0) return 0;
+  if (r >= 10) return 100;
+  if (r >= 5) {
+    // 5 → 60, 9 → 90
+    return Math.round(60 + (r - 5) * (30 / 4));
+  }
+  // 1 → 20, 4 → 60
+  return Math.round(20 + (r - 1) * (40 / 3));
+}
+
+function calculateFixes(userId) {
+  const empty = { fixes: 0, resolvedToday: 0, remaining: 0, reason: 'not_started' };
+  if (!userId) return empty;
+  const ctx = getTodayContext(userId);
+  const resolvedToday = (ctx && ctx.weakness && ctx.weakness.focusResolved) || 0;
+  const remaining = (ctx && ctx.weakness && ctx.weakness.focusRemaining) || 0;
+  const fixes = calculateFixesFromResolvedCount(resolvedToday, remaining);
+
+  let reason;
+  if (resolvedToday === 0 && remaining === 0) reason = 'no_weakness';
+  else if (resolvedToday > 0) reason = 'resolved_progress';
+  else reason = 'not_started';
+
+  return { fixes, resolvedToday, remaining, reason };
+}
+
+// ── Streak Engine ─────────────────────────────────────────────
+function getDateKey(date) {
+  const d = (date instanceof Date) ? date : (date == null ? new Date() : new Date(date));
+  if (isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getDaysBetweenDateKeys(dateKeyA, dateKeyB) {
+  if (!dateKeyA || !dateKeyB) return NaN;
+  const a = new Date(dateKeyA + 'T00:00:00');
+  const b = new Date(dateKeyB + 'T00:00:00');
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return NaN;
+  const ms = b.getTime() - a.getTime();
+  return Math.round(ms / 86400000);
+}
+
+function hasActiveLearningToday(userId) {
+  if (!userId) return false;
+  const ctx = getTodayContext(userId);
+  const normalExamCount = (ctx.attempts || []).filter(_isNormalExamAttempt).length;
+  const practiceCount = (ctx.practiceLogs || []).length;
+  return normalExamCount >= 1 || practiceCount >= 1;
+}
+
+function getCoachStreak(userId) {
+  if (!userId) return null;
+  try {
+    const s = Store.load();
+    const map = (s && s.coachStreaks) || {};
+    const rec = map[userId];
+    if (!rec || typeof rec !== 'object') return null;
+    return {
+      count: Number(rec.count) || 0,
+      lastActiveDate: rec.lastActiveDate || null,
+      updatedAt: rec.updatedAt || null
+    };
+  } catch { return null; }
+}
+
+function _saveCoachStreak(userId, count, lastActiveDate) {
+  const s = Store.load();
+  if (!s.coachStreaks || typeof s.coachStreaks !== 'object') s.coachStreaks = {};
+  s.coachStreaks[userId] = {
+    count: Math.max(0, Number(count) || 0),
+    lastActiveDate: lastActiveDate || null,
+    updatedAt: new Date().toISOString()
+  };
+  Store.save(s);
+}
+
+function updateCoachStreak(userId) {
+  const empty = { count: 0, status: 'none', emoji: '', lastActiveDate: null, isActiveToday: false };
+  if (!userId) return empty;
+
+  const todayKey = getDateKey(new Date());
+  const isActiveToday = hasActiveLearningToday(userId);
+  const rec = getCoachStreak(userId);
+  const lastKey = rec && rec.lastActiveDate ? rec.lastActiveDate : null;
+  const prevCount = rec ? rec.count : 0;
+  const daysSince = lastKey ? getDaysBetweenDateKeys(lastKey, todayKey) : null;
+
+  if (isActiveToday) {
+    if (lastKey === todayKey) {
+      // Already counted today — do not increment
+      return {
+        count: prevCount, status: 'active', emoji: '🔥',
+        lastActiveDate: todayKey, isActiveToday: true
+      };
+    }
+    let newCount;
+    if (lastKey == null || daysSince == null || isNaN(daysSince) || daysSince > 3) {
+      newCount = 1;
+    } else if (daysSince >= 1 && daysSince <= 3) {
+      // yesterday OR within grace window (1 or 2 missed days) → continue streak
+      newCount = prevCount + 1;
+    } else {
+      // daysSince <= 0 (clock skew) — be safe, treat as fresh
+      newCount = Math.max(1, prevCount);
+    }
+    _saveCoachStreak(userId, newCount, todayKey);
+    return {
+      count: newCount, status: 'active', emoji: '🔥',
+      lastActiveDate: todayKey, isActiveToday: true
+    };
+  }
+
+  // Not active today
+  if (!rec) {
+    return { count: 0, status: 'none', emoji: '', lastActiveDate: null, isActiveToday: false };
+  }
+  if (daysSince == null || isNaN(daysSince)) {
+    return { count: prevCount, status: 'none', emoji: '', lastActiveDate: lastKey, isActiveToday: false };
+  }
+  if (daysSince <= 0) {
+    // last active was today (e.g., active earlier same day, ctx changed) — treat as active
+    return { count: prevCount, status: 'active', emoji: '🔥', lastActiveDate: lastKey, isActiveToday: false };
+  }
+  if (daysSince === 1) {
+    return { count: prevCount, status: 'grace1', emoji: '🪔', lastActiveDate: lastKey, isActiveToday: false };
+  }
+  if (daysSince === 2) {
+    return { count: prevCount, status: 'grace2', emoji: '🕯️', lastActiveDate: lastKey, isActiveToday: false };
+  }
+  // daysSince >= 3 → reset
+  _saveCoachStreak(userId, 0, lastKey);
+  return { count: 0, status: 'reset', emoji: '', lastActiveDate: lastKey, isActiveToday: false };
+}
+
+// ── Combined Stage 3 Helper ───────────────────────────────────
+function getDailyCoachMetricsStage3(userId) {
+  const stage2 = getDailyCoachMetricsStage2(userId);
+  const fixes = calculateFixes(userId);
+  const streak = updateCoachStreak(userId);
+  return { ...stage2, fixes, streak };
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
