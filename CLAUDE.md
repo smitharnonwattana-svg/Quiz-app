@@ -1,13 +1,11 @@
 # My Exam Academia — Claude Development Rules
-
 ## Project Overview
 Single-page web app (SPA) for exam practice, targeting students preparing for ม.1 entrance exams.
-All logic lives in one self-contained HTML file — no build step, no server.
+All logic lives in one self-contained HTML file — no build step, no frontend server.
+Backend: Firebase Cloud Functions (Node.js 22, asia-southeast1) สำหรับส่ง LINE notify เท่านั้น
 
 ## Version Update Rule (IMPORTANT)
-
 **Every time any HTML file is modified or generated**, you MUST:
-
 1. **Increment the version number** — bump the minor version (e.g. v45.2 → v45.3, v45.3 → v45.4)
 2. **Update both version locations** in the HTML:
    - `<head>` comment: `<!-- APP_VERSION: v{new_version} -->`
@@ -17,16 +15,14 @@ All logic lives in one self-contained HTML file — no build step, no server.
    - Save a local copy named `index_v{new_version}.html` — ไฟล์นี้ถูก .gitignore ไว้ ไม่ push ขึ้น GitHub
 
 ### Version locations in index.html
-- Line ~7: `<!-- APP_VERSION: v45.2 -->`
-- Line ~346: `<div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.2</div>`
+- Line ~7: `<!-- APP_VERSION: v45.47 -->`
+- Line ~346: `<div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.47</div>`
 
-### Current version: v45.22
-When making the next change, bump to v45.23.
+### Current version: v45.47
+When making the next change, bump to v45.48.
 
 ## GitHub Push (Deploy)
-
 Token และข้อมูล deploy เก็บอยู่ใน `.claude-local` (gitignored — ไม่ push ขึ้น GitHub)
-
 วิธี push ทุกครั้ง:
 ```bash
 # อ่าน token จาก .claude-local แล้ว push
@@ -37,9 +33,16 @@ git push -u origin claude/review-webapp-structure-gaY4S
 git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 ```
 
+## Deployment
+- Production URL: https://smitharnonwattana-svg.github.io/Quiz-app/
+- Platform: GitHub Pages (deploy จาก branch main เท่านั้น)
+- Firebase project nanont-exam: ใช้สำหรับ Cloud Functions เท่านั้น (ไม่ใช้ Firebase Hosting)
+- _headers: deprecated ไม่ได้ใช้แล้ว
 
+## App Structure
 - Navigation: `navigate('page-name')` function
 - All pages: `div.page` elements, shown via `.page.active` CSS class
-- Data storage: localStorage (no backend)
+- Data storage: localStorage (client-side, no database)
+- LINE notify: Firebase Cloud Functions → LINE Messaging API (Secrets: LINE_TOKEN, LINE_USER_ID)
 - PDF viewer: custom canvas-based renderer using pdf.js
 - Language: Thai (th)
