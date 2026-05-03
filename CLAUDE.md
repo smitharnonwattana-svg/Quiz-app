@@ -50,6 +50,12 @@ git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 ## Important files / paths
 - index.html — frontend ทั้งหมด (อย่าสร้างไฟล์ JS/CSS แยก)
 - functions/index.js — Cloud Function lineNotify
+  ⚠️ ทุกครั้งที่แก้ functions/index.js ต้อง deploy ผ่าน Cloud Shell:
+  1. เปิด https://console.cloud.google.com → กด >_ Cloud Shell
+  2. git stash && git pull origin main
+  3. npx firebase-tools deploy --only functions --project nanont-exam
+  4. รอ Deploy complete! แล้วทดสอบใน DevTools
+  Claude Code deploy functions ตรงไม่ได้ — หลังแก้ functions/index.js ให้แจ้ง user ทุกครั้งว่าต้อง deploy เองผ่าน Cloud Shell
 - functions/package.json — dependencies ของ Cloud Functions
 - firebase.json — config deploy Cloud Functions (ไม่ใช่ Firebase Hosting)
 - .firebaserc — Firebase project: nanont-exam
