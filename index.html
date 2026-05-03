@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.61 -->
+  <!-- APP_VERSION: v45.62 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.61</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.62</div>
     </div>
   </div>
 </div>
@@ -2946,6 +2946,9 @@ function initTake(id){
     if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
     const ok=Store.save(savedS);
     WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
+    if (takerName && !Auth.isTeacher()) {
+      updateCoachStreak(takerName);
+    }
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
     lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
@@ -4506,6 +4509,10 @@ function initPractice(params){
     const sv=Store.load();
     sv.attempts=[attempt,...(sv.attempts||[])];
     await Store.save(sv);
+    const _practiceUserId = st.userId || st.takerName || '';
+    if (_practiceUserId && !Auth.isTeacher()) {
+      updateCoachStreak(_practiceUserId);
+    }
   }
 
   renderPrac();
