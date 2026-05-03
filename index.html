@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.58 -->
+  <!-- APP_VERSION: v45.59 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.58</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.59</div>
     </div>
   </div>
 </div>
@@ -2108,13 +2108,15 @@ function renderHome(){
     if (v >= 50) return '#f97316';
     return '#ef4444';
   }
-  function ringSvg(label, value){
+  // Ring Labels + Subtitle — UI Update
+  function ringSvg(label, value, subtitle){
     const has = (value != null && !isNaN(value));
     const pct = has ? Math.max(0, Math.min(100, Number(value))) : 0;
     const stroke = has ? ringColor(pct) : ringColor(null);
     const r = 38, C = 2 * Math.PI * r;
     const dash = (pct / 100) * C;
     const display = has ? `${Math.round(pct)}%` : '--';
+    const sub = subtitle || '';
     return `
       <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;">
         <svg width="92" height="92" viewBox="0 0 96 96" aria-hidden="true">
@@ -2126,9 +2128,11 @@ function renderHome(){
           <text x="48" y="55" text-anchor="middle" font-size="20" font-weight="800" fill="#111">${display}</text>
         </svg>
         <div style="margin-top:6px;font-size:13px;font-weight:700;color:#374151;">${label}</div>
+        ${sub ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;">${esc(sub)}</div>` : ''}
       </div>
     `;
   }
+  // Ring Labels + Subtitle — UI Update
   function whoopSectionHTML(userId){
     if (!userId) {
       return `<div class="muted" style="padding:18px 4px;text-align:center;font-size:13px;">ยังไม่มีนักเรียนที่จะแสดงข้อมูล</div>`;
@@ -2142,15 +2146,22 @@ function renderHome(){
     const fixesVal    = (m && m.fixes && typeof m.fixes.fixes === 'number') ? m.fixes.fixes : 0;
     const focusList   = (m && Array.isArray(m.focusSubjects) && m.focusSubjects.length)
                         ? m.focusSubjects.join(' · ') : '—';
+    const focusSetCount = (m && m.activity && typeof m.activity.focusSetCount === 'number') ? m.activity.focusSetCount : 0;
+    const hasScoreToday = !!(m && m.score && m.score.hasScoreToday);
+    const decisionScore = (m && m.score && typeof m.score.decisionScore === 'number') ? m.score.decisionScore : null;
+    const remaining     = (m && m.fixes && typeof m.fixes.remaining === 'number') ? m.fixes.remaining : 0;
+    const activitySub = `${focusSetCount} sets today`;
+    const scoreSub    = hasScoreToday ? `${decisionScore}% lowest` : 'no exam today';
+    const fixesSub    = `${remaining} pending`;
     return `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;">
         <div style="font-weight:800;font-size:15px;">${streakEmoji ? streakEmoji + ' ' : '✨ '}${streakCount} วัน</div>
         <div class="muted" style="font-size:12px;">โฟกัส: ${esc(focusList)}</div>
       </div>
       <div style="display:flex;gap:10px;justify-content:space-between;padding:6px 0 12px;">
-        ${ringSvg('ลงมือ', activityVal)}
-        ${ringSvg('แม่นยำ', scoreVal)}
-        ${ringSvg('แก้จุด', fixesVal)}
+        ${ringSvg('Activity', activityVal, activitySub)}
+        ${ringSvg('Score', scoreVal, scoreSub)}
+        ${ringSvg('Fixes', fixesVal, fixesSub)}
       </div>
     `;
   }
