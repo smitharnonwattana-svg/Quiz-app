@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.50 -->
+  <!-- APP_VERSION: v45.51 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.50</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.51</div>
     </div>
   </div>
 </div>
@@ -5842,6 +5842,117 @@ function getTodayContext(userId) {
       focusRemaining: wkActiveFocus.length
     }
   };
+}
+
+// ===================== STAGE 2: Activity + Score Engines =====================
+// Pure calculation helpers built on top of getTodayContext(userId).
+// No UI, no recommendations, no streak — additive only.
+
+// ── Activity Engine ───────────────────────────────────────────
+function calculateBaseActivityFromWeightedSets(weightedSets) {
+  const w = Number(weightedSets) || 0;
+  if (w <= 0) return 0;
+  if (w <= 1) return w * 70;            // 0 → 0, 1 → 70 (0.5 → 35)
+  if (w <= 2) return 70 + (w - 1) * 20; // 1 → 70, 2 → 90 (1.5 → 80)
+  return 90;
+}
+
+function calculatePracticeBonus(practiceConfirmCount) {
+  const n = Number(practiceConfirmCount) || 0;
+  if (n <= 0) return 0;
+  if (n <= 4) return 5;
+  if (n <= 9) return 10;
+  return 15;
+}
+
+function _isNormalExamAttempt(a) {
+  return !!a && a.mode !== 'weakness_practice';
+}
+
+function calculateActivity(userId) {
+  const empty = {
+    activity: 0, baseActivity: 0, practiceBonus: 0,
+    weightedSets: 0, focusSetCount: 0, nonFocusSetCount: 0,
+    practiceConfirmCount: 0
+  };
+  if (!userId) return empty;
+
+  const ctx = getTodayContext(userId);
+  const focusSets = (ctx.focusAttempts || []).filter(_isNormalExamAttempt);
+  const nonFocusSets = (ctx.nonFocusAttempts || []).filter(_isNormalExamAttempt);
+  const focusSetCount = focusSets.length;
+  const nonFocusSetCount = nonFocusSets.length;
+  const weightedSets = focusSetCount * 1.0 + nonFocusSetCount * 0.5;
+
+  const baseActivity = calculateBaseActivityFromWeightedSets(weightedSets);
+  const practiceConfirmCount = (ctx.practiceLogs || []).length;
+  const practiceBonus = calculatePracticeBonus(practiceConfirmCount);
+  const activity = Math.min(100, baseActivity + practiceBonus);
+
+  return {
+    activity, baseActivity, practiceBonus,
+    weightedSets, focusSetCount, nonFocusSetCount,
+    practiceConfirmCount
+  };
+}
+
+// ── Score Engine ──────────────────────────────────────────────
+function calculateScore(userId) {
+  const empty = { score: null, decisionScore: null, bySubject: {}, hasScoreToday: false };
+  if (!userId) return empty;
+
+  const ctx = getTodayContext(userId);
+  const focusExams = (ctx.focusAttempts || []).filter(_isNormalExamAttempt);
+  if (focusExams.length === 0) return empty;
+
+  const bySubject = {};
+  let totalCorrect = 0;
+  let totalQuestions = 0;
+
+  focusExams.forEach(a => {
+    const subj = (a && a.examSubject) || 'ไม่ระบุ';
+    const correct = Number(a && a.score) || 0;
+    const total = Number(a && a.total) || 0;
+    if (total <= 0) return;
+    if (!bySubject[subj]) bySubject[subj] = { correct: 0, total: 0, score: 0 };
+    bySubject[subj].correct += correct;
+    bySubject[subj].total += total;
+    totalCorrect += correct;
+    totalQuestions += total;
+  });
+
+  if (totalQuestions <= 0) return empty;
+
+  Object.keys(bySubject).forEach(k => {
+    const s = bySubject[k];
+    s.score = Math.round((s.correct / s.total) * 100);
+  });
+
+  const score = Math.round((totalCorrect / totalQuestions) * 100);
+  const decisionScore = Object.values(bySubject).reduce(
+    (lo, s) => (s.score < lo ? s.score : lo), 100
+  );
+
+  return { score, decisionScore, bySubject, hasScoreToday: true };
+}
+
+// ── Score Threshold ───────────────────────────────────────────
+function getScoreBand(score) {
+  if (score == null || isNaN(score)) return { band: 'none', label: 'ยังไม่มีข้อมูลวันนี้' };
+  const n = Number(score);
+  if (n >= 85) return { band: 'excellent', label: 'ดีมาก' };
+  if (n >= 70) return { band: 'good',      label: 'ดี' };
+  if (n >= 50) return { band: 'caution',   label: 'ต้องระวัง' };
+  return { band: 'review', label: 'ควรทบทวน' };
+}
+
+// ── Combined Stage 2 Helper ───────────────────────────────────
+function getDailyCoachMetricsStage2(userId) {
+  const focusSubjects = getFocusSubjects(userId);
+  const activity = calculateActivity(userId);
+  const score = calculateScore(userId);
+  const scoreBand = getScoreBand(score.score);
+  return { userId: userId || null, focusSubjects, activity, score, scoreBand };
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
