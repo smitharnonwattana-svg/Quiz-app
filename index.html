@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.59 -->
+  <!-- APP_VERSION: v45.60 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.59</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.60</div>
     </div>
   </div>
 </div>
@@ -2150,18 +2150,18 @@ function renderHome(){
     const hasScoreToday = !!(m && m.score && m.score.hasScoreToday);
     const decisionScore = (m && m.score && typeof m.score.decisionScore === 'number') ? m.score.decisionScore : null;
     const remaining     = (m && m.fixes && typeof m.fixes.remaining === 'number') ? m.fixes.remaining : 0;
-    const activitySub = `${focusSetCount} sets today`;
-    const scoreSub    = hasScoreToday ? `${decisionScore}% lowest` : 'no exam today';
-    const fixesSub    = `${remaining} pending`;
+    const activitySub = `${focusSetCount} ชุดวันนี้`;
+    const scoreSub    = hasScoreToday ? `ต่ำสุด ${decisionScore}%` : 'ยังไม่มีข้อสอบวันนี้';
+    const fixesSub    = `เหลือ ${remaining} ข้อ`;
     return `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;">
         <div style="font-weight:800;font-size:15px;">${streakEmoji ? streakEmoji + ' ' : '✨ '}${streakCount} วัน</div>
         <div class="muted" style="font-size:12px;">โฟกัส: ${esc(focusList)}</div>
       </div>
       <div style="display:flex;gap:10px;justify-content:space-between;padding:6px 0 12px;">
-        ${ringSvg('Activity', activityVal, activitySub)}
-        ${ringSvg('Score', scoreVal, scoreSub)}
-        ${ringSvg('Fixes', fixesVal, fixesSub)}
+        ${ringSvg('ลงมือ', activityVal, activitySub)}
+        ${ringSvg('แม่นยำ', scoreVal, scoreSub)}
+        ${ringSvg('แก้จุด', fixesVal, fixesSub)}
       </div>
     `;
   }
