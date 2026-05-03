@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.63 -->
+  <!-- APP_VERSION: v45.64 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.63</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.64</div>
     </div>
   </div>
 </div>
@@ -6397,6 +6397,123 @@ function getDailyCoachMetricsStage3(userId) {
   const fixes = calculateFixes(userId);
   const streak = updateCoachStreak(userId);
   return { ...stage2, fixes, streak };
+}
+
+// ===================== STAGE 6: Coach Recommendation =====================
+// Pure read-only helper. Returns ONE recommendation. No UI, no side effects.
+
+function getActiveWeaknessCountsByFocusSubject(userId, focusSubjects) {
+  const out = {};
+  if (!userId || !Array.isArray(focusSubjects) || focusSubjects.length === 0) return out;
+  let actives = [];
+  try { actives = WeaknessTracker.getActiveWeaknessesForUser(userId) || []; } catch { actives = []; }
+  const focusSet = new Set(focusSubjects);
+  actives.forEach(w => {
+    const subj = (w && w.subject) || '';
+    if (!focusSet.has(subj)) return;
+    out[subj] = (out[subj] || 0) + 1;
+  });
+  return out;
+}
+
+function getTodayFocusSubjectsDone(userId, focusSubjects) {
+  if (!userId || !Array.isArray(focusSubjects) || focusSubjects.length === 0) return [];
+  let ctx;
+  try { ctx = getTodayContext(userId); } catch { return []; }
+  const focusSet = new Set(focusSubjects);
+  const done = new Set();
+  (ctx.focusAttempts || []).forEach(a => {
+    if (!a || a.mode === 'weakness_practice') return;
+    const subj = a.examSubject || '';
+    if (focusSet.has(subj)) done.add(subj);
+  });
+  return Array.from(done);
+}
+
+function getOtherFocusSubject(focusSubjects, doneSubjects) {
+  if (!Array.isArray(focusSubjects) || focusSubjects.length === 0) return null;
+  const doneSet = new Set(doneSubjects || []);
+  for (const s of focusSubjects) {
+    if (!doneSet.has(s)) return s;
+  }
+  return null;
+}
+
+function getCoachRecommendation(userId) {
+  // Special: no userId
+  if (!userId) {
+    return {
+      type: 'no_focus', subject: null, priority: 0,
+      message: 'ยังไม่ได้ตั้งค่าวิชาที่โฟกัส ลองเลือกข้อสอบที่อยากฝึกก่อน'
+    };
+  }
+
+  const focusSubjects = getFocusSubjects(userId) || [];
+
+  // Special: no focus subjects set
+  if (focusSubjects.length === 0) {
+    return {
+      type: 'no_focus', subject: null, priority: 0,
+      message: 'ยังไม่ได้ตั้งค่าวิชาที่โฟกัส ลองเลือกข้อสอบที่อยากฝึกก่อน'
+    };
+  }
+
+  // Rule 1 — active weaknesses in focus subjects (pick subject with MOST)
+  const wkCounts = getActiveWeaknessCountsByFocusSubject(userId, focusSubjects);
+  let topSubject = null, topCount = 0;
+  Object.keys(wkCounts).forEach(subj => {
+    if (wkCounts[subj] > topCount) { topCount = wkCounts[subj]; topSubject = subj; }
+  });
+  if (topSubject && topCount > 0) {
+    return {
+      type: 'fix_weakness', subject: topSubject, priority: 1,
+      message: `${topSubject}ยังมีจุดที่ค้างอยู่ ลองแก้จุดอ่อนก่อน`
+    };
+  }
+
+  // Rule 2 / Rule 3 — score-based
+  let score = null;
+  try { score = calculateScore(userId); } catch { score = null; }
+  if (score && score.hasScoreToday && typeof score.decisionScore === 'number') {
+    if (score.decisionScore < 50) {
+      return {
+        type: 'review', subject: null, priority: 2,
+        message: 'ชุดล่าสุดอาจหนักไป ลองพักหรือทบทวนพื้นฐานก่อน'
+      };
+    }
+    if (score.decisionScore < 70) {
+      return {
+        type: 'fix_mistakes', subject: null, priority: 3,
+        message: 'ยังมีจุดที่พลาด ลองกลับไปแก้จุดอ่อนก่อน'
+      };
+    }
+  }
+
+  // Rule 4 — only one focus subject done today (requires exactly 2 focus subjects)
+  const doneSubjects = getTodayFocusSubjectsDone(userId, focusSubjects);
+  if (focusSubjects.length === 2 && doneSubjects.length === 1) {
+    const other = getOtherFocusSubject(focusSubjects, doneSubjects);
+    if (other) {
+      return {
+        type: 'switch_subject', subject: other, priority: 4,
+        message: `${doneSubjects[0]}วันนี้โอเคแล้ว ลองขยับไป${other}ต่อ`
+      };
+    }
+  }
+
+  // Rule 5 — no focus subject exam done today
+  if (doneSubjects.length === 0) {
+    return {
+      type: 'start', subject: null, priority: 5,
+      message: `วันนี้ลองเริ่มจาก${focusSubjects.join('หรือ')}สักชุดก่อน`
+    };
+  }
+
+  // Rule 6 — default
+  return {
+    type: 'default', subject: null, priority: 6,
+    message: 'วันนี้ทำได้ดีแล้ว ถ้ามีเวลา ลองทำต่ออีกเล็กน้อย'
+  };
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
