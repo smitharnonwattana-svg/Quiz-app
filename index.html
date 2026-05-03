@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.54 -->
+  <!-- APP_VERSION: v45.55 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.54</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.55</div>
     </div>
   </div>
 </div>
@@ -4677,6 +4677,8 @@ function initAdminMembers(){
     const tbody = document.getElementById('memberTbody');
     if (!tbody) return;
     tbody.innerHTML = '';
+    // Focus Subjects UI — Stage 5
+    const validSubjects = (typeof _getValidSubjects === 'function') ? _getValidSubjects() : [];
     members.forEach((m, idx) => {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #e5e7eb;';
@@ -4689,6 +4691,71 @@ function initAdminMembers(){
         '<button class="btn" data-save="' + idx + '" style="white-space:nowrap;">ยืนยัน</button>' +
         '<button class="btn" style="border-color:#ef4444;color:#b91c1c;white-space:nowrap;" data-del="' + idx + '">ลบ</button>';
       tbody.appendChild(row);
+
+      // Focus Subjects UI — Stage 5
+      const currentFocus = (typeof getFocusSubjects === 'function') ? getFocusSubjects(m.name) : [];
+      const focusBox = document.createElement('div');
+      focusBox.style.cssText = 'background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-top:4px;margin-bottom:8px;';
+      const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      const badgesHtml = currentFocus.length
+        ? currentFocus.map(sub => '<span class="badge ok" style="margin-left:6px;">' + escAttr(sub) + '</span>').join('')
+        : '<span class="muted" style="margin-left:6px;font-size:12px;">— ยังไม่ได้ตั้ง</span>';
+      const checksHtml = validSubjects.length
+        ? validSubjects.map((sub, sIdx) => {
+            const checked = currentFocus.includes(sub) ? 'checked' : '';
+            return '<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">' +
+                     '<input type="checkbox" class="focusChk" data-sub="' + escAttr(sub) + '" data-uidx="' + idx + '" ' + checked + '/>' +
+                     '<span>' + escAttr(sub) + '</span>' +
+                   '</label>';
+          }).join('')
+        : '<span class="muted" style="font-size:12px;">ยังไม่มีวิชาในระบบ</span>';
+      focusBox.innerHTML =
+        '<div style="display:flex;align-items:center;flex-wrap:wrap;">' +
+          '<span class="muted" style="font-size:12px;font-weight:700;">📌 โฟกัสวิชา</span>' +
+          '<span data-focus-badges="' + idx + '">' + badgesHtml + '</span>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;" data-focus-checks="' + idx + '">' + checksHtml + '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">' +
+          '<button type="button" class="btn" data-focus-save="' + idx + '">บันทึก</button>' +
+          '<span class="muted" style="font-size:11px;">เลือกได้สูงสุด 2 วิชา</span>' +
+          '<span data-focus-err="' + idx + '" style="color:#b91c1c;font-size:12px;"></span>' +
+        '</div>';
+      tbody.appendChild(focusBox);
+
+      // Wire up checkbox enforcement (max 2)
+      const checks = focusBox.querySelectorAll('.focusChk');
+      const saveBtn = focusBox.querySelector('[data-focus-save="' + idx + '"]');
+      const errSpan = focusBox.querySelector('[data-focus-err="' + idx + '"]');
+      function refreshDisabled(){
+        const checkedCount = Array.from(checks).filter(c => c.checked).length;
+        checks.forEach(c => { c.disabled = (checkedCount >= 2 && !c.checked); });
+        if (saveBtn) saveBtn.disabled = (checkedCount > 2);
+      }
+      refreshDisabled();
+      checks.forEach(c => {
+        c.addEventListener('change', () => {
+          if (errSpan) errSpan.textContent = '';
+          refreshDisabled();
+        });
+      });
+      if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+          const picked = Array.from(checks).filter(c => c.checked).map(c => c.getAttribute('data-sub'));
+          if (picked.length > 2) {
+            if (errSpan) errSpan.textContent = 'เลือกได้สูงสุด 2 วิชา';
+            return;
+          }
+          const adminId = (typeof Auth !== 'undefined' && Auth.getName) ? Auth.getName() : 'admin';
+          const result = setFocusSubjects(adminId, m.name, picked);
+          if (result && result.ok) {
+            if (errSpan) errSpan.textContent = '';
+            toast('✅ บันทึกโฟกัสวิชาแล้ว');
+            renderMembers();
+          } else {
+            if (errSpan) errSpan.textContent = (result && result.error) || 'บันทึกไม่สำเร็จ';
+          }
+        });
+      }
     });
     tbody.querySelectorAll('[data-eye]').forEach(btn => {
       btn.onclick = () => {
