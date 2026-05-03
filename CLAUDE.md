@@ -46,3 +46,13 @@ git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 - LINE notify: Firebase Cloud Functions → LINE Messaging API (Secrets: LINE_TOKEN, LINE_USER_ID)
 - PDF viewer: custom canvas-based renderer using pdf.js
 - Language: Thai (th)
+
+## Important files / paths
+- index.html — frontend ทั้งหมด (อย่าสร้างไฟล์ JS/CSS แยก)
+- functions/index.js — Cloud Function lineNotify
+- functions/package.json — dependencies ของ Cloud Functions
+- firebase.json — config deploy Cloud Functions (ไม่ใช่ Firebase Hosting)
+- .firebaserc — Firebase project: nanont-exam
+- _headers — deprecated ไม่ต้องแก้
+- .claude-local — เก็บ GITHUB_PAT (gitignored ห้าม commit)
+- index_v*.html — version backups (gitignored)
