@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.72 -->
+  <!-- APP_VERSION: v45.73 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.72</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.73</div>
     </div>
   </div>
 </div>
@@ -933,6 +933,17 @@
       <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
       <div id="memberTbody"></div>
     </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: REWARDS (Gamification G4) ===================== -->
+<div id="page-rewards" class="page">
+  <div class="container" style="max-width:600px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h1 class="h1">🏆 Rewards</h1>
+      <button class="btn" onclick="navigate('home')">กลับ</button>
+    </div>
+    <div id="rewardsBody"></div>
   </div>
 </div>
 
@@ -2230,6 +2241,9 @@ function renderHome(){
         <div class="linkCard" onclick="navigate('entrance_stats')">
           <div style="font-weight:900;">🎯 สถิติการสอบเข้า ม.1</div>
         </div>
+        <div class="linkCard" onclick="navigate('rewards')">
+          <div style="font-weight:900;">🏆 Rewards</div>
+        </div>
         ${isTeacher ? `
         <div class="linkCard" onclick="navigate('admin')">
           <div style="font-weight:900;">⚙️ Admin</div>
@@ -2467,6 +2481,7 @@ function navigate(page, params={}){
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
   else if(page==='entrance_compare') initEntranceCompare(params);
+  else if(page==='rewards') initRewards();
 
   if(!params._noScroll) window.scrollTo(0,0);
 }
@@ -4751,7 +4766,7 @@ function getStudyRoadRewards() {
 
 function saveStudyRoadReward(tier, rewardName) {
   const key = String(tier);
-  const valid = new Set(['100','300','600','1000']);
+  const valid = new Set(['100','300','600','1000','stamps']);
   if (!valid.has(key)) return false;
   const s = Store.load();
   if (!s.studyRoadRewards || typeof s.studyRoadRewards !== 'object') s.studyRoadRewards = {};
@@ -4799,6 +4814,194 @@ function rebuildStreakFromAttempts(userId) {
 
   _saveCoachStreak(userId, count, mostRecent);
   return { count, lastActiveDate: mostRecent };
+}
+
+// Gamification G4: Rewards Page
+function initRewards() {
+  const isTeacher = Auth.isTeacher();
+  const bodyEl = document.getElementById('rewardsBody');
+  if (!bodyEl) return;
+
+  function _rEsc(v){
+    return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function _rTabStyle(active){
+    return (active
+      ? 'background:#111;color:#fff;border:1px solid #111;'
+      : 'background:#fff;color:#111;border:1px solid #d1d5db;')
+      + 'padding:6px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;';
+  }
+
+  if (isTeacher) {
+    const members = (Auth.getMembers() || []).slice(0, 3);
+    const initialUserId = members[0] ? members[0].name : null;
+    const tabsHtml = `
+      <div id="rewardsTabs" style="display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap;">
+        ${members.map((mb, i) => `
+          <button type="button" class="rewardsTab" data-name="${_rEsc(mb.name)}"
+                  style="${_rTabStyle(i === 0)}">${_rEsc(mb.name)}</button>
+        `).join('')}
+      </div>
+      <div id="rewardsContent"></div>
+    `;
+    bodyEl.innerHTML = tabsHtml;
+    if (initialUserId) renderRewardsFor(initialUserId);
+    const tabs = bodyEl.querySelectorAll('.rewardsTab');
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.getAttribute('data-name');
+        tabs.forEach(b => { b.style.cssText = _rTabStyle(b === btn); });
+        renderRewardsFor(name);
+      });
+    });
+  } else {
+    bodyEl.innerHTML = '<div id="rewardsContent"></div>';
+    const uid = (typeof getCurrentUserId === 'function') ? getCurrentUserId() : null;
+    if (uid) renderRewardsFor(uid);
+    else bodyEl.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กรุณาเข้าสู่ระบบ</div>';
+  }
+}
+
+function renderRewardsFor(userId) {
+  const bodyEl = document.getElementById('rewardsBody');
+  if (!bodyEl) return;
+  let host = document.getElementById('rewardsContent');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'rewardsContent';
+    bodyEl.appendChild(host);
+  }
+  if (!userId) {
+    host.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">ไม่มีผู้ใช้ที่จะแสดงข้อมูล</div>';
+    return;
+  }
+
+  const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // Section 1: Study Road
+  const state = getGamificationState(userId);
+  const rewards = getStudyRoadRewards();
+  const points = Number(state.points) || 0;
+  const tiers = [
+    { key:'100',  label:'⚡ Scholar', pts:100  },
+    { key:'300',  label:'🔥 Pro',     pts:300  },
+    { key:'600',  label:'💎 Elite',   pts:600  },
+    { key:'1000', label:'👑 Legend',  pts:1000 }
+  ];
+  let currentTier = null, nextTier = null;
+  for (const t of tiers) {
+    if (points >= t.pts) currentTier = t;
+    else if (!nextTier) nextTier = t;
+  }
+  const currentPts = currentTier ? currentTier.pts : 0;
+  let pct = 100, fillText = '';
+  if (nextTier) {
+    const span = nextTier.pts - currentPts;
+    pct = Math.max(0, Math.min(100, Math.round(((points - currentPts) / span) * 100)));
+    fillText = `${points} / ${nextTier.pts} pt`;
+  } else {
+    fillText = `${points} pt — Maxed 👑`;
+  }
+  const nextRewardName = nextTier ? (rewards[nextTier.key] || '') : '';
+  const tierBadgeHtml = currentTier
+    ? `<span style="font-weight:800;">${esc(currentTier.label)}</span>`
+    : `<span class="muted" style="font-size:13px;">ยังไม่ถึงระดับแรก</span>`;
+  const nextLineHtml = nextTier
+    ? `<div class="muted" style="font-size:13px;margin-top:6px;">เป้าหมายถัดไป: <b>${esc(nextTier.label)}</b> · ` +
+      (nextRewardName ? `รางวัล: <b>${esc(nextRewardName)}</b>` : '<span class="muted">— ยังไม่ได้ตั้งรางวัล</span>') + `</div>`
+    : `<div class="muted" style="font-size:13px;margin-top:6px;">🎉 ทำได้ครบทุกระดับแล้ว!</div>`;
+
+  const studyRoadHtml = `
+    <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:800;font-size:15px;">🗺️ Study Road</div>
+        <div>${tierBadgeHtml}</div>
+      </div>
+      <div style="margin-top:10px;height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#f59e0b,#16a34a);transition:width .3s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#6b7280;">
+        <span>⭐ ${points} pt</span>
+        <span>${esc(fillText)}</span>
+      </div>
+      ${nextLineHtml}
+    </div>
+  `;
+
+  // Section 2: Daily Quest
+  let questHtml = '';
+  try {
+    const qs = getQuestState(userId);
+    const quest = qs && qs.quest;
+    if (!quest) {
+      questHtml = `
+        <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:15px;">🎯 Daily Quest</div>
+          <div class="muted" style="margin-top:8px;font-size:13px;">ยังไม่มี Quest วันนี้</div>
+        </div>
+      `;
+    } else {
+      const qProg = Number(quest.progress) || 0;
+      const qTarg = Math.max(1, Number(quest.target) || 1);
+      const qPct = Math.max(0, Math.min(100, Math.round((qProg / qTarg) * 100)));
+      let actionHtml = '';
+      if (quest.claimed) {
+        actionHtml = `<div style="margin-top:8px;color:#16a34a;font-weight:700;font-size:13px;">✅ รับรางวัลแล้ว</div>`;
+      } else if (qs.canClaim) {
+        actionHtml = `<button type="button" class="btn btnPrimary" id="rewardsClaimBtn" style="margin-top:10px;">รับ +${Number(quest.reward)||0}pt</button>`;
+      } else {
+        actionHtml = `<div class="muted" style="margin-top:8px;font-size:12px;">ทำต่ออีก ${Math.max(0, qTarg - qProg)} เพื่อรับรางวัล</div>`;
+      }
+      questHtml = `
+        <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="font-weight:800;font-size:15px;">🎯 Daily Quest</div>
+            <div class="muted" style="font-size:12px;">รางวัล: ${Number(quest.reward)||0}pt</div>
+          </div>
+          <div style="margin-top:6px;font-size:13px;color:#374151;">${esc(quest.description||'')}</div>
+          <div style="margin-top:10px;height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+            <div style="height:100%;width:${qPct}%;background:linear-gradient(90deg,#3b82f6,#16a34a);transition:width .3s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:#6b7280;">
+            <span>${qProg}/${qTarg}</span>
+            <span>${qPct}%</span>
+          </div>
+          ${actionHtml}
+        </div>
+      `;
+    }
+  } catch (e) { questHtml = ''; }
+
+  // Section 3: Stamps
+  const stamps = Number(state.stamps) || 0;
+  const stampReward = rewards['stamps'] || '';
+  const stampHtml = `
+    <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:800;font-size:15px;">🎫 Stamps</div>
+        <div style="font-weight:800;">${stamps}</div>
+      </div>
+      <div class="muted" style="font-size:13px;margin-top:6px;">
+        ${stampReward ? 'รางวัลสะสม: <b>' + esc(stampReward) + '</b>' : '— ยังไม่ได้ตั้งรางวัล'}
+      </div>
+    </div>
+  `;
+
+  host.innerHTML = studyRoadHtml + questHtml + stampHtml;
+
+  const claimBtn = host.querySelector('#rewardsClaimBtn');
+  if (claimBtn) {
+    claimBtn.addEventListener('click', () => {
+      const result = claimQuestReward(userId);
+      if (result && result.ok) {
+        toast('🎉 รับ +' + (result.pointsAwarded || 0) + 'pt แล้ว!');
+        renderRewardsFor(userId);
+      } else {
+        const reason = (result && result.reason) || 'unknown';
+        toast('⚠️ รับรางวัลไม่สำเร็จ (' + reason + ')');
+      }
+    });
+  }
 }
 
 function initAdminMembers(){
