@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.55 -->
+  <!-- APP_VERSION: v45.56 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.55</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.56</div>
     </div>
   </div>
 </div>
@@ -2056,6 +2056,20 @@ function _downloadCanvas(canvas) {
 }
 
 // ── Home page render (role-aware) ──
+// Weakness Cloud Sync — Stage 6
+async function fetchWeaknessFromCloud(userId) {
+  if (!userId || !FirebaseSync.ready()) return;
+  try {
+    const sanitized = userId.replace(/[^a-zA-Z0-9฀-๿]/g,'_').slice(0,60);
+    const docId = 'weaknesses_' + sanitized;
+    const lsKey = 'nanont:weaknesses_' + sanitized;
+    const data = await FirebaseSync.loadDoc(docId);
+    if (data && typeof data === 'object') {
+      localStorage.setItem(lsKey, JSON.stringify(data));
+    }
+  } catch(e) { console.warn('fetchWeaknessFromCloud error', e); }
+}
+
 // WHOOP UI — Stage 4
 function renderHome(){
   const isTeacher = Auth.isTeacher();
@@ -2130,6 +2144,8 @@ function renderHome(){
       : 'background:#fff;color:#111;border:1px solid #d1d5db;')
       + 'padding:6px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;';
   }
+  const loadingHtml = '<div style="text-align:center;padding:24px;' +
+    'color:#9ca3af;font-size:13px;">⏳ กำลังโหลด...</div>';
 
   // ── decide initial userId + teacher tabs ──────────────
   let teacherTabsHtml = '';
@@ -2183,15 +2199,24 @@ function renderHome(){
     </div>
   `;
 
-  // ── teacher: wire up tab clicks (re-render WHOOP body only) ─
+  // ── teacher: initial cloud fetch, then wire up tab clicks ─
+  if (isTeacher && initialUserId) {
+    const body = homeEl.querySelector('#whoopBody');
+    if (body) body.innerHTML = loadingHtml;
+    fetchWeaknessFromCloud(initialUserId).then(() => {
+      if (body) body.innerHTML = whoopSectionHTML(initialUserId);
+    });
+  }
   if (isTeacher && teacherMembers.length > 0) {
     const tabs = homeEl.querySelectorAll('.whoopTab');
     tabs.forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const name = btn.getAttribute('data-name');
         const body = homeEl.querySelector('#whoopBody');
-        if (body) body.innerHTML = whoopSectionHTML(name);
         tabs.forEach(b => { b.style.cssText = tabStyle(b === btn); });
+        if (body) body.innerHTML = loadingHtml;
+        await fetchWeaknessFromCloud(name);
+        if (body) body.innerHTML = whoopSectionHTML(name);
       });
     });
   }
