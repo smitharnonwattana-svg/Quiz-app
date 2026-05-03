@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.70 -->
+  <!-- APP_VERSION: v45.71 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.70</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.71</div>
     </div>
   </div>
 </div>
@@ -6546,7 +6546,8 @@ const _GAMIFICATION_DEFAULT = () => ({
   stamps: 0,
   streakMilestones: [],
   claimedTiers: [],
-  lastPointDate: ''
+  lastPointDate: '',
+  dailyQuest: null
 });
 
 function _getGamificationUser(userId) {
@@ -6562,7 +6563,8 @@ function _getGamificationUser(userId) {
       stamps: Number(rec.stamps) || def.stamps,
       streakMilestones: Array.isArray(rec.streakMilestones) ? rec.streakMilestones.slice() : def.streakMilestones,
       claimedTiers: Array.isArray(rec.claimedTiers) ? rec.claimedTiers.slice() : def.claimedTiers,
-      lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate
+      lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate,
+      dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest
     };
   } catch { return _GAMIFICATION_DEFAULT(); }
 }
@@ -6576,7 +6578,8 @@ function _saveGamificationUser(userId, data) {
     stamps: Math.max(0, Number(data.stamps) || 0),
     streakMilestones: Array.isArray(data.streakMilestones) ? data.streakMilestones.slice() : [],
     claimedTiers: Array.isArray(data.claimedTiers) ? data.claimedTiers.slice() : [],
-    lastPointDate: typeof data.lastPointDate === 'string' ? data.lastPointDate : ''
+    lastPointDate: typeof data.lastPointDate === 'string' ? data.lastPointDate : '',
+    dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null
   };
   Store.save(s);
 }
@@ -6656,6 +6659,138 @@ function processGamificationAfterSubmit(userId /*, attemptData */) {
 
   const stampResult = checkAndAwardStampMilestones(userId);
   return { pointsAwarded, stampsAwarded: stampResult.newStamps };
+}
+
+// ===================== GAMIFICATION G2: Daily Quest Engine =====================
+// Pure additive engine. No UI, no submit-flow wiring.
+
+function _generateQuestFromRecommendation(userId) {
+  if (!userId) return null;
+  let rec = null;
+  try { rec = getCoachRecommendation(userId); } catch { rec = null; }
+  if (!rec || !rec.type || rec.type === 'no_focus') return null;
+
+  const today = getDateKey(new Date());
+  const subj = rec.subject || null;
+  let target = 1, reward = 10, description = '';
+  switch (rec.type) {
+    case 'fix_weakness':
+      target = 3; reward = 15;
+      description = `แก้จุดอ่อนใน ${subj || ''} 3 ข้อ`.trim();
+      break;
+    case 'fix_mistakes':
+      target = 2; reward = 10;
+      description = 'แก้จุดอ่อน 2 ข้อจากชุดล่าสุด';
+      break;
+    case 'review':
+      target = 1; reward = 10;
+      description = 'ทำข้อสอบ 1 ชุดวันนี้';
+      break;
+    case 'switch_subject':
+      target = 1; reward = 15;
+      description = `ทำข้อสอบวิชา ${subj || ''} 1 ชุด`.trim();
+      break;
+    case 'start':
+      target = 1; reward = 15;
+      description = 'เริ่มทำข้อสอบ 1 ชุดวันนี้';
+      break;
+    case 'default':
+    default:
+      target = 1; reward = 10;
+      description = 'ทำข้อสอบเพิ่มอีก 1 ชุด';
+      break;
+  }
+  return {
+    date: today,
+    type: rec.type,
+    subject: subj,
+    description,
+    target,
+    progress: 0,
+    reward,
+    claimed: false
+  };
+}
+
+function _calculateQuestProgress(userId, quest) {
+  if (!userId || !quest) return 0;
+  let progress = 0;
+  try {
+    if (quest.type === 'fix_weakness' || quest.type === 'fix_mistakes') {
+      const fixes = calculateFixes(userId);
+      progress = (fixes && Number(fixes.resolvedToday)) || 0;
+    } else if (quest.type === 'switch_subject') {
+      const ctx = getTodayContext(userId);
+      const wantedSubj = quest.subject || '';
+      progress = (ctx.focusAttempts || []).filter(a =>
+        a && a.mode !== 'weakness_practice' && (a.examSubject || '') === wantedSubj
+      ).length;
+    } else if (quest.type === 'review') {
+      const ctx = getTodayContext(userId);
+      progress = (ctx.focusAttempts || []).filter(a =>
+        a && a.mode !== 'weakness_practice'
+      ).length;
+    } else {
+      // start, default → all exam attempts today (focus + non-focus, normal exams only)
+      const ctx = getTodayContext(userId);
+      const focusN    = (ctx.focusAttempts    || []).filter(a => a && a.mode !== 'weakness_practice').length;
+      const nonFocusN = (ctx.nonFocusAttempts || []).filter(a => a && a.mode !== 'weakness_practice').length;
+      progress = focusN + nonFocusN;
+    }
+  } catch { progress = 0; }
+  const target = Number(quest.target) || 0;
+  if (target > 0 && progress > target) progress = target;
+  return progress;
+}
+
+function getDailyQuest(userId) {
+  if (!userId) return null;
+  const todayKey = getDateKey(new Date());
+  const state = _getGamificationUser(userId);
+  let quest = state.dailyQuest;
+
+  if (quest && quest.date === todayKey) {
+    const newProgress = _calculateQuestProgress(userId, quest);
+    if (newProgress !== quest.progress) {
+      quest = { ...quest, progress: newProgress };
+      _saveGamificationUser(userId, { ...state, dailyQuest: quest });
+    }
+    return quest;
+  }
+
+  // Need to (re)generate
+  const fresh = _generateQuestFromRecommendation(userId);
+  if (fresh) {
+    fresh.progress = _calculateQuestProgress(userId, fresh);
+  }
+  _saveGamificationUser(userId, { ...state, dailyQuest: fresh });
+  return fresh;
+}
+
+function claimQuestReward(userId) {
+  if (!userId) return { ok: false, reason: 'no_user' };
+  const quest = getDailyQuest(userId);
+  if (!quest) return { ok: false, reason: 'no_quest' };
+  if (quest.claimed) return { ok: false, reason: 'already_claimed' };
+  if ((Number(quest.progress) || 0) < (Number(quest.target) || 0)) {
+    return { ok: false, reason: 'not_complete', progress: quest.progress, target: quest.target };
+  }
+
+  awardPoints(userId, quest.reward, 'daily_quest');
+
+  const state = _getGamificationUser(userId);
+  const sealed = { ...quest, claimed: true };
+  _saveGamificationUser(userId, { ...state, dailyQuest: sealed });
+
+  return { ok: true, pointsAwarded: quest.reward };
+}
+
+function getQuestState(userId) {
+  const quest = getDailyQuest(userId);
+  if (!quest) return { quest: null, isComplete: false, canClaim: false };
+  const isComplete = (Number(quest.progress) || 0) >= (Number(quest.target) || 0);
+  const canClaim = isComplete && !quest.claimed;
+  return { quest, isComplete, canClaim };
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
