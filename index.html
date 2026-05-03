@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.64 -->
+  <!-- APP_VERSION: v45.65 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.64</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.65</div>
     </div>
   </div>
 </div>
@@ -6467,7 +6467,7 @@ function getCoachRecommendation(userId) {
   if (topSubject && topCount > 0) {
     return {
       type: 'fix_weakness', subject: topSubject, priority: 1,
-      message: `${topSubject}ยังมีจุดที่ค้างอยู่ ลองแก้จุดอ่อนก่อน`
+      message: `${topSubject} ยังมีจุดที่ค้างอยู่ ลองแก้จุดอ่อนก่อน`
     };
   }
 
@@ -6513,6 +6513,15 @@ function getCoachRecommendation(userId) {
   return {
     type: 'default', subject: null, priority: 6,
     message: 'วันนี้ทำได้ดีแล้ว ถ้ามีเวลา ลองทำต่ออีกเล็กน้อย'
+  };
+}
+
+// ===================== STAGE 4 AGGREGATOR (Stage 6 wrapper) =====================
+// Pure read-only wrapper that bundles Stage 3 metrics + Stage 6 recommendation.
+function getDailyCoachMetricsStage4(userId) {
+  return {
+    ...getDailyCoachMetricsStage3(userId),
+    recommendation: getCoachRecommendation(userId)
   };
 }
 
