@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.69 -->
+  <!-- APP_VERSION: v45.70 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.69</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.70</div>
     </div>
   </div>
 </div>
@@ -6536,6 +6536,126 @@ function getDailyCoachMetricsStage4(userId) {
     ...getDailyCoachMetricsStage3(userId),
     recommendation: getCoachRecommendation(userId)
   };
+}
+
+// ===================== GAMIFICATION G1: Point + Stamp Engine =====================
+// Pure additive engine. No UI, not wired to submit flows yet.
+
+const _GAMIFICATION_DEFAULT = () => ({
+  points: 0,
+  stamps: 0,
+  streakMilestones: [],
+  claimedTiers: [],
+  lastPointDate: ''
+});
+
+function _getGamificationUser(userId) {
+  if (!userId) return _GAMIFICATION_DEFAULT();
+  try {
+    const s = Store.load();
+    const map = (s && s.gamification) || {};
+    const rec = map[userId];
+    if (!rec || typeof rec !== 'object') return _GAMIFICATION_DEFAULT();
+    const def = _GAMIFICATION_DEFAULT();
+    return {
+      points: Number(rec.points) || def.points,
+      stamps: Number(rec.stamps) || def.stamps,
+      streakMilestones: Array.isArray(rec.streakMilestones) ? rec.streakMilestones.slice() : def.streakMilestones,
+      claimedTiers: Array.isArray(rec.claimedTiers) ? rec.claimedTiers.slice() : def.claimedTiers,
+      lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate
+    };
+  } catch { return _GAMIFICATION_DEFAULT(); }
+}
+
+function _saveGamificationUser(userId, data) {
+  if (!userId || !data || typeof data !== 'object') return;
+  const s = Store.load();
+  if (!s.gamification || typeof s.gamification !== 'object') s.gamification = {};
+  s.gamification[userId] = {
+    points: Math.max(0, Number(data.points) || 0),
+    stamps: Math.max(0, Number(data.stamps) || 0),
+    streakMilestones: Array.isArray(data.streakMilestones) ? data.streakMilestones.slice() : [],
+    claimedTiers: Array.isArray(data.claimedTiers) ? data.claimedTiers.slice() : [],
+    lastPointDate: typeof data.lastPointDate === 'string' ? data.lastPointDate : ''
+  };
+  Store.save(s);
+}
+
+function awardPoints(userId, points, reason) {
+  if (!userId) return 0;
+  const n = Number(points) || 0;
+  if (n <= 0) return _getGamificationUser(userId).points;
+  const rec = _getGamificationUser(userId);
+  rec.points = (Number(rec.points) || 0) + n;
+  _saveGamificationUser(userId, rec);
+  return rec.points;
+}
+
+function checkAndAwardStampMilestones(userId) {
+  if (!userId) return { newStamps: 0, totalStamps: 0 };
+  const rec = _getGamificationUser(userId);
+  const milestoneSet = new Set(rec.streakMilestones || []);
+  let count = 0;
+  try { count = (updateCoachStreak(userId) || {}).count || 0; } catch { count = 0; }
+
+  const milestones = [
+    { key: '7',  threshold: 7,  stamps: 1 },
+    { key: '14', threshold: 14, stamps: 1 },
+    { key: '30', threshold: 30, stamps: 2 }
+  ];
+  let newStamps = 0;
+  milestones.forEach(m => {
+    if (count >= m.threshold && !milestoneSet.has(m.key)) {
+      milestoneSet.add(m.key);
+      newStamps += m.stamps;
+    }
+  });
+  if (newStamps > 0) {
+    rec.streakMilestones = Array.from(milestoneSet);
+    rec.stamps = (Number(rec.stamps) || 0) + newStamps;
+    _saveGamificationUser(userId, rec);
+  }
+  return { newStamps, totalStamps: rec.stamps };
+}
+
+function getGamificationState(userId) {
+  return _getGamificationUser(userId);
+}
+
+function processGamificationAfterSubmit(userId /*, attemptData */) {
+  if (!userId) return { pointsAwarded: 0, stampsAwarded: 0 };
+
+  const rec = _getGamificationUser(userId);
+  const todayKey = getDateKey(new Date());
+  const alreadyAwardedToday = (rec.lastPointDate === todayKey);
+
+  let pointsAwarded = 0;
+  if (!alreadyAwardedToday) {
+    let activity = null, score = null;
+    try { activity = calculateActivity(userId); } catch { activity = null; }
+    try { score    = calculateScore(userId); }    catch { score    = null; }
+
+    const focusSets    = (activity && Number(activity.focusSetCount))    || 0;
+    const nonFocusSets = (activity && Number(activity.nonFocusSetCount)) || 0;
+    const resolved     = (activity && Number(activity.resolvedToday))    || 0;
+
+    pointsAwarded += focusSets    * 10;
+    pointsAwarded += nonFocusSets * 5;
+    pointsAwarded += resolved     * 2;
+
+    if (score && score.hasScoreToday && typeof score.score === 'number' && score.score >= 85) {
+      pointsAwarded += 5;
+    }
+
+    if (pointsAwarded > 0) {
+      rec.points = (Number(rec.points) || 0) + pointsAwarded;
+      rec.lastPointDate = todayKey;
+      _saveGamificationUser(userId, rec);
+    }
+  }
+
+  const stampResult = checkAndAwardStampMilestones(userId);
+  return { pointsAwarded, stampsAwarded: stampResult.newStamps };
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
