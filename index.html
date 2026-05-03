@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.71 -->
+  <!-- APP_VERSION: v45.72 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.71</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.72</div>
     </div>
   </div>
 </div>
@@ -4740,6 +4740,26 @@ function initAdminExams(){
 }
 
 // ===================== ADMIN MEMBERS PAGE =====================
+// Gamification G3: Study Road Admin UI
+function getStudyRoadRewards() {
+  try {
+    const s = Store.load();
+    const r = (s && s.studyRoadRewards);
+    return (r && typeof r === 'object') ? r : {};
+  } catch { return {}; }
+}
+
+function saveStudyRoadReward(tier, rewardName) {
+  const key = String(tier);
+  const valid = new Set(['100','300','600','1000']);
+  if (!valid.has(key)) return false;
+  const s = Store.load();
+  if (!s.studyRoadRewards || typeof s.studyRoadRewards !== 'object') s.studyRoadRewards = {};
+  s.studyRoadRewards[key] = String(rewardName == null ? '' : rewardName).trim();
+  Store.save(s);
+  return true;
+}
+
 // Streak Rebuild — Admin Tool
 function rebuildStreakFromAttempts(userId) {
   if (!userId) return { count: 0, lastActiveDate: null };
@@ -4784,11 +4804,52 @@ function rebuildStreakFromAttempts(userId) {
 function initAdminMembers(){
   if(!Auth.isTeacher()){navigate('home');return;}
 
+  // Gamification G3: Study Road Admin UI — inject once above #memberTbody
+  function renderStudyRoadSettings() {
+    const tbody = document.getElementById('memberTbody');
+    if (!tbody || !tbody.parentNode) return;
+    let host = document.getElementById('studyRoadSettings');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'studyRoadSettings';
+      host.style.cssText = 'background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:4px 0 14px;';
+      tbody.parentNode.insertBefore(host, tbody);
+    }
+    const tiers = [
+      { key: '100',  label: '⚡ Scholar' },
+      { key: '300',  label: '🔥 Pro' },
+      { key: '600',  label: '💎 Elite' },
+      { key: '1000', label: '👑 Legend' }
+    ];
+    const rewards = getStudyRoadRewards();
+    const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    host.innerHTML =
+      '<div style="font-weight:800;font-size:14px;margin-bottom:8px;">🗺️ Study Road — รางวัลแต่ละระดับ</div>' +
+      tiers.map(t => {
+        const v = escAttr(rewards[t.key] || '');
+        return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;">' +
+                 '<div style="min-width:130px;font-weight:700;font-size:13px;color:#374151;">' + t.key + ' pt → ' + t.label + '</div>' +
+                 '<input class="titleInput" type="text" placeholder="ชื่อรางวัล" style="flex:1;min-width:160px;" data-srtier="' + t.key + '" value="' + v + '" />' +
+                 '<button type="button" class="btn" data-srsave="' + t.key + '">บันทึก</button>' +
+               '</div>';
+      }).join('');
+    host.querySelectorAll('[data-srsave]').forEach(btn => {
+      btn.onclick = () => {
+        const tier = btn.getAttribute('data-srsave');
+        const inp = host.querySelector('[data-srtier="' + tier + '"]');
+        const name = inp ? inp.value : '';
+        saveStudyRoadReward(tier, name);
+        toast('✅ บันทึกรางวัลแล้ว');
+      };
+    });
+  }
+
   function renderMembers() {
     const s = Store.load();
     const members = s.members || [{pin:'311257',name:'ณนนท์'}];
     const tbody = document.getElementById('memberTbody');
     if (!tbody) return;
+    renderStudyRoadSettings();
     tbody.innerHTML = '';
     // Focus Subjects UI — Stage 5
     const validSubjects = (typeof _getValidSubjects === 'function') ? _getValidSubjects() : [];
@@ -4836,6 +4897,26 @@ function initAdminMembers(){
           '<span data-focus-err="' + idx + '" style="color:#b91c1c;font-size:12px;"></span>' +
         '</div>';
       tbody.appendChild(focusBox);
+
+      // Gamification G3: per-member stats + reset
+      const gState = (typeof getGamificationState === 'function') ? getGamificationState(m.name) : { points: 0, stamps: 0 };
+      const statsBox = document.createElement('div');
+      statsBox.style.cssText = 'background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;margin:0 0 12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;';
+      statsBox.innerHTML =
+        '<span class="muted" style="font-size:13px;font-weight:700;">⭐ ' + (Number(gState.points)||0) + ' pt</span>' +
+        '<span class="muted" style="font-size:13px;font-weight:700;">🎫 ' + (Number(gState.stamps)||0) + ' stamps</span>' +
+        '<button type="button" class="btn" style="margin-left:auto;padding:4px 10px;font-size:12px;" data-greset="' + idx + '">🔄 Reset Points</button>';
+      tbody.appendChild(statsBox);
+      const resetBtn = statsBox.querySelector('[data-greset="' + idx + '"]');
+      if (resetBtn) {
+        resetBtn.onclick = () => {
+          if (!confirm('รีเซ็ต points/stamps ของ "' + m.name + '" เป็น 0?')) return;
+          const cur = _getGamificationUser(m.name);
+          _saveGamificationUser(m.name, { ...cur, points: 0, stamps: 0 });
+          toast('✅ รีเซ็ต points แล้ว');
+          renderMembers();
+        };
+      }
 
       // Wire up checkbox enforcement (max 2)
       const checks = focusBox.querySelectorAll('.focusChk');
