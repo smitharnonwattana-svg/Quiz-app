@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.57 -->
+  <!-- APP_VERSION: v45.58 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.57</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.58</div>
     </div>
   </div>
 </div>
@@ -2057,17 +2057,33 @@ function _downloadCanvas(canvas) {
 
 // ── Home page render (role-aware) ──
 // Weakness Cloud Sync — Stage 6
+// Weakness Sync Fallback — Bug #2
 async function fetchWeaknessFromCloud(userId) {
-  if (!userId || !FirebaseSync.ready()) return;
+  if (!userId) return;
+  const sanitized = userId.replace(/[^a-zA-Z0-9฀-๿]/g,'_').slice(0,60);
+  const lsKey = 'nanont:weaknesses_' + sanitized;
+  const docId = 'weaknesses_' + sanitized;
+
+  // 1) Try Firestore first
+  if (FirebaseSync.ready()) {
+    try {
+      const data = await FirebaseSync.loadDoc(docId);
+      if (data && typeof data === 'object') {
+        localStorage.setItem(lsKey, JSON.stringify(data));
+        return;
+      }
+    } catch (e) { console.warn('fetchWeaknessFromCloud cloud error', e); }
+  }
+
+  // 2) Fallback: rebuild from s.attempts in mainStore (read-only, no cloud write)
   try {
-    const sanitized = userId.replace(/[^a-zA-Z0-9฀-๿]/g,'_').slice(0,60);
-    const docId = 'weaknesses_' + sanitized;
-    const lsKey = 'nanont:weaknesses_' + sanitized;
-    const data = await FirebaseSync.loadDoc(docId);
-    if (data && typeof data === 'object') {
-      localStorage.setItem(lsKey, JSON.stringify(data));
+    const s = Store.load();
+    const attempts = (s && s.attempts) || [];
+    const items = WeaknessTracker.buildWeaknessItemsFromAttempts(attempts, userId);
+    if (items && typeof items === 'object') {
+      localStorage.setItem(lsKey, JSON.stringify(items));
     }
-  } catch(e) { console.warn('fetchWeaknessFromCloud error', e); }
+  } catch (e) { console.warn('fetchWeaknessFromCloud fallback error', e); }
 }
 
 // WHOOP UI — Stage 4
