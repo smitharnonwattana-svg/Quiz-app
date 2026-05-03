@@ -56,3 +56,19 @@ git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 - _headers — deprecated ไม่ต้องแก้
 - .claude-local — เก็บ GITHUB_PAT (gitignored ห้าม commit)
 - index_v*.html — version backups (gitignored)
+
+## Session Setup (ทำทุกครั้งที่เริ่ม session ใหม่)
+ก่อนทำงานทุกครั้ง ให้รันตามลำดับนี้:
+
+1. git pull origin main
+   (sync โค้ดล่าสุดจาก GitHub)
+
+2. ตรวจว่า .claude-local มีอยู่ไหม
+   ถ้าไม่มี → สร้างจาก GITHUB_PAT ใน ~/.claude/settings.json:
+   echo "GITHUB_PAT=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.HOME+'/.claude/settings.json','utf8')).env.GITHUB_PAT)")" > /home/user/Quiz-app/.claude-local
+
+3. ทดสอบ push ได้เลยถ้าต้องการ deploy
+   (ใช้ deploy script ใน ## GitHub Push section)
+
+หมายเหตุ: ถ้า ~/.claude/settings.json ไม่มี GITHUB_PAT
+→ แจ้งผู้ใช้ว่า "ต้องสร้าง .claude-local ก่อน กรุณาให้ GITHUB_PAT"
