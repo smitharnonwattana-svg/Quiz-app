@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.60 -->
+  <!-- APP_VERSION: v45.61 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.60</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.61</div>
     </div>
   </div>
 </div>
@@ -4720,6 +4720,47 @@ function initAdminExams(){
 }
 
 // ===================== ADMIN MEMBERS PAGE =====================
+// Streak Rebuild — Admin Tool
+function rebuildStreakFromAttempts(userId) {
+  if (!userId) return { count: 0, lastActiveDate: null };
+  const s = Store.load();
+  const attempts = (s && s.attempts) || [];
+
+  const dateKeySet = new Set();
+  attempts.forEach(a => {
+    if (!a) return;
+    if (a.takerName !== userId) return;
+    if (a.mode === 'weakness_practice') return;
+    if (!a.submittedAt) return;
+    const d = new Date(a.submittedAt);
+    if (isNaN(d.getTime())) return;
+    dateKeySet.add(getDateKey(d));
+  });
+
+  const dateKeys = Array.from(dateKeySet).sort().reverse(); // descending
+  if (dateKeys.length === 0) {
+    _saveCoachStreak(userId, 0, null);
+    return { count: 0, lastActiveDate: null };
+  }
+
+  const mostRecent = dateKeys[0];
+  let count = 0;
+  let lastKey = getDateKey(new Date()); // today
+  for (const dk of dateKeys) {
+    const daysSince = getDaysBetweenDateKeys(dk, lastKey);
+    if (isNaN(daysSince)) break;
+    if (daysSince <= 3) {
+      count += 1;
+      lastKey = dk;
+    } else {
+      break;
+    }
+  }
+
+  _saveCoachStreak(userId, count, mostRecent);
+  return { count, lastActiveDate: mostRecent };
+}
+
 function initAdminMembers(){
   if(!Auth.isTeacher()){navigate('home');return;}
 
@@ -4741,7 +4782,9 @@ function initAdminMembers(){
           '<button type="button" class="btn" style="padding:4px 8px;min-width:32px;" data-eye="' + idx + '" title="แสดง/ซ่อนรหัส">👁</button>' +
         '</div>' +
         '<button class="btn" data-save="' + idx + '" style="white-space:nowrap;">ยืนยัน</button>' +
-        '<button class="btn" style="border-color:#ef4444;color:#b91c1c;white-space:nowrap;" data-del="' + idx + '">ลบ</button>';
+        '<button class="btn" style="border-color:#ef4444;color:#b91c1c;white-space:nowrap;" data-del="' + idx + '">ลบ</button>' +
+        // Streak Rebuild — Admin Tool
+        '<button class="btn" style="padding:4px 10px;font-size:12px;white-space:nowrap;" data-streak="' + idx + '" title="คำนวณ streak ใหม่จาก attempts">🔄 Streak</button>';
       tbody.appendChild(row);
 
       // Focus Subjects UI — Stage 5
@@ -4849,6 +4892,19 @@ function initAdminMembers(){
         s2.members = ms;
         Store.save(s2);
         toast('ลบสมาชิกแล้ว');
+        renderMembers();
+      };
+    });
+    // Streak Rebuild — Admin Tool
+    tbody.querySelectorAll('[data-streak]').forEach(btn => {
+      btn.onclick = () => {
+        const i = Number(btn.getAttribute('data-streak'));
+        const s2 = Store.load();
+        const ms = s2.members || [];
+        const target = ms[i];
+        if (!target || !target.name) return;
+        const result = rebuildStreakFromAttempts(target.name);
+        toast('✅ Streak rebuilt: ' + (result?.count ?? 0) + ' วัน');
         renderMembers();
       };
     });
