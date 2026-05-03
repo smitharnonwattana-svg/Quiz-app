@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.56 -->
+  <!-- APP_VERSION: v45.57 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.56</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.57</div>
     </div>
   </div>
 </div>
@@ -6056,8 +6056,9 @@ function calculateBaseActivityFromWeightedSets(weightedSets) {
   return 90;
 }
 
-function calculatePracticeBonus(practiceConfirmCount) {
-  const n = Number(practiceConfirmCount) || 0;
+// Activity Bonus Fix — Bug #1
+function calculatePracticeBonus(resolvedToday) {
+  const n = Number(resolvedToday) || 0;
   if (n <= 0) return 0;
   if (n <= 4) return 5;
   if (n <= 9) return 10;
@@ -6068,11 +6069,12 @@ function _isNormalExamAttempt(a) {
   return !!a && a.mode !== 'weakness_practice';
 }
 
+// Activity Bonus Fix — Bug #1
 function calculateActivity(userId) {
   const empty = {
     activity: 0, baseActivity: 0, practiceBonus: 0,
     weightedSets: 0, focusSetCount: 0, nonFocusSetCount: 0,
-    practiceConfirmCount: 0
+    resolvedToday: 0
   };
   if (!userId) return empty;
 
@@ -6084,14 +6086,14 @@ function calculateActivity(userId) {
   const weightedSets = focusSetCount * 1.0 + nonFocusSetCount * 0.5;
 
   const baseActivity = calculateBaseActivityFromWeightedSets(weightedSets);
-  const practiceConfirmCount = (ctx.practiceLogs || []).length;
-  const practiceBonus = calculatePracticeBonus(practiceConfirmCount);
+  const resolvedToday = (ctx.weakness && ctx.weakness.focusResolved) || 0;
+  const practiceBonus = calculatePracticeBonus(resolvedToday);
   const activity = Math.min(100, baseActivity + practiceBonus);
 
   return {
     activity, baseActivity, practiceBonus,
     weightedSets, focusSetCount, nonFocusSetCount,
-    practiceConfirmCount
+    resolvedToday
   };
 }
 
