@@ -1,4 +1,3 @@
 index_v*.html
 .claude-local
 functions/node_modules/
-SYSTEM_AUDIT_*.txt

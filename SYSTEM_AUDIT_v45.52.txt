@@ -1,0 +1,224 @@
+My Exam Academia — System Audit (v45.52)
+==========================================
+Read-only audit. No code modified.
+
+
+1. CORE ARCHITECTURE
+--------------------
+
+Store (index.html:1534)
+- Object literal with key: "quizSciDemoStoreV1".
+- load()         : JSON.parse(localStorage.getItem(key) || "{}")
+- save(data)     : writes localStorage AND fires
+                   FirebaseSync.saveDoc('mainStore', data) (fire-and-forget).
+- saveLocalOnly(): localStorage only — used by migrate() and seed.
+- syncFromCloud(): pulls 'mainStore' from Firestore on startup, overwrites
+                   localStorage, refreshes safe pages (home, exams, stats).
+- init()         : boots FirebaseSync, migrates legacy localStorage to cloud.
+- migrate()      : enforces schema on s.exams, s.subjectTopics, s.benchmarks.
+
+Auth (index.html:2094, IIFE)
+- ADMIN_PIN = '134140'.
+- Session in sessionStorage under key 'appSession' = {role, name, ts}.
+- Roles: 'teacher' (admin pin) or 'student' (member pin in s.members).
+- API: login(pin), logout(), isLoggedIn(), isTeacher(), getRole(),
+       getName(), getMembers(), findByPin(), ADMIN_PIN.
+- Single-session enforcement via FirebaseSync.claimSession(pin) +
+  listenSession() — login on a second device kicks the first.
+- Helpers (index.html:2165):
+    getCurrentUserId() = Auth.getName() for students, null for teacher.
+    isAdminUser()      = Auth.isTeacher().
+
+Navigation (index.html:2257, function navigate(page, params={}))
+- Auth guard: any non-'login' page redirects to login if not logged in.
+- Removes .active from all .page elements, adds it to #page-{page}.
+- Tracks _currentPage, _pageParams, window._currentPage, window._currentParams.
+- Dispatches per-page init: renderHome, initExams, initExamDetail, initTake,
+  initReview, initStats, initPractice, initAdmin*, initEntrance*.
+- Admin-only pages redirect non-teachers to home. Practice page redirects
+  teacher to exams.
+
+Pages (all div.page elements):
+- page-login
+- page-home
+- page-exams
+- page-exam
+- page-take
+- page-practice
+- page-review
+- page-entrance_stats
+- page-entrance_program
+- page-entrance_year
+- page-entrance_compare
+- page-admin_benchmark
+- page-stats
+- page-admin
+- page-admin_exams
+- page-admin_members
+- page-admin_memes
+- page-admin_new
+- page-admin_editor
+
+
+2. DATA SCHEMAS
+---------------
+
+attempts (s.attempts: Attempt[]) — written at index.html:2785 (normal exam)
+                                   and index.html:4339 (practice):
+
+  {
+    id:           string,
+    examId:       string,
+    examTitle:    string,
+    examSubject:  string,                 // e.g. "คณิตศาสตร์", "ไม่ระบุ"
+    takerName:    string,                 // student name = userId
+    startedAt:    string (ISO),
+    submittedAt:  string (ISO),
+    usedSeconds:  number,
+    score:        number,                 // correct count
+    total:        number,                 // total questions
+    answers:      { [qid]: chosen },      // normal exam only
+    perQuestion:  [{
+      qid?, no, page?, tags, topic,
+      chosen, correct, isCorrect, isFree, unsure
+    }],
+    mode?:        'weakness_practice'     // present only for practice attempts
+  }
+
+Practice attempts share the same array but include mode:'weakness_practice'.
+
+
+weakness items (WeaknessTracker, index.html:5591)
+- Storage: per-user localStorage key  nanont:weaknesses_{sanitizedUserId}
+           plus Firestore doc         weaknesses_{sanitizedUserId}.
+- Shape: object map keyed by examId__no, values:
+
+  {
+    userId:         string,                  // takerName
+    examId:         string,
+    examTitle:      string,
+    subject:        string,                  // examSubject
+    questionNo:     number,
+    status:         'active' | 'resolved',
+    lastResult:     'wrong' | 'correct',
+    wrongCount:     number,
+    correctCount:   number,
+    firstWrongAt:   ISO string,
+    lastAttemptAt:  ISO string,
+    resolvedAt:     ISO string | null,
+    updatedAt:      ISO string
+  }
+
+
+practiceLogs
+- Not a separate array. Practice sessions are stored in s.attempts with
+  mode === 'weakness_practice'.
+- Stage 1 helper getTodayPracticeLogs(allAttempts, userId) (line 5780)
+  filters today's submitted practice attempts.
+
+
+users / members (s.members: Member[]) — default seed at line 1675/2102:
+
+  { pin: string, name: string }
+
+- Default member { pin: '311257', name: 'ณนนท์' } if list is empty.
+- Admin is NOT stored as a member — gated by the ADMIN_PIN constant.
+
+
+3. WHOOP ENGINES (Stages 1–3)
+------------------------------
+All present in index.html between line 5697 and ~6100.
+
+getTodayContext(userId)              line 5809
+  Returns { focusSubjects, attempts, focusAttempts, nonFocusAttempts,
+            practiceLogs,
+            weakness: { resolvedToday, remaining, focusResolved, focusRemaining } }
+  Read-only aggregator over today's attempts + WeaknessTracker.
+
+calculateActivity(userId)            line 5872
+  Returns { activity, baseActivity, practiceBonus, weightedSets,
+            focusSetCount, nonFocusSetCount, practiceConfirmCount }
+  Excludes weakness_practice from set counts. Capped at 100.
+
+calculateScore(userId)               line 5900
+  Returns { score, decisionScore,
+            bySubject: { [subj]: {score,correct,total} },
+            hasScoreToday }
+  Uses focus-subject normal exams only; returns null score when no focus
+  exam today.
+
+calculateFixes(userId)               line 5985
+  Returns { fixes, resolvedToday, remaining,
+            reason: 'no_weakness' | 'resolved_progress' | 'not_started' }
+  Uses ctx.weakness.focusResolved / focusRemaining.
+
+updateCoachStreak(userId)            line 6038
+  Returns { count,
+            status: 'active' | 'grace1' | 'grace2' | 'reset' | 'none',
+            emoji, lastActiveDate, isActiveToday }
+  Persists s.coachStreaks[userId]. Idempotent same-day.
+
+getDailyCoachMetricsStage3(userId)   line 6093
+  Returns { ...stage2, fixes, streak }
+  where stage2 = { userId, focusSubjects, activity, score, scoreBand }.
+
+
+4. FOCUS SUBJECTS
+-----------------
+
+Storage
+- Top-level s.focusSubjects: { [userId]: string[] } in mainStore
+  (Store.load / Store.save). Written in setFocusSubjects at line 5739.
+
+setFocusSubjects(adminId, targetUserId, subjectsArray)   line 5721
+- Requires Auth.isTeacher() — otherwise returns
+    { ok:false, error:'forbidden: admin only' }.
+- Validates:
+    targetUserId present,
+    array input,
+    max FOCUS_MAX = 2 after dedup,
+    every entry must exist in _getValidSubjects() (built from
+    s.exams[].subject).
+- On success returns { ok:true, focusSubjects: cleaned[] }.
+
+getFocusSubjects(userId)                                 line 5711
+- Returns string[] — copy of s.focusSubjects[userId] if array, else [].
+- Returns [] for missing userId or any error.
+
+
+5. CURRENT HOME PAGE
+--------------------
+
+- page-home static markup (lines 361–382) is overwritten at runtime.
+- renderHome() (line 2059) replaces #page-home innerHTML with:
+    Header: "My Exam Academia"
+    Role label: 👨‍🏫 โหมดครู / 👨‍🎓 โหมดนักเรียน
+    Logout button
+  Then a .list of linkCard tiles:
+    📝 ทำข้อสอบ              → navigate('exams')
+    📊 ผลการฝึกซ้อม           → navigate('stats')
+    🎯 สถิติการสอบเข้า ม.1     → navigate('entrance_stats')
+    ⚙️ Admin                 → navigate('admin')   (teacher only)
+
+- NO WHOOP / coach UI is present on home.
+  Activity / Score / Fixes / Streak metrics from Stages 1–3 are computed
+  but not rendered anywhere.
+
+
+6. NAVIGATION ENTRY POINTS
+--------------------------
+
+- All page transitions go through the global navigate(page, params)
+  (line 2257). Buttons/cards use inline onclick="navigate('...')".
+- Auth-related: Auth.logout() calls navigate('login'). Successful login
+  flow elsewhere routes to home.
+
+From page-home (rendered by renderHome):
+  - navigate('exams')           — exam list
+  - navigate('stats')           — student stats / results
+  - navigate('entrance_stats')  — entrance exam statistics
+  - navigate('admin')           — admin panel (teacher only)
+  - Auth.logout()               — back to login
+
+- No deep links from home into individual exams, weakness practice,
+  or coach metrics.
