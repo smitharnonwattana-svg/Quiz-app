@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.25 -->
+  <!-- APP_VERSION: v46.26 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.25</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.26</div>
     </div>
   </div>
 </div>
@@ -5973,6 +5973,7 @@ function initAdminMembers(){
               ...mainQuest, progress: Number(mainQuest.target)||1,
               date: todayKey, claimed: false
             } : null;
+            alert('updatedBonus[0].progress: ' + updatedBonus[0].progress + ' target: ' + updatedBonus[0].target);
             _saveGamificationUser(m.name, {
               ...state, bonusQuests: updatedBonus, dailyQuest: updatedMain
             });
@@ -9306,7 +9307,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.25';
+  const CURRENT_VERSION = 'v46.26';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
