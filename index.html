@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.28 -->
+  <!-- APP_VERSION: v46.29 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.28</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.29</div>
     </div>
   </div>
 </div>
@@ -2611,6 +2611,17 @@ function renderHome(){
   if(!homeEl) return;
 
   // ── local helpers (renderHome scope only) ─────────────
+  function _getHomeGreeting(name){
+    const h = new Date().getHours();
+    const timeGreet = h >= 5 && h < 12
+      ? 'สวัสดีตอนเช้า 🌅'
+      : h >= 12 && h < 18
+      ? 'สวัสดีตอนบ่าย ☀️'
+      : h >= 18 && h < 21
+      ? 'สวัสดีตอนเย็น 🌆'
+      : 'ดึกแลวนะ 🌙';
+    return name ? timeGreet + ' ' + name : timeGreet;
+  }
   function esc(s){
     return String(s||'')
       .replace(/&/g,'&amp;')
@@ -2727,7 +2738,7 @@ function renderHome(){
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
           <h1 class="h1">My Exam Academia</h1>
-          <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : '👨‍🎓 โหมดนักเรียน'}</div>
+          <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
         </div>
         <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
       </div>
@@ -9306,7 +9317,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.28';
+  const CURRENT_VERSION = 'v46.29';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
