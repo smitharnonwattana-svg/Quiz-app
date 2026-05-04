@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.15 -->
+  <!-- APP_VERSION: v46.16 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -825,7 +825,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.15</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.16</div>
     </div>
   </div>
 </div>
@@ -3489,6 +3489,9 @@ function initTake(id){
     if (takerName && !Auth.isTeacher()) {
       processGamificationAfterSubmit(takerName);
     }
+    if (takerName && !Auth.isTeacher()) {
+      updateBonusQuestProgress(takerName);
+    }
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
     lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
@@ -5056,6 +5059,9 @@ function initPractice(params){
     // Gamification G5: Stamp UI + Points Wiring
     if (_practiceUserId && !Auth.isTeacher()) {
       processGamificationAfterSubmit(_practiceUserId);
+    }
+    if (_practiceUserId && !Auth.isTeacher()) {
+      updateBonusQuestProgress(_practiceUserId);
     }
   }
 
@@ -8190,6 +8196,34 @@ function getBonusQuestStates(userId) {
   });
 }
 
+// G8-B: Bonus Quest Progress Wiring
+function updateBonusQuestProgress(userId) {
+  if (!userId) return;
+  try {
+    const quests = getBonusQuests(userId);
+    const ctx = getTodayContext(userId);
+    const state = _getGamificationUser(userId);
+    let changed = false;
+    const updated = quests.map(q => {
+      if (q.claimed) return q;
+      const newProgress = _calcBonusQuestProgress(userId, q, ctx);
+      if (newProgress !== q.progress) {
+        changed = true;
+        return { ...q, progress: newProgress };
+      }
+      return q;
+    });
+    if (changed) {
+      _saveGamificationUser(userId, {
+        ...state,
+        bonusQuests: updated
+      });
+    }
+  } catch(e) {
+    console.warn('updateBonusQuestProgress error', e);
+  }
+}
+
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
 (function() {
   const p = new URLSearchParams(location.search);
@@ -9209,7 +9243,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.15';
+  const CURRENT_VERSION = 'v46.16';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
