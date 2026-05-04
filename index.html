@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.84 -->
+  <!-- APP_VERSION: v45.85 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -539,6 +539,72 @@
         max-width: 100% !important;
         min-width: 0 !important;
       }
+
+      /* Editor table mobile fit — v45.84 */
+      /* ─── Editor table: fit 5 columns on mobile ─── */
+      #page-admin_editor .tableBox {
+        overflow-x: hidden !important;
+      }
+      #page-admin_editor table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+      }
+      #page-admin_editor table th:nth-child(1),
+      #page-admin_editor table td:nth-child(1) {
+        width: 32px !important;
+        font-size: 12px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table th:nth-child(2),
+      #page-admin_editor table td:nth-child(2) {
+        width: 52px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table td:nth-child(2) input {
+        width: 44px !important;
+        padding: 4px 6px !important;
+        font-size: 13px !important;
+      }
+      #page-admin_editor table th:nth-child(3),
+      #page-admin_editor table td:nth-child(3) {
+        width: auto !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table td:nth-child(3) .correctBtns {
+        gap: 3px !important;
+      }
+      #page-admin_editor table td:nth-child(3) .correctBtn {
+        padding: 6px 8px !important;
+        font-size: 13px !important;
+        min-width: 30px !important;
+      }
+      #page-admin_editor table th:nth-child(4),
+      #page-admin_editor table td:nth-child(4) {
+        width: 40px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table td:nth-child(4) .freeBtn {
+        font-size: 11px !important;
+        padding: 4px 4px !important;
+        width: 100% !important;
+      }
+      #page-admin_editor table th:nth-child(5),
+      #page-admin_editor table td:nth-child(5) {
+        width: 36px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table td:nth-child(5) button {
+        font-size: 14px !important;
+        padding: 4px 4px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+      }
+      #page-admin_editor table td:nth-child(5) button span {
+        display: none !important;
+      }
     }
   </style>
   <!-- PDF.js from CDN -->
@@ -604,7 +670,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.84</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.85</div>
     </div>
   </div>
 </div>
