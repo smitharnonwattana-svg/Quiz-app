@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.74 -->
+  <!-- APP_VERSION: v45.75 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -349,7 +349,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.74</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.75</div>
     </div>
   </div>
 </div>
@@ -4774,7 +4774,7 @@ function getStudyRoadRewards() {
 
 function saveStudyRoadReward(tier, rewardName) {
   const key = String(tier);
-  const valid = new Set(['100','300','600','1000','stamps']);
+  const valid = new Set(['100','300','600','1000','stamps','stamps_3','stamps_7','stamps_15']);
   if (!valid.has(key)) return false;
   const s = Store.load();
   if (!s.studyRoadRewards || typeof s.studyRoadRewards !== 'object') s.studyRoadRewards = {};
@@ -4886,44 +4886,75 @@ function renderRewardsFor(userId) {
 
   const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-  // Section 1: Study Road
+  // Trophy Road UI — G6 (Section 1)
   const state = getGamificationState(userId);
   const rewards = getStudyRoadRewards();
   const points = Number(state.points) || 0;
-  const tiers = [
-    { key:'100',  label:'⚡ Scholar', pts:100  },
-    { key:'300',  label:'🔥 Pro',     pts:300  },
-    { key:'600',  label:'💎 Elite',   pts:600  },
-    { key:'1000', label:'👑 Legend',  pts:1000 }
+  const trophyTiers = [
+    { key:'0',    label:'📚 Rookie',  pts:0,    emoji:'📚' },
+    { key:'100',  label:'⚡ Scholar', pts:100,  emoji:'⚡' },
+    { key:'300',  label:'🔥 Pro',     pts:300,  emoji:'🔥' },
+    { key:'600',  label:'💎 Elite',   pts:600,  emoji:'💎' },
+    { key:'1000', label:'👑 Legend',  pts:1000, emoji:'👑' }
   ];
-  let currentTier = null, nextTier = null;
-  for (const t of tiers) {
-    if (points >= t.pts) currentTier = t;
-    else if (!nextTier) nextTier = t;
+  let currentIdx = 0;
+  for (let i = 0; i < trophyTiers.length; i++) {
+    if (points >= trophyTiers[i].pts) currentIdx = i;
   }
-  const currentPts = currentTier ? currentTier.pts : 0;
+  const currentTier = trophyTiers[currentIdx];
+  const nextTier = (currentIdx < trophyTiers.length - 1) ? trophyTiers[currentIdx + 1] : null;
+  const segCount = trophyTiers.length - 1;
+  let segs = currentIdx;
+  if (nextTier) {
+    const span = nextTier.pts - currentTier.pts;
+    segs += Math.max(0, Math.min(1, span > 0 ? (points - currentTier.pts) / span : 0));
+  }
+  const roadPct = Math.max(0, Math.min(100, (segs / segCount) * 100));
   let pct = 100, fillText = '';
   if (nextTier) {
-    const span = nextTier.pts - currentPts;
-    pct = Math.max(0, Math.min(100, Math.round(((points - currentPts) / span) * 100)));
+    const span = nextTier.pts - currentTier.pts;
+    pct = Math.max(0, Math.min(100, Math.round(((points - currentTier.pts) / span) * 100)));
     fillText = `${points} / ${nextTier.pts} pt`;
   } else {
     fillText = `${points} pt — Maxed 👑`;
   }
   const nextRewardName = nextTier ? (rewards[nextTier.key] || '') : '';
-  const tierBadgeHtml = currentTier
-    ? `<span style="font-weight:800;">${esc(currentTier.label)}</span>`
-    : `<span class="muted" style="font-size:13px;">ยังไม่ถึงระดับแรก</span>`;
+  const tierBadgeHtml = `<span style="font-weight:800;">${esc(currentTier.label)}</span>`;
+  const remainingPt = nextTier ? Math.max(0, nextTier.pts - points) : 0;
   const nextLineHtml = nextTier
-    ? `<div class="muted" style="font-size:13px;margin-top:6px;">เป้าหมายถัดไป: <b>${esc(nextTier.label)}</b> · ` +
-      (nextRewardName ? `รางวัล: <b>${esc(nextRewardName)}</b>` : '<span class="muted">— ยังไม่ได้ตั้งรางวัล</span>') + `</div>`
-    : `<div class="muted" style="font-size:13px;margin-top:6px;">🎉 ทำได้ครบทุกระดับแล้ว!</div>`;
+    ? `<div style="margin-top:8px;font-size:13px;color:#374151;">🎁 อีก <b>${remainingPt}pt</b> → <b>${esc(nextTier.label)}</b></div>` +
+      `<div class="muted" style="font-size:12px;margin-top:2px;">รางวัล: ${nextRewardName ? '<b>' + esc(nextRewardName) + '</b>' : '— ยังไม่ได้ตั้งรางวัล'}</div>`
+    : `<div style="margin-top:8px;font-size:13px;color:#16a34a;font-weight:700;">🎉 ทำได้ครบทุกระดับแล้ว!</div>`;
+
+  const trophyNodesHtml = trophyTiers.map((t, i) => {
+    const reached = i <= currentIdx;
+    const isCurrent = i === currentIdx;
+    const opacity = reached ? '1' : '0.3';
+    const fontWeight = reached ? '800' : '500';
+    const ring = isCurrent ? 'border:3px solid #f59e0b;box-shadow:0 0 0 2px #fef3c7;' : 'border:2px solid #e5e7eb;';
+    const bg = reached ? '#fff' : '#f3f4f6';
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${t.emoji}</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${t.pts}</div>
+        <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
+        <div style="height:14px;font-size:10px;color:#6b7280;line-height:1;">${isCurrent ? 'คุณอยู่ที่นี่' : ''}</div>
+      </div>
+    `;
+  }).join('');
 
   const studyRoadHtml = `
     <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <div style="font-weight:800;font-size:15px;">🗺️ Study Road</div>
+        <div style="font-weight:800;font-size:15px;">🗺️ Trophy Road</div>
         <div>${tierBadgeHtml}</div>
+      </div>
+      <div style="position:relative;margin:18px 6px 6px;overflow-x:auto;">
+        <div style="position:absolute;left:25px;right:25px;top:19px;height:4px;background:#e5e7eb;border-radius:2px;"></div>
+        <div style="position:absolute;left:25px;top:19px;height:4px;background:linear-gradient(90deg,#f59e0b,#16a34a);border-radius:2px;width:calc((100% - 50px) * ${roadPct/100});transition:width .3s;"></div>
+        <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:0;">
+          ${trophyNodesHtml}
+        </div>
       </div>
       <div style="margin-top:10px;height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
         <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#f59e0b,#16a34a);transition:width .3s;"></div>
@@ -4980,18 +5011,80 @@ function renderRewardsFor(userId) {
     }
   } catch (e) { questHtml = ''; }
 
-  // Section 3: Stamps
+  // Trophy Road UI — G6 (Section 3: Stamp Road)
   const stamps = Number(state.stamps) || 0;
-  const stampReward = rewards['stamps'] || '';
+  const stampMilestones = [
+    { key:'start',     threshold:0,  label:'Start',         emoji:'○' },
+    { key:'stamps_3',  threshold:3,  label:'🥉 Milestone 1', emoji:'🥉' },
+    { key:'stamps_7',  threshold:7,  label:'🥈 Milestone 2', emoji:'🥈' },
+    { key:'stamps_15', threshold:15, label:'🥇 Milestone 3', emoji:'🥇' }
+  ];
+  let stCurIdx = 0;
+  for (let i = 0; i < stampMilestones.length; i++) {
+    if (stamps >= stampMilestones[i].threshold) stCurIdx = i;
+  }
+  const stCurrent = stampMilestones[stCurIdx];
+  const stNext = (stCurIdx < stampMilestones.length - 1) ? stampMilestones[stCurIdx + 1] : null;
+  const stSegCount = stampMilestones.length - 1;
+  let stSegs = stCurIdx;
+  if (stNext) {
+    const span = stNext.threshold - stCurrent.threshold;
+    stSegs += Math.max(0, Math.min(1, span > 0 ? (stamps - stCurrent.threshold) / span : 0));
+  }
+  const stRoadPct = Math.max(0, Math.min(100, (stSegs / stSegCount) * 100));
+  let stPct = 100, stFillText = '';
+  if (stNext) {
+    const span = stNext.threshold - stCurrent.threshold;
+    stPct = Math.max(0, Math.min(100, Math.round(((stamps - stCurrent.threshold) / span) * 100)));
+    stFillText = `${stamps} / ${stNext.threshold} stamps`;
+  } else {
+    stFillText = `${stamps} stamps — Maxed 🥇`;
+  }
+  const stNextRewardName = stNext ? (rewards[stNext.key] || '') : '';
+  const stNextLineHtml = stNext
+    ? `<div style="margin-top:8px;font-size:13px;color:#374151;">🎁 อีก <b>${Math.max(0, stNext.threshold - stamps)} stamps</b> → <b>${esc(stNext.label)}</b></div>` +
+      `<div class="muted" style="font-size:12px;margin-top:2px;">รางวัล: ${stNextRewardName ? '<b>' + esc(stNextRewardName) + '</b>' : '— ยังไม่ได้ตั้งรางวัล'}</div>`
+    : `<div style="margin-top:8px;font-size:13px;color:#16a34a;font-weight:700;">🎉 ทำได้ครบทุก milestone แล้ว!</div>`;
+
+  const stampNodesHtml = stampMilestones.map((m, i) => {
+    const reached = i <= stCurIdx;
+    const isCurrent = i === stCurIdx;
+    const opacity = reached ? '1' : '0.3';
+    const fontWeight = reached ? '800' : '500';
+    const ring = isCurrent ? 'border:3px solid #f59e0b;box-shadow:0 0 0 2px #fef3c7;' : 'border:2px solid #e5e7eb;';
+    const bg = reached ? '#fff' : '#f3f4f6';
+    const display = (m.key === 'start') ? '🏁' : m.emoji;
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${display}</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${m.threshold}</div>
+        <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
+        <div style="height:14px;font-size:10px;color:#6b7280;line-height:1;">${isCurrent ? (stamps + ' stamps') : ''}</div>
+      </div>
+    `;
+  }).join('');
+
   const stampHtml = `
     <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <div style="font-weight:800;font-size:15px;">🎫 Stamps</div>
-        <div style="font-weight:800;">${stamps}</div>
+        <div style="font-weight:800;font-size:15px;">🎫 Stamp Road</div>
+        <div style="font-weight:800;">${stamps} 🎫</div>
       </div>
-      <div class="muted" style="font-size:13px;margin-top:6px;">
-        ${stampReward ? 'รางวัลสะสม: <b>' + esc(stampReward) + '</b>' : '— ยังไม่ได้ตั้งรางวัล'}
+      <div style="position:relative;margin:18px 6px 6px;overflow-x:auto;">
+        <div style="position:absolute;left:25px;right:25px;top:19px;height:4px;background:#e5e7eb;border-radius:2px;"></div>
+        <div style="position:absolute;left:25px;top:19px;height:4px;background:linear-gradient(90deg,#3b82f6,#16a34a);border-radius:2px;width:calc((100% - 50px) * ${stRoadPct/100});transition:width .3s;"></div>
+        <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:0;">
+          ${stampNodesHtml}
+        </div>
       </div>
+      <div style="margin-top:10px;height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+        <div style="height:100%;width:${stPct}%;background:linear-gradient(90deg,#3b82f6,#16a34a);transition:width .3s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#6b7280;">
+        <span>🎫 ${stamps}</span>
+        <span>${esc(stFillText)}</span>
+      </div>
+      ${stNextLineHtml}
     </div>
   `;
 
@@ -5026,13 +5119,15 @@ function initAdminMembers(){
       host.style.cssText = 'background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:4px 0 14px;';
       tbody.parentNode.insertBefore(host, tbody);
     }
-    // Gamification G5: Stamp UI + Points Wiring
+    // Trophy Road UI — G6
     const tiers = [
-      { key: '100',    label: '⚡ Scholar' },
-      { key: '300',    label: '🔥 Pro' },
-      { key: '600',    label: '💎 Elite' },
-      { key: '1000',   label: '👑 Legend' },
-      { key: 'stamps', label: '🎫 Stamp Reward' }
+      { key: '100',       label: '⚡ Scholar' },
+      { key: '300',       label: '🔥 Pro' },
+      { key: '600',       label: '💎 Elite' },
+      { key: '1000',      label: '👑 Legend' },
+      { key: 'stamps_3',  label: '🥉 Stamp Milestone 1 (3 stamps)' },
+      { key: 'stamps_7',  label: '🥈 Stamp Milestone 2 (7 stamps)' },
+      { key: 'stamps_15', label: '🥇 Stamp Milestone 3 (15 stamps)' }
     ];
     const rewards = getStudyRoadRewards();
     const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -5040,7 +5135,7 @@ function initAdminMembers(){
       '<div style="font-weight:800;font-size:14px;margin-bottom:8px;">🗺️ Study Road — รางวัลแต่ละระดับ</div>' +
       tiers.map(t => {
         const v = escAttr(rewards[t.key] || '');
-        const head = (t.key === 'stamps') ? t.label : (t.key + ' pt → ' + t.label);
+        const head = /^\d+$/.test(t.key) ? (t.key + ' pt → ' + t.label) : t.label;
         return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;">' +
                  '<div style="min-width:130px;font-weight:700;font-size:13px;color:#374151;">' + head + '</div>' +
                  '<input class="titleInput" type="text" placeholder="ชื่อรางวัล" style="flex:1;min-width:160px;" data-srtier="' + t.key + '" value="' + v + '" />' +
