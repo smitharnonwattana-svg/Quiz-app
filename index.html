@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.17 -->
+  <!-- APP_VERSION: v46.18 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -729,36 +729,35 @@
         align-items: start !important;
       }
 
-      /* Trophy Road — row 1 col 1 */
-      #rewardsContent > div:nth-child(1) {
+      /* Trophy Road — col 1 */
+      .rewards-trophy {
         grid-column: 1 !important;
-        grid-row: 1 !important;
         align-self: start !important;
         height: auto !important;
       }
 
-      /* Quest section — row 2 full width */
-      #rewardsContent > div:nth-child(2) {
-        grid-column: 1 / -1 !important;
-        grid-row: 2 !important;
+      /* Stamp Road — col 2 */
+      .rewards-stamp {
+        grid-column: 2 !important;
+        overflow: visible !important;
       }
 
-      /* Stamp Road — row 1 col 2 */
-      #rewardsContent > div:nth-child(3) {
-        grid-column: 2 !important;
-        grid-row: 1 !important;
-        overflow: visible !important;
+      /* Quest section — full width, last */
+      .rewards-quest {
+        grid-column: 1 / -1 !important;
+        order: 99 !important;
       }
 
       /* Prevent stamp node text/badges from being clipped by scroll container */
-      #rewardsContent > div:nth-child(3) div[style*="overflow-x:auto"] {
+      .rewards-stamp div[style*="overflow-x:auto"] {
         overflow: visible !important;
       }
 
-      /* Banner — full width above all */
+      /* Banner — full width, always first */
       #rewardsContent > div[style*="background:#fffbeb"],
       #rewardsContent > div[style*="background:#f0fdf4"] {
         grid-column: 1 / -1 !important;
+        order: -1 !important;
       }
     }
   </style>
@@ -825,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.17</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.18</div>
     </div>
   </div>
 </div>
@@ -5548,7 +5547,7 @@ function renderRewardsFor(userId) {
   }).join('');
 
   const studyRoadHtml = `
-    <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div class="rewards-trophy" style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-weight:800;font-size:15px;">🗺️ Trophy Road</div>
         <div>${tierBadgeHtml}</div>
@@ -5609,9 +5608,9 @@ function renderRewardsFor(userId) {
 
   const bonusCards = bonusQS.map(qs => renderQuestCard(qs, qs.quest ? qs.quest.tier : '')).join('');
 
-  const questHtml = '<div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">'
+  const questHtml = '<div class="rewards-quest" style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">'
     + '<div style="font-weight:800;font-size:15px;margin-bottom:12px;">🎯 Daily Quests</div>'
-    + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    + '<div style="display:flex;gap:10px;flex-wrap:nowrap;align-items:stretch;">'
     + renderQuestCard(mainQS, 'main')
     + bonusCards
     + '</div>'
@@ -5682,7 +5681,7 @@ function renderRewardsFor(userId) {
   }).join('');
 
   const stampHtml = `
-    <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div class="rewards-stamp" style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-weight:800;font-size:15px;">🎫 Stamp Road</div>
         <div style="font-weight:800;">${stamps} 🎫</div>
@@ -9257,7 +9256,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.17';
+  const CURRENT_VERSION = 'v46.18';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
