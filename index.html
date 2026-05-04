@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.91 -->
+  <!-- APP_VERSION: v45.92 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -95,6 +95,9 @@
         flex:0 0 30vh;
         height:30vh;
         overflow:hidden;
+        overflow-y: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
         background:#fff;
         border-top:1px solid var(--border);
       }
@@ -142,9 +145,10 @@
         padding: 6px 8px !important;
         gap: 6px !important;
         align-content: flex-start !important;
-        height: calc(30vh - 32px) !important;
-        box-sizing: border-box !important;
+        flex: 1 !important;
+        min-height: 0 !important;
         overflow: hidden !important;
+        box-sizing: border-box !important;
       }
 
       /* ROW 2 left — ก ข ค ง 2x2 grid */
@@ -751,7 +755,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.91</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.92</div>
     </div>
   </div>
 </div>
