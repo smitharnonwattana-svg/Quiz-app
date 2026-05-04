@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.20 -->
+  <!-- APP_VERSION: v46.21 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.20</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.21</div>
     </div>
   </div>
 </div>
@@ -5952,32 +5952,28 @@ function initAdminMembers(){
       const testQuestBtn = statsBox.querySelector('[data-gtest-quest="' + idx + '"]');
       if (testQuestBtn) {
         testQuestBtn.onclick = () => {
-          const state = _getGamificationUser(m.name);
-          const quests = getBonusQuests(m.name);
-          const mainQuest = state.dailyQuest;
-          const todayKey = getDateKey(new Date());
-
-          // Force complete all bonus quests
-          const updatedBonus = quests.map(q => ({
-            ...q,
-            progress: q.target,
-            date: todayKey
-          }));
-
-          // Force complete main quest
-          const updatedMain = mainQuest ? {
-            ...mainQuest,
-            progress: mainQuest.target,
-            date: todayKey
-          } : mainQuest;
-
-          _saveGamificationUser(m.name, {
-            ...state,
-            bonusQuests: updatedBonus,
-            dailyQuest: updatedMain
-          });
-          toast('🧪 Force complete quests ของ ' + m.name + ' แล้ว');
-          renderMembers();
+          try {
+            alert('Step 1: clicked');
+            const quests = getBonusQuests(m.name);
+            alert('Step 2: quests = ' + quests.length);
+            const state = _getGamificationUser(m.name);
+            const mainQuest = state.dailyQuest;
+            const todayKey = getDateKey(new Date());
+            const updatedBonus = quests.map(q => ({
+              ...q, progress: q.target, date: todayKey
+            }));
+            const updatedMain = mainQuest ? {
+              ...mainQuest, progress: mainQuest.target, date: todayKey
+            } : mainQuest;
+            _saveGamificationUser(m.name, {
+              ...state, bonusQuests: updatedBonus, dailyQuest: updatedMain
+            });
+            alert('Step 3: saved');
+            toast('🧪 Force complete quests ของ ' + m.name + ' แล้ว');
+            renderMembers();
+          } catch(e) {
+            alert('ERROR: ' + e.message);
+          }
         };
       }
 
@@ -9288,7 +9284,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.20';
+  const CURRENT_VERSION = 'v46.21';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
