@@ -1,8 +1,12 @@
 const { onRequest } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const https = require('https');
+const admin = require('firebase-admin');
 
 setGlobalOptions({ region: 'asia-southeast1' });
+
+if (!admin.apps.length) admin.initializeApp();
 
 const LINE_TOKEN = process.env.LINE_TOKEN;
 const LINE_USER_ID = process.env.LINE_USER_ID;
@@ -85,5 +89,89 @@ exports.lineNotify = onRequest(
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  }
+);
+
+// Daily Summary LINE notification — 21:00 Bangkok
+exports.dailySummaryNotify = onSchedule(
+  {
+    schedule: '0 21 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'asia-southeast1',
+    secrets: ['LINE_TOKEN', 'LINE_USER_ID'],
+  },
+  async (event) => {
+    const db = admin.firestore();
+
+    // Today's date key in Bangkok time (UTC+7)
+    const bangkokNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const todayKey = bangkokNow.toISOString().slice(0, 10);
+
+    // Fetch all app docs and filter by ID pattern
+    const snapshot = await db.collection('app').get();
+    const todayDocs = snapshot.docs.filter(
+      (doc) => doc.id.includes('_dailySummary_') && doc.id.endsWith('_' + todayKey)
+    );
+
+    for (const doc of todayDocs) {
+      try {
+        const raw = doc.data()._d;
+        if (!raw) continue;
+        const d = JSON.parse(raw);
+        if (!d || !d.userId) continue;
+
+        const qDone = Array.isArray(d.questsCompleted) ? d.questsCompleted.length : 0;
+        const message =
+          '📊 สรุปวันนี้ของ ' + d.userId + '\n' +
+          '━━━━━━━━━━━━━━\n' +
+          '🔥 Activity: ' + (d.activityPct || 0) + '%  (' + (d.setsToday || 0) + ' ชุด)\n' +
+          '🎯 Score: ' + (d.scorePct || 0) + '%\n' +
+          '🔧 Fixes: ' + (d.fixesPct || 0) + '%  (' + (d.resolvedToday || 0) + ' ข้อ)\n' +
+          '🔥 Streak: ' + (d.streak || 0) + ' วัน\n' +
+          '⭐ Points: ' + (d.pointsTotal || 0) + ' pt\n' +
+          '🎫 Stamps: ' + (d.stampsTotal || 0) + '\n' +
+          '🎯 Quests: ' + qDone + '/' + (d.questsTotal || 4);
+
+        await pushLine(message);
+      } catch (e) {
+        console.warn('dailySummaryNotify: failed for doc', doc.id, e.message);
+      }
+    }
+
+    console.log('dailySummaryNotify: sent', todayDocs.length, 'summaries for', todayKey);
+  }
+);
+
+// TTL Cleanup — delete expired dailySummary docs at 02:00 Bangkok
+exports.cleanupExpiredSummaries = onSchedule(
+  {
+    schedule: '0 2 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'asia-southeast1',
+  },
+  async (event) => {
+    const db = admin.firestore();
+    const nowIso = new Date().toISOString();
+
+    const snapshot = await db.collection('app').get();
+    const expired = snapshot.docs.filter((doc) => {
+      if (!doc.id.includes('_dailySummary_')) return false;
+      try {
+        const d = JSON.parse(doc.data()._d || 'null');
+        return d && d.expiresAt && d.expiresAt < nowIso;
+      } catch {
+        return false;
+      }
+    });
+
+    // Delete in batches of 500
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < expired.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      expired.slice(i, i + BATCH_SIZE).forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    console.log('cleanupExpiredSummaries: deleted', expired.length, 'expired docs');
   }
 );
