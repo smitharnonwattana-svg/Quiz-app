@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.23 -->
+  <!-- APP_VERSION: v46.24 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.23</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.24</div>
     </div>
   </div>
 </div>
@@ -5954,18 +5954,34 @@ function initAdminMembers(){
       const testQuestBtn = statsBox.querySelector('[data-gtest-quest="' + idx + '"]');
       if (testQuestBtn) {
         testQuestBtn.onclick = () => {
-          const quests = getBonusQuests(m.name);
           const state = _getGamificationUser(m.name);
-          const mainQuest = state.dailyQuest;
           const todayKey = getDateKey(new Date());
+
+          // Generate fresh quests if empty, then force complete
+          let quests = state.bonusQuests || [];
+          if (quests.length === 0 || quests[0].date !== todayKey) {
+            quests = _pickRandomBonusQuests(m.name);
+          }
+
           const updatedBonus = quests.map(q => ({
-            ...q, progress: q.target, date: todayKey, claimed: false
+            ...q,
+            progress: Number(q.target) || 1,
+            date: todayKey,
+            claimed: false
           }));
+
+          const mainQuest = state.dailyQuest;
           const updatedMain = mainQuest ? {
-            ...mainQuest, progress: mainQuest.target, date: todayKey, claimed: false
-          } : mainQuest;
+            ...mainQuest,
+            progress: Number(mainQuest.target) || 1,
+            date: todayKey,
+            claimed: false
+          } : null;
+
           _saveGamificationUser(m.name, {
-            ...state, bonusQuests: updatedBonus, dailyQuest: updatedMain
+            ...state,
+            bonusQuests: updatedBonus,
+            dailyQuest: updatedMain
           });
           toast('🧪 Force complete quests ของ ' + m.name + ' แล้ว');
           renderMembers();
@@ -9293,7 +9309,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.23';
+  const CURRENT_VERSION = 'v46.24';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
