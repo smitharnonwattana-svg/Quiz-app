@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.32 -->
+  <!-- APP_VERSION: v46.33 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.32</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.33</div>
     </div>
   </div>
 </div>
@@ -2232,6 +2232,12 @@ const PdfDB=(()=>{
 const LINE_NOTIFY_URL = 'https://asia-southeast1-nanont-exam.cloudfunctions.net/lineNotify';
 function lineNotify(payload) {
   if (!LINE_NOTIFY_URL || LINE_NOTIFY_URL.startsWith('REPLACE')) return;
+  // LINE Notification Toggle — per user
+  if (payload && payload.name) {
+    const _s = Store.load();
+    const _member = (_s.members || []).find(m => m.name === payload.name);
+    if (_member && _member.lineNotify === false) return;
+  }
   // G8-E: Reward Request LINE Notification — build message client-side
   if (payload && payload.type === 'reward_request') {
     payload = {
@@ -5932,6 +5938,9 @@ function initAdminMembers(){
       const gState = (typeof getGamificationState === 'function') ? getGamificationState(m.name) : { points: 0, stamps: 0 };
       const statsBox = document.createElement('div');
       statsBox.style.cssText = 'background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;margin:0 0 12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;';
+      const _memberLineNotify = (m.lineNotify !== false);
+      const _lineToggleStyle = _memberLineNotify ? 'color:#16a34a;border-color:#86efac;' : 'color:#6b7280;border-color:#d1d5db;';
+      const _lineToggleLabel = _memberLineNotify ? '🔔 LINE On' : '🔕 LINE Off';
       statsBox.innerHTML =
         '<span class="muted" style="font-size:13px;font-weight:700;">⭐ ' + (Number(gState.points)||0) + ' pt</span>' +
         '<span class="muted" style="font-size:13px;font-weight:700;">🎫 ' + (Number(gState.stamps)||0) + ' stamps</span>' +
@@ -5941,7 +5950,8 @@ function initAdminMembers(){
         '<button type="button" class="btn" style="margin-left:4px;padding:4px 10px;font-size:12px;color:#7c3aed;border-color:#c4b5fd;" data-gtest="' + idx + '">🧪 +100pt</button>' +
         '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#0369a1;border-color:#7dd3fc;" data-gtest-stamp="' + idx + '">🧪 +1 stamp</button>' +
         '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#7c3aed;border-color:#c4b5fd;" data-gtest-quest="' + idx + '">🧪 Complete Quests</button>' +
-        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#dc2626;border-color:#fca5a5;" data-greset-quest="' + idx + '">🔄 Reset Quests</button>';
+        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#dc2626;border-color:#fca5a5;" data-greset-quest="' + idx + '">🔄 Reset Quests</button>' +
+        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;' + _lineToggleStyle + '" data-line-toggle="' + idx + '">' + _lineToggleLabel + '</button>';
       tbody.appendChild(statsBox);
       const resetBtn = statsBox.querySelector('[data-greset="' + idx + '"]');
       if (resetBtn) {
@@ -6040,6 +6050,20 @@ function initAdminMembers(){
             dailyQuest: null
           });
           toast('✅ Reset quests ของ ' + m.name + ' แล้ว');
+          renderMembers();
+        };
+      }
+      // LINE Notification Toggle — per user
+      const lineToggleBtn = statsBox.querySelector('[data-line-toggle="' + idx + '"]');
+      if (lineToggleBtn) {
+        lineToggleBtn.onclick = () => {
+          const _s2 = Store.load();
+          const _mi = _s2.members.findIndex(mb => mb.name === m.name);
+          if (_mi === -1) return;
+          const _current = _s2.members[_mi].lineNotify !== false;
+          _s2.members[_mi].lineNotify = !_current;
+          Store.save(_s2);
+          toast((!_current ? '🔔' : '🔕') + ' LINE ' + (!_current ? 'เปิด' : 'ปิด') + ' สำหรับ ' + m.name);
           renderMembers();
         };
       }
@@ -9431,7 +9455,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.32';
+  const CURRENT_VERSION = 'v46.33';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
