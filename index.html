@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.30 -->
+  <!-- APP_VERSION: v46.31 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.30</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.31</div>
     </div>
   </div>
 </div>
@@ -2232,6 +2232,16 @@ const PdfDB=(()=>{
 const LINE_NOTIFY_URL = 'https://asia-southeast1-nanont-exam.cloudfunctions.net/lineNotify';
 function lineNotify(payload) {
   if (!LINE_NOTIFY_URL || LINE_NOTIFY_URL.startsWith('REPLACE')) return;
+  // G8-E: Reward Request LINE Notification — build message client-side
+  if (payload && payload.type === 'reward_request') {
+    payload = {
+      ...payload,
+      message: '📬 ' + (payload.name || '') + ' ขอรับรางวัล!\n'
+        + '🏆 ' + (payload.examTitle || '') + '\n'
+        + '🎁 ' + (payload.rewardName || '') + '\n'
+        + 'กรุณาเตรียมรางวัลให้น้องด้วยครับ 🙏'
+    };
+  }
   fetch(LINE_NOTIFY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -7852,6 +7862,27 @@ function requestTierReward(userId, tierKey) {
   if (rec.pendingTiers.includes(tierKey)) return { ok: false, reason: 'already_pending' };
   rec.pendingTiers = [...rec.pendingTiers, tierKey];
   _saveGamificationUser(userId, rec);
+
+  // G8-E: LINE notify admin when student requests reward
+  try {
+    const _tierLabels = {
+      '100': '⚡ Scholar', '300': '🔥 Pro',
+      '600': '💎 Elite', '1000': '👑 Legend',
+      'stamps_3': '🥉 Milestone 1',
+      'stamps_7': '🥈 Milestone 2',
+      'stamps_15': '🥇 Milestone 3'
+    };
+    const _rewards = getStudyRoadRewards();
+    const _tierLabel = _tierLabels[tierKey] || tierKey;
+    const _rewardName = _rewards[tierKey] || '(ยังไม่ได้ตั้งรางวัล)';
+    lineNotify({
+      type: 'reward_request',
+      name: userId,
+      examTitle: _tierLabel,
+      rewardName: _rewardName
+    });
+  } catch(e) { /* silent fail */ }
+
   return { ok: true };
 }
 
@@ -9355,7 +9386,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.30';
+  const CURRENT_VERSION = 'v46.31';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
