@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="ExamAcademia">
   <link rel="apple-touch-icon" href="/Quiz-app/icon.svg">
   <meta name="theme-color" content="#3b82f6">
-  <!-- APP_VERSION: v45.95 -->
+  <!-- APP_VERSION: v45.96 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -701,6 +701,11 @@
         justify-content: center !important;
       }
     }
+
+    /* Prevent double-tap zoom on buttons and inputs */
+    button, input, select, label {
+      touch-action: manipulation;
+    }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -765,7 +770,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.95</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.96</div>
     </div>
   </div>
 </div>
