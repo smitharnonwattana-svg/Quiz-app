@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.79 -->
+  <!-- APP_VERSION: v45.80 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -286,60 +286,121 @@
     .freeBtn:hover{border-color:#f59e0b;background:#fffbeb;}
     .freeBtn.active{background:#f59e0b;border-color:#f59e0b;color:#fff;}
 
-    /* Mobile Admin UI v2 — v45.78 */
+    /* Mobile Admin UI v3 — v45.79 */
     @media (max-width: 600px) {
-      /* FIX 1 — page-admin_exams: card-style rows, ชื่อชุด full-width on top */
+
+      /* ─── รายการข้อสอบ: card layout ─── */
       #page-admin_exams .tableWrap { overflow-x: visible; }
-      #page-admin_exams table { display: block; font-size: 12px; }
+      #page-admin_exams table { display: block; }
       #page-admin_exams table thead { display: none; }
       #page-admin_exams table tbody { display: block; }
+
+      /* each exam row = card */
       #page-admin_exams table tbody tr {
         display: block;
         border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: 10px;
+        border-radius: 12px;
+        padding: 12px;
         margin-bottom: 10px;
         background: #fff;
       }
+
+      /* all cells inline by default */
       #page-admin_exams table tbody td {
         display: inline-flex;
         align-items: center;
-        padding: 4px 6px;
+        padding: 2px 4px;
         font-size: 12px;
+        vertical-align: middle;
       }
+
+      /* col 1: ชื่อชุด — full width top line */
       #page-admin_exams table tbody td:nth-child(1) {
         display: block;
         width: 100%;
         font-weight: 800;
-        font-size: 13px;
-        padding: 0 0 6px 0;
+        font-size: 14px;
+        padding: 0 0 8px 0;
         border-bottom: 1px solid #f3f4f6;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
-      #page-admin_exams table tbody td:nth-child(3),
-      #page-admin_exams table tbody td:nth-child(6),
+
+      /* col 2: วิชา — show inline */
+      #page-admin_exams table tbody td:nth-child(2) {
+        font-size: 12px;
+        color: #6b7280;
+        padding-right: 8px;
+      }
+
+      /* col 3: จัดลำดับ — hide */
+      #page-admin_exams table tbody td:nth-child(3) { display: none; }
+
+      /* col 4: สถานะ dropdown — show */
+      #page-admin_exams table tbody td:nth-child(4) { font-size: 12px; }
+
+      /* col 5: ข้อ — show */
+      #page-admin_exams table tbody td:nth-child(5) {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      /* col 6: อัพโหลด — hide */
+      #page-admin_exams table tbody td:nth-child(6) { display: none; }
+
+      /* col 7: PDF — hide */
       #page-admin_exams table tbody td:nth-child(7) { display: none; }
 
-      /* FIX 2 — page-admin_editor: collapse form grids + shrink question table */
+      /* col 8: แก้ไข (เปิด Editor) — show */
+      #page-admin_exams table tbody td:nth-child(8) { font-size: 12px; }
+
+      /* col 9: ลบ — show */
+      #page-admin_exams table tbody td:nth-child(9) { font-size: 12px; }
+
+      /* ─── Editor form: collapse to 1 column ─── */
       #page-admin_editor .card > div > div:first-child,
       #page-admin_editor .card > div > div:nth-child(2) {
         grid-template-columns: 1fr !important;
       }
-      #page-admin_editor table th:nth-child(5),
-      #page-admin_editor table td:nth-child(5) { display: none; }
+
+      /* ─── Editor table: fit 4 columns on mobile ─── */
+      #page-admin_editor table {
+        min-width: 0 !important;
+        width: 100% !important;
+        table-layout: fixed;
+      }
+      /* col 1: ข้อ */
       #page-admin_editor table th:nth-child(1),
-      #page-admin_editor table td:nth-child(1) { width: 36px !important; }
+      #page-admin_editor table td:nth-child(1) {
+        width: 36px !important;
+      }
+      /* col 2: หน้า (was หน้า PDF) */
       #page-admin_editor table th:nth-child(2),
-      #page-admin_editor table td:nth-child(2) { width: 72px !important; }
+      #page-admin_editor table td:nth-child(2) {
+        width: 60px !important;
+      }
+      /* col 3: เฉลย — takes remaining space */
+      #page-admin_editor table th:nth-child(3),
+      #page-admin_editor table td:nth-child(3) {
+        width: auto !important;
+      }
+      /* col 4: ฟรี */
       #page-admin_editor table th:nth-child(4),
-      #page-admin_editor table td:nth-child(4) { width: 44px !important; }
+      #page-admin_editor table td:nth-child(4) {
+        width: 44px !important;
+      }
+      /* col 5: Tag — hide */
+      #page-admin_editor table th:nth-child(5),
+      #page-admin_editor table td:nth-child(5) {
+        display: none !important;
+      }
+      /* shrink answer buttons */
       #page-admin_editor table td button {
         padding: 6px 8px !important;
         font-size: 13px !important;
         min-width: 32px !important;
       }
 
-      /* FIX 3 — page-admin_benchmark: collapse form grid to single column */
+      /* ─── Benchmark: collapse form to 1 column ─── */
       #page-admin_benchmark .card > div,
       #page-admin_benchmark .card > div > div {
         grid-template-columns: 1fr !important;
@@ -410,7 +471,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.79</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.80</div>
     </div>
   </div>
 </div>
@@ -1243,7 +1304,7 @@
             <thead>
               <tr>
                 <th style="width:56px;">ข้อ</th>
-                <th style="width:100px;">หน้า PDF</th>
+                <th style="width:56px;">หน้า</th>
                 <th style="width:120px;">เฉลย</th>
                 <th style="width:60px;">ฟรี</th>
                 <th style="width:100px;">Tag</th>
