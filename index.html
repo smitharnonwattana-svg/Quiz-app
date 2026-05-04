@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="ExamAcademia">
   <link rel="apple-touch-icon" href="/Quiz-app/icon.svg">
   <meta name="theme-color" content="#3b82f6">
-  <!-- APP_VERSION: v46.06 -->
+  <!-- APP_VERSION: v46.07 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -749,7 +749,7 @@
       <div id="loginError" style="color:#dc2626;font-size:13px;min-height:20px;margin-bottom:16px;"></div>
 
       <!-- hidden input — focused always so keyboard works -->
-      <input id="loginPinInput" type="tel" maxlength="6"
+      <input id="loginPinInput" type="tel" maxlength="6" inputmode="none"
         style="position:fixed;top:-9999px;left:-9999px;opacity:0;"
         oninput="syncPinFromInput()"
         onkeydown="if(event.key==='Enter') doLogin()"
@@ -770,7 +770,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.06</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.07</div>
     </div>
   </div>
 </div>
@@ -2769,9 +2769,10 @@ const Auth = (() => {
     navigate('login');
     setTimeout(()=>{
       const inp = document.getElementById('loginPinInput');
-      if(inp){ inp.value=''; inp.focus(); }
+      if(inp) inp.value='';
       const err = document.getElementById('loginError');
       if(err) err.textContent='';
+      document.querySelectorAll('#page-login input').forEach(el => el.blur());
     }, 50);
   }
   function login(pin) {
@@ -2901,7 +2902,7 @@ function navigate(page, params={}){
   if(page !== 'login' && !Auth.isLoggedIn()){
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     const lel=document.getElementById('page-login');
-    if(lel){ lel.classList.add('active'); setTimeout(()=>document.getElementById('loginPinInput')?.focus(),100); }
+    if(lel){ lel.classList.add('active'); setTimeout(()=>document.querySelectorAll('#page-login input').forEach(el=>el.blur()),100); }
     return;
   }
 
@@ -7959,7 +7960,7 @@ if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   navigate('exam', { id: _pid });
 } else {
   navigate('login');
-  setTimeout(()=>document.getElementById('loginPinInput')?.focus(), 300);
+  setTimeout(()=>document.querySelectorAll('#page-login input').forEach(el=>el.blur()), 300);
 }
 
 
