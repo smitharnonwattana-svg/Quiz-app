@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.29 -->
+  <!-- APP_VERSION: v46.30 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.29</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.30</div>
     </div>
   </div>
 </div>
@@ -3500,7 +3500,20 @@ function initTake(id){
       processGamificationAfterSubmit(takerName);
     }
     if (takerName && !Auth.isTeacher()) {
-      updateBonusQuestProgress(takerName);
+      // G8-D: Quest Complete Notification
+      const _completedTiers = updateBonusQuestProgress(takerName);
+      if (_completedTiers && _completedTiers.length > 0) {
+        const _tierNames = {
+          easy: '🟢 Easy', medium: '🟡 Medium',
+          challenge: '🔴 Challenge'
+        };
+        setTimeout(() => {
+          _completedTiers.forEach(tier => {
+            const label = _tierNames[tier] || tier;
+            toast('🎯 ' + label + ' Quest สำเร็จ! กดรับรางวัลที่หน้า Rewards');
+          });
+        }, 3000);
+      }
     }
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
@@ -5071,7 +5084,20 @@ function initPractice(params){
       processGamificationAfterSubmit(_practiceUserId);
     }
     if (_practiceUserId && !Auth.isTeacher()) {
-      updateBonusQuestProgress(_practiceUserId);
+      // G8-D: Quest Complete Notification
+      const _completedTiers2 = updateBonusQuestProgress(_practiceUserId);
+      if (_completedTiers2 && _completedTiers2.length > 0) {
+        const _tierNames2 = {
+          easy: '🟢 Easy', medium: '🟡 Medium',
+          challenge: '🔴 Challenge'
+        };
+        setTimeout(() => {
+          _completedTiers2.forEach(tier => {
+            const label = _tierNames2[tier] || tier;
+            toast('🎯 ' + label + ' Quest สำเร็จ! กดรับรางวัลที่หน้า Rewards');
+          });
+        }, 2000);
+      }
     }
   }
 
@@ -8287,14 +8313,26 @@ function updateBonusQuestProgress(userId) {
       }
       return q;
     });
+    // G8-D: Quest Complete Notification
+    const newlyCompleted = [];
     if (changed) {
+      updated.forEach((q, i) => {
+        const was = quests[i];
+        if (!was.claimed &&
+            Number(q.progress) >= Number(q.target) &&
+            Number(was.progress) < Number(was.target)) {
+          newlyCompleted.push(q.tier);
+        }
+      });
       _saveGamificationUser(userId, {
         ...state,
         bonusQuests: updated
       });
     }
+    return newlyCompleted;
   } catch(e) {
     console.warn('updateBonusQuestProgress error', e);
+    return [];
   }
 }
 
@@ -9317,7 +9355,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.29';
+  const CURRENT_VERSION = 'v46.30';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
