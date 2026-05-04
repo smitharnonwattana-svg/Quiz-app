@@ -45,7 +45,8 @@ exports.lineNotify = onRequest(
     }
 
     const { type, name, examTitle, score, total, usedSeconds,
-            subject, count, correct, answered, remaining, finished } = req.body || {};
+            subject, count, correct, answered, remaining, finished,
+            rewardName } = req.body || {};
     if (!type || !name || !examTitle) {
       res.status(400).json({ error: 'Missing fields' });
       return;
@@ -68,6 +69,11 @@ exports.lineNotify = onRequest(
       const icon = finished ? '✅' : '📝';
       const label = finished ? 'แก้จุดอ่อนเสร็จสิ้น' : 'ออกจากการแก้จุดอ่อน';
       message = `${icon} ${label}\n👤 ${name}\n📚 วิชา: ${subj}\n📋 ${examTitle}\n✅ แก้ได้ ${correct || 0}/${answered || 0} ข้อ\n⚠️ เหลือจุดอ่อน ${remaining ?? '?'} ข้อ`;
+    } else if (type === 'reward_request') {
+      message = '📬 ' + (name || '') + ' ขอรับรางวัล!\n'
+        + '🏆 ' + (examTitle || '') + '\n'
+        + '🎁 ' + (rewardName || '') + '\n'
+        + 'กรุณาเตรียมรางวัลให้น้องด้วยครับ 🙏';
     } else {
       res.status(400).json({ error: 'Invalid type' });
       return;
