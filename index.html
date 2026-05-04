@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="ExamAcademia">
   <link rel="apple-touch-icon" href="/Quiz-app/icon.svg">
   <meta name="theme-color" content="#3b82f6">
-  <!-- APP_VERSION: v46.00 -->
+  <!-- APP_VERSION: v46.01 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -770,7 +770,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.00</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.01</div>
     </div>
   </div>
 </div>
@@ -1363,6 +1363,15 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <h1 class="h1">🏆 Rewards</h1>
       <button class="btn" onclick="navigate('home')">กลับ</button>
+    </div>
+    <div id="rewardsTierModal" style="display:none;position:fixed;inset:0;z-index:998;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:20px;padding:24px;max-width:300px;width:100%;text-align:center;">
+        <div id="rewardsTierEmoji" style="font-size:40px;margin-bottom:8px;"></div>
+        <div id="rewardsTierLabel" style="font-weight:800;font-size:18px;margin-bottom:4px;"></div>
+        <div id="rewardsTierPts" style="font-size:13px;color:#6b7280;margin-bottom:16px;"></div>
+        <div id="rewardsTierReward" style="background:#f9fafb;border-radius:12px;padding:12px;font-size:14px;font-weight:700;color:#374151;margin-bottom:16px;"></div>
+        <button id="rewardsTierClose" class="btn" style="width:100%;">ปิด</button>
+      </div>
     </div>
     <div id="rewardsHelpModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:20px;">
       <div style="background:#fff;border-radius:20px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;">
@@ -5297,6 +5306,18 @@ function rebuildStreakFromAttempts(userId) {
 }
 
 // Gamification G4: Rewards Page
+// Tier Reward Popup — Rewards Page
+function showTierReward(emoji, label, ptsText, rewardName) {
+  const m = document.getElementById('rewardsTierModal');
+  if (!m) return;
+  document.getElementById('rewardsTierEmoji').textContent = emoji;
+  document.getElementById('rewardsTierLabel').textContent = label;
+  document.getElementById('rewardsTierPts').textContent = ptsText;
+  document.getElementById('rewardsTierReward').textContent =
+    rewardName ? '🎁 ' + rewardName : '— ยังไม่ได้ตั้งรางวัล';
+  m.style.display = 'flex';
+}
+
 function initRewards() {
   const isTeacher = Auth.isTeacher();
   const bodyEl = document.getElementById('rewardsBody');
@@ -5314,6 +5335,20 @@ function initRewards() {
   if (_helpModal) {
     _helpModal.addEventListener('click', (e) => {
       if (e.target === _helpModal) _helpModal.style.display = 'none';
+    });
+  }
+
+  // Tier Reward Popup — Rewards Page
+  const _tierModal = document.getElementById('rewardsTierModal');
+  const _tierClose = document.getElementById('rewardsTierClose');
+  if (_tierClose) {
+    _tierClose.addEventListener('click', () => {
+      if (_tierModal) _tierModal.style.display = 'none';
+    });
+  }
+  if (_tierModal) {
+    _tierModal.addEventListener('click', (e) => {
+      if (e.target === _tierModal) _tierModal.style.display = 'none';
     });
   }
 
@@ -5429,8 +5464,10 @@ function renderRewardsFor(userId) {
     const fontWeight = reached ? '800' : '500';
     const ring = isCurrent ? 'border:3px solid #f59e0b;box-shadow:0 0 0 2px #fef3c7;' : 'border:2px solid #e5e7eb;';
     const bg = reached ? '#fff' : '#f3f4f6';
+    const ptsText = t.pts === 0 ? 'จุดเริ่มต้น' : (t.pts + ' pt');
+    const rewardForTier = esc(rewards[t.key] || '');
     return `
-      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;">
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;cursor:pointer;" onclick="showTierReward('${t.emoji}','${esc(t.label)}','${ptsText}','${rewardForTier}')">
         <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${t.emoji}</div>
         <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${t.pts}</div>
         <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
@@ -5550,8 +5587,11 @@ function renderRewardsFor(userId) {
     const ring = isCurrent ? 'border:3px solid #f59e0b;box-shadow:0 0 0 2px #fef3c7;' : 'border:2px solid #e5e7eb;';
     const bg = reached ? '#fff' : '#f3f4f6';
     const display = (m.key === 'start') ? '🏁' : m.emoji;
+    const stOnclick = (m.key === 'start')
+      ? `showTierReward('🏁','จุดเริ่มต้น','0 stamps','')`
+      : `showTierReward('${m.emoji}','${esc(m.label)}','${m.threshold} stamps','${esc(rewards[m.key]||'')}')`;
     return `
-      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;">
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;cursor:pointer;" onclick="${stOnclick}">
         <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${display}</div>
         <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${m.threshold}</div>
         <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
