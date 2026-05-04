@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.87 -->
+  <!-- APP_VERSION: v45.88 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -74,6 +74,7 @@
     }
 
     /* ══ MOBILE: PDF 70% top, controls 30% bottom ══ */
+    /* Take page mobile redesign — controls zone */
     @media (max-width: 900px) {
       .takeRoot{height:100vh;overflow:hidden;}
       .takeGrid{height:100%;display:flex;flex-direction:column;}
@@ -98,28 +99,59 @@
         border-top:1px solid var(--border);
       }
 
-      .takeRight .stickyBar{display:none !important;}
-      .takeNumsWrap { display:none !important; }
-      .takeRight > div > .muted { display:none !important; }
-
-      /* content wrapper — flex row: ก ข ค ง ซ้าย | nav ขวา */
-      .takeRight > div {
-        padding:8px 10px !important;
-        gap:8px !important;
-        display:flex !important;
-        flex-direction:row !important;
-        align-items:stretch !important;
-        height:100%;
-        box-sizing:border-box;
+      /* ROW 1 — Header bar (stickyBar) */
+      .takeRight .stickyBar {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 6px 10px !important;
+        border-bottom: 1px solid var(--border) !important;
+        flex-shrink: 0 !important;
+        gap: 8px !important;
+        flex-wrap: nowrap !important;
+        min-height: 44px !important;
+      }
+      .takeRight .stickyBar > div:first-child {
+        font-size: 12px !important;
+        line-height: 1.3 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1px !important;
+      }
+      #takeExitBtn {
+        padding: 5px 8px !important;
+        font-size: 12px !important;
+      }
+      #takeSubmitBtn {
+        padding: 5px 8px !important;
+        font-size: 12px !important;
       }
 
-      /* ก ข ค ง — แนวตั้ง 1 คอลัมน์ ซ้ายมือ */
+      /* hide เลือกคำตอบ label */
+      .takeRight > div > .muted { display:none !important; }
+
+      /* ROW 2 + ROW 3 wrapper — choices+nav row, then number bar */
+      .takeRight > div {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        padding: 6px 8px !important;
+        gap: 6px !important;
+        align-content: flex-start !important;
+        height: calc(30vh - 44px) !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+      }
+
+      /* ROW 2 left — ก ข ค ง 2x2 grid */
       #takeChoices{
-        display:flex !important;
-        flex-direction:column !important;
-        gap:5px !important;
-        flex:1;
-        min-width:0;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        grid-template-rows: 1fr 1fr !important;
+        gap: 5px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+        align-self: stretch !important;
       }
       .choice{
         padding:0 8px !important;
@@ -127,33 +159,59 @@
         font-weight:900 !important;
         border-radius:12px !important;
         min-height:0 !important;
-        flex:1;
         align-items:center;
         justify-content:flex-start;
         gap:10px;
       }
 
-      /* nav column ขวา — prev/unsure/next แนวตั้ง */
+      /* ROW 2 right — nav column */
       .takeMobileNav{
-        display:flex !important;
-        flex-direction:column !important;
-        gap:5px;
-        width:80px;
-        flex-shrink:0;
+        display: flex !important;
+        flex-direction: column !important;
+        width: 70px !important;
+        flex-shrink: 0 !important;
+        gap: 4px !important;
+        align-self: stretch !important;
       }
       #takePrevBtn,#takeUnsureBtn,#takeNextBtn{
-        flex:1;
+        flex:1 !important;
         padding:0 !important;
-        font-size:12px !important;
+        font-size:11px !important;
         font-weight:700 !important;
         border-radius:10px !important;
         text-align:center;
-        display:flex;
-        align-items:center;
-        justify-content:center;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
         min-height:0;
       }
       #takeUnsureBtn{ font-size:11px !important; }
+
+      /* ROW 3 — number bar, horizontal scroll */
+      .takeNumsWrap {
+        display: block !important;
+        width: 100% !important;
+        flex-shrink: 0 !important;
+        overflow: hidden !important;
+      }
+      #takeNums {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 4px !important;
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        padding-bottom: 2px !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .numBtn {
+        flex-shrink: 0 !important;
+        width: 30px !important;
+        height: 30px !important;
+        padding: 0 !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+      }
 
       .pdfOverlay{position:fixed;inset:0;z-index:200;}
       #reviewPdfViewer{min-height:300px;}
@@ -611,6 +669,19 @@
         padding: 4px !important;
         min-width: 36px !important;
       }
+
+      /* Fix 1 — หน้าเริ่มทำ */
+      #examDetailWrap .card > div:first-child {
+        flex-wrap: wrap !important;
+      }
+      #examDetailWrap #detailTakerName {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+      }
+      #examDetailWrap #examStartBtn {
+        width: 100% !important;
+        justify-content: center !important;
+      }
     }
   </style>
   <!-- PDF.js from CDN -->
@@ -676,7 +747,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.87</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.88</div>
     </div>
   </div>
 </div>
