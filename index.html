@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.77 -->
+  <!-- APP_VERSION: v45.78 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -285,6 +285,30 @@
     .freeBtn{min-width:38px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;transition:all .12s;padding:0 8px;}
     .freeBtn:hover{border-color:#f59e0b;background:#fffbeb;}
     .freeBtn.active{background:#f59e0b;border-color:#f59e0b;color:#fff;}
+
+    /* Mobile Admin UI — v45.77 */
+    @media (max-width: 600px) {
+      /* FIX 1 — page-admin_exams: hide less important columns, shrink table */
+      #page-admin_exams .tableWrap { overflow-x: auto; }
+      #page-admin_exams table { font-size: 12px; }
+      #page-admin_exams table th:nth-child(3),
+      #page-admin_exams table td:nth-child(3),
+      #page-admin_exams table th:nth-child(6),
+      #page-admin_exams table td:nth-child(6),
+      #page-admin_exams table th:nth-child(7),
+      #page-admin_exams table td:nth-child(7) { display: none; }
+
+      /* FIX 2 — page-admin_editor: collapse grid rows to single column */
+      #page-admin_editor .card > div > div:first-child,
+      #page-admin_editor .card > div > div:nth-child(2) {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* FIX 3 — page-admin_benchmark: collapse form grid to single column */
+      #page-admin_benchmark .card div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+      }
+    }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -349,7 +373,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.77</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.78</div>
     </div>
   </div>
 </div>
