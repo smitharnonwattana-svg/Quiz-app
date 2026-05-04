@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.83 -->
+  <!-- APP_VERSION: v45.84 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -604,7 +604,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.83</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.84</div>
     </div>
   </div>
 </div>
@@ -4939,6 +4939,34 @@ function initAdminExams(){
     const list=subjectFilter?all.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter):all;
     const fmtDate=(ts)=>{if(!ts) return '-';try{return new Date(ts).toLocaleString('th-TH');}catch{return '-';}};
     const tb=document.getElementById('adminTbody');tb.innerHTML='';
+    // Mobile card layout — renderAdmin()
+    const isMobile = window.innerWidth < 600;
+    if (isMobile) {
+      list.forEach((e) => {
+        const card = document.createElement('div');
+        card.innerHTML = `
+          <div style="border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:10px;background:#fff;">
+            <div style="font-weight:800;font-size:14px;color:#111;margin-bottom:6px;word-break:break-word;">
+              ${esc(e.title)}
+            </div>
+            <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">
+              ${esc(e.subject||'ไม่ระบุ')} · ${e.questionCount} ข้อ
+            </div>
+            <div style="margin-bottom:8px;">
+              <select class="statusSel" data-status="${e.id}" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;font-size:13px;">
+                <option value="published" ${e.published?'selected':''}>เผยแพร่</option>
+                <option value="hidden" ${!e.published?'selected':''}>ซ่อน</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn" data-edit="${e.id}" style="flex:1;text-align:center;">เปิด Editor</button>
+              <button class="btn" data-del="${e.id}" style="border-color:#ef4444;color:#b91c1c;padding:8px 16px;">ลบ</button>
+            </div>
+          </div>
+        `;
+        tb.appendChild(card);
+      });
+    } else {
     list.forEach((e,idx)=>{
       const tr=document.createElement('tr');
       const hasPdf=!!(e.pdfUrl);
@@ -4955,6 +4983,7 @@ function initAdminExams(){
       `;
       tb.appendChild(tr);
     });
+    }
     tb.querySelectorAll('[data-copy]').forEach(btn=>{
       btn.addEventListener('click',()=>{
         const url=btn.getAttribute('data-copy');
