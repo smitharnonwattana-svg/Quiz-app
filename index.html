@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.16 -->
+  <!-- APP_VERSION: v46.17 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -719,46 +719,46 @@
         max-width: 800px !important;
       }
     }
-    /* Rewards 3-column layout on tablet */
+    /* Rewards 2-col + quest full-width layout on tablet */
     @media (min-width: 768px) {
       #rewardsContent {
         display: grid !important;
-        grid-template-columns: 1fr 1fr 1fr !important;
-        grid-template-rows: auto !important;
+        grid-template-columns: 1fr 1fr !important;
+        grid-template-rows: auto auto !important;
         gap: 14px !important;
         align-items: start !important;
       }
 
-      /* Banner divs (🎉 newly reached) — full width above columns */
-      #rewardsContent > div[style*="background:#fffbeb"],
-      #rewardsContent > div[style*="background:#f0fdf4"] {
-        grid-column: 1 / -1 !important;
-      }
-
-      /* Trophy Road — column 1 */
+      /* Trophy Road — row 1 col 1 */
       #rewardsContent > div:nth-child(1) {
         grid-column: 1 !important;
-        grid-row: auto !important;
+        grid-row: 1 !important;
         align-self: start !important;
         height: auto !important;
       }
 
-      /* Daily Quest — column 2 */
+      /* Quest section — row 2 full width */
       #rewardsContent > div:nth-child(2) {
-        grid-column: 2 !important;
-        grid-row: auto !important;
+        grid-column: 1 / -1 !important;
+        grid-row: 2 !important;
       }
 
-      /* Stamp Road — column 3 */
+      /* Stamp Road — row 1 col 2 */
       #rewardsContent > div:nth-child(3) {
-        grid-column: 3 !important;
-        grid-row: auto !important;
+        grid-column: 2 !important;
+        grid-row: 1 !important;
         overflow: visible !important;
       }
 
       /* Prevent stamp node text/badges from being clipped by scroll container */
       #rewardsContent > div:nth-child(3) div[style*="overflow-x:auto"] {
         overflow: visible !important;
+      }
+
+      /* Banner — full width above all */
+      #rewardsContent > div[style*="background:#fffbeb"],
+      #rewardsContent > div[style*="background:#f0fdf4"] {
+        grid-column: 1 / -1 !important;
       }
     }
   </style>
@@ -825,7 +825,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.16</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.17</div>
     </div>
   </div>
 </div>
@@ -5571,49 +5571,51 @@ function renderRewardsFor(userId) {
     </div>
   `;
 
-  // Section 2: Daily Quest
-  let questHtml = '';
-  try {
-    const qs = getQuestState(userId);
-    const quest = qs && qs.quest;
-    if (!quest) {
-      questHtml = `
-        <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
-          <div style="font-weight:800;font-size:15px;">🎯 Daily Quest</div>
-          <div class="muted" style="margin-top:8px;font-size:13px;">ยังไม่มี Quest วันนี้</div>
-        </div>
-      `;
+  // Section 2: Daily Quest — G8-C: Bonus Quest UI
+  const mainQS = getQuestState(userId);
+  const bonusQS = getBonusQuestStates(userId);
+
+  function renderQuestCard(qs, tier) {
+    if (!qs || !qs.quest) return '';
+    const q = qs.quest;
+    const pct = Math.max(0, Math.min(100,
+      Math.round((q.progress / Math.max(1, q.target)) * 100)));
+    const tierLabel = tier === 'main' ? '🎯 Main'
+      : tier === 'easy' ? '🟢 Easy'
+      : tier === 'medium' ? '🟡 Medium'
+      : '🔴 Challenge';
+    const tierColor = tier === 'main' ? '#2563eb'
+      : tier === 'easy' ? '#16a34a'
+      : tier === 'medium' ? '#d97706'
+      : '#dc2626';
+    let actionHtml = '';
+    if (q.claimed) {
+      actionHtml = '<div style="margin-top:8px;font-size:11px;color:#16a34a;font-weight:700;">✅ รับแล้ว</div>';
+    } else if (qs.canClaim) {
+      actionHtml = '<button class="btn btnPrimary" data-claim-quest="' + tier + '" style="margin-top:8px;width:100%;font-size:12px;padding:6px;">รับ +' + q.reward + 'pt</button>';
     } else {
-      const qProg = Number(quest.progress) || 0;
-      const qTarg = Math.max(1, Number(quest.target) || 1);
-      const qPct = Math.max(0, Math.min(100, Math.round((qProg / qTarg) * 100)));
-      let actionHtml = '';
-      if (quest.claimed) {
-        actionHtml = `<div style="margin-top:8px;color:#16a34a;font-weight:700;font-size:13px;">✅ รับรางวัลแล้ว</div>`;
-      } else if (qs.canClaim) {
-        actionHtml = `<button type="button" class="btn btnPrimary" id="rewardsClaimBtn" style="margin-top:10px;">รับ +${Number(quest.reward)||0}pt</button>`;
-      } else {
-        actionHtml = `<div class="muted" style="margin-top:8px;font-size:12px;">ทำต่ออีก ${Math.max(0, qTarg - qProg)} เพื่อรับรางวัล</div>`;
-      }
-      questHtml = `
-        <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-            <div style="font-weight:800;font-size:15px;">🎯 Daily Quest</div>
-            <div class="muted" style="font-size:12px;">รางวัล: ${Number(quest.reward)||0}pt</div>
-          </div>
-          <div style="margin-top:6px;font-size:13px;color:#374151;">${esc(quest.description||'')}</div>
-          <div style="margin-top:10px;height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
-            <div style="height:100%;width:${qPct}%;background:linear-gradient(90deg,#3b82f6,#16a34a);transition:width .3s;"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:#6b7280;">
-            <span>${qProg}/${qTarg}</span>
-            <span>${qPct}%</span>
-          </div>
-          ${actionHtml}
-        </div>
-      `;
+      actionHtml = '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">อีก ' + Math.max(0, q.target - q.progress) + ' เพื่อรับรางวัล</div>';
     }
-  } catch (e) { questHtml = ''; }
+    return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;flex:1;min-width:0;display:flex;flex-direction:column;">'
+      + '<div style="font-size:11px;font-weight:700;color:' + tierColor + ';margin-bottom:4px;">' + tierLabel + '</div>'
+      + '<div style="font-size:12px;color:#374151;flex:1;line-height:1.4;margin-bottom:8px;">' + esc(q.description||'') + '</div>'
+      + '<div style="height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin-bottom:4px;">'
+      + '<div style="height:100%;width:' + pct + '%;background:' + tierColor + ';transition:width .3s;"></div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:#6b7280;">' + q.progress + '/' + q.target + ' (' + pct + '%)</div>'
+      + actionHtml
+      + '</div>';
+  }
+
+  const bonusCards = bonusQS.map(qs => renderQuestCard(qs, qs.quest ? qs.quest.tier : '')).join('');
+
+  const questHtml = '<div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">'
+    + '<div style="font-weight:800;font-size:15px;margin-bottom:12px;">🎯 Daily Quests</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    + renderQuestCard(mainQS, 'main')
+    + bonusCards
+    + '</div>'
+    + '</div>';
 
   // Trophy Road UI — G6 (Section 3: Stamp Road)
   const stamps = Number(state.stamps) || 0;
@@ -5744,19 +5746,31 @@ function renderRewardsFor(userId) {
     });
   });
 
-  const claimBtn = host.querySelector('#rewardsClaimBtn');
-  if (claimBtn) {
-    claimBtn.addEventListener('click', () => {
+  // Main quest claim
+  const mainClaimBtn = host.querySelector('[data-claim-quest="main"]');
+  if (mainClaimBtn) {
+    mainClaimBtn.addEventListener('click', () => {
       const result = claimQuestReward(userId);
       if (result && result.ok) {
-        toast('🎉 รับ +' + (result.pointsAwarded || 0) + 'pt แล้ว!');
+        toast('🎉 รับ +' + result.pointsAwarded + 'pt แล้ว!');
         renderRewardsFor(userId);
-      } else {
-        const reason = (result && result.reason) || 'unknown';
-        toast('⚠️ รับรางวัลไม่สำเร็จ (' + reason + ')');
       }
     });
   }
+
+  // Bonus quest claims
+  ['easy', 'medium', 'challenge'].forEach(tier => {
+    const btn = host.querySelector('[data-claim-quest="' + tier + '"]');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const result = claimBonusQuestReward(userId, tier);
+        if (result && result.ok) {
+          toast('🎉 รับ +' + result.pointsAwarded + 'pt แล้ว!');
+          renderRewardsFor(userId);
+        }
+      });
+    }
+  });
 }
 
 function initAdminMembers(){
@@ -9243,7 +9257,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.16';
+  const CURRENT_VERSION = 'v46.17';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
