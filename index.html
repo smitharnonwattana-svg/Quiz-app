@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.81 -->
+  <!-- APP_VERSION: v45.82 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -441,6 +441,94 @@
         text-align: center !important;
         box-sizing: border-box !important;
       }
+
+      /* รายการข้อสอบ v2 — 3-row card */
+      /* card wrapper */
+      #page-admin_exams table tbody tr {
+        display: grid !important;
+        grid-template-columns: 1fr auto !important;
+        grid-template-rows: auto auto auto !important;
+        gap: 6px 8px !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 12px !important;
+        padding: 12px !important;
+        margin-bottom: 10px !important;
+        background: #fff !important;
+      }
+
+      /* all td default: hide */
+      #page-admin_exams table tbody td {
+        display: none !important;
+      }
+
+      /* col 1: ชื่อชุด — row 1 left, bold */
+      #page-admin_exams table tbody td:nth-child(1) {
+        display: flex !important;
+        align-items: center !important;
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        font-weight: 800 !important;
+        font-size: 13px !important;
+        color: #111 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+
+      /* col 4: dropdown สถานะ — row 1 right */
+      #page-admin_exams table tbody td:nth-child(4) {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        padding: 0 !important;
+      }
+
+      /* row 2: วิชา (left) + ข้อ (right) */
+      #page-admin_exams table tbody td:nth-child(2) {
+        display: flex !important;
+        align-items: center !important;
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        font-size: 12px !important;
+        color: #6b7280 !important;
+        padding: 0 !important;
+      }
+      #page-admin_exams table tbody td:nth-child(5) {
+        display: flex !important;
+        align-items: center !important;
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+        font-size: 12px !important;
+        color: #6b7280 !important;
+        padding: 0 !important;
+        justify-content: flex-end !important;
+      }
+
+      /* col 8: เปิด Editor — row 3 left */
+      #page-admin_exams table tbody td:nth-child(8) {
+        display: flex !important;
+        align-items: center !important;
+        grid-column: 1 !important;
+        grid-row: 3 !important;
+        padding: 0 !important;
+      }
+      #page-admin_exams table tbody td:nth-child(8) .btn,
+      #page-admin_exams table tbody td:nth-child(8) button {
+        width: 100% !important;
+        justify-content: center !important;
+      }
+
+      /* col 9: ลบ — row 3 right */
+      #page-admin_exams table tbody td:nth-child(9) {
+        display: flex !important;
+        align-items: center !important;
+        grid-column: 2 !important;
+        grid-row: 3 !important;
+        padding: 0 !important;
+        justify-content: flex-end !important;
+      }
     }
   </style>
   <!-- PDF.js from CDN -->
@@ -506,7 +594,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.81</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.82</div>
     </div>
   </div>
 </div>
