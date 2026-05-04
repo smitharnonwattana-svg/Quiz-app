@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.26 -->
+  <!-- APP_VERSION: v46.27 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.26</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.27</div>
     </div>
   </div>
 </div>
@@ -5954,35 +5954,26 @@ function initAdminMembers(){
       const testQuestBtn = statsBox.querySelector('[data-gtest-quest="' + idx + '"]');
       if (testQuestBtn) {
         testQuestBtn.onclick = () => {
-          try {
-            alert('clicked: ' + m.name);
-            const state = _getGamificationUser(m.name);
-            alert('state.bonusQuests: ' + JSON.stringify(state.bonusQuests));
-            const todayKey = getDateKey(new Date());
-            let quests = state.bonusQuests || [];
-            if (quests.length === 0 || quests[0].date !== todayKey) {
-              quests = _pickRandomBonusQuests(m.name);
-            }
-            alert('quests after pick: ' + JSON.stringify(quests));
-            const updatedBonus = quests.map(q => ({
-              ...q, progress: Number(q.target)||1,
-              date: todayKey, claimed: false
-            }));
-            const mainQuest = state.dailyQuest;
-            const updatedMain = mainQuest ? {
-              ...mainQuest, progress: Number(mainQuest.target)||1,
-              date: todayKey, claimed: false
-            } : null;
-            alert('updatedBonus[0].progress: ' + updatedBonus[0].progress + ' target: ' + updatedBonus[0].target);
-            _saveGamificationUser(m.name, {
-              ...state, bonusQuests: updatedBonus, dailyQuest: updatedMain
-            });
-            alert('saved! bonusQuests: ' + updatedBonus.length);
-            toast('🧪 done');
-            renderMembers();
-          } catch(e) {
-            alert('ERROR: ' + e.message + '\n' + e.stack);
+          const state = _getGamificationUser(m.name);
+          const todayKey = getDateKey(new Date());
+          let quests = state.bonusQuests || [];
+          if (quests.length === 0 || quests[0].date !== todayKey) {
+            quests = _pickRandomBonusQuests(m.name);
           }
+          const updatedBonus = quests.map(q => ({
+            ...q, progress: Number(q.target)||1,
+            date: todayKey, claimed: false
+          }));
+          const mainQuest = state.dailyQuest;
+          const updatedMain = mainQuest ? {
+            ...mainQuest, progress: Number(mainQuest.target)||1,
+            date: todayKey, claimed: false
+          } : null;
+          _saveGamificationUser(m.name, {
+            ...state, bonusQuests: updatedBonus, dailyQuest: updatedMain
+          });
+          toast('🧪 Force complete quests ของ ' + m.name + ' แล้ว');
+          renderMembers();
         };
       }
       const resetQuestBtn = statsBox.querySelector('[data-greset-quest="' + idx + '"]');
@@ -8204,6 +8195,14 @@ function getBonusQuests(userId) {
   if (!userId) return [];
   const todayKey = getDateKey(new Date());
   const state = _getGamificationUser(userId);
+
+  // Preserve force-completed quests (admin test) — don't recalculate
+  const stored = state.bonusQuests || [];
+  if (stored.length === 3 && stored.every(q => q && q.date === todayKey)) {
+    const allComplete = stored.every(q => Number(q.progress) >= Number(q.target));
+    if (allComplete) return stored;
+  }
+
   let quests = Array.isArray(state.bonusQuests) ? state.bonusQuests.slice() : [];
 
   const valid = quests.length === 3 && quests.every(q => q && q.date === todayKey);
@@ -9307,7 +9306,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.26';
+  const CURRENT_VERSION = 'v46.27';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
