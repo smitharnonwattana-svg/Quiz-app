@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="ExamAcademia">
   <link rel="apple-touch-icon" href="/Quiz-app/icon.svg">
   <meta name="theme-color" content="#3b82f6">
-  <!-- APP_VERSION: v46.09 -->
+  <!-- APP_VERSION: v46.10 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -715,6 +715,28 @@
         max-width: 800px !important;
       }
     }
+    /* Rewards 2-column layout on tablet */
+    @media (min-width: 768px) {
+      #rewardsContent {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        grid-template-rows: auto auto !important;
+        gap: 14px !important;
+        align-items: start !important;
+      }
+      #rewardsContent > div:nth-child(1) {
+        grid-column: 1 !important;
+        grid-row: 1 / 3 !important;
+      }
+      #rewardsContent > div:nth-child(2) {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+      }
+      #rewardsContent > div:nth-child(3) {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+      }
+    }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -779,7 +801,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.09</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.10</div>
     </div>
   </div>
 </div>
