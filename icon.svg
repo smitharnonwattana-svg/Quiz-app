@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 680 680"
+     xmlns="http://www.w3.org/2000/svg">
+<rect x="40" y="40" width="600" height="600" rx="130" fill="#3b82f6"/>
+<g opacity="0.3">
+  <line x1="560" y1="120" x2="580" y2="80" stroke="#fef08a" stroke-width="8" stroke-linecap="round"/>
+  <line x1="580" y1="140" x2="620" y2="130" stroke="#fef08a" stroke-width="8" stroke-linecap="round"/>
+  <line x1="570" y1="160" x2="615" y2="165" stroke="#fef08a" stroke-width="8" stroke-linecap="round"/>
+</g>
+<rect x="160" y="190" width="360" height="300" rx="20" fill="#ffffff"/>
+<rect x="320" y="190" width="12" height="300" fill="#e5e7eb"/>
+<rect x="185" y="240" width="110" height="12" rx="6" fill="#bfdbfe"/>
+<rect x="185" y="268" width="90" height="12" rx="6" fill="#bfdbfe"/>
+<rect x="185" y="296" width="100" height="12" rx="6" fill="#bfdbfe"/>
+<rect x="185" y="324" width="80" height="12" rx="6" fill="#bfdbfe"/>
+<rect x="185" y="352" width="95" height="12" rx="6" fill="#bfdbfe"/>
+<circle cx="430" cy="330" r="70" fill="#fef9c3"/>
+<polygon points="430,270 444,308 484,308 452,330 464,370 430,347 396,370 408,330 376,308 416,308" fill="#f59e0b"/>
+<path d="M412 330 L425 343 L452 316" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+<g transform="rotate(-35, 200, 160)">
+  <rect x="175" y="80" width="30" height="120" rx="4" fill="#fbbf24"/>
+  <polygon points="175,200 205,200 190,230" fill="#f97316"/>
+  <rect x="175" y="80" width="30" height="20" rx="4" fill="#9ca3af"/>
+  <rect x="178" y="95" width="4" height="90" rx="2" fill="#fde68a"/>
+</g>
+<circle cx="490" cy="185" r="10" fill="#fef08a"/>
+<circle cx="510" cy="215" r="6" fill="#fef08a"/>
+<circle cx="470" cy="200" r="7" fill="#fef08a"/>
+<circle cx="165" cy="480" r="8" fill="#fde68a" opacity="0.7"/>
+<circle cx="510" cy="470" r="6" fill="#fde68a" opacity="0.7"/>
+<rect x="140" y="515" width="400" height="70" rx="20" fill="#1d4ed8"/>
+<text x="340" y="558" text-anchor="middle"
+      font-family="system-ui,sans-serif"
+      font-size="28" font-weight="700" fill="#ffffff">My Exam Academia</text>
+</svg>

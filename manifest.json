@@ -1,0 +1,19 @@
+{
+  "name": "My Exam Academia",
+  "short_name": "ExamAcademia",
+  "description": "ระบบข้อสอบออนไลน์สำหรับนักเรียน",
+  "start_url": "/Quiz-app/",
+  "scope": "/Quiz-app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/Quiz-app/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
