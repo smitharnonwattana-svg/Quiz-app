@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.14 -->
+  <!-- APP_VERSION: v46.15 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -825,7 +825,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.14</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.15</div>
     </div>
   </div>
 </div>
@@ -7681,7 +7681,8 @@ const _GAMIFICATION_DEFAULT = () => ({
   pendingTiers: [],
   lastPointDate: '',
   lastStampDate: '',
-  dailyQuest: null
+  dailyQuest: null,
+  bonusQuests: []
 });
 
 function _getGamificationUser(userId) {
@@ -7700,7 +7701,8 @@ function _getGamificationUser(userId) {
       pendingTiers: Array.isArray(rec.pendingTiers) ? rec.pendingTiers.slice() : def.pendingTiers,
       lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate,
       lastStampDate: typeof rec.lastStampDate === 'string' ? rec.lastStampDate : def.lastStampDate,
-      dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest
+      dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest,
+      bonusQuests: Array.isArray(rec.bonusQuests) ? rec.bonusQuests.slice() : def.bonusQuests
     };
   } catch { return _GAMIFICATION_DEFAULT(); }
 }
@@ -7717,7 +7719,8 @@ function _saveGamificationUser(userId, data) {
     pendingTiers: Array.isArray(data.pendingTiers) ? data.pendingTiers.slice() : [],
     lastPointDate: typeof data.lastPointDate === 'string' ? data.lastPointDate : '',
     lastStampDate: typeof data.lastStampDate === 'string' ? data.lastStampDate : '',
-    dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null
+    dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null,
+    bonusQuests: Array.isArray(data.bonusQuests) ? data.bonusQuests.slice() : []
   };
   Store.save(s);
 }
@@ -7964,6 +7967,227 @@ function getQuestState(userId) {
   const isComplete = (Number(quest.progress) || 0) >= (Number(quest.target) || 0);
   const canClaim = isComplete && !quest.claimed;
   return { quest, isComplete, canClaim };
+}
+
+// ===================== GAMIFICATION G8: Bonus Quest Engine =====================
+// Pure additive. Does not touch G2 dailyQuest. 3 bonus quests/day (easy/medium/challenge).
+
+const BONUS_QUEST_POOL = {
+  easy: [
+    { type:'non_focus_exam',  description:'ทำข้อสอบวิชาอื่น 1 ชุด',         target:1, reward:8  },
+    { type:'fix_2_weakness',  description:'แก้จุดอ่อน 2 ข้อ',                target:2, reward:8  },
+    { type:'morning_exam',    description:'ทำข้อสอบก่อนเที่ยววันนี้',       target:1, reward:8  },
+    { type:'evening_exam',    description:'ทำข้อสอบหลัง 18.00 น.',          target:1, reward:10 },
+    { type:'any_exam',        description:'ทำข้อสอบ 1 ชุดวันนี้',            target:1, reward:8  },
+    { type:'random_subject',  description:'ทำข้อสอบวิชาที่ไม่เคยทำวันนี้',  target:1, reward:8  },
+    { type:'fix_3_weakness',  description:'แก้จุดอ่อน 3 ข้อ',                target:3, reward:10 }
+  ],
+  medium: [
+    { type:'two_sets',        description:'ทำข้อสอบ 2 ชุดวันเดียว',          target:2, reward:12 },
+    { type:'fix_5_weakness',  description:'แก้จุดอ่อน 5 ข้อวันเดียว',        target:5, reward:12 },
+    { type:'both_focus',      description:'ทำครบทั้ง 2 วิชา focus',          target:2, reward:15 },
+    { type:'streak_5',        description:'ตอบถูก 5 ข้อติดกันในชุดเดียว',   target:1, reward:15 },
+    { type:'exam_plus_fix',   description:'ทำข้อสอบ + แก้จุดอ่อน 3 ข้อ',     target:1, reward:12 },
+    { type:'score_80',        description:'ทำคะแนนได้ ≥ 80% ในชุดใดก็ได้',  target:1, reward:12 },
+    { type:'fix_focus_all',   description:'แก้จุดอ่อนทุกวิชา focus อย่างน้อย 1 ข้อ', target:1, reward:12 }
+  ],
+  challenge: [
+    { type:'score_90',        description:'ทำคะแนนได้ ≥ 90%',                target:1, reward:18 },
+    { type:'three_sets',      description:'ทำข้อสอบ 3 ชุดวันเดียว',          target:3, reward:18 },
+    { type:'streak_10',       description:'ตอบถูก 10 ข้อติดกันในชุดเดียว',  target:1, reward:20 },
+    { type:'both_focus_85',   description:'Score ≥ 85% ทั้ง 2 วิชา focus',   target:2, reward:20 },
+    { type:'fix_10_weakness', description:'แก้จุดอ่อน 10 ข้อวันเดียว',       target:10, reward:18 },
+    { type:'two_sets_80',     description:'ทำข้อสอบ 2 ชุด + Score ≥ 80% ทั้งคู่', target:2, reward:20 }
+  ]
+};
+
+function _bonusQuestSeedHash(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function _pickRandomBonusQuests(userId) {
+  const today = getDateKey(new Date());
+  const tiers = ['easy', 'medium', 'challenge'];
+  const out = [];
+  tiers.forEach((tier, ti) => {
+    const pool = BONUS_QUEST_POOL[tier] || [];
+    if (pool.length === 0) return;
+    const seed = _bonusQuestSeedHash(String(userId) + '|' + today + '|' + tier + '|' + ti);
+    const idx = seed % pool.length;
+    const def = pool[idx];
+    out.push({
+      date: today,
+      tier,
+      type: def.type,
+      description: def.description,
+      target: Number(def.target) || 1,
+      progress: 0,
+      reward: Number(def.reward) || 0,
+      claimed: false
+    });
+  });
+  return out;
+}
+
+function _calcBonusQuestProgress(userId, quest, ctx) {
+  if (!userId || !quest || !ctx) return 0;
+  const focusAttempts = (ctx.focusAttempts || []).filter(a => a && a.mode !== 'weakness_practice');
+  const nonFocusAttempts = (ctx.nonFocusAttempts || []).filter(a => a && a.mode !== 'weakness_practice');
+  const allAttempts = focusAttempts.concat(nonFocusAttempts);
+  const resolvedToday = (ctx.weakness && Number(ctx.weakness.resolvedToday)) || 0;
+  const focusSubjects = ctx.focusSubjects || [];
+  const target = Number(quest.target) || 1;
+  const cap = (n) => Math.max(0, Math.min(target, n));
+
+  const getHour = (a) => {
+    const t = a && (a.submittedAt || a.startedAt);
+    if (!t) return null;
+    const d = (t instanceof Date) ? t : new Date(t);
+    if (isNaN(d.getTime())) return null;
+    return d.getHours();
+  };
+  const ratioOf = (a) => {
+    const total = Number(a && a.total) || 0;
+    const score = Number(a && a.score) || 0;
+    return total > 0 ? (score / total) : 0;
+  };
+  const longestStreakInAttempt = (a) => {
+    const arr = a && a.perQuestion;
+    if (!Array.isArray(arr) || arr.length === 0) return 0;
+    let best = 0, cur = 0;
+    arr.forEach(q => {
+      if (q && q.correct === true) { cur += 1; if (cur > best) best = cur; }
+      else { cur = 0; }
+    });
+    return best;
+  };
+
+  switch (quest.type) {
+    case 'non_focus_exam':  return cap(nonFocusAttempts.length);
+    case 'fix_2_weakness':
+    case 'fix_3_weakness':
+    case 'fix_5_weakness':
+    case 'fix_10_weakness': return cap(resolvedToday);
+    case 'morning_exam':    return cap(focusAttempts.filter(a => { const h = getHour(a); return h != null && h < 12; }).length);
+    case 'evening_exam':    return cap(focusAttempts.filter(a => { const h = getHour(a); return h != null && h >= 18; }).length);
+    case 'any_exam':        return cap(allAttempts.length);
+    case 'random_subject': {
+      const subjs = new Set(allAttempts.map(a => (a && a.examSubject) || '').filter(Boolean));
+      return cap(subjs.size);
+    }
+    case 'two_sets':        return cap(focusAttempts.length);
+    case 'three_sets':      return cap(focusAttempts.length);
+    case 'both_focus': {
+      const focusSet = new Set(focusSubjects);
+      const done = new Set();
+      focusAttempts.forEach(a => { const subj = (a && a.examSubject) || ''; if (focusSet.has(subj)) done.add(subj); });
+      return cap(done.size);
+    }
+    case 'streak_5':  return (allAttempts.some(a => longestStreakInAttempt(a) >= 5))  ? 1 : 0;
+    case 'streak_10': return (allAttempts.some(a => longestStreakInAttempt(a) >= 10)) ? 1 : 0;
+    case 'exam_plus_fix': return (focusAttempts.length >= 1 && resolvedToday >= 3) ? 1 : 0;
+    case 'score_80':  return (allAttempts.some(a => ratioOf(a) >= 0.80)) ? 1 : 0;
+    case 'score_90':  return (allAttempts.some(a => ratioOf(a) >= 0.90)) ? 1 : 0;
+    case 'fix_focus_all': {
+      if (!focusSubjects || focusSubjects.length === 0) return 0;
+      let actives = [];
+      try { actives = WeaknessTracker.getAllWeaknessesForUser(userId) || []; } catch { actives = []; }
+      const resolvedTodayBySubj = {};
+      actives.forEach(w => {
+        if (!w || w.status !== 'resolved' || !isToday(w.resolvedAt)) return;
+        const subj = w.subject || '';
+        resolvedTodayBySubj[subj] = (resolvedTodayBySubj[subj] || 0) + 1;
+      });
+      return focusSubjects.every(s => (resolvedTodayBySubj[s] || 0) >= 1) ? 1 : 0;
+    }
+    case 'both_focus_85': {
+      const focusSet = new Set(focusSubjects);
+      const bySubj = {};
+      focusAttempts.forEach(a => {
+        const subj = (a && a.examSubject) || '';
+        if (!focusSet.has(subj)) return;
+        const correct = Number(a && a.score) || 0;
+        const total   = Number(a && a.total) || 0;
+        if (total <= 0) return;
+        if (!bySubj[subj]) bySubj[subj] = { correct: 0, total: 0 };
+        bySubj[subj].correct += correct;
+        bySubj[subj].total   += total;
+      });
+      let count = 0;
+      Object.values(bySubj).forEach(v => {
+        const pct = v.total > 0 ? Math.round((v.correct / v.total) * 100) : 0;
+        if (pct >= 85) count += 1;
+      });
+      return cap(count);
+    }
+    case 'two_sets_80': return cap(focusAttempts.filter(a => ratioOf(a) >= 0.80).length);
+    default: return 0;
+  }
+}
+
+function getBonusQuests(userId) {
+  if (!userId) return [];
+  const todayKey = getDateKey(new Date());
+  const state = _getGamificationUser(userId);
+  let quests = Array.isArray(state.bonusQuests) ? state.bonusQuests.slice() : [];
+
+  const valid = quests.length === 3 && quests.every(q => q && q.date === todayKey);
+  if (!valid) {
+    quests = _pickRandomBonusQuests(userId);
+  }
+
+  let ctx = null;
+  try { ctx = getTodayContext(userId); } catch { ctx = null; }
+
+  let mutated = !valid;
+  quests = quests.map(q => {
+    const progress = _calcBonusQuestProgress(userId, q, ctx);
+    if (progress !== q.progress) {
+      mutated = true;
+      return { ...q, progress };
+    }
+    return q;
+  });
+
+  if (mutated) {
+    _saveGamificationUser(userId, { ...state, bonusQuests: quests });
+  }
+  return quests;
+}
+
+function claimBonusQuestReward(userId, tier) {
+  if (!userId) return { ok: false, reason: 'no_user' };
+  if (!tier) return { ok: false, reason: 'no_tier' };
+  const quests = getBonusQuests(userId);
+  const idx = quests.findIndex(q => q && q.tier === tier);
+  if (idx < 0) return { ok: false, reason: 'no_quest' };
+  const q = quests[idx];
+  if (q.claimed) return { ok: false, reason: 'already_claimed' };
+  if ((Number(q.progress) || 0) < (Number(q.target) || 0)) {
+    return { ok: false, reason: 'not_complete', progress: q.progress, target: q.target };
+  }
+
+  awardPoints(userId, q.reward, 'bonus_quest_' + tier);
+
+  const state = _getGamificationUser(userId);
+  const updated = (state.bonusQuests || []).map(qq => (qq && qq.tier === tier) ? { ...qq, claimed: true } : qq);
+  _saveGamificationUser(userId, { ...state, bonusQuests: updated });
+
+  return { ok: true, pointsAwarded: q.reward };
+}
+
+function getBonusQuestStates(userId) {
+  const quests = getBonusQuests(userId);
+  return quests.map(q => {
+    const isComplete = (Number(q.progress) || 0) >= (Number(q.target) || 0);
+    const canClaim = isComplete && !q.claimed;
+    return { quest: q, isComplete, canClaim };
+  });
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
@@ -8985,7 +9209,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.14';
+  const CURRENT_VERSION = 'v46.15';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
