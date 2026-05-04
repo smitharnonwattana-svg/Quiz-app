@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="ExamAcademia">
   <link rel="apple-touch-icon" href="/Quiz-app/icon.svg">
   <meta name="theme-color" content="#3b82f6">
-  <!-- APP_VERSION: v46.03 -->
+  <!-- APP_VERSION: v46.04 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -770,7 +770,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.03</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.04</div>
     </div>
   </div>
 </div>
@@ -5469,14 +5469,16 @@ function renderRewardsFor(userId) {
     const rewardForTier = esc(rewards[t.key] || '');
     const isPending = tierStatus.pending.includes(t.key);
     const isClaimed = tierStatus.claimed.includes(t.key);
-    const statusBadge = isClaimed ? '<div style="font-size:9px;color:#16a34a;font-weight:800;margin-top:1px;">✅</div>'
-      : isPending ? '<div style="font-size:9px;color:#d97706;font-weight:800;margin-top:1px;">🕐</div>'
-      : '<div style="height:13px;"></div>';
+    const badgeHtml = isClaimed
+      ? '<div style="font-size:10px;color:#16a34a;font-weight:700;margin-top:2px;">รับแล้ว</div>'
+      : isPending
+      ? '<div style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:2px;">รอรับ</div>'
+      : '<div style="height:16px;margin-top:2px;"></div>';
     return `
       <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;cursor:pointer;" onclick="showTierReward('${t.emoji}','${esc(t.label)}','${ptsText}','${rewardForTier}')">
         <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${t.emoji}</div>
         <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${t.pts}</div>
-        ${statusBadge}
+        ${badgeHtml}
         <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
         <div style="height:14px;font-size:10px;color:#6b7280;line-height:1;">${isCurrent ? 'คุณอยู่ที่นี่' : ''}</div>
       </div>
@@ -5599,14 +5601,16 @@ function renderRewardsFor(userId) {
       : `showTierReward('${m.emoji}','${esc(m.label)}','${m.threshold} stamps','${esc(rewards[m.key]||'')}')`;
     const stIsPending = tierStatus.pending.includes(m.key);
     const stIsClaimed = tierStatus.claimed.includes(m.key);
-    const stStatusBadge = stIsClaimed ? '<div style="font-size:9px;color:#16a34a;font-weight:800;margin-top:1px;">✅</div>'
-      : stIsPending ? '<div style="font-size:9px;color:#d97706;font-weight:800;margin-top:1px;">🕐</div>'
-      : '<div style="height:13px;"></div>';
+    const stBadgeHtml = stIsClaimed
+      ? '<div style="font-size:10px;color:#16a34a;font-weight:700;margin-top:2px;">รับแล้ว</div>'
+      : stIsPending
+      ? '<div style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:2px;">รอรับ</div>'
+      : '<div style="height:16px;margin-top:2px;"></div>';
     return `
       <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;cursor:pointer;" onclick="${stOnclick}">
         <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${display}</div>
         <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${m.threshold}</div>
-        ${stStatusBadge}
+        ${stBadgeHtml}
         <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
         <div style="height:14px;font-size:10px;color:#6b7280;line-height:1;">${isCurrent ? (stamps + ' stamps') : ''}</div>
       </div>
