@@ -16,7 +16,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.31 -->
+  <!-- APP_VERSION: v46.32 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -824,7 +824,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.31</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.32</div>
     </div>
   </div>
 </div>
@@ -3525,6 +3525,9 @@ function initTake(id){
         }, 3000);
       }
     }
+    if (takerName && !Auth.isTeacher()) {
+      syncDailySummary(takerName); // F2: Daily Summary Firestore Sync
+    }
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
     lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
@@ -5108,6 +5111,9 @@ function initPractice(params){
           });
         }, 2000);
       }
+    }
+    if (_practiceUserId && !Auth.isTeacher()) {
+      syncDailySummary(_practiceUserId); // F2: Daily Summary Firestore Sync
     }
   }
 
@@ -8367,6 +8373,45 @@ function updateBonusQuestProgress(userId) {
   }
 }
 
+// F2: Daily Summary Firestore Sync
+function syncDailySummary(userId) {
+  if (!userId || !FirebaseSync.ready()) return;
+  try {
+    const metrics = getDailyCoachMetricsStage4(userId);
+    const gState = _getGamificationUser(userId);
+    const bonusQS = getBonusQuestStates(userId);
+    const mainQS = getQuestState(userId);
+    const todayKey = getDateKey(new Date());
+
+    const questsCompleted = [
+      ...(mainQS.isComplete ? ['main'] : []),
+      ...bonusQS.filter(q => q.isComplete).map(q => q.quest.tier)
+    ];
+
+    const summary = {
+      userId,
+      date: todayKey,
+      updatedAt: new Date().toISOString(),
+      activityPct: metrics.activity?.percent || 0,
+      setsToday: metrics.activity?.setsToday || 0,
+      scorePct: metrics.score?.score || 0,
+      fixesPct: metrics.fixes?.percent || 0,
+      resolvedToday: metrics.fixes?.resolvedToday || 0,
+      streak: metrics.streak?.streak || 0,
+      pointsTotal: gState.points || 0,
+      stampsTotal: gState.stamps || 0,
+      questsCompleted,
+      questsTotal: 4,
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+    };
+
+    const docId = 'dailySummary_' + userId + '_' + todayKey;
+    FirebaseSync.saveDoc(docId, summary);
+  } catch(e) {
+    console.warn('syncDailySummary error', e);
+  }
+}
+
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
 (function() {
   const p = new URLSearchParams(location.search);
@@ -9386,7 +9431,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.31';
+  const CURRENT_VERSION = 'v46.32';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
