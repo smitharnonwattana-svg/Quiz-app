@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Exam Academia</title>
-  <!-- APP_VERSION: v45.80 -->
+  <!-- APP_VERSION: v45.81 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -406,6 +406,41 @@
         grid-template-columns: 1fr !important;
         display: grid !important;
       }
+
+      /* Benchmark Mobile Fix */
+      /* FIX 1 — Input + Dropdown พอดีจอ */
+      #page-admin_benchmark input,
+      #page-admin_benchmark select {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+      }
+
+      /* FIX 2 — Card Upload Excel text wrap */
+      #page-admin_benchmark .card div[style*="dashed"] {
+        overflow: hidden;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      #page-admin_benchmark .card div[style*="dashed"] div {
+        white-space: normal !important;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+
+      /* FIX 3 — ปุ่ม Template + เลือก Excel พอดีจอ */
+      #page-admin_benchmark .card div[style*="dashed"] > div[style*="flex"] {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+      }
+      #page-admin_benchmark .card div[style*="dashed"] > div[style*="flex"] .btn,
+      #page-admin_benchmark .card div[style*="dashed"] > div[style*="flex"] label.btn {
+        flex: 1 1 100% !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+      }
     }
   </style>
   <!-- PDF.js from CDN -->
@@ -471,7 +506,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.80</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v45.81</div>
     </div>
   </div>
 </div>
