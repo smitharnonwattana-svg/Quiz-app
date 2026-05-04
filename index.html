@@ -12,7 +12,11 @@
   <meta name="apple-mobile-web-app-title" content="ExamAcademia">
   <link rel="apple-touch-icon" href="/Quiz-app/icon.svg">
   <meta name="theme-color" content="#3b82f6">
-  <!-- APP_VERSION: v46.10 -->
+  <!-- Cache Control -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <!-- APP_VERSION: v46.11 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -801,7 +805,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.10</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.11</div>
     </div>
   </div>
 </div>
@@ -8959,6 +8963,48 @@ function initEntranceCompare(params) {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+<script>
+(function(){
+  const CURRENT_VERSION = 'v46.11';
+  const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
+
+  async function checkVersion(){
+    try {
+      const res = await fetch(
+        '/Quiz-app/version.json?t=' + Date.now(),
+        { cache: 'no-store' }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.version && data.version !== CURRENT_VERSION) {
+        if (confirm(
+          '🆕 มีเวอร์ชันใหม่ (' + data.version + ')\n' +
+          'อัพเดทเพื่อใช้ฟีเจอร์ล่าสุดไหม?'
+        )) {
+          window.location.reload(true);
+        }
+      }
+    } catch(e) {
+      // silent fail — offline or fetch error
+    }
+  }
+
+  // Check on app open
+  window.addEventListener('load', () => {
+    setTimeout(checkVersion, 3000);
+  });
+
+  // Check every 5 minutes while app is open
+  setInterval(checkVersion, CHECK_INTERVAL);
+
+  // Check when app comes back to foreground
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkVersion();
+    }
+  });
+})();
+</script>
 </body>
 </html>
 
