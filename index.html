@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.35 -->
+  <!-- APP_VERSION: v46.36 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.35</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.36</div>
     </div>
   </div>
 </div>
@@ -2122,6 +2122,7 @@ const Store = {
   save(data){
     try{
       this.lastError=null;
+      data._savedAt = Date.now();
       localStorage.setItem(this.key,JSON.stringify(data));
       // async sync to Firestore (fire-and-forget, non-blocking)
       if(FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', data).catch(()=>{});
@@ -2151,7 +2152,15 @@ const Store = {
     // Instead just update the cache; next Store.load() will get fresh data
     let _listenDocRefreshTimeout = null;
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
-      try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
+      try{
+        // Only overwrite local if cloud data is newer
+        const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
+        const _localTs = _local._savedAt || 0;
+        const _cloudTs = cloudData._savedAt || 0;
+        if (_cloudTs >= _localTs) {
+          localStorage.setItem(this.key, JSON.stringify(cloudData));
+        }
+      }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
       const safeSoftRefresh = ['home','stats','rewards'].concat(window._examsEditMode ? [] : ['exams']);
@@ -2841,8 +2850,21 @@ function renderHome(){
         const body = homeEl.querySelector('#whoopBody');
         tabs.forEach(b => { b.style.cssText = tabStyle(b === btn); });
         if (body) body.innerHTML = loadingHtml;
-        await fetchWeaknessFromCloud(name);
-        if (body) body.innerHTML = whoopSectionHTML(name);
+        _whoopFetching = true;
+        const _myReq = ++_whoopReqId;
+        try {
+          await fetchWeaknessFromCloud(name);
+          if (_myReq !== _whoopReqId) return;
+          _whoopFetching = false;
+          if (body) {
+            try { body.innerHTML = whoopSectionHTML(name); }
+            catch(e) { body.innerHTML = '<div class="muted">โหลดไม่ได้</div>'; }
+          }
+        } catch(e) {
+          _whoopFetching = false;
+          if (_myReq !== _whoopReqId) return;
+          if (body) body.innerHTML = '<div class="muted">โหลดไม่ได้</div>';
+        }
       });
     });
   }
@@ -9495,7 +9517,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.35';
+  const CURRENT_VERSION = 'v46.36';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
