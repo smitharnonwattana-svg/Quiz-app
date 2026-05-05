@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.34 -->
+  <!-- APP_VERSION: v46.35 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.34</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.35</div>
     </div>
   </div>
 </div>
@@ -1950,7 +1950,12 @@ const FirebaseSync = (() => {
     if (!_ready) return null;
     try {
       // source: 'server' forces fresh fetch, prevents stale cache causing overwrites
-      const s = await _doc(id).get({ source: 'server' });
+      const _timeout = new Promise((_, rej) =>
+        setTimeout(() => rej(new Error('timeout')), 10000));
+      const s = await Promise.race([
+        _doc(id).get({ source: 'server' }),
+        _timeout
+      ]);
       if (!s.exists) return null;
       return JSON.parse(s.data()._d || 'null');
     } catch(e) {
@@ -2144,9 +2149,12 @@ const Store = {
     // Real-time listener: if another device saves, update localStorage only
     // Do NOT call navigate() here — it resets scroll and re-inits page disruptively
     // Instead just update the cache; next Store.load() will get fresh data
+    let _listenDocRefreshTimeout = null;
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
-      const safeSoftRefresh = ['home','stats'].concat(window._examsEditMode ? [] : ['exams']);
+      if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
+      _listenDocRefreshTimeout = setTimeout(() => {
+      const safeSoftRefresh = ['home','stats','rewards'].concat(window._examsEditMode ? [] : ['exams']);
       const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
@@ -2191,6 +2199,7 @@ const Store = {
           }
         }
       }
+      }, 500);
     });
     const s=this.load();
     if(!s.exams){
@@ -2631,6 +2640,8 @@ async function fetchWeaknessFromCloud(userId) {
 }
 
 // WHOOP UI — Stage 4
+let _whoopReqId = 0;
+let _whoopFetching = false;
 function renderHome(){
   const isTeacher = Auth.isTeacher();
   const role = Auth.getRole();
@@ -2801,9 +2812,26 @@ function renderHome(){
   if (isTeacher && initialUserId) {
     const body = homeEl.querySelector('#whoopBody');
     if (body) body.innerHTML = loadingHtml;
-    fetchWeaknessFromCloud(initialUserId).then(() => {
-      if (body) body.innerHTML = whoopSectionHTML(initialUserId);
-    });
+    if (!_whoopFetching) {
+      _whoopFetching = true;
+      const _thisReq = ++_whoopReqId;
+      fetchWeaknessFromCloud(initialUserId).then(() => {
+        _whoopFetching = false;
+        if (_thisReq !== _whoopReqId) return;
+        if (body) {
+          try { body.innerHTML = whoopSectionHTML(initialUserId); }
+          catch(e) { body.innerHTML = '<div class="muted">โหลดไม่ได้</div>'; }
+        }
+      }).catch(() => {
+        _whoopFetching = false;
+        if (body) body.innerHTML = '<div class="muted">โหลดไม่ได้</div>';
+      });
+    } else {
+      if (body && body.innerHTML === loadingHtml) {
+        try { body.innerHTML = whoopSectionHTML(initialUserId); }
+        catch(e) {}
+      }
+    }
   }
   if (isTeacher && teacherMembers.length > 0) {
     const tabs = homeEl.querySelectorAll('.whoopTab');
@@ -3623,6 +3651,7 @@ function initTake(id){
 
     // Show resume popup
     const _resumeOverlay = document.createElement('div');
+    _resumeOverlay.id = '_resumeOverlay';
     _resumeOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
@@ -9466,7 +9495,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.34';
+  const CURRENT_VERSION = 'v46.35';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
