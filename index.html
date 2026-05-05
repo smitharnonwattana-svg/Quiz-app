@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.36 -->
+  <!-- APP_VERSION: v46.37 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.36</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.37</div>
     </div>
   </div>
 </div>
@@ -2659,6 +2659,10 @@ function _showAssignModal(examId, examTitle, examSubject) {
     '</div>';
   document.body.appendChild(modal);
 
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
   const listEl = modal.querySelector('#assignStudentList');
   members.forEach(m => {
     const cnt = pendingByUser[m.name] || 0;
@@ -2876,11 +2880,19 @@ function renderHome(){
   `;
 
   // ── teacher: initial cloud fetch, then wire up tab clicks ─
+  let _whoopReqId = 0;
   if (isTeacher && initialUserId) {
     const body = homeEl.querySelector('#whoopBody');
     if (body) body.innerHTML = loadingHtml;
+    const _thisReq = ++_whoopReqId;
     fetchWeaknessFromCloud(initialUserId).then(() => {
-      if (body) body.innerHTML = whoopSectionHTML(initialUserId);
+      if (_thisReq !== _whoopReqId) return;
+      if (body) {
+        try { body.innerHTML = whoopSectionHTML(initialUserId); }
+        catch(e) { body.innerHTML = '<div class="muted">โหลดไม่ได้</div>'; }
+      }
+    }).catch(() => {
+      if (body) body.innerHTML = '<div class="muted">โหลดไม่ได้</div>';
     });
   }
   if (isTeacher && teacherMembers.length > 0) {
@@ -2891,8 +2903,15 @@ function renderHome(){
         const body = homeEl.querySelector('#whoopBody');
         tabs.forEach(b => { b.style.cssText = tabStyle(b === btn); });
         if (body) body.innerHTML = loadingHtml;
-        await fetchWeaknessFromCloud(name);
-        if (body) body.innerHTML = whoopSectionHTML(name);
+        const _myReq = ++_whoopReqId;
+        try {
+          await fetchWeaknessFromCloud(name);
+          if (_myReq !== _whoopReqId) return;
+          if (body) body.innerHTML = whoopSectionHTML(name);
+        } catch(e) {
+          if (_myReq !== _whoopReqId) return;
+          if (body) body.innerHTML = '<div class="muted">โหลดไม่ได้</div>';
+        }
       });
     });
   }
@@ -3121,6 +3140,12 @@ function navigate(page, params={}){
   // hide take page cleanup
   if(_currentPage==='take') cleanupTake();
   if(_currentPage==='practice') cleanupPractice();
+
+  // Defensive: remove any orphaned overlays
+  const _orphanOverlay = document.getElementById('_resumeOverlay');
+  if (_orphanOverlay) _orphanOverlay.remove();
+  const _orphanAssignModal = document.getElementById('assignModal');
+  if (_orphanAssignModal) _orphanAssignModal.remove();
 
   // ── Auth guard: redirect to login if not logged in ──
   if(page !== 'login' && !Auth.isLoggedIn()){
@@ -9624,7 +9649,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.36';
+  const CURRENT_VERSION = 'v46.37';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
