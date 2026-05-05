@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.38 -->
+  <!-- APP_VERSION: v46.34 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.38</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.34</div>
     </div>
   </div>
 </div>
@@ -1950,12 +1950,7 @@ const FirebaseSync = (() => {
     if (!_ready) return null;
     try {
       // source: 'server' forces fresh fetch, prevents stale cache causing overwrites
-      const _timeout = new Promise((_, rej) =>
-        setTimeout(() => rej(new Error('timeout')), 10000));
-      const s = await Promise.race([
-        _doc(id).get({ source: 'server' }),
-        _timeout
-      ]);
+      const s = await _doc(id).get({ source: 'server' });
       if (!s.exists) return null;
       return JSON.parse(s.data()._d || 'null');
     } catch(e) {
@@ -2114,7 +2109,7 @@ const Store = {
     }
     return s;
   },
-  load(){try{const s=JSON.parse(localStorage.getItem(this.key)||"{}");if(!Array.isArray(s.assignments))s.assignments=[];return s;}catch{return {assignments:[]};}},
+  load(){try{return JSON.parse(localStorage.getItem(this.key)||"{}");}catch{return {};}},
   // บันทึกเฉพาะ localStorage ไม่ sync Firebase — ใช้ใน migrate() และ seed
   saveLocalOnly(data){
     try{ localStorage.setItem(this.key, JSON.stringify(data)); }catch(e){}
@@ -2149,12 +2144,8 @@ const Store = {
     // Real-time listener: if another device saves, update localStorage only
     // Do NOT call navigate() here — it resets scroll and re-inits page disruptively
     // Instead just update the cache; next Store.load() will get fresh data
-    let _listenDocRefreshTimeout = null;
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{ localStorage.setItem(this.key, JSON.stringify(cloudData)); }catch(e){}
-      // Debounce auto-refresh to prevent mid-tap re-renders
-      if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
-      _listenDocRefreshTimeout = setTimeout(() => {
       const safeSoftRefresh = ['home','stats'].concat(window._examsEditMode ? [] : ['exams']);
       const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
@@ -2200,7 +2191,6 @@ const Store = {
           }
         }
       }
-      }, 2000); // 2 second debounce
     });
     const s=this.load();
     if(!s.exams){
@@ -2640,77 +2630,7 @@ async function fetchWeaknessFromCloud(userId) {
   } catch (e) { console.warn('fetchWeaknessFromCloud fallback error', e); }
 }
 
-// Assignment System
-function _showAssignModal(examId, examTitle, examSubject) {
-  const existing = document.getElementById('assignModal');
-  if (existing) existing.remove();
-
-  const members = (Auth.getMembers() || []).filter(m => !m.isTeacher);
-  const s = Store.load();
-  const pendingByUser = {};
-  (s.assignments || []).forEach(a => {
-    if (a.status === 'pending') {
-      pendingByUser[a.assignedTo] = (pendingByUser[a.assignedTo] || 0) + 1;
-    }
-  });
-
-  const modal = document.createElement('div');
-  modal.id = 'assignModal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;';
-  modal.innerHTML =
-    '<div style="background:#fff;border-radius:20px;padding:24px;max-width:320px;width:100%;">' +
-      '<div style="font-weight:800;font-size:16px;margin-bottom:4px;">📤 ส่งให้นักเรียน</div>' +
-      '<div style="font-size:13px;color:#6b7280;margin-bottom:16px;">' + esc(examTitle) + '</div>' +
-      '<div id="assignStudentList" style="display:grid;gap:8px;margin-bottom:16px;"></div>' +
-      '<div style="display:flex;gap:8px;">' +
-        '<button id="assignCancelBtn" class="btn" style="flex:1;">ยกเลิก</button>' +
-        '<button id="assignConfirmBtn" class="btn btnPrimary" style="flex:1;">ส่ง</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(modal);
-
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
-  });
-
-  const listEl = modal.querySelector('#assignStudentList');
-  members.forEach(m => {
-    const cnt = pendingByUser[m.name] || 0;
-    const maxed = cnt >= 3;
-    const row = document.createElement('label');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;cursor:' + (maxed ? 'not-allowed' : 'pointer') + ';opacity:' + (maxed ? '0.5' : '1') + ';';
-    row.innerHTML =
-      '<input type="checkbox" data-assign-student="' + esc(m.name) + '"' + (maxed ? ' disabled' : '') + ' style="width:18px;height:18px;">' +
-      '<span style="font-size:14px;font-weight:700;flex:1;">' + esc(m.name) + '</span>' +
-      '<span style="font-size:11px;color:' + (maxed ? '#dc2626' : '#9ca3af') + ';">' + (maxed ? 'ครบ 3 ชุด' : (cnt + '/3')) + '</span>';
-    listEl.appendChild(row);
-  });
-
-  modal.querySelector('#assignCancelBtn').onclick = () => modal.remove();
-  modal.querySelector('#assignConfirmBtn').onclick = () => {
-    const checked = Array.from(modal.querySelectorAll('[data-assign-student]:checked'));
-    if (checked.length === 0) { toast('กรุณาเลือกนักเรียนอย่างน้อย 1 คน'); return; }
-    const s2 = Store.load();
-    if (!Array.isArray(s2.assignments)) s2.assignments = [];
-    const nowIso = new Date().toISOString();
-    checked.forEach((cb, i) => {
-      s2.assignments.push({
-        id: String(Date.now()) + '_' + i,
-        examId, examTitle, examSubject,
-        assignedTo: cb.getAttribute('data-assign-student'),
-        assignedBy: 'admin',
-        assignedAt: nowIso,
-        status: 'pending'
-      });
-    });
-    Store.save(s2);
-    toast('✅ ส่งข้อสอบแล้ว');
-    modal.remove();
-  };
-}
-
 // WHOOP UI — Stage 4
-let _whoopReqId = 0;
 function renderHome(){
   const isTeacher = Auth.isTeacher();
   const role = Auth.getRole();
@@ -2840,17 +2760,6 @@ function renderHome(){
   }
 
   // ── compose page ──────────────────────────────────────
-  // Assignment System: render card for student only
-  let _assignmentCardHtml = '';
-  try {
-    if (!isTeacher && Auth.getName()) {
-      _assignmentCardHtml = _renderAssignmentCard(Auth.getName());
-    }
-  } catch(e) {
-    console.error('Assignment card error:', e);
-    _assignmentCardHtml = '';
-  }
-
   homeEl.innerHTML = `
     <div class="container">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -2860,8 +2769,6 @@ function renderHome(){
         </div>
         <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
       </div>
-
-      ${_assignmentCardHtml}
 
       <div id="whoopSection" style="margin-top:14px;padding:12px 12px 4px;border:1px solid #e5e7eb;border-radius:14px;background:#fafafa;">
         ${teacherTabsHtml}
@@ -2894,15 +2801,8 @@ function renderHome(){
   if (isTeacher && initialUserId) {
     const body = homeEl.querySelector('#whoopBody');
     if (body) body.innerHTML = loadingHtml;
-    const _thisReq = ++_whoopReqId;
     fetchWeaknessFromCloud(initialUserId).then(() => {
-      if (_thisReq !== _whoopReqId) return;
-      if (body) {
-        try { body.innerHTML = whoopSectionHTML(initialUserId); }
-        catch(e) { body.innerHTML = '<div class="muted">โหลดไม่ได้</div>'; }
-      }
-    }).catch(() => {
-      if (body) body.innerHTML = '<div class="muted">โหลดไม่ได้</div>';
+      if (body) body.innerHTML = whoopSectionHTML(initialUserId);
     });
   }
   if (isTeacher && teacherMembers.length > 0) {
@@ -2913,72 +2813,11 @@ function renderHome(){
         const body = homeEl.querySelector('#whoopBody');
         tabs.forEach(b => { b.style.cssText = tabStyle(b === btn); });
         if (body) body.innerHTML = loadingHtml;
-        const _myReq = ++_whoopReqId;
-        try {
-          await fetchWeaknessFromCloud(name);
-          if (_myReq !== _whoopReqId) return;
-          if (body) body.innerHTML = whoopSectionHTML(name);
-        } catch(e) {
-          if (_myReq !== _whoopReqId) return;
-          if (body) body.innerHTML = '<div class="muted">โหลดไม่ได้</div>';
-        }
+        await fetchWeaknessFromCloud(name);
+        if (body) body.innerHTML = whoopSectionHTML(name);
       });
     });
   }
-
-  // Assignment System: wire toggle + "ทำเลย" buttons
-  try {
-    const _assignHeader = homeEl.querySelector('#assignmentCardHeader');
-    const _assignItems = homeEl.querySelector('#assignmentItems');
-    const _assignIcon = homeEl.querySelector('#assignmentToggleIcon');
-    if (_assignHeader && _assignItems && _assignIcon) {
-      _assignHeader.onclick = () => {
-        const isOpen = _assignItems.style.display !== 'none';
-        _assignItems.style.display = isOpen ? 'none' : 'block';
-        _assignIcon.textContent = isOpen ? '▼' : '▲';
-      };
-    }
-    homeEl.querySelectorAll('[data-assign-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const assignId = btn.getAttribute('data-assign-id');
-        const s2 = Store.load();
-        const assignment = (s2.assignments || []).find(a => a.id === assignId);
-        if (!assignment) return;
-        navigate('exam', { id: assignment.examId });
-      });
-    });
-  } catch(e) {
-    console.error('Assignment wiring error:', e);
-  }
-}
-
-// Assignment System: render student's pending assignment card
-function _renderAssignmentCard(userId) {
-  const s = Store.load();
-  const pending = (s.assignments || []).filter(
-    a => a.assignedTo === userId && a.status === 'pending'
-  );
-  if (pending.length === 0) return '';
-
-  const count = pending.length;
-  const itemsHtml = pending.map(a => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #e5e7eb;">
-      <div style="font-size:13px;color:#374151;flex:1;padding-right:8px;">${esc(a.examTitle)}</div>
-      <button class="btn btnPrimary" data-assign-id="${esc(a.id)}" style="font-size:12px;padding:5px 12px;white-space:nowrap;">ทำเลย</button>
-    </div>
-  `).join('');
-
-  return `
-    <div id="assignmentCard" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:14px;margin-top:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" id="assignmentCardHeader">
-        <div style="font-weight:800;font-size:14px;">💌 พ่อฝากการบ้านไว้ ${count} ชุด</div>
-        <div id="assignmentToggleIcon" style="font-size:18px;color:#d97706;">▼</div>
-      </div>
-      <div id="assignmentItems" style="display:none;">
-        ${itemsHtml}
-      </div>
-    </div>
-  `;
 }
 
 // ===================== AUTH =====================
@@ -3150,12 +2989,6 @@ function navigate(page, params={}){
   // hide take page cleanup
   if(_currentPage==='take') cleanupTake();
   if(_currentPage==='practice') cleanupPractice();
-
-  // Defensive: remove any orphaned overlays
-  const _orphanOverlay = document.getElementById('_resumeOverlay');
-  if (_orphanOverlay) _orphanOverlay.remove();
-  const _orphanAssignModal = document.getElementById('assignModal');
-  if (_orphanAssignModal) _orphanAssignModal.remove();
 
   // ── Auth guard: redirect to login if not logged in ──
   if(page !== 'login' && !Auth.isLoggedIn()){
@@ -3399,19 +3232,6 @@ function initExams(){
         ${practiceBtnHtml}
         ${resumeHtml}
       `;
-
-      // Assignment System: 📤 button (teacher only)
-      if (Auth.isTeacher()) {
-        const assignBtn = document.createElement('button');
-        assignBtn.className = 'btn';
-        assignBtn.style.cssText = 'font-size:12px;padding:4px 10px;margin-top:8px;width:100%;';
-        assignBtn.textContent = '📤 ส่งให้นักเรียน';
-        assignBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          _showAssignModal(e.id, e.title, e.subject);
-        };
-        card.appendChild(assignBtn);
-      }
 
       // drag (edit mode only)
       if(_editMode){
@@ -3725,19 +3545,6 @@ function initTake(id){
     if (takerName && !Auth.isTeacher()) {
       syncDailySummary(takerName); // F2: Daily Summary Firestore Sync
     }
-    // Assignment System: auto-mark assignment as done
-    if (takerName && !Auth.isTeacher()) {
-      const _s3 = Store.load();
-      const _ai = (_s3.assignments || []).findIndex(a =>
-        a.assignedTo === takerName &&
-        a.examId === _newAttempt.examId &&
-        a.status === 'pending'
-      );
-      if (_ai !== -1) {
-        _s3.assignments[_ai].status = 'done';
-        Store.save(_s3);
-      }
-    }
     // 🎉 Show meme popup before going to review
     // LINE notification — ส่งข้อสอบแล้ว
     lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
@@ -3816,7 +3623,6 @@ function initTake(id){
 
     // Show resume popup
     const _resumeOverlay = document.createElement('div');
-    _resumeOverlay.id = '_resumeOverlay';
     _resumeOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
@@ -9660,7 +9466,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.38';
+  const CURRENT_VERSION = 'v46.34';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
