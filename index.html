@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.52 -->
+  <!-- APP_VERSION: v46.53 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.52</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.53</div>
     </div>
   </div>
 </div>
@@ -6194,6 +6194,8 @@ function renderRewardsFor(userId) {
           'padding:4px 10px;color:#0369a1;border-color:#7dd3fc;">🎫 Reset Stamps</button>' +
         '<button class="btn" id="rt_resetQuests" style="font-size:12px;' +
           'padding:4px 10px;color:#dc2626;border-color:#fca5a5;">🔄 Reset Quests</button>' +
+        '<button class="btn" id="rt_completeQuests" style="font-size:12px;' +
+          'padding:4px 10px;color:#16a34a;border-color:#86efac;">🧪 Complete Quests</button>' +
       '</div>';
     host.appendChild(adminToolsDiv);
 
@@ -6236,7 +6238,6 @@ function renderRewardsFor(userId) {
     };
 
     adminToolsDiv.querySelector('#rt_resetStamps').onclick = () => {
-      if (!confirm('Reset Stamp rewards ของ "' + userId + '"?')) return;
       const cur = _getGamificationUser(userId);
       const stampKeys = ['stamps_3','stamps_7','stamps_15'];
       _saveGamificationUser(userId, {
@@ -6249,7 +6250,6 @@ function renderRewardsFor(userId) {
     };
 
     adminToolsDiv.querySelector('#rt_resetQuests').onclick = () => {
-      if (!confirm('Reset Quests ของ "' + userId + '"?')) return;
       const cur = _getGamificationUser(userId);
       _saveGamificationUser(userId, {
         ...cur,
@@ -6258,6 +6258,29 @@ function renderRewardsFor(userId) {
         questSalt: (Number(cur.questSalt) || 0) + 1
       });
       toast('✅ Reset Quests ของ ' + userId);
+      renderRewardsFor(userId);
+    };
+
+    adminToolsDiv.querySelector('#rt_completeQuests').onclick = () => {
+      const cur = _getGamificationUser(userId);
+      const todayKey = getDateKey(new Date());
+      let quests = cur.bonusQuests || [];
+      if (quests.length === 0 || quests[0].date !== todayKey) {
+        quests = _pickRandomBonusQuests(userId);
+      }
+      const updatedBonus = quests.map(q => ({
+        ...q, progress: Number(q.target)||1,
+        date: todayKey, claimed: false
+      }));
+      const mainQuest = cur.dailyQuest;
+      const updatedMain = mainQuest ? {
+        ...mainQuest, progress: Number(mainQuest.target)||1,
+        date: todayKey, claimed: false
+      } : null;
+      _saveGamificationUser(userId, {
+        ...cur, bonusQuests: updatedBonus, dailyQuest: updatedMain
+      });
+      toast('🧪 Complete Quests ของ ' + userId + ' แล้ว');
       renderRewardsFor(userId);
     };
   }
@@ -9936,7 +9959,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.52';
+  const CURRENT_VERSION = 'v46.53';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
