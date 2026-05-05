@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.43 -->
+  <!-- APP_VERSION: v46.44 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.43</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.44</div>
     </div>
   </div>
 </div>
@@ -8745,7 +8745,7 @@ function syncDailySummary(userId) {
       activityPct: metrics.activity?.percent || 0,
       setsToday: metrics.activity?.setsToday || 0,
       scorePct: metrics.score?.score || 0,
-      fixesPct: metrics.fixes?.percent || 0,
+      fixesPct: metrics.fixes?.fixes || 0,
       resolvedToday: metrics.fixes?.resolvedToday || 0,
       streak: metrics.streak?.streak || 0,
       pointsTotal: gState.points || 0,
@@ -9781,7 +9781,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.43';
+  const CURRENT_VERSION = 'v46.44';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
