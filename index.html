@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.36 -->
+  <!-- APP_VERSION: v46.37 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.36</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.37</div>
     </div>
   </div>
 </div>
@@ -2167,6 +2167,10 @@ const Store = {
       const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
+        if (pg === 'home' && typeof _whoopFetching !== 'undefined' && _whoopFetching) {
+          // Skip re-render if WHOOP fetch in progress
+          return;
+        }
         navigate(pg, window._currentParams||{});
       } else if(pg && pg === 'admin'){
         // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
@@ -2208,7 +2212,7 @@ const Store = {
           }
         }
       }
-      }, 500);
+      }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
     const s=this.load();
     if(!s.exams){
@@ -9517,7 +9521,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.36';
+  const CURRENT_VERSION = 'v46.37';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
