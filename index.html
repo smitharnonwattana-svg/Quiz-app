@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.48 -->
+  <!-- APP_VERSION: v46.49 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.48</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.49</div>
     </div>
   </div>
 </div>
@@ -8474,31 +8474,47 @@ function getQuestState(userId) {
 
 const BONUS_QUEST_POOL = {
   easy: [
-    { type:'non_focus_exam',  description:'ทำข้อสอบวิชาอื่น 1 ชุด',         target:1, reward:8  },
-    { type:'fix_2_weakness',  description:'แก้จุดอ่อน 2 ข้อ',                target:2, reward:8  },
-    { type:'morning_exam',    description:'ทำข้อสอบก่อนเที่ยววันนี้',       target:1, reward:8  },
-    { type:'evening_exam',    description:'ทำข้อสอบหลัง 18.00 น.',          target:1, reward:10 },
-    { type:'any_exam',        description:'ทำข้อสอบ 1 ชุดวันนี้',            target:1, reward:8  },
-    { type:'random_subject',  description:'ทำข้อสอบวิชาที่ไม่เคยทำวันนี้',  target:1, reward:8  },
-    { type:'fix_3_weakness',  description:'แก้จุดอ่อน 3 ข้อ',                target:3, reward:10 }
+    { type:'non_focus_exam',  description:'ทำข้อสอบวิชาอื่น 1 ชุด',           target:1, reward:5 },
+    { type:'morning_exam',    description:'ทำข้อสอบก่อนเที่ยงวันนี้',          target:1, reward:5 },
+    { type:'evening_exam',    description:'ทำข้อสอบหลัง 18.00 น.',            target:1, reward:5 },
+    { type:'any_exam',        description:'ทำข้อสอบ 1 ชุดวันนี้',              target:1, reward:5 },
+    { type:'random_subject',  description:'ทำข้อสอบวิชาที่ไม่เคยทำวันนี้',    target:1, reward:4 },
+    { type:'fix_2_weakness',  description:'แก้จุดอ่อน 2 ข้อ',                 target:2, reward:3 },
+    { type:'fix_3_weakness',  description:'แก้จุดอ่อน 3 ข้อ',                 target:3, reward:4 }
   ],
   medium: [
-    { type:'two_sets',        description:'ทำข้อสอบ 2 ชุดวันเดียว',          target:2, reward:12 },
-    { type:'fix_5_weakness',  description:'แก้จุดอ่อน 5 ข้อวันเดียว',        target:5, reward:12 },
-    { type:'both_focus',      description:'ทำครบทั้ง 2 วิชา focus',          target:2, reward:15 },
-    { type:'streak_5',        description:'ตอบถูก 5 ข้อติดกันในชุดเดียว',   target:1, reward:15 },
-    { type:'exam_plus_fix',   description:'ทำข้อสอบ + แก้จุดอ่อน 3 ข้อ',     target:1, reward:12 },
-    { type:'score_80',        description:'ทำคะแนนได้ ≥ 80% ในชุดใดก็ได้',  target:1, reward:12 },
-    { type:'fix_focus_all',   description:'แก้จุดอ่อนทุกวิชา focus อย่างน้อย 1 ข้อ', target:1, reward:12 }
+    { type:'two_sets',        description:'ทำข้อสอบ 2 ชุดวันเดียว',           target:2, reward:8 },
+    { type:'both_focus',      description:'ทำครบทั้ง 2 วิชา focus',            target:2, reward:8 },
+    { type:'score_80',        description:'ทำคะแนนได้ ≥ 80% ในชุดใดก็ได้',    target:1, reward:7 },
+    { type:'streak_5',        description:'ตอบถูก 5 ข้อติดกันในชุดเดียว',      target:1, reward:7 },
+    { type:'exam_plus_fix',   description:'ทำข้อสอบ + แก้จุดอ่อน 3 ข้อ',     target:1, reward:6 },
+    { type:'fix_5_weakness',  description:'แก้จุดอ่อน 5 ข้อวันเดียว',         target:5, reward:5 },
+    { type:'fix_focus_all',   description:'แก้จุดอ่อน 1 วิชา focus',          target:1, reward:5 }
   ],
   challenge: [
-    { type:'score_90',        description:'ทำคะแนนได้ ≥ 90%',                target:1, reward:18 },
-    { type:'three_sets',      description:'ทำข้อสอบ 3 ชุดวันเดียว',          target:3, reward:18 },
-    { type:'streak_10',       description:'ตอบถูก 10 ข้อติดกันในชุดเดียว',  target:1, reward:20 },
-    { type:'both_focus_85',   description:'Score ≥ 85% ทั้ง 2 วิชา focus',   target:2, reward:20 },
-    { type:'fix_10_weakness', description:'แก้จุดอ่อน 10 ข้อวันเดียว',       target:10, reward:18 },
-    { type:'two_sets_80',     description:'ทำข้อสอบ 2 ชุด + Score ≥ 80% ทั้งคู่', target:2, reward:20 }
+    { type:'three_sets',      description:'ทำข้อสอบ 3 ชุดวันเดียว',           target:3, reward:10 },
+    { type:'two_sets_80',     description:'ทำข้อสอบ 2 ชุด + Score ≥ 80% ทั้งคู่', target:2, reward:10 },
+    { type:'score_90',        description:'ทำคะแนนได้ ≥ 90%',                 target:1, reward:9 },
+    { type:'both_focus_85',   description:'Score ≥ 85% ทั้ง 2 วิชา focus',    target:2, reward:9 },
+    { type:'streak_10',       description:'ตอบถูก 10 ข้อติดกันในชุดเดียว',    target:1, reward:8 },
+    { type:'fix_10_weakness', description:'แก้จุดอ่อนทั้งหมด',               target:999, reward:8 }
   ]
+};
+// Existing stored bonusQuests will auto-reset tomorrow
+// (date check in getBonusQuests handles this). No migration needed.
+
+const _QUEST_CATEGORY = {
+  non_focus_exam: 'exam', morning_exam: 'exam',
+  evening_exam: 'exam', any_exam: 'exam',
+  random_subject: 'exam', two_sets: 'exam',
+  both_focus: 'exam', three_sets: 'exam',
+  two_sets_80: 'exam',
+  fix_2_weakness: 'fix', fix_3_weakness: 'fix',
+  fix_5_weakness: 'fix', fix_10_weakness: 'fix',
+  fix_focus_all: 'fix', exam_plus_fix: 'fix',
+  score_80: 'score', score_90: 'score',
+  both_focus_85: 'score', streak_5: 'score',
+  streak_10: 'score'
 };
 
 function _bonusQuestSeedHash(str) {
@@ -8514,13 +8530,34 @@ function _pickRandomBonusQuests(userId) {
   const today = getDateKey(new Date());
   const tiers = ['easy', 'medium', 'challenge'];
   const out = [];
+  const usedCategories = new Set();
+
+  // Dynamic target source for fix_10_weakness
+  let _ctx = null;
+  try { _ctx = getTodayContext(userId); } catch(e) { _ctx = null; }
+  const _remaining = (_ctx && _ctx.weakness && _ctx.weakness.focusRemaining) || 0;
+
   tiers.forEach((tier, ti) => {
     const pool = BONUS_QUEST_POOL[tier] || [];
     if (pool.length === 0) return;
     const seed = _bonusQuestSeedHash(String(userId) + '|' + today + '|' + tier + '|' + ti);
-    const idx = seed % pool.length;
-    const def = pool[idx];
-    out.push({
+    const startIdx = seed % pool.length;
+
+    // Category dedup: advance through pool until we find an unused category.
+    // Fallback: if all candidates share a used category, allow repeat (no infinite loop).
+    let def = null;
+    for (let i = 0; i < pool.length; i++) {
+      const candidate = pool[(startIdx + i) % pool.length];
+      const cat = _QUEST_CATEGORY[candidate.type];
+      if (!usedCategories.has(cat)) {
+        def = candidate;
+        usedCategories.add(cat);
+        break;
+      }
+    }
+    if (!def) def = pool[startIdx];
+
+    let q = {
       date: today,
       tier,
       type: def.type,
@@ -8529,7 +8566,14 @@ function _pickRandomBonusQuests(userId) {
       progress: 0,
       reward: Number(def.reward) || 0,
       claimed: false
-    });
+    };
+
+    // Dynamic target = all remaining weakness
+    if (q.type === 'fix_10_weakness') {
+      q = { ...q, target: Math.max(1, _remaining) };
+    }
+
+    out.push(q);
   });
   return out;
 }
@@ -9797,7 +9841,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.48';
+  const CURRENT_VERSION = 'v46.49';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
