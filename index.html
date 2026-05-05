@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.50 -->
+  <!-- APP_VERSION: v46.51 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.50</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.51</div>
     </div>
   </div>
 </div>
@@ -6388,7 +6388,8 @@ function initAdminMembers(){
           _saveGamificationUser(m.name, {
             ...cur,
             bonusQuests: [],
-            dailyQuest: null
+            dailyQuest: null,
+            questSalt: (Number(cur.questSalt) || 0) + 1
           });
           toast('✅ Reset quests ของ ' + m.name + ' แล้ว');
           renderMembers();
@@ -8161,7 +8162,8 @@ const _GAMIFICATION_DEFAULT = () => ({
   lastPointDate: '',
   lastStampDate: '',
   dailyQuest: null,
-  bonusQuests: []
+  bonusQuests: [],
+  questSalt: 0
 });
 
 function _getGamificationUser(userId) {
@@ -8181,7 +8183,8 @@ function _getGamificationUser(userId) {
       lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate,
       lastStampDate: typeof rec.lastStampDate === 'string' ? rec.lastStampDate : def.lastStampDate,
       dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest,
-      bonusQuests: Array.isArray(rec.bonusQuests) ? rec.bonusQuests.slice() : def.bonusQuests
+      bonusQuests: Array.isArray(rec.bonusQuests) ? rec.bonusQuests.slice() : def.bonusQuests,
+      questSalt: Number(rec.questSalt) || 0
     };
   } catch { return _GAMIFICATION_DEFAULT(); }
 }
@@ -8540,7 +8543,9 @@ function _pickRandomBonusQuests(userId) {
   tiers.forEach((tier, ti) => {
     const pool = BONUS_QUEST_POOL[tier] || [];
     if (pool.length === 0) return;
-    const seed = _bonusQuestSeedHash(String(userId) + '|' + today + '|' + tier + '|' + ti);
+    const _gState = _getGamificationUser(userId);
+    const _salt = _gState.questSalt || 0;
+    const seed = _bonusQuestSeedHash(String(userId) + '|' + today + '|' + tier + '|' + ti + '|' + _salt);
     const startIdx = seed % pool.length;
 
     // Category dedup: advance through pool until we find an unused category.
@@ -9841,7 +9846,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.50';
+  const CURRENT_VERSION = 'v46.51';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
