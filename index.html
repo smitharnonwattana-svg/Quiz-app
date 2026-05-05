@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.51 -->
+  <!-- APP_VERSION: v46.52 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.51</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.52</div>
     </div>
   </div>
 </div>
@@ -6171,6 +6171,96 @@ function renderRewardsFor(userId) {
       });
     }
   });
+
+  // Admin Tools Panel — teacher only
+  if (Auth.isTeacher()) {
+    const adminToolsDiv = document.createElement('div');
+    adminToolsDiv.style.cssText =
+      'background:#f9fafb;border:1px solid #e5e7eb;' +
+      'border-radius:14px;padding:14px;margin-top:14px;';
+    adminToolsDiv.innerHTML =
+      '<div style="font-weight:800;font-size:13px;' +
+      'color:#6b7280;margin-bottom:10px;">🔧 Admin Tools</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button class="btn" id="rt_addPt" style="font-size:12px;' +
+          'padding:4px 10px;color:#7c3aed;border-color:#c4b5fd;">🧪 +1pt</button>' +
+        '<button class="btn" id="rt_addStamp" style="font-size:12px;' +
+          'padding:4px 10px;color:#0369a1;border-color:#7dd3fc;">🧪 +1 stamp</button>' +
+        '<button class="btn" id="rt_resetPts" style="font-size:12px;' +
+          'padding:4px 10px;color:#6b7280;border-color:#d1d5db;">🔄 Reset Points</button>' +
+        '<button class="btn" id="rt_resetTrophy" style="font-size:12px;' +
+          'padding:4px 10px;color:#b45309;border-color:#fcd34d;">🏆 Reset Trophy</button>' +
+        '<button class="btn" id="rt_resetStamps" style="font-size:12px;' +
+          'padding:4px 10px;color:#0369a1;border-color:#7dd3fc;">🎫 Reset Stamps</button>' +
+        '<button class="btn" id="rt_resetQuests" style="font-size:12px;' +
+          'padding:4px 10px;color:#dc2626;border-color:#fca5a5;">🔄 Reset Quests</button>' +
+      '</div>';
+    host.appendChild(adminToolsDiv);
+
+    adminToolsDiv.querySelector('#rt_addPt').onclick = () => {
+      awardPoints(userId, 1, 'admin_test');
+      toast('🧪 +1pt ให้ ' + userId);
+      renderRewardsFor(userId);
+    };
+
+    adminToolsDiv.querySelector('#rt_addStamp').onclick = () => {
+      const cur = _getGamificationUser(userId);
+      _saveGamificationUser(userId, {
+        ...cur,
+        stamps: (Number(cur.stamps) || 0) + 1,
+        lastStampDate: getDateKey(new Date())
+      });
+      toast('🧪 +1 stamp ให้ ' + userId);
+      renderRewardsFor(userId);
+    };
+
+    adminToolsDiv.querySelector('#rt_resetPts').onclick = () => {
+      if (!confirm('Reset Points ของ "' + userId + '"?')) return;
+      const cur = _getGamificationUser(userId);
+      _saveGamificationUser(userId, { ...cur, points: 0, lastPointDate: '' });
+      toast('✅ Reset Points ของ ' + userId);
+      renderRewardsFor(userId);
+    };
+
+    adminToolsDiv.querySelector('#rt_resetTrophy').onclick = () => {
+      if (!confirm('Reset Trophy rewards ของ "' + userId + '"?')) return;
+      const cur = _getGamificationUser(userId);
+      const trophyKeys = ['100','300','600','1000'];
+      _saveGamificationUser(userId, {
+        ...cur,
+        claimedTiers: (cur.claimedTiers||[]).filter(k => !trophyKeys.includes(k)),
+        pendingTiers: (cur.pendingTiers||[]).filter(k => !trophyKeys.includes(k))
+      });
+      toast('✅ Reset Trophy ของ ' + userId);
+      renderRewardsFor(userId);
+    };
+
+    adminToolsDiv.querySelector('#rt_resetStamps').onclick = () => {
+      if (!confirm('Reset Stamp rewards ของ "' + userId + '"?')) return;
+      const cur = _getGamificationUser(userId);
+      const stampKeys = ['stamps_3','stamps_7','stamps_15'];
+      _saveGamificationUser(userId, {
+        ...cur,
+        claimedTiers: (cur.claimedTiers||[]).filter(k => !stampKeys.includes(k)),
+        pendingTiers: (cur.pendingTiers||[]).filter(k => !stampKeys.includes(k))
+      });
+      toast('✅ Reset Stamps ของ ' + userId);
+      renderRewardsFor(userId);
+    };
+
+    adminToolsDiv.querySelector('#rt_resetQuests').onclick = () => {
+      if (!confirm('Reset Quests ของ "' + userId + '"?')) return;
+      const cur = _getGamificationUser(userId);
+      _saveGamificationUser(userId, {
+        ...cur,
+        bonusQuests: [],
+        dailyQuest: null,
+        questSalt: (Number(cur.questSalt) || 0) + 1
+      });
+      toast('✅ Reset Quests ของ ' + userId);
+      renderRewardsFor(userId);
+    };
+  }
 }
 
 function initAdminMembers(){
@@ -9846,7 +9936,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.51';
+  const CURRENT_VERSION = 'v46.52';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
