@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.53 -->
+  <!-- APP_VERSION: v46.54 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.53</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.54</div>
     </div>
   </div>
 </div>
@@ -6399,12 +6399,7 @@ function initAdminMembers(){
         '<span class="muted" style="font-size:13px;font-weight:700;">⭐ ' + (Number(gState.points)||0) + ' pt</span>' +
         '<span class="muted" style="font-size:13px;font-weight:700;">🎫 ' + (Number(gState.stamps)||0) + ' stamps</span>' +
         '<button type="button" class="btn" style="margin-left:auto;padding:4px 10px;font-size:12px;" data-greset="' + idx + '">🔄 Reset Points</button>' +
-        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#b45309;border-color:#fcd34d;" data-greset-trophy="' + idx + '">🏆 Reset Trophy</button>' +
-        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#0369a1;border-color:#7dd3fc;margin-left:4px;" data-greset-stamps="' + idx + '">🎫 Reset Stamps</button>' +
         '<button type="button" class="btn" style="margin-left:4px;padding:4px 10px;font-size:12px;color:#7c3aed;border-color:#c4b5fd;" data-gtest="' + idx + '">🧪 +1pt</button>' +
-        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#0369a1;border-color:#7dd3fc;" data-gtest-stamp="' + idx + '">🧪 +1 stamp</button>' +
-        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#7c3aed;border-color:#c4b5fd;" data-gtest-quest="' + idx + '">🧪 Complete Quests</button>' +
-        '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;color:#dc2626;border-color:#fca5a5;" data-greset-quest="' + idx + '">🔄 Reset Quests</button>' +
         '<button type="button" class="btn" style="padding:4px 10px;font-size:12px;' + _lineToggleStyle + '" data-line-toggle="' + idx + '">' + _lineToggleLabel + '</button>';
       tbody.appendChild(statsBox);
       const resetBtn = statsBox.querySelector('[data-greset="' + idx + '"]');
@@ -6417,94 +6412,11 @@ function initAdminMembers(){
           renderMembers();
         };
       }
-      const resetTrophyBtn = statsBox.querySelector('[data-greset-trophy="' + idx + '"]');
-      if (resetTrophyBtn) {
-        resetTrophyBtn.onclick = () => {
-          if (!confirm('Reset สถานะรางวัล Trophy ของ "' + m.name + '"?\n(points ยังคงเดิม)')) return;
-          const cur = _getGamificationUser(m.name);
-          const trophyKeys = ['100','300','600','1000'];
-          _saveGamificationUser(m.name, {
-            ...cur,
-            claimedTiers: (cur.claimedTiers||[]).filter(k => !trophyKeys.includes(k)),
-            pendingTiers: (cur.pendingTiers||[]).filter(k => !trophyKeys.includes(k))
-          });
-          toast('✅ Reset Trophy rewards ของ ' + m.name + ' แล้ว');
-          renderMembers();
-        };
-      }
-      const resetStampsBtn = statsBox.querySelector('[data-greset-stamps="' + idx + '"]');
-      if (resetStampsBtn) {
-        resetStampsBtn.onclick = () => {
-          if (!confirm('Reset สถานะรางวัล Stamp ของ "' + m.name + '"?\n(stamps ยังคงเดิม)')) return;
-          const cur = _getGamificationUser(m.name);
-          const stampKeys = ['stamps_3','stamps_7','stamps_15'];
-          _saveGamificationUser(m.name, {
-            ...cur,
-            claimedTiers: (cur.claimedTiers||[]).filter(k => !stampKeys.includes(k)),
-            pendingTiers: (cur.pendingTiers||[]).filter(k => !stampKeys.includes(k))
-          });
-          toast('✅ Reset Stamp rewards ของ ' + m.name + ' แล้ว');
-          renderMembers();
-        };
-      }
       const testBtn = statsBox.querySelector('[data-gtest="' + idx + '"]');
       if (testBtn) {
         testBtn.onclick = () => {
           awardPoints(m.name, 1, 'admin_test');
           toast('🧪 เพิ่ม 100pt ให้ ' + m.name + ' แล้ว');
-          renderMembers();
-        };
-      }
-      const testStampBtn = statsBox.querySelector('[data-gtest-stamp="' + idx + '"]');
-      if (testStampBtn) {
-        testStampBtn.onclick = () => {
-          const cur = _getGamificationUser(m.name);
-          _saveGamificationUser(m.name, {
-            ...cur,
-            stamps: (Number(cur.stamps) || 0) + 1,
-            lastStampDate: getDateKey(new Date())
-          });
-          toast('🧪 เพิ่ม 1 stamp ให้ ' + m.name + ' แล้ว');
-          renderMembers();
-        };
-      }
-      const testQuestBtn = statsBox.querySelector('[data-gtest-quest="' + idx + '"]');
-      if (testQuestBtn) {
-        testQuestBtn.onclick = () => {
-          const state = _getGamificationUser(m.name);
-          const todayKey = getDateKey(new Date());
-          let quests = state.bonusQuests || [];
-          if (quests.length === 0 || quests[0].date !== todayKey) {
-            quests = _pickRandomBonusQuests(m.name);
-          }
-          const updatedBonus = quests.map(q => ({
-            ...q, progress: Number(q.target)||1,
-            date: todayKey, claimed: false
-          }));
-          const mainQuest = state.dailyQuest || _generateQuestFromRecommendation(m.name);
-          const updatedMain = mainQuest ? {
-            ...mainQuest, progress: Number(mainQuest.target)||1,
-            date: todayKey, claimed: false
-          } : null;
-          _saveGamificationUser(m.name, {
-            ...state, bonusQuests: updatedBonus, dailyQuest: updatedMain
-          });
-          toast('🧪 Force complete quests ของ ' + m.name + ' แล้ว');
-          renderMembers();
-        };
-      }
-      const resetQuestBtn = statsBox.querySelector('[data-greset-quest="' + idx + '"]');
-      if (resetQuestBtn) {
-        resetQuestBtn.onclick = () => {
-          if (!confirm('Reset quests ของ "' + m.name + '"?')) return;
-          const cur = _getGamificationUser(m.name);
-          _saveGamificationUser(m.name, {
-            ...cur,
-            bonusQuests: [],
-            dailyQuest: null,
-            questSalt: (Number(cur.questSalt) || 0) + 1
-          });
-          toast('✅ Reset quests ของ ' + m.name + ' แล้ว');
           renderMembers();
         };
       }
@@ -9959,7 +9871,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.53';
+  const CURRENT_VERSION = 'v46.54';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
