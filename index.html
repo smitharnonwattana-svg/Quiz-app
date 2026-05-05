@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.39 -->
+  <!-- APP_VERSION: v46.40 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.39</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.40</div>
     </div>
   </div>
 </div>
@@ -3045,6 +3045,16 @@ function navigate(page, params={}){
   const _orphanBanner = document.getElementById('_syncConflictBanner');
   if (_orphanBanner) _orphanBanner.remove();
 
+  // Clear and restart version check on navigate
+  // (prevents accumulation across page visits)
+  if (window._versionCheckInterval && window.checkVersion) {
+    clearInterval(window._versionCheckInterval);
+    window._versionCheckInterval = setInterval(
+      window.checkVersion,
+      5 * 60 * 1000
+    );
+  }
+
   // ── Auth guard: redirect to login if not logged in ──
   if(page !== 'login' && !Auth.isLoggedIn()){
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -3572,7 +3582,11 @@ function initTake(id){
       return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
     });
     const usedSeconds=st.startedAt?Math.min(Math.floor((Date.now()-st.startedAt)/1000),exam.durationSeconds):0;
-    const takerName=st.takerName||localStorage.getItem(LAST_TAKER_KEY)||'';
+    const takerName = st.takerName || '';
+    if (!takerName) {
+      toast('⚠️ ไม่พบชื่อผู้สอบ กรุณาออกแล้วเริ่มใหม่');
+      return;
+    }
     const savedS=Store.load();
     const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion};
     savedS.attempts.unshift(_newAttempt);
@@ -9530,7 +9544,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.39';
+  const CURRENT_VERSION = 'v46.40';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
@@ -9560,7 +9574,8 @@ function initEntranceCompare(params) {
   });
 
   // Check every 5 minutes while app is open
-  setInterval(checkVersion, CHECK_INTERVAL);
+  window.checkVersion = checkVersion;
+  window._versionCheckInterval = setInterval(checkVersion, CHECK_INTERVAL);
 
   // Check when app comes back to foreground
   document.addEventListener('visibilitychange', () => {
