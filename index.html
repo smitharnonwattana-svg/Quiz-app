@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.58 -->
+  <!-- APP_VERSION: v46.59 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -720,6 +720,7 @@
     /* Prevent double-tap zoom on buttons and inputs */
     button, .btn, input, input[type=button], select, label {
       touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     /* Prevent overscroll bounce on iOS/iPadOS */
     html { overscroll-behavior: none; }
@@ -835,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.58</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.59</div>
     </div>
   </div>
 </div>
@@ -9876,7 +9877,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.58';
+  const CURRENT_VERSION = 'v46.59';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
