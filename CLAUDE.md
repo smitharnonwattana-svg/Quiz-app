@@ -93,3 +93,33 @@ git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 
 หมายเหตุ: ถ้า ~/.claude/settings.json ไม่มี GITHUB_PAT
 → แจ้งผู้ใช้ว่า "ต้องสร้าง .claude-local ก่อน กรุณาให้ GITHUB_PAT"
+
+---
+
+## AI Coding Guidelines (Karpathy-inspired)
+
+### 1. Think Before Coding
+- State assumptions explicitly before implementing
+- If multiple interpretations exist, present them — don't pick silently
+- If a simpler approach exists, say so and push back when warranted
+- If something is unclear, STOP — name what's confusing and ask
+
+### 2. Simplicity First
+- Minimum code that solves the problem. Nothing speculative.
+- No features beyond what was asked
+- No abstractions for single-use code
+- No "flexibility" or "configurability" that wasn't requested
+- If you write 200 lines and it could be 50, rewrite it
+
+### 3. Surgical Changes
+- Touch only what you must. Clean up only your own mess.
+- Don't "improve" adjacent code, comments, or formatting
+- Don't refactor things that aren't broken
+- Match existing style, even if you'd do it differently
+- If you notice unrelated dead code, MENTION it — don't delete it
+- Remove imports/variables/functions only if YOUR change made them orphans
+
+### 4. Verify Before Claiming Done
+- Re-read your output before saying it's complete
+- Check that every requirement from the spec is addressed
+- If you skipped something, say so explicitly — don't silently omit
