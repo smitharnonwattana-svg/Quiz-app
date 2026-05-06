@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.73 -->
+  <!-- APP_VERSION: v46.74 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.73</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.74</div>
     </div>
   </div>
 </div>
@@ -2311,7 +2311,8 @@ const Store = {
     const _cloudCount = Array.isArray(cloud.attempts) ? cloud.attempts.length : 0;
     const _localCountBefore = Array.isArray(_local.attempts) ? _local.attempts.length : 0;
     let _preserved = 0;
-    if (Array.isArray(cloud.attempts) && Array.isArray(_local.attempts)) {
+    const _isPending = localStorage.getItem('nanont:syncPending') === '1';
+    if (_isPending && Array.isArray(cloud.attempts) && Array.isArray(_local.attempts)) {
       const _cloudIds = new Set(cloud.attempts.map(a => a.id));
       const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
       _preserved = _localOnly.length;
@@ -2323,9 +2324,10 @@ const Store = {
           _seen.add(a.id);
           return true;
         });
-        console.log('[forcePull] preserved', _localOnly.length, 'local-only attempts');
+        console.log('[forcePull] preserved', _localOnly.length, 'unpushed local-only attempts');
       }
     }
+    // else: pendingSync='' → trust cloud as-is; deletions propagate
     cloud._savedAt = Date.now();
     localStorage.setItem(this.key, JSON.stringify(cloud));
     console.log('[forcePull] complete — cloud:', _cloudCount, 'localBefore:', _localCountBefore, 'preserved:', _preserved);
@@ -2411,7 +2413,8 @@ const Store = {
         }
         const _localHasData = _localTs > 0;
         if (!_localHasData || _cloudTs > _localTs) {
-          if (_localHasData && Array.isArray(_local.attempts)
+          const _isPending = localStorage.getItem('nanont:syncPending') === '1';
+          if (_isPending && _localHasData && Array.isArray(_local.attempts)
               && Array.isArray(cloudData.attempts)) {
             try {
               const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
@@ -2430,12 +2433,13 @@ const Store = {
                   return true;
                 });
                 cloudData.attempts = _deduped;
-                console.log('[listenDoc] bidirectional merge:',
+                console.log('[listenDoc] bidirectional merge (pending):',
                   'localOnly:', _localOnly.length,
                   'cloudOnly:', _cloudOnly.length);
               }
             } catch(e) {}
           }
+          // else: pendingSync='' → trust cloud as-is; deletions propagate
           localStorage.setItem(this.key, JSON.stringify(cloudData));
           _updateBellBadge();
         } else {
@@ -10296,7 +10300,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.73';
+  const CURRENT_VERSION = 'v46.74';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
