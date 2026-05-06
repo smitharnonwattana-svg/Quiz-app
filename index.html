@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.74 -->
+  <!-- APP_VERSION: v46.75 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.74</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.75</div>
     </div>
   </div>
 </div>
@@ -2517,12 +2517,10 @@ const Store = {
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
-      const safeSoftRefresh = ['stats'];
+      const safeSoftRefresh = ['home','stats'];
       const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
-        // Never auto re-render home — WHOOP loads once on navigate
-        if (pg === 'home') return;
         navigate(pg, window._currentParams||{});
       } else if(pg && pg === 'admin'){
         // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
@@ -3173,13 +3171,18 @@ function renderHome(){
   let teacherMembers = [];
   if (isTeacher) {
     teacherMembers = (Auth.getMembers() || []).slice(0, 3);
-    initialUserId = teacherMembers[0] ? teacherMembers[0].name : null;
+    // Preserve previously selected WHOOP tab across re-renders if still valid
+    const _saved = window._currentWhoopUserId;
+    const _savedValid = _saved && teacherMembers.some(m => m.name === _saved);
+    initialUserId = _savedValid
+      ? _saved
+      : (teacherMembers[0] ? teacherMembers[0].name : null);
     window._currentWhoopUserId = initialUserId;
     teacherTabsHtml = `
       <div id="whoopTabs" style="display:flex;gap:6px;margin:6px 0 8px;flex-wrap:wrap;">
-        ${teacherMembers.map((mb, i) => `
-          <button type="button" class="whoopTab" data-name="${esc(mb.name)}" data-idx="${i}"
-                  style="${tabStyle(i === 0)}">${esc(mb.name)}</button>
+        ${teacherMembers.map((mb) => `
+          <button type="button" class="whoopTab" data-name="${esc(mb.name)}"
+                  style="${tabStyle(mb.name === initialUserId)}">${esc(mb.name)}</button>
         `).join('')}
       </div>
     `;
@@ -10300,7 +10303,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.74';
+  const CURRENT_VERSION = 'v46.75';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
