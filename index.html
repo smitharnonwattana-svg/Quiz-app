@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.72 -->
+  <!-- APP_VERSION: v46.73 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.72</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.73</div>
     </div>
   </div>
 </div>
@@ -1280,6 +1280,7 @@
         <button id="statsBtnExport" class="btn btnPrimary" style="font-size:13px;">⬇️ ดาวน์โหลด</button>
         <label class="btn" style="font-size:13px;">นำเข้า<input id="statsFileImport" type="file" accept=".xlsx" style="display:none;" /></label>
         <button id="statsBtnForceSync" class="btn" style="font-size:13px;">🔄 ดึงข้อมูลล่าสุด</button>
+        <button id="statsBtnForcePush" class="btn" style="font-size:13px;">📤 ดันขึ้น cloud</button>
         <button id="statsBtnClear" class="btn" style="font-size:13px;">ล้างสถิติ</button>
       </div>
     </div>
@@ -2112,6 +2113,30 @@ function _updateOfflineBanner() {
   } catch(e) {}
 }
 
+async function _testSync() {
+  if (typeof toast === 'function') toast('⏳ กำลังทดสอบ sync...');
+  if (!FirebaseSync.ready()) {
+    if (typeof toast === 'function') toast('❌ FirebaseSync ไม่ ready — เครื่องนี้ offline');
+    return;
+  }
+  try {
+    const _ts = Date.now();
+    const _payload = { test: true, ts: _ts, origin: location.hostname || 'unknown' };
+    const _ok = await FirebaseSync.saveDoc('syncTest', _payload);
+    if (!_ok) { toast('❌ Write ล้มเหลว'); return; }
+    const _back = await FirebaseSync.loadDoc('syncTest');
+    if (!_back) { toast('❌ Read-back ได้ null — server อาจไม่ได้รับ write'); return; }
+    if (_back.ts === _ts) {
+      toast('✅ Server ยืนยันรับ write — sync ใช้ได้ ✓');
+    } else {
+      toast('⚠️ Read-back ได้คนละชุด — local cache vs server ไม่ตรง (ts diff: ' + (_ts - _back.ts) + 'ms)');
+    }
+  } catch(e) {
+    console.error('[testSync] failed', e);
+    if (typeof toast === 'function') toast('❌ ทดสอบล้มเหลว: ' + (e && e.message ? e.message : 'unknown'));
+  }
+}
+
 // ===================== STORE =====================
 const Store = {
   lastError:null,
@@ -2283,9 +2308,13 @@ const Store = {
     const cloud = await FirebaseSync.loadDoc('mainStore');
     if(!cloud) throw new Error('cloud empty or unreachable');
     const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
+    const _cloudCount = Array.isArray(cloud.attempts) ? cloud.attempts.length : 0;
+    const _localCountBefore = Array.isArray(_local.attempts) ? _local.attempts.length : 0;
+    let _preserved = 0;
     if (Array.isArray(cloud.attempts) && Array.isArray(_local.attempts)) {
       const _cloudIds = new Set(cloud.attempts.map(a => a.id));
       const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
+      _preserved = _localOnly.length;
       if (_localOnly.length > 0) {
         const _all = [..._localOnly, ...cloud.attempts];
         const _seen = new Set();
@@ -2299,11 +2328,41 @@ const Store = {
     }
     cloud._savedAt = Date.now();
     localStorage.setItem(this.key, JSON.stringify(cloud));
-    console.log('[forcePull] complete — local now reflects cloud');
+    console.log('[forcePull] complete — cloud:', _cloudCount, 'localBefore:', _localCountBefore, 'preserved:', _preserved);
+    return { cloudAttempts: _cloudCount, localAttemptsBefore: _localCountBefore, preserved: _preserved };
+  },
+  // Force push local mainStore + verify server actually received it
+  // by reading back from {source:'server'} and comparing _savedAt.
+  // Returns {written, serverTs, match, localAttempts, serverAttempts}.
+  async forcePushToCloud(){
+    if (!FirebaseSync.ready()) throw new Error('Firebase ไม่พร้อม');
+    const _raw = localStorage.getItem(this.key);
+    if (!_raw) throw new Error('localStorage ว่าง');
+    let _data;
+    try { _data = JSON.parse(_raw); } catch(e) { throw new Error('localStorage parse err'); }
+    if (!_data || !Array.isArray(_data.attempts)) throw new Error('local data ไม่ถูกต้อง');
+    _data._savedAt = Date.now();
+    localStorage.setItem(this.key, JSON.stringify(_data));
+    const _ok = await FirebaseSync.saveDoc('mainStore', _data);
+    if (!_ok) throw new Error('saveDoc returned false');
+    const _verified = await FirebaseSync.loadDoc('mainStore');
+    if (!_verified) throw new Error('read-back ได้ null — server อาจไม่ได้รับ');
+    return {
+      written: _data._savedAt,
+      serverTs: _verified._savedAt || 0,
+      match: (_verified._savedAt || 0) === _data._savedAt,
+      localAttempts: _data.attempts.length,
+      serverAttempts: Array.isArray(_verified.attempts) ? _verified.attempts.length : 0
+    };
   },
   // Retry-pending pushes that failed earlier because Firebase wasn't ready
   flushPendingSync(){
     if (!FirebaseSync.ready()) return;
+    // Flush weakness pending (per-user flags) — independent of mainStore
+    if (typeof WeaknessTracker !== 'undefined' && WeaknessTracker.flushPendingWeaknesses) {
+      WeaknessTracker.flushPendingWeaknesses();
+    }
+    // Flush mainStore pending
     if (localStorage.getItem('nanont:syncPending') !== '1') return;
     const _raw = localStorage.getItem(this.key);
     if (!_raw) { localStorage.removeItem('nanont:syncPending'); return; }
@@ -3130,7 +3189,10 @@ function renderHome(){
           <h1 class="h1">My Exam Academia</h1>
           <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
         </div>
-        <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn" onclick="_testSync()" style="font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
+          <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
+        </div>
       </div>
 
       <div id="whoopSection" style="margin-top:14px;padding:12px 12px 4px;border:1px solid #e5e7eb;border-radius:14px;background:#fafafa;">
@@ -5440,12 +5502,30 @@ function initStats(){
   document.getElementById('statsBtnForceSync').onclick = async ()=>{
     toast('⏳ กำลังดึงข้อมูลล่าสุด...');
     try {
-      await Store.forcePullFromCloud();
-      toast('✅ ดึงข้อมูลล่าสุดสำเร็จ');
+      const r = await Store.forcePullFromCloud();
+      const _msg = '✅ ดึงสำเร็จ — cloud: ' + r.cloudAttempts + ' / local-เดิม: ' + r.localAttemptsBefore + (r.preserved ? ' (กู้ ' + r.preserved + ' จาก local)' : '');
+      toast(_msg);
       render();
     } catch(e) {
       console.error('[forcePull] failed', e);
       toast('⚠️ ดึงข้อมูลไม่สำเร็จ — ' + (e && e.message ? e.message : 'unknown'));
+    }
+  };
+
+  document.getElementById('statsBtnForcePush').onclick = async ()=>{
+    if(!confirm('ดันข้อมูลของเครื่องนี้ขึ้น cloud + verify?\n\n⚠️ จะทับข้อมูลใน cloud (ถ้าเครื่องอื่นมีข้อมูลใหม่กว่า อาจหาย)')) return;
+    toast('⏳ กำลัง push + verify...');
+    try {
+      const r = await Store.forcePushToCloud();
+      if (r.match && r.serverAttempts === r.localAttempts) {
+        toast('✅ Server ยืนยันรับ ' + r.serverAttempts + ' attempts (ตรงกับ local)');
+      } else {
+        toast('⚠️ Push สำเร็จแต่ verify ไม่ตรง — local: ' + r.localAttempts + ' / server: ' + r.serverAttempts + ' (ts match: ' + r.match + ')');
+      }
+      render();
+    } catch(e) {
+      console.error('[forcePush] failed', e);
+      toast('❌ Push ล้มเหลว: ' + (e && e.message ? e.message : 'unknown'));
     }
   };
 
@@ -7845,8 +7925,46 @@ const WeaknessTracker = (() => {
   function _saveLocal(u, d) { try { localStorage.setItem(_lsKey(u), JSON.stringify(d)); } catch(e) {} }
 
   async function _saveToCloud(u, d) {
+    if (!u) return;
+    const sanitized = _sanitize(u);
+    const flagKey = 'nanont:weaknessSyncPending_' + sanitized;
+    if (!FirebaseSync.ready()) {
+      try { localStorage.setItem(flagKey, '1'); } catch(e) {}
+      console.warn('[Weakness._saveToCloud] FirebaseSync NOT ready — queued', u);
+      return;
+    }
+    try { localStorage.setItem(flagKey, '1'); } catch(e) {}
+    try {
+      await FirebaseSync.saveDoc(_fsDocId(u), d);
+      try { localStorage.removeItem(flagKey); } catch(e) {}
+    } catch(e) {
+      console.error('[Weakness._saveToCloud] failed', e);
+    }
+  }
+
+  async function flushPendingWeaknesses() {
     if (!FirebaseSync.ready()) return;
-    try { await FirebaseSync.saveDoc(_fsDocId(u), d); } catch(e) { console.warn('weakness sync err', e); }
+    const _PREFIX = 'nanont:weaknessSyncPending_';
+    const _flags = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(_PREFIX) === 0 && localStorage.getItem(k) === '1') _flags.push(k);
+    }
+    for (const flagKey of _flags) {
+      const sanitized = flagKey.substring(_PREFIX.length);
+      const dataKey = LS_PREFIX + sanitized;
+      const docId = 'weaknesses_' + sanitized;
+      const _raw = localStorage.getItem(dataKey);
+      if (!_raw) { try { localStorage.removeItem(flagKey); } catch(e) {} continue; }
+      try {
+        const _data = JSON.parse(_raw);
+        await FirebaseSync.saveDoc(docId, _data);
+        try { localStorage.removeItem(flagKey); } catch(e) {}
+        console.log('[flushPendingWeaknesses] flushed', sanitized);
+      } catch(e) {
+        console.error('[flushPendingWeaknesses] failed for', sanitized, e);
+      }
+    }
   }
 
   function _processAttemptIntoItems(items, attempt) {
@@ -7935,7 +8053,8 @@ const WeaknessTracker = (() => {
 
   return { updateWeaknessAfterSubmit, getActiveWeaknessesForUser, getAllWeaknessesForUser,
     resetWeaknessesForUser, countWeaknessesByExam, countWeaknessesBySubject,
-    buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser };
+    buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser,
+    flushPendingWeaknesses };
 })();
 
 // ===================== STAGE 1: Focus Subjects + Daily Context =====================
@@ -10177,7 +10296,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.72';
+  const CURRENT_VERSION = 'v46.73';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
