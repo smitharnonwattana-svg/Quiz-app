@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.66 -->
+  <!-- APP_VERSION: v46.67 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.66</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.67</div>
     </div>
   </div>
 </div>
@@ -2176,8 +2176,15 @@ const Store = {
     try{
       // Only overwrite local if cloud is strictly newer
       const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
-      const _localTs = _local._savedAt || 0;
+      let _localTs = _local._savedAt || 0;
       const _cloudTs = cloud._savedAt || 0;
+      const _now = Date.now();
+      if (_localTs > _now + 300000) {
+        console.warn('[sync] stuck timestamp detected, resetting');
+        _local._savedAt = 0;
+        _localTs = 0;
+        localStorage.setItem(this.key, JSON.stringify(_local));
+      }
       const _localHasData = _localTs > 0;
       if (!_localHasData || _cloudTs > _localTs) {
         // Cloud is newer — but merge attempts to prevent data loss
@@ -2241,8 +2248,15 @@ const Store = {
         // Only accept cloud data if it's strictly newer
         // AND local data exists and has been saved recently
         const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
-        const _localTs = _local._savedAt || 0;
+        let _localTs = _local._savedAt || 0;
         const _cloudTs = cloudData._savedAt || 0;
+        const _now = Date.now();
+        if (_localTs > _now + 300000) {
+          console.warn('[listenDoc] stuck timestamp detected, resetting');
+          _local._savedAt = 0;
+          _localTs = 0;
+          localStorage.setItem(this.key, JSON.stringify(_local));
+        }
         const _localHasData = _localTs > 0;
         if (!_localHasData || _cloudTs > _localTs) {
           if (_localHasData && Array.isArray(_local.attempts)
@@ -2328,6 +2342,7 @@ const Store = {
             if (_changed) {
               localStorage.setItem(this.key, JSON.stringify(_local));
               _updateBellBadge();
+              if (FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', _local).catch(()=>{});
               console.log('[listenDoc] local-wins: merged assignments/gamification');
             }
           } catch(e) {}
@@ -10036,7 +10051,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.66';
+  const CURRENT_VERSION = 'v46.67';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
