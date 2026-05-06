@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.63 -->
+  <!-- APP_VERSION: v46.64 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.63</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.64</div>
     </div>
   </div>
 </div>
@@ -2237,6 +2237,51 @@ const Store = {
             } catch(e) {}
           }
           localStorage.setItem(this.key, JSON.stringify(cloudData));
+        } else {
+          // Local is newer — but still merge assignments and gamification
+          // to ensure non-attempt data stays in sync across devices
+          try {
+            let _changed = false;
+
+            // Merge assignments — union by id
+            if (Array.isArray(cloudData.assignments) &&
+                Array.isArray(_local.assignments)) {
+              const _localAssignIds = new Set(
+                _local.assignments.map(a => a.id)
+              );
+              const _newAssigns = cloudData.assignments
+                .filter(a => !_localAssignIds.has(a.id));
+              if (_newAssigns.length > 0) {
+                _local.assignments = [..._local.assignments, ..._newAssigns];
+                _changed = true;
+                console.log('[listenDoc] merged',
+                  _newAssigns.length, 'new assignments');
+              }
+              // Also sync status changes (pending→done/cancelled)
+              cloudData.assignments.forEach(ca => {
+                const li = _local.assignments.findIndex(a => a.id === ca.id);
+                if (li !== -1 && _local.assignments[li].status !== ca.status) {
+                  _local.assignments[li].status = ca.status;
+                  _changed = true;
+                }
+              });
+            }
+
+            // Merge gamification — take cloud values if user has data there
+            if (cloudData.gamification && _local.gamification) {
+              Object.keys(cloudData.gamification).forEach(userId => {
+                if (!_local.gamification[userId]) {
+                  _local.gamification[userId] = cloudData.gamification[userId];
+                  _changed = true;
+                }
+              });
+            }
+
+            if (_changed) {
+              localStorage.setItem(this.key, JSON.stringify(_local));
+              console.log('[listenDoc] local-wins: merged assignments/gamification');
+            }
+          } catch(e) {}
         }
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
@@ -9939,7 +9984,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.63';
+  const CURRENT_VERSION = 'v46.64';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
