@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.76 -->
+  <!-- APP_VERSION: v46.77 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.76</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.77</div>
     </div>
   </div>
 </div>
@@ -3231,6 +3231,16 @@ function renderHome(){
 
   // ── teacher: initial cloud fetch, then wire up tab clicks ─
   if (isTeacher && initialUserId) {
+    // Pre-fetch all members' weakness once per session so per-student
+    // weakness counts on the exam selection page are accurate.
+    if (!window._teacherWeaknessPrefetched) {
+      window._teacherWeaknessPrefetched = true;
+      (Auth.getMembers() || []).forEach(m => {
+        if (m && m.name && m.name !== initialUserId) {
+          fetchWeaknessFromCloud(m.name).catch(()=>{});
+        }
+      });
+    }
     const body = homeEl.querySelector('#whoopBody');
     if (body) body.innerHTML = loadingHtml;
     if (!_whoopFetching) {
@@ -3827,10 +3837,12 @@ function initExams(){
           const uPct=uLast&&uLast.total?Math.round((uLast.score||0)/uLast.total*100):0;
           const uWc=WeaknessTracker.countWeaknessesByExam(uName,e.id);
           const wLine=uWc>0?`<div style="font-size:11px;color:#dc2626;margin-top:2px;">⚠️ จุดอ่อน: ${uWc} ข้อ</div>`:'';
+          const resetBtnHtml=uWc>0?`<button data-resetweakness="${esc(uName)}" style="margin-top:4px;padding:3px 8px;font-size:11px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-weight:600;">🧹 ล้างจุดอ่อนชุดนี้</button>`:'';
           return `<div style="margin-top:6px;padding:6px 8px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
             <div style="font-size:12px;font-weight:700;color:#374151;">${esc(uName)}</div>
             <div style="font-size:11px;color:#6b7280;margin-top:1px;">🏆 ${uBest}/${e.questionCount} &nbsp;•&nbsp; ล่าสุด ${uLast.score||0}/${uLast.total||0} (${uPct}%) &nbsp;•&nbsp; ${uAtts.length} ครั้ง</div>
             ${wLine}
+            ${resetBtnHtml}
           </div>`;
         }).join('');
       })():'';
@@ -3940,8 +3952,24 @@ function initExams(){
         });
       }
 
-      card.onclick=(ev)=>{
+      card.onclick=async (ev)=>{
         if(_editMode) return; // ไม่ navigate ตอน edit mode
+
+        const resetEl = ev.target.closest('[data-resetweakness]');
+        if (resetEl) {
+          ev.stopPropagation();
+          const uName = resetEl.getAttribute('data-resetweakness');
+          if (!confirm('ล้างจุดอ่อนของ "' + uName + '" สำหรับชุดนี้?\n\n⚠️ ไม่สามารถกู้คืนได้')) return;
+          try {
+            await WeaknessTracker.resetWeaknessesForUserAndExam(uName, e.id);
+            toast('✅ ล้างจุดอ่อนของ "' + uName + '" สำเร็จ');
+            navigate('exams', window._currentParams||{});
+          } catch(err) {
+            console.error('[resetWeakness] failed', err);
+            toast('⚠️ ล้างจุดอ่อนไม่สำเร็จ');
+          }
+          return;
+        }
 
         if(ev.target.closest('[data-practiceexam]')){
           navigate('practice',{examId:e.id});
@@ -8035,6 +8063,18 @@ const WeaknessTracker = (() => {
     return Object.values(_loadLocal(userId)).filter(w => w.status === 'active' && w.examId === examId).length;
   }
 
+  async function resetWeaknessesForUserAndExam(userId, examId) {
+    if (!userId || !examId) return;
+    const items = _loadLocal(userId);
+    const filtered = {};
+    Object.keys(items).forEach(k => {
+      const w = items[k];
+      if (w && w.examId !== examId) filtered[k] = w;
+    });
+    _saveLocal(userId, filtered);
+    await _saveToCloud(userId, filtered);
+  }
+
   function countWeaknessesBySubject(userId, subject) {
     return Object.values(_loadLocal(userId)).filter(w => w.status === 'active' && w.subject === subject).length;
   }
@@ -8060,7 +8100,8 @@ const WeaknessTracker = (() => {
   }
 
   return { updateWeaknessAfterSubmit, getActiveWeaknessesForUser, getAllWeaknessesForUser,
-    resetWeaknessesForUser, countWeaknessesByExam, countWeaknessesBySubject,
+    resetWeaknessesForUser, resetWeaknessesForUserAndExam,
+    countWeaknessesByExam, countWeaknessesBySubject,
     buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser,
     flushPendingWeaknesses };
 })();
@@ -10304,7 +10345,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.76';
+  const CURRENT_VERSION = 'v46.77';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
