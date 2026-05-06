@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.59 -->
+  <!-- APP_VERSION: v46.60 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.59</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.60</div>
     </div>
   </div>
 </div>
@@ -2152,11 +2152,43 @@ const Store = {
       const _cloudTs = cloud._savedAt || 0;
       const _localHasData = _localTs > 0;
       if (!_localHasData || _cloudTs > _localTs) {
+        // Cloud is newer — but merge attempts to prevent data loss
+        try {
+          const _localIds = new Set((_local.attempts||[]).map(a => a.id));
+          const _missingAttempts = (cloud.attempts||[])
+            .filter(a => !_localIds.has(a.id));
+          if (_missingAttempts.length > 0 && _localHasData) {
+            // Merge missing attempts from cloud into local
+            cloud.attempts = [
+              ...(_missingAttempts),
+              ...(cloud.attempts||[]).filter(a => _localIds.has(a.id))
+            ];
+            console.log('[Store] merged', _missingAttempts.length,
+              'local attempts into cloud');
+          }
+        } catch(e) {}
         localStorage.setItem(this.key, JSON.stringify(cloud));
       } else {
         console.log('[Store] syncFromCloud: local is newer, keeping local');
-        // Push local data back to cloud to fix stale cloud
-        if(FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', _local).catch(()=>{});
+        // Merge any attempts from cloud not in local
+        try {
+          const _cloudIds = new Set((cloud.attempts||[]).map(a => a.id));
+          const _missingFromCloud = (_local.attempts||[])
+            .filter(a => !_cloudIds.has(a.id));
+          if (_missingFromCloud.length > 0) {
+            _local.attempts = [
+              ...(_missingFromCloud),
+              ...(_local.attempts||[])
+            ];
+            console.log('[Store] merged', _missingFromCloud.length,
+              'cloud attempts into local');
+          }
+        } catch(e) {}
+        // Push merged local back to cloud
+        _local._savedAt = Date.now();
+        localStorage.setItem(this.key, JSON.stringify(_local));
+        if(FirebaseSync.ready())
+          FirebaseSync.saveDoc('mainStore', _local).catch(()=>{});
       }
     }catch(e){}
     console.log('[Store] synced from cloud');
@@ -9877,7 +9909,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.59';
+  const CURRENT_VERSION = 'v46.60';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
