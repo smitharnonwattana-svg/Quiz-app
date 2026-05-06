@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.78 -->
+  <!-- APP_VERSION: v46.79 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.78</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.79</div>
     </div>
   </div>
 </div>
@@ -3979,7 +3979,9 @@ function initExams(){
           try {
             await WeaknessTracker.resetWeaknessesForUserAndExam(uName, e.id);
             toast('✅ ล้างจุดอ่อนของ "' + uName + '" สำเร็จ');
-            navigate('exams', window._currentParams||{});
+            if (typeof renderExams === 'function') {
+              try { renderExams(); } catch(err) {}
+            }
           } catch(err) {
             console.error('[resetWeakness] failed', err);
             toast('⚠️ ล้างจุดอ่อนไม่สำเร็จ');
@@ -5413,31 +5415,50 @@ function initStats(){
     if(!section||!rowsEl||!Auth.isTeacher()) return;
 
     const s=Store.load();
+    const validExamIds = new Set((s.exams||[]).map(e => e.id));
     const allUsers=[...new Set((s.attempts||[]).map(a=>a.takerName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));
     const userData=allUsers.map(u=>{
       const activeW=WeaknessTracker.getActiveWeaknessesForUser(u);
       if(!activeW.length) return null;
       const bySubject={};
-      activeW.forEach(w=>{ const subj=w.subject||'ไม่ระบุ'; bySubject[subj]=(bySubject[subj]||0)+1; });
-      return {userId:u,bySubject,total:activeW.length};
+      let orphanCount=0;
+      activeW.forEach(w=>{
+        const subj=w.subject||'ไม่ระบุ';
+        if(!bySubject[subj]) bySubject[subj]={total:0,orphan:0};
+        bySubject[subj].total += 1;
+        if(!validExamIds.has(w.examId)){
+          bySubject[subj].orphan += 1;
+          orphanCount += 1;
+        }
+      });
+      return {userId:u,bySubject,total:activeW.length,orphanCount};
     }).filter(Boolean);
 
     if(!userData.length){section.style.display='none';return;}
     section.style.display='block';
     rowsEl.innerHTML='';
-    userData.forEach(({userId,bySubject,total})=>{
+    userData.forEach(({userId,bySubject,total,orphanCount})=>{
       const div=document.createElement('div');
       div.className='card';
       div.style.cssText='padding:14px 16px;';
-      const subjectLines=Object.entries(bySubject).sort((a,b)=>b[1]-a[1])
-        .map(([subj,cnt])=>`<div style="font-size:13px;color:#374151;">${esc(subj)}: <b>${cnt} ข้อ</b></div>`).join('');
+      const subjectLines=Object.entries(bySubject).sort((a,b)=>b[1].total-a[1].total)
+        .map(([subj,c])=>{
+          const orphanNote = c.orphan>0 ? ` <span style="color:#9ca3af;font-size:12px;">(orphan: ${c.orphan})</span>` : '';
+          return `<div style="font-size:13px;color:#374151;">${esc(subj)}: <b>${c.total} ข้อ</b>${orphanNote}</div>`;
+        }).join('');
+      const orphanBtn = orphanCount > 0
+        ? `<button class="btn" data-cleanorphan="${esc(userId)}" style="padding:6px 12px;font-size:12px;color:#92400e;border-color:#fde68a;background:#fef3c7;white-space:nowrap;flex-shrink:0;margin-right:6px;">🧹 ล้าง orphan (${orphanCount})</button>`
+        : '';
       div.innerHTML=`
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
           <div>
             <div style="font-weight:800;font-size:14px;color:#111827;margin-bottom:6px;">${esc(userId)}</div>
             ${subjectLines}
           </div>
-          <button class="btn" data-resetuser="${esc(userId)}" style="padding:6px 12px;font-size:12px;color:#dc2626;border-color:#fca5a5;white-space:nowrap;flex-shrink:0;">ลบจุดอ่อน</button>
+          <div style="display:flex;flex-wrap:wrap;gap:0;">
+            ${orphanBtn}
+            <button class="btn" data-resetuser="${esc(userId)}" style="padding:6px 12px;font-size:12px;color:#dc2626;border-color:#fca5a5;white-space:nowrap;flex-shrink:0;">ลบจุดอ่อน</button>
+          </div>
         </div>`;
       rowsEl.appendChild(div);
     });
@@ -5447,6 +5468,16 @@ function initStats(){
         if(!confirm(`ต้องการลบจุดอ่อนของ ${u} ใช่หรือไม่?`)) return;
         await WeaknessTracker.resetWeaknessesForUser(u);
         toast(`ลบจุดอ่อนของ ${u} แล้ว`);
+        renderAdminWeaknessSection();
+      });
+    });
+    rowsEl.querySelectorAll('[data-cleanorphan]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const u=btn.getAttribute('data-cleanorphan');
+        if(!confirm(`ล้างจุดอ่อน orphan ของ ${u}?\n\n(จุดอ่อนจากชุดข้อสอบที่ถูกลบไปแล้ว — ไม่กระทบจุดอ่อนของชุดที่ยังมีอยู่)`)) return;
+        const validIds = (Store.load().exams||[]).map(e=>e.id);
+        const removed = await WeaknessTracker.cleanupOrphanWeaknesses(u, validIds);
+        toast(`ล้าง orphan ${removed} ข้อของ ${u} แล้ว`);
         renderAdminWeaknessSection();
       });
     });
@@ -8091,6 +8122,24 @@ const WeaknessTracker = (() => {
     await _saveToCloud(userId, filtered);
   }
 
+  // Remove weakness items whose examId is no longer in validExamIds.
+  // Useful for cleaning up data left behind by deleted/re-imported exams.
+  async function cleanupOrphanWeaknesses(userId, validExamIds) {
+    if (!userId || !Array.isArray(validExamIds)) return 0;
+    const items = _loadLocal(userId);
+    const validSet = new Set(validExamIds);
+    const filtered = {};
+    let removed = 0;
+    Object.keys(items).forEach(k => {
+      const w = items[k];
+      if (w && validSet.has(w.examId)) filtered[k] = w;
+      else removed++;
+    });
+    _saveLocal(userId, filtered);
+    await _saveToCloud(userId, filtered);
+    return removed;
+  }
+
   function countWeaknessesBySubject(userId, subject) {
     return Object.values(_loadLocal(userId)).filter(w => w.status === 'active' && w.subject === subject).length;
   }
@@ -8116,7 +8165,7 @@ const WeaknessTracker = (() => {
   }
 
   return { updateWeaknessAfterSubmit, getActiveWeaknessesForUser, getAllWeaknessesForUser,
-    resetWeaknessesForUser, resetWeaknessesForUserAndExam,
+    resetWeaknessesForUser, resetWeaknessesForUserAndExam, cleanupOrphanWeaknesses,
     countWeaknessesByExam, countWeaknessesBySubject,
     buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser,
     flushPendingWeaknesses };
@@ -10361,7 +10410,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.78';
+  const CURRENT_VERSION = 'v46.79';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
