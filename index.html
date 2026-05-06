@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.68 -->
+  <!-- APP_VERSION: v46.69 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.68</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.69</div>
     </div>
   </div>
 </div>
@@ -5357,8 +5357,18 @@ function initStats(){
   };
 
   document.getElementById('statsBtnClear').onclick=()=>{
-    if(!confirm('ล้างสถิติทั้งหมดในเครื่องนี้?')) return;
-    const s=Store.load();s.attempts=[];Store.save(s);render();
+    const _sel = document.getElementById('statsFilterStudent');
+    const _selectedUser = _sel ? _sel.value : '';
+
+    if (_selectedUser && _selectedUser !== 'all') {
+      if(!confirm('ล้างสถิติของ "' + _selectedUser + '" ใช่ไหม?\n\n⚠️ ไม่สามารถกู้คืนได้')) return;
+      const s = Store.load();
+      s.attempts = s.attempts.filter(a => a.takerName !== _selectedUser);
+      Store.save(s);
+      render();
+    } else {
+      toast('⚠️ กรุณาเลือกนักเรียนก่อนล้างสถิติ');
+    }
   };
 
   render();
@@ -10074,7 +10084,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.68';
+  const CURRENT_VERSION = 'v46.69';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
