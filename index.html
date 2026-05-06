@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.65 -->
+  <!-- APP_VERSION: v46.66 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.65</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.66</div>
     </div>
   </div>
 </div>
@@ -2267,11 +2267,30 @@ const Store = {
           localStorage.setItem(this.key, JSON.stringify(cloudData));
           _updateBellBadge();
         } else {
-          // Local is newer — but still merge assignments and gamification
-          // to ensure non-attempt data stays in sync across devices
+          // Local is newer — merge attempts + assignments + gamification
+          let _changed = false;
           try {
-            let _changed = false;
-
+            // Merge attempts bidirectionally
+            if (Array.isArray(cloudData.attempts) &&
+                Array.isArray(_local.attempts)) {
+              const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
+              const _localIds = new Set(_local.attempts.map(a => a.id));
+              const _cloudOnly = cloudData.attempts.filter(a => !_localIds.has(a.id));
+              const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
+              if (_cloudOnly.length > 0 || _localOnly.length > 0) {
+                const _merged = [..._local.attempts, ..._cloudOnly];
+                _merged.sort((a,b) =>
+                  new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
+                );
+                _local.attempts = _merged;
+                _changed = true;
+                console.log('[listenDoc] local-wins: merged attempts',
+                  'cloudOnly:', _cloudOnly.length,
+                  'localOnly:', _localOnly.length);
+              }
+            }
+          } catch(e) {}
+          try {
             // Merge assignments — union by id
             if (Array.isArray(cloudData.assignments) &&
                 Array.isArray(_local.assignments)) {
@@ -10017,7 +10036,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.65';
+  const CURRENT_VERSION = 'v46.66';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
