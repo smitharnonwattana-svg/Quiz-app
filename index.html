@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.67 -->
+  <!-- APP_VERSION: v46.68 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.67</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.68</div>
     </div>
   </div>
 </div>
@@ -2194,10 +2194,16 @@ const Store = {
             .filter(a => !_localIds.has(a.id));
           if (_missingAttempts.length > 0 && _localHasData) {
             // Merge missing attempts from cloud into local
-            cloud.attempts = [
+            const _all = [
               ...(_missingAttempts),
               ...(cloud.attempts||[]).filter(a => _localIds.has(a.id))
             ];
+            const _seen = new Set();
+            cloud.attempts = _all.filter(a => {
+              if (_seen.has(a.id)) return false;
+              _seen.add(a.id);
+              return true;
+            });
             console.log('[Store] merged', _missingAttempts.length,
               'local attempts into cloud');
           }
@@ -2211,10 +2217,16 @@ const Store = {
           const _missingFromCloud = (_local.attempts||[])
             .filter(a => !_cloudIds.has(a.id));
           if (_missingFromCloud.length > 0) {
-            _local.attempts = [
+            const _all = [
               ...(_missingFromCloud),
               ...(_local.attempts||[])
             ];
+            const _seen = new Set();
+            _local.attempts = _all.filter(a => {
+              if (_seen.has(a.id)) return false;
+              _seen.add(a.id);
+              return true;
+            });
             console.log('[Store] merged', _missingFromCloud.length,
               'cloud attempts into local');
           }
@@ -2271,7 +2283,13 @@ const Store = {
                 _allAttempts.sort((a,b) =>
                   new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
                 );
-                cloudData.attempts = _allAttempts;
+                const _seen = new Set();
+                const _deduped = _allAttempts.filter(a => {
+                  if (_seen.has(a.id)) return false;
+                  _seen.add(a.id);
+                  return true;
+                });
+                cloudData.attempts = _deduped;
                 console.log('[listenDoc] bidirectional merge:',
                   'localOnly:', _localOnly.length,
                   'cloudOnly:', _cloudOnly.length);
@@ -2296,7 +2314,13 @@ const Store = {
                 _merged.sort((a,b) =>
                   new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
                 );
-                _local.attempts = _merged;
+                const _seen = new Set();
+                const _deduped = _merged.filter(a => {
+                  if (_seen.has(a.id)) return false;
+                  _seen.add(a.id);
+                  return true;
+                });
+                _local.attempts = _deduped;
                 _changed = true;
                 console.log('[listenDoc] local-wins: merged attempts',
                   'cloudOnly:', _cloudOnly.length,
@@ -2342,7 +2366,6 @@ const Store = {
             if (_changed) {
               localStorage.setItem(this.key, JSON.stringify(_local));
               _updateBellBadge();
-              if (FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', _local).catch(()=>{});
               console.log('[listenDoc] local-wins: merged assignments/gamification');
             }
           } catch(e) {}
@@ -10051,7 +10074,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.67';
+  const CURRENT_VERSION = 'v46.68';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
