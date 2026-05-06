@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.62 -->
+  <!-- APP_VERSION: v46.63 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.62</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.63</div>
     </div>
   </div>
 </div>
@@ -2193,7 +2193,7 @@ const Store = {
     }catch(e){}
     console.log('[Store] synced from cloud');
     // Only refresh safe pages after initial sync
-    const safeSyncPages = ['home','exams','stats'];
+    const safeSyncPages = ['stats'];
     if(typeof navigate==='function' && window._currentPage && safeSyncPages.includes(window._currentPage)){
       navigate(window._currentPage, window._currentParams||{});
     }
@@ -2832,13 +2832,23 @@ function renderHome(){
       const _s = Store.load();
       const _assignments = _s.assignments || [];
       if (Auth.isTeacher()) {
-        return _assignments.filter(
+        const _pendingForUser = _assignments.filter(
           a => a.assignedTo === userId && a.status === 'pending'
-        ).length;
+        );
+        console.log('[bell] userId:', userId,
+          'total assignments:', _assignments.length,
+          'pending for user:', _pendingForUser.length,
+          'all assignedTo:', _assignments.map(a => a.assignedTo));
+        return _pendingForUser.length;
       } else {
-        return _assignments.filter(
+        const _pendingForUser = _assignments.filter(
           a => a.assignedTo === userId && a.status === 'pending'
-        ).length;
+        );
+        console.log('[bell] userId:', userId,
+          'total assignments:', _assignments.length,
+          'pending for user:', _pendingForUser.length,
+          'all assignedTo:', _assignments.map(a => a.assignedTo));
+        return _pendingForUser.length;
       }
     })();
     const _bellHtml = `
@@ -9929,7 +9939,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.62';
+  const CURRENT_VERSION = 'v46.63';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
