@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.61 -->
+  <!-- APP_VERSION: v46.62 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.61</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.62</div>
     </div>
   </div>
 </div>
@@ -2217,21 +2217,22 @@ const Store = {
         const _cloudTs = cloudData._savedAt || 0;
         const _localHasData = _localTs > 0;
         if (!_localHasData || _cloudTs > _localTs) {
-          // Cloud is newer — merge local attempts that cloud might be missing
-          if (_localHasData && Array.isArray(_local.attempts)) {
+          if (_localHasData && Array.isArray(_local.attempts)
+              && Array.isArray(cloudData.attempts)) {
             try {
-              const _cloudIds = new Set(
-                (cloudData.attempts||[]).map(a => a.id)
-              );
-              const _localOnly = _local.attempts
-                .filter(a => !_cloudIds.has(a.id));
-              if (_localOnly.length > 0) {
-                cloudData.attempts = [
-                  ...(_localOnly),
-                  ...(cloudData.attempts||[])
-                ];
-                console.log('[listenDoc] rescued',
-                  _localOnly.length, 'local-only attempts');
+              const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
+              const _localIds = new Set(_local.attempts.map(a => a.id));
+              const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
+              const _cloudOnly = cloudData.attempts.filter(a => !_localIds.has(a.id));
+              if (_localOnly.length > 0 || _cloudOnly.length > 0) {
+                const _allAttempts = [..._local.attempts, ..._cloudOnly];
+                _allAttempts.sort((a,b) =>
+                  new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
+                );
+                cloudData.attempts = _allAttempts;
+                console.log('[listenDoc] bidirectional merge:',
+                  'localOnly:', _localOnly.length,
+                  'cloudOnly:', _cloudOnly.length);
               }
             } catch(e) {}
           }
@@ -9928,7 +9929,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.61';
+  const CURRENT_VERSION = 'v46.62';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
