@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.64 -->
+  <!-- APP_VERSION: v46.65 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.64</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.65</div>
     </div>
   </div>
 </div>
@@ -2064,6 +2064,34 @@ const FirebaseSync = (() => {
   return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
 })();
 
+function _updateBellBadge() {
+  try {
+    const _uid = window._currentWhoopUserId || '';
+    if (!_uid) return;
+    const _bellEl = document.getElementById('notifBell_' + _uid);
+    if (!_bellEl) return;
+    const _s2 = Store.load();
+    const _pending = (_s2.assignments||[]).filter(
+      a => a.assignedTo === _uid && a.status === 'pending'
+    ).length;
+    let _badge = _bellEl.querySelector('span');
+    if (_pending > 0) {
+      if (!_badge) {
+        _badge = document.createElement('span');
+        _badge.style.cssText =
+          'position:absolute;top:-4px;right:-6px;' +
+          'background:#ef4444;color:#fff;border-radius:99px;' +
+          'font-size:10px;font-weight:800;min-width:16px;height:16px;' +
+          'display:flex;align-items:center;justify-content:center;padding:0 3px;';
+        _bellEl.appendChild(_badge);
+      }
+      _badge.textContent = _pending;
+    } else if (_badge) {
+      _badge.remove();
+    }
+  } catch(e) {}
+}
+
 // ===================== STORE =====================
 const Store = {
   lastError:null,
@@ -2237,6 +2265,7 @@ const Store = {
             } catch(e) {}
           }
           localStorage.setItem(this.key, JSON.stringify(cloudData));
+          _updateBellBadge();
         } else {
           // Local is newer — but still merge assignments and gamification
           // to ensure non-attempt data stays in sync across devices
@@ -2279,6 +2308,7 @@ const Store = {
 
             if (_changed) {
               localStorage.setItem(this.key, JSON.stringify(_local));
+              _updateBellBadge();
               console.log('[listenDoc] local-wins: merged assignments/gamification');
             }
           } catch(e) {}
@@ -2286,7 +2316,7 @@ const Store = {
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
-      const safeSoftRefresh = ['home','stats'].concat(window._examsEditMode ? [] : ['exams']);
+      const safeSoftRefresh = ['stats'];
       const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
@@ -2938,10 +2968,12 @@ function renderHome(){
   // ── decide initial userId + teacher tabs ──────────────
   let teacherTabsHtml = '';
   let initialUserId = isTeacher ? null : (Auth.getName() || null);
+  if (!isTeacher) window._currentWhoopUserId = initialUserId;
   let teacherMembers = [];
   if (isTeacher) {
     teacherMembers = (Auth.getMembers() || []).slice(0, 3);
     initialUserId = teacherMembers[0] ? teacherMembers[0].name : null;
+    window._currentWhoopUserId = initialUserId;
     teacherTabsHtml = `
       <div id="whoopTabs" style="display:flex;gap:6px;margin:6px 0 8px;flex-wrap:wrap;">
         ${teacherMembers.map((mb, i) => `
@@ -3020,6 +3052,7 @@ function renderHome(){
     tabs.forEach(btn => {
       btn.addEventListener('click', async () => {
         const name = btn.getAttribute('data-name');
+        window._currentWhoopUserId = name;
         const body = homeEl.querySelector('#whoopBody');
         tabs.forEach(b => { b.style.cssText = tabStyle(b === btn); });
         if (body) body.innerHTML = loadingHtml;
@@ -9984,7 +10017,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.64';
+  const CURRENT_VERSION = 'v46.65';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
