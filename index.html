@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.69 -->
+  <!-- APP_VERSION: v46.70 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.69</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.70</div>
     </div>
   </div>
 </div>
@@ -1279,6 +1279,7 @@
       <div id="statsTeacherBtns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button id="statsBtnExport" class="btn btnPrimary" style="font-size:13px;">⬇️ ดาวน์โหลด</button>
         <label class="btn" style="font-size:13px;">นำเข้า<input id="statsFileImport" type="file" accept=".xlsx" style="display:none;" /></label>
+        <button id="statsBtnForceSync" class="btn" style="font-size:13px;">🔄 ดึงข้อมูลล่าสุด</button>
         <button id="statsBtnClear" class="btn" style="font-size:13px;">ล้างสถิติ</button>
       </div>
     </div>
@@ -2165,7 +2166,10 @@ const Store = {
       data._savedAt = Date.now();
       localStorage.setItem(this.key,JSON.stringify(data));
       // async sync to Firestore (fire-and-forget, non-blocking)
-      if(FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', data).catch(()=>{});
+      if(FirebaseSync.ready()) FirebaseSync.saveDoc('mainStore', data).catch(e => {
+        console.error('[Store.save] cloud sync FAILED', e);
+        if (typeof toast === 'function') toast('⚠️ ไม่ได้ sync ขึ้น cloud — ตรวจ network');
+      });
       return true;
     } catch(e){this.lastError=String(e&&e.message?e.message:e);console.warn('Store.save failed',e);return false;}
   },
@@ -2235,7 +2239,7 @@ const Store = {
         _local._savedAt = Date.now();
         localStorage.setItem(this.key, JSON.stringify(_local));
         if(FirebaseSync.ready())
-          FirebaseSync.saveDoc('mainStore', _local).catch(()=>{});
+          FirebaseSync.saveDoc('mainStore', _local).catch(e => console.error('[syncFromCloud] cloud push FAILED', e));
       }
     }catch(e){}
     console.log('[Store] synced from cloud');
@@ -2244,6 +2248,30 @@ const Store = {
     if(typeof navigate==='function' && window._currentPage && safeSyncPages.includes(window._currentPage)){
       navigate(window._currentPage, window._currentParams||{});
     }
+  },
+  // Force pull cloud data — bypass timestamp guard. Union-merges any
+  // local-only attempts so nothing the user already submitted is lost.
+  async forcePullFromCloud(){
+    const cloud = await FirebaseSync.loadDoc('mainStore');
+    if(!cloud) throw new Error('cloud empty or unreachable');
+    const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
+    if (Array.isArray(cloud.attempts) && Array.isArray(_local.attempts)) {
+      const _cloudIds = new Set(cloud.attempts.map(a => a.id));
+      const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
+      if (_localOnly.length > 0) {
+        const _all = [..._localOnly, ...cloud.attempts];
+        const _seen = new Set();
+        cloud.attempts = _all.filter(a => {
+          if (_seen.has(a.id)) return false;
+          _seen.add(a.id);
+          return true;
+        });
+        console.log('[forcePull] preserved', _localOnly.length, 'local-only attempts');
+      }
+    }
+    cloud._savedAt = Date.now();
+    localStorage.setItem(this.key, JSON.stringify(cloud));
+    console.log('[forcePull] complete — local now reflects cloud');
   },
   init(){
     // Boot Firebase, migrate old localStorage data to cloud
@@ -5354,6 +5382,18 @@ function initStats(){
     }
     catch(err){alert('นำเข้าไม่สำเร็จ: '+(err?.message||err));}
     finally{e.target.value='';}
+  };
+
+  document.getElementById('statsBtnForceSync').onclick = async ()=>{
+    toast('⏳ กำลังดึงข้อมูลล่าสุด...');
+    try {
+      await Store.forcePullFromCloud();
+      toast('✅ ดึงข้อมูลล่าสุดสำเร็จ');
+      render();
+    } catch(e) {
+      console.error('[forcePull] failed', e);
+      toast('⚠️ ดึงข้อมูลไม่สำเร็จ — ' + (e && e.message ? e.message : 'unknown'));
+    }
   };
 
   document.getElementById('statsBtnClear').onclick=()=>{
@@ -10084,7 +10124,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.69';
+  const CURRENT_VERSION = 'v46.70';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
