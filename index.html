@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.56 -->
+  <!-- APP_VERSION: v46.57 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -835,7 +835,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.56</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.57</div>
     </div>
   </div>
 </div>
@@ -2337,67 +2337,63 @@ let _lastMemeKey = null;
 const MemeScore = (() => {
   // Giphy IDs — embed via giphy.com/embed/{ID} (iframe, no hotlink block)
   const MEMES = {
-    // 💀 0–49% หายนะ — crying jordan / sad pepe / wojak
     disaster: [
-      ['7HMiotS0zfMsyMefkU', 'คะแนนออกมาแล้ว... ร้องให้เลยดีกว่า 😭'],
-      ['Ke2Jwsjv7MhIWNuZhe', 'Crying Jordan ของแท้ 100%'],
-      ['opRAG6bNFdA36fpGJS', 'Sad Pepe รู้สึกแทนเลย...'],
-      ['wA7JI5LRuqbIQYck3N', 'Pepe ร้องให้แทนเธอเลย 🐸😭'],
-      ['ERdc3B6TMgkND4fhBH', 'Wojak รู้สึก... ไม่โอเคมากเลย'],
-      ['pIlVCyHWQKEDebaJhK', 'ร้องได้เลย ไม่ตัดสิน 🌅😭'],
+      ['XKaVXL4k7HXkv8Hu3L', 'Vecna กำลังมา! 😱'],
+      ['01YNlwcyv1uryCPqUl', 'ติดอยู่ใน Upside Down แล้ว!'],
+      ['Ck8ALbc3WRJwKnDuSo', 'Vecna จับตาดูอยู่นะ... 👁️'],
+      ['jfra408q2VgSmabp1X', 'The Upside Down เรียกหาเธออยู่'],
+      ['axdUGyhEPyZ2hwMtaa', 'ไม่มีใครได้ยินเธอร้องใน Upside Down'],
+      ['9hI7aGLXO6KggzII1p', 'Demogorgon หิวโหยมากวันนี้... 🦷']
     ],
-    // 😬 50–69% พอผ่าน — this is fine / meh / shrug
     meh: [
-      ['B01UhEnqUO1QXV062I', 'ไฟไหม้รอบข้าง แต่โอเคนะ 🐶🔥'],
-      ['3jbR27OLT5YJv0ewvN', 'ผ่านแล้ว! (แต่แค่พอผ่าน)'],
-      ['UWEP6CXjvmZxfUBUeu', 'Not great, not terrible — แบบนั้นแหละ'],
-      ['l0Iy0QMOGQmoWntpm',  'Meh... ไม่แย่ แต่ก็ไม่ดี'],
-      ['guoU4K4C2nBkPCRTIH', 'The Simpsons shrug — ก็ได้วะ 🤷'],
-      ['l1J3HdnZLet0oQaA0',  'Great Success! (จริงๆ แค่พออยู่รอด)'],
+      ['GRl1ubg1MANGukPknJ', 'Will รู้สึกอะไรบางอย่าง...'],
+      ['3oxHQjW3i4vxT6zeM0', 'Steve ก็ยังงง เหมือนกัน 🤔'],
+      ['JAnUlXlaPZrYOszeo8', 'Will: มันยังไม่ถึงเวลา...'],
+      ['2AMIqw91Quaw4L5kAP', 'ยังพอไปได้ แต่ต้องสู้ต่อ!'],
+      ['kopN26K2ThF9j7RL4K', 'Hawkins Lab บอกว่าต้องฝึกเพิ่ม 🔬'],
+      ['iO4ptP2iuV29yui3mx', 'Eddie: Rock on! ยังมีหวัง! 🤘']
     ],
-    // 😎 70–84% ดี — stonks / nailed it / galaxy brain
     good: [
-      ['XDWguh1BM1LdOuL6Lc', 'STONKS 📈 คะแนนขึ้นสูงเลย!'],
-      ['bzWW5589KIccDHEeM7', 'GameStonks! คะแนนพุ่งแรงมาก 🚀'],
-      ['cOQSc9wAHifk1LlQBM', 'NAILED IT! ทำได้แล้วววว 🎯'],
-      ['05eOQMLvQDvB6wVo4I', 'Nailed It — เฉียบมาก!'],
-      ['TYmReKrevWMHXSIfWb', 'Galaxy Brain เปิดสมองได้เต็มๆ 🧠✨'],
-      ['3oEhmCNXgCrL3d1Aw8', 'YES! Dog บอกว่าทำได้ดีมาก 🐶'],
+      ['3ohhwhjxmrQwLXJFgk', 'Eleven ใช้พลังแล้ว! ⚡'],
+      ['QKVY9InPCvfSM34sS8', 'Eleven: Friends don\'t lie! 💪'],
+      ['T9JPznkGDAxYC8m7yC', 'Steve & Dustin handshake! เกือบแล้ว!'],
+      ['GB1nOUs9WussSAPcif', 'Eddie ภูมิใจมากเลย 🎸'],
+      ['F1cehBDCMnsukCPUXo', 'Max วิ่งหนี Vecna ได้! 🏃'],
+      ['glrnJU3tQITiD9KQTx', 'Eleven กลับมาแล้ว พร้อมสู้! ⚡']
     ],
-    // 🔥 85–100% เทพ — gigachad / we are the champions / limitless
     goat: [
-      ['HzshGTcQLgFcOiiykn', 'GIGACHAD เข้าร่างแล้ว 💪😤'],
-      ['2yiCkWOziRVCvo3tYK', 'Legend. Yes. นั่นคือเธอแหละ 👑'],
-      ['zmQjxv7M5XvMq7Eckx', 'Gigachad ภูมิใจในตัวเธอมาก 🏆'],
-      ['jwQyCxjOfxSH8IMrrz', 'We Are The Champions! 🎸👑'],
-      ['1yjZXySg7tSohpcmUM', 'Queen confirmed GOAT 🏆🎶'],
-      ['l41lJnxoGHcS3glhu',  'Limitless mode activated ✨🧠'],
-    ],
+      ['I1IiIhF0EYycM', 'Dustin: เพื่อนของฉันเก่งสุดๆ! 🏆'],
+      ['aLjliUPnWyISFLIC4C', 'วีรบุรุษของ Hawkins! 🦸'],
+      ['2AMIqw91Quaw4L5kAP', 'Eleven สุดยอดมาก! พลังเต็ม! ⚡'],
+      ['T9JPznkGDAxYC8m7yC', 'Scoop Troop ปรบมือให้! 👏'],
+      ['3ohhwhjxmrQwLXJFgk', 'Eleven ทำได้! Friends don\'t lie! 💜'],
+      ['iO4ptP2iuV29yui3mx', 'Eddie: CHAMPION OF HAWKINS! 🎸🏆']
+    ]
   };
 
   const TIERS = [
-    { max:49,  key:'disaster', emoji:'🔴 💀', title:'Under Construction', color:'#dc2626', bg:'#fef2f2',
+    { max:49,  key:'disaster', emoji:'🙃', title:'The Upside Down', color:'#dc2626', bg:'#fef2f2',
       cheers: [
         { speaker:'ออลไมท์',       cheer:'ล้มแล้วลุกขึ้นได้เสมอ! ทุก Hero เคยผ่านช่วงฝึกฝนมาก่อน — Plus Ultra!' },
         { speaker:'โกโจ ซาโตรุ',   cheer:'ไม่ต้องกังวล — ข้าแข็งแกร่งที่สุดอยู่แล้ว แล้วเจ้าล่ะ?' },
         { speaker:'รีบอร์น',        cheer:'ผลลัพธ์ห่วยแตกขนาดนี้... แต่นายยังไม่ถึงขีดสุดของตัวเองเลย นั่นหมายความว่านายยังพัฒนาได้อีกมาก' },
         { speaker:'ฟรีเรน',         cheer:'ข้าใช้เวลาหลายร้อยปีกว่าจะเข้าใจเวทมนตร์บางอย่าง อย่าคิดว่าแค่ครั้งเดียวจะพอ' },
       ]},
-    { max:69,  key:'meh',      emoji:'🟠 😬', title:'Risk Zone',          color:'#ea580c', bg:'#fff7ed',
+    { max:69,  key:'meh',      emoji:'🔦', title:'Hawkins',          color:'#ea580c', bg:'#fff7ed',
       cheers: [
         { speaker:'ออลไมท์',       cheer:'อัตลักษณ์ของเธอยังปลดล็อคไม่หมด! ฝึกต่อแล้วจะทะลุขีดจำกัด — Plus Ultra!' },
         { speaker:'โกโจ ซาโตรุ',   cheer:'ชนะโดยยอมตาย กับชนะแม้จะเสี่ยงตาย มันต่างกันนะ — ทุ่มสุดตัวสิ เห็นแก่ตัวได้เลย' },
         { speaker:'รีบอร์น',        cheer:'ซึนะก็เคยห่วยแตกเหมือนกัน แต่ดูสิ — เขากลายเป็น Boss ได้ นายก็ทำได้' },
         { speaker:'ฟรีเรน',         cheer:'ฉันเคยมีลูกศิษย์ที่สอบไม่ผ่านซ้ำแล้วซ้ำเล่า แต่สุดท้ายเขาก็เก่งกว่าฉันในบางเรื่อง' },
       ]},
-    { max:84,  key:'good',     emoji:'🟡 😎', title:'Potential Zone',     color:'#d97706', bg:'#fffbeb',
+    { max:84,  key:'good',     emoji:'⚡', title:'Eleven',     color:'#d97706', bg:'#fffbeb',
       cheers: [
         { speaker:'ออลไมท์',       cheer:'เก่งมาก! แต่ยอดฮีโร่ต้องการมากกว่านี้ ก้าวต่อไปอีกขั้น — Plus Ultra!' },
         { speaker:'โกโจ ซาโตรุ',   cheer:'ลูกศิษย์ข้ากำลังดูอยู่นะ งั้นข้าขอโชว์หน่อยละกัน — เจ้าเองก็ลองโชว์หน่อยสิ' },
         { speaker:'รีบอร์น',        cheer:'กล่องไฟของนายเริ่มลุกแล้ว แต่ยังไม่ร้อนพอ กลับไปฝึกแล้วมาใหม่' },
         { speaker:'ฟรีเรน',         cheer:'น่าประทับใจ... แต่อย่าลืมว่าจุดหมายปลายทางยังอีกไกล อย่าพอใจแค่นี้' },
       ]},
-    { max:100, key:'goat',     emoji:'🟢 🔥', title:'Safety Zone',        color:'#16a34a', bg:'#f0fdf4',
+    { max:100, key:'goat',     emoji:'🏆', title:'Hero of Hawkins',        color:'#16a34a', bg:'#f0fdf4',
       cheers: [
         { speaker:'ออลไมท์',       cheer:'เธอคือฮีโร่ที่ยิ่งใหญ่ที่สุด! ไม่มีอะไรกั้นเธอได้อีกแล้ว — PLUS ULTRA!!!' },
         { speaker:'โกโจ ซาโตรุ',   cheer:"Nah, I'd win. — นี่คือระดับที่เจ้าเอาจริงแล้วสินะ กางอาณาเขต" },
@@ -9880,7 +9876,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.56';
+  const CURRENT_VERSION = 'v46.57';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
