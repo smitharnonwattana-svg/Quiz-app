@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.71 -->
+  <!-- APP_VERSION: v46.72 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -836,7 +836,7 @@
         <button class="iPadBtn" onclick="numpadPress('0')">0</button>
         <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.71</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.6;">v46.72</div>
     </div>
   </div>
 </div>
@@ -2322,9 +2322,12 @@ const Store = {
   init(){
     // Boot Firebase, migrate old localStorage data to cloud
     FirebaseSync.init();
-    _updateOfflineBanner();
-    setInterval(_updateOfflineBanner, 5000);
-    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
+    if (!Store._syncTimersBooted) {
+      _updateOfflineBanner();
+      setInterval(_updateOfflineBanner, 5000);
+      setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
+      Store._syncTimersBooted = true;
+    }
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
       this.flushPendingSync();
@@ -10174,7 +10177,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.71';
+  const CURRENT_VERSION = 'v46.72';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
