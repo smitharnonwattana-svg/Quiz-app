@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.90 -->
+  <!-- APP_VERSION: v46.91 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.90</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.91</div>
     </div>
   </div>
 </div>
@@ -2404,8 +2404,10 @@ const Store = {
     let _lastCloudHash = '';
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{
-        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (กัน flicker จากการ snapshot ซ้ำ)
-        const _hash = JSON.stringify(cloudData);
+        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (ตัด _savedAt ออกเพราะ timestamp เปลี่ยนทุก save)
+        const _hashObj = { ...cloudData };
+        delete _hashObj._savedAt;
+        const _hash = JSON.stringify(_hashObj);
         if (_hash === _lastCloudHash) return;
         _lastCloudHash = _hash;
         // Only accept cloud data if it's strictly newer
@@ -2506,12 +2508,16 @@ const Store = {
               });
             }
 
-            // Merge gamification — take cloud values if user has data there
-            if (cloudData.gamification && _local.gamification) {
+            // Merge gamification — admin คือ source of truth, รับ cloud value เสมอถ้าต่าง
+            if (cloudData.gamification) {
+              if (!_local.gamification) _local.gamification = {};
               Object.keys(cloudData.gamification).forEach(userId => {
-                if (!_local.gamification[userId]) {
-                  _local.gamification[userId] = cloudData.gamification[userId];
+                const _cloudUser = cloudData.gamification[userId];
+                const _localUser = _local.gamification[userId];
+                if (JSON.stringify(_cloudUser) !== JSON.stringify(_localUser)) {
+                  _local.gamification[userId] = _cloudUser;
                   _changed = true;
+                  console.log('[listenDoc] gamification updated for', userId);
                 }
               });
             }
@@ -10566,7 +10572,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.90';
+  const CURRENT_VERSION = 'v46.91';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
