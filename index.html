@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.94 -->
+  <!-- APP_VERSION: v46.95 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.94</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.95</div>
     </div>
   </div>
 </div>
@@ -2141,6 +2141,26 @@ async function _testSync() {
   }
 }
 
+// Merge gamification per-user using _updatedAt — keep newer version per user
+// ใช้ทั้งใน listenDoc (cloud-wins, local-wins) และ flushPendingSync
+// (ป้องกัน rollback เมื่อ device อื่น push stale data ทับ admin's update)
+function _mergeGamificationByTs(localGam, cloudGam) {
+  const _local = (localGam && typeof localGam === 'object') ? localGam : {};
+  const _cloud = (cloudGam && typeof cloudGam === 'object') ? cloudGam : {};
+  const out = {};
+  const allUids = new Set([...Object.keys(_local), ...Object.keys(_cloud)]);
+  allUids.forEach(uid => {
+    const lc = _local[uid];
+    const cc = _cloud[uid];
+    const lcTs = (lc && lc._updatedAt) || 0;
+    const ccTs = (cc && cc._updatedAt) || 0;
+    if (lcTs >= ccTs && lc) out[uid] = lc;
+    else if (cc) out[uid] = cc;
+    else if (lc) out[uid] = lc;
+  });
+  return out;
+}
+
 // ===================== STORE =====================
 const Store = {
   lastError:null,
@@ -2362,7 +2382,7 @@ const Store = {
     };
   },
   // Retry-pending pushes that failed earlier because Firebase wasn't ready
-  flushPendingSync(){
+  async flushPendingSync(){
     if (!FirebaseSync.ready()) return;
     // Flush weakness pending (per-user flags) — independent of mainStore
     if (typeof WeaknessTracker !== 'undefined' && WeaknessTracker.flushPendingWeaknesses) {
@@ -2375,6 +2395,20 @@ const Store = {
     try {
       const _data = JSON.parse(_raw);
       if (!_data || !Array.isArray(_data.attempts)) return;
+      // ป้องกันการ push gamification stale ทับ admin's update
+      // — fetch cloud, merge gamification by per-user _updatedAt
+      try {
+        const cloudSnapshot = await FirebaseSync.loadDoc('mainStore');
+        if (cloudSnapshot && cloudSnapshot.gamification) {
+          _data.gamification = _mergeGamificationByTs(
+            _data.gamification, cloudSnapshot.gamification
+          );
+          // อัพเดต local ด้วยเพื่อไม่ให้ stale อยู่
+          const _localCopy = JSON.parse(localStorage.getItem(this.key) || '{}');
+          _localCopy.gamification = _data.gamification;
+          localStorage.setItem(this.key, JSON.stringify(_localCopy));
+        }
+      } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
       FirebaseSync.saveDoc('mainStore', _data).then(() => {
         localStorage.removeItem('nanont:syncPending');
         console.log('[flushPendingSync] flushed pending data to cloud');
@@ -2461,6 +2495,14 @@ const Store = {
             } catch(e) {}
           }
           // else: pendingSync='' → trust cloud as-is; deletions propagate
+          // แต่ต้องเก็บ gamification ที่ local ใหม่กว่าไว้ — ป้องกัน rollback
+          // (เช่น iPad push stale gamification หลัง admin set points)
+          try {
+            const _mergedGam = _mergeGamificationByTs(
+              _local.gamification, cloudData.gamification
+            );
+            if (_mergedGam) cloudData.gamification = _mergedGam;
+          } catch(e) {}
           localStorage.setItem(this.key, JSON.stringify(cloudData));
           _updateBellBadge();
         } else {
@@ -2518,21 +2560,15 @@ const Store = {
               });
             }
 
-            // Merge gamification — ใช้ _updatedAt เพื่อตัดสินว่า version ไหนใหม่กว่า
-            // (ป้องกัน device อื่น push ข้อมูล stale ทับ admin ที่เพิ่ง set points)
-            if (cloudData.gamification) {
-              if (!_local.gamification) _local.gamification = {};
-              Object.keys(cloudData.gamification).forEach(userId => {
-                const _cloudUser = cloudData.gamification[userId];
-                const _localUser = _local.gamification[userId];
-                const _cloudGT = (_cloudUser && _cloudUser._updatedAt) || 0;
-                const _localGT = (_localUser && _localUser._updatedAt) || 0;
-                if (_cloudGT > _localGT) {
-                  _local.gamification[userId] = _cloudUser;
-                  _changed = true;
-                  console.log('[listenDoc] gamification updated for', userId, 'cloudGT:', _cloudGT, '> localGT:', _localGT);
-                }
-              });
+            // Merge gamification — ใช้ helper per-user _updatedAt comparison
+            if (cloudData.gamification || _local.gamification) {
+              const _mergedGam = _mergeGamificationByTs(
+                _local.gamification, cloudData.gamification
+              );
+              if (JSON.stringify(_mergedGam) !== JSON.stringify(_local.gamification || {})) {
+                _local.gamification = _mergedGam;
+                _changed = true;
+              }
             }
 
             if (_changed) {
@@ -10540,7 +10576,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.94';
+  const CURRENT_VERSION = 'v46.95';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
