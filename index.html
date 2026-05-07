@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.96 -->
+  <!-- APP_VERSION: v46.97 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.96</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.97</div>
     </div>
   </div>
 </div>
@@ -2117,6 +2117,28 @@ function _updateOfflineBanner() {
   } catch(e) {}
 }
 
+// บังคับโหลดข้อมูลล่าสุดจาก cloud มาทับ local — ใช้เมื่อ 2 device ข้อมูลไม่ตรงกัน
+async function _forcePullFromCloud() {
+  if (!FirebaseSync.ready()) {
+    if (typeof toast === 'function') toast('❌ FirebaseSync ไม่ ready');
+    return;
+  }
+  if (!confirm('ดึงข้อมูลล่าสุดจาก cloud มาทับ local?\n(ใช้เมื่อ 2 device ข้อมูลไม่ตรงกัน)')) return;
+  try {
+    if (typeof toast === 'function') toast('⏳ กำลังโหลดจาก cloud...');
+    // Clear pending flag เพื่อไม่ให้ flushPendingSync push local stale ทับ
+    localStorage.removeItem('nanont:syncPending');
+    const cloudData = await FirebaseSync.loadDoc('mainStore');
+    if (!cloudData) { toast('❌ Cloud ไม่มีข้อมูล'); return; }
+    localStorage.setItem(Store.key, JSON.stringify(cloudData));
+    if (typeof toast === 'function') toast('✅ ดึงข้อมูลจาก cloud สำเร็จ');
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {
+    console.error('[forcePullFromCloud] failed', e);
+    if (typeof toast === 'function') toast('❌ ล้มเหลว: ' + (e && e.message ? e.message : 'unknown'));
+  }
+}
+
 async function _testSync() {
   if (typeof toast === 'function') toast('⏳ กำลังทดสอบ sync...');
   if (!FirebaseSync.ready()) {
@@ -3240,6 +3262,7 @@ function renderHome(){
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn" onclick="_testSync()" style="font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
+          <button class="btn" onclick="_forcePullFromCloud()" style="font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
           <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
         </div>
       </div>
@@ -8945,9 +8968,17 @@ function _saveGamificationUser(userId, data) {
   if (!userId || !data || typeof data !== 'object') return;
   const s = Store.load();
   if (!s.gamification || typeof s.gamification !== 'object') s.gamification = {};
+  const existing = s.gamification[userId] || {};
+  const newPoints = Math.max(0, Number(data.points) || 0);
+  const newStamps = Math.max(0, Number(data.stamps) || 0);
+  // Bump _updatedAt เฉพาะเมื่อ points หรือ stamps เปลี่ยนจริง
+  // (quest progress save / claimedTiers ฝั่ง student ไม่ทำให้ stale pts
+  // ของ device นั้น "ดูใหม่กว่า" admin's update ที่เพิ่งเปลี่ยน pts)
+  const ptsOrStampsChanged = newPoints !== (Number(existing.points) || 0)
+                          || newStamps !== (Number(existing.stamps) || 0);
   s.gamification[userId] = {
-    points: Math.max(0, Number(data.points) || 0),
-    stamps: Math.max(0, Number(data.stamps) || 0),
+    points: newPoints,
+    stamps: newStamps,
     streakMilestones: Array.isArray(data.streakMilestones) ? data.streakMilestones.slice() : [],
     claimedTiers: Array.isArray(data.claimedTiers) ? data.claimedTiers.slice() : [],
     pendingTiers: Array.isArray(data.pendingTiers) ? data.pendingTiers.slice() : [],
@@ -8956,7 +8987,7 @@ function _saveGamificationUser(userId, data) {
     dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null,
     bonusQuests: Array.isArray(data.bonusQuests) ? data.bonusQuests.slice() : [],
     questSalt: Number(data.questSalt) || 0,
-    _updatedAt: Date.now()
+    _updatedAt: ptsOrStampsChanged ? Date.now() : (existing._updatedAt || 0)
   };
   Store.save(s);
 }
@@ -10600,7 +10631,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.96';
+  const CURRENT_VERSION = 'v46.97';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
