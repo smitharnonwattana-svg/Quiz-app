@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.89 -->
+  <!-- APP_VERSION: v46.90 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.89</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.90</div>
     </div>
   </div>
 </div>
@@ -2401,8 +2401,13 @@ const Store = {
     // Do NOT call navigate() here — it resets scroll and re-inits page disruptively
     // Instead just update the cache; next Store.load() will get fresh data
     let _listenDocRefreshTimeout = null;
+    let _lastCloudHash = '';
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{
+        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (กัน flicker จากการ snapshot ซ้ำ)
+        const _hash = JSON.stringify(cloudData);
+        if (_hash === _lastCloudHash) return;
+        _lastCloudHash = _hash;
         // Only accept cloud data if it's strictly newer
         // AND local data exists and has been saved recently
         const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
@@ -3621,6 +3626,7 @@ function doLogin() {
   const _loginName = Auth.getName();
   if (_loginName && !Auth.isTeacher()) {
     setTimeout(() => WeaknessTracker.runBackfillIfNeeded(_loginName), 1500);
+    setTimeout(() => WeaknessTracker.subscribeMyWeakness(), 2000);
   }
 }
 
@@ -8052,6 +8058,28 @@ window.navigate = function(page, params) {
 };
 navigate = window.navigate;
 
+// Subscribe weakness realtime listener ถ้า user logged in (รอ Firebase ready)
+(function _bootWeaknessSubscribe(){
+  const _tryStart = () => {
+    try {
+      if (typeof Auth !== 'undefined' && Auth.isLoggedIn && Auth.isLoggedIn() &&
+          !Auth.isTeacher() && Auth.getName() &&
+          typeof FirebaseSync !== 'undefined' && FirebaseSync.ready &&
+          FirebaseSync.ready() &&
+          typeof WeaknessTracker !== 'undefined' && WeaknessTracker.subscribeMyWeakness) {
+        WeaknessTracker.subscribeMyWeakness();
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  };
+  // ลองทุก 1 วิ จนกว่า Firebase พร้อม + user login (สูงสุด 30 วิ)
+  let _tries = 0;
+  const _i = setInterval(() => {
+    if (_tryStart() || ++_tries > 30) clearInterval(_i);
+  }, 1000);
+})();
+
 // ── Take state persistence: save answers + timer across refresh ──
 // Key แยกตาม takerName เพื่อให้ resume รายคน
 function _takeResumeKey(takerName) {
@@ -8259,11 +8287,44 @@ const WeaknessTracker = (() => {
     localStorage.setItem(BACKFILL_FLAG + u, 'true');
   }
 
+  // Realtime listener สำหรับ weakness ของ user ปัจจุบัน
+  let _weaknessUnsubscribe = null;
+  function subscribeMyWeakness() {
+    if (_weaknessUnsubscribe) { try { _weaknessUnsubscribe(); } catch(e){} _weaknessUnsubscribe = null; }
+    const u = Auth.getName && Auth.getName();
+    if (!u || Auth.isTeacher()) return; // teacher ไม่ต้องฟัง weakness ของตัวเอง
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) return;
+    const flagKey = 'nanont:weaknessSyncPending_' + _sanitize(u);
+    _weaknessUnsubscribe = FirebaseSync.listenDoc(_fsDocId(u), (cloudData) => {
+      if (!cloudData || typeof cloudData !== 'object') return;
+      // ถ้ามี local write ค้างอยู่ — ยังไม่ overwrite
+      if (localStorage.getItem(flagKey) === '1') {
+        console.log('[Weakness.subscribe] skip — local pending');
+        return;
+      }
+      const _localRaw = localStorage.getItem(_lsKey(u));
+      // ข้ามถ้าไม่มีอะไรเปลี่ยน
+      if (_localRaw && JSON.stringify(cloudData) === _localRaw) return;
+      _saveLocal(u, cloudData);
+      console.log('[Weakness.subscribe] cloud update applied for', u, 'items:', Object.keys(cloudData).length);
+      // Refresh UI ถ้าอยู่หน้า home หรือ exams
+      const pg = window._currentPage;
+      if (pg === 'home' && typeof renderHome === 'function') {
+        try { renderHome(); } catch(e) {}
+      } else if (pg === 'exams' && typeof renderExams === 'function') {
+        try { renderExams(); } catch(e) {}
+      }
+    });
+  }
+  function unsubscribeMyWeakness() {
+    if (_weaknessUnsubscribe) { try { _weaknessUnsubscribe(); } catch(e){} _weaknessUnsubscribe = null; }
+  }
+
   return { updateWeaknessAfterSubmit, getActiveWeaknessesForUser, getAllWeaknessesForUser,
     resetWeaknessesForUser, resetWeaknessesForUserAndExam, cleanupOrphanWeaknesses,
     countWeaknessesByExam, countWeaknessesBySubject,
     buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser,
-    flushPendingWeaknesses };
+    flushPendingWeaknesses, subscribeMyWeakness, unsubscribeMyWeakness };
 })();
 
 // ===================== STAGE 1: Focus Subjects + Daily Context =====================
@@ -10505,7 +10566,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.89';
+  const CURRENT_VERSION = 'v46.90';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
