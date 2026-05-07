@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.92 -->
+  <!-- APP_VERSION: v46.93 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.92</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.93</div>
     </div>
   </div>
 </div>
@@ -2404,9 +2404,19 @@ const Store = {
     let _lastCloudHash = '';
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{
-        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (ตัด _savedAt ออกเพราะ timestamp เปลี่ยนทุก save)
+        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (ตัด _savedAt และ gamification._updatedAt ออก
+        // เพราะ _updatedAt เปลี่ยนทุกครั้งที่ save gamification แม้ค่าจริงจะเหมือนเดิม)
         const _hashObj = { ...cloudData };
         delete _hashObj._savedAt;
+        if (_hashObj.gamification && typeof _hashObj.gamification === 'object') {
+          const _gStripped = {};
+          Object.keys(_hashObj.gamification).forEach(uid => {
+            const u = { ..._hashObj.gamification[uid] };
+            delete u._updatedAt;
+            _gStripped[uid] = u;
+          });
+          _hashObj.gamification = _gStripped;
+        }
         const _hash = JSON.stringify(_hashObj);
         if (_hash === _lastCloudHash) return;
         _lastCloudHash = _hash;
@@ -2535,12 +2545,8 @@ const Store = {
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
-      const safeSoftRefresh = ['home','stats'];
-      const adminPages = ['admin','admin_new','admin_editor','admin_benchmark','admin_memes'];
       const pg = window._currentPage;
-      if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
-        navigate(pg, window._currentParams||{});
-      } else if(pg && pg === 'admin'){
+      if(pg && pg === 'admin'){
         // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
         if(!sessionStorage.getItem('_conflictBannerDismissed')){
           let banner = document.getElementById('_syncConflictBanner');
@@ -2580,6 +2586,9 @@ const Store = {
           }
         }
       }
+      // ไม่เรียก navigate('home') อัตโนมัติ — ป้องกัน flickering และ render loop
+      // (renderHome → getDailyQuest → _saveGamificationUser → cloud write → listenDoc → loop)
+      // listenDoc update localStorage แล้ว user เห็นข้อมูลใหม่เมื่อเปลี่ยนหน้าเอง
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
     const s=this.load();
@@ -10576,7 +10585,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.92';
+  const CURRENT_VERSION = 'v46.93';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
