@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.88 -->
+  <!-- APP_VERSION: v46.89 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.88</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.89</div>
     </div>
   </div>
 </div>
@@ -3743,35 +3743,113 @@ function initExams(){
     const allPub = (s2.exams||[]).filter(e=>e.published);
     const subjCounts = {};
     allPub.forEach(e=>{ const subj=e.subject||'ไม่ระบุ'; subjCounts[subj]=(subjCounts[subj]||0)+1; });
+
+    // ใช้ subjectDisplayOrder จาก Store ถ้ามี ไม่งั้น fallback ไป KNOWN_SUBJS order
+    const savedOrder = s2.subjectDisplayOrder || [];
     const subjList = Object.entries(subjCounts).sort((a,b)=>{
+      if(savedOrder.length){
+        const ia=savedOrder.indexOf(a[0]), ib=savedOrder.indexOf(b[0]);
+        if(ia>=0&&ib>=0) return ia-ib; if(ia>=0) return -1; if(ib>=0) return 1;
+      }
       const ia=KNOWN_SUBJS.indexOf(a[0]),ib=KNOWN_SUBJS.indexOf(b[0]);
       if(ia>=0&&ib>=0) return ia-ib; if(ia>=0) return -1; if(ib>=0) return 1;
       return a[0].localeCompare(b[0],'th');
     });
+
     if(subjectGrid){
       const otherCount = allPub.filter(e=>!KNOWN_SUBJS.includes(e.subject||'')).length;
-      subjectGrid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:16px;">`+
-        subjList.filter(([subj])=>KNOWN_SUBJS.includes(subj)).map(([subj,cnt])=>
-          `<div class="linkCard subjCard" data-subj="${esc(subj)}" style="text-align:center;padding:22px 12px 18px;cursor:pointer;">
-            <div style="width:54px;height:54px;border-radius:16px;background:${SUBJ_BG[subj]||'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">${SUBJ_EMOJI[subj]||'📚'}</div>
-            <div style="font-weight:900;font-size:14px;line-height:1.3;">${esc(subj)}</div>
-            <div class="muted" style="font-size:12px;margin-top:5px;">${cnt} ชุด</div>
-          </div>`).join('')+
-        (otherCount>0?`<div class="linkCard subjCard" data-subj="อื่นๆ" style="text-align:center;padding:22px 12px 18px;cursor:pointer;">
+      const handleHtml = _editMode
+        ? '<span class="subj-drag-handle" style="position:absolute;top:6px;right:6px;font-size:16px;color:#6b7280;background:#f3f4f6;border-radius:6px;padding:2px 5px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;line-height:1;">☰</span>'
+        : '';
+      const gridEl = document.createElement('div');
+      gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:16px;';
+
+      subjList.filter(([subj])=>KNOWN_SUBJS.includes(subj)).forEach(([subj,cnt])=>{
+        const card = document.createElement('div');
+        card.className = 'linkCard subjCard';
+        card.dataset.subj = subj;
+        card.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
+        card.innerHTML = `${handleHtml}
+          <div style="width:54px;height:54px;border-radius:16px;background:${SUBJ_BG[subj]||'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">${SUBJ_EMOJI[subj]||'📚'}</div>
+          <div style="font-weight:900;font-size:14px;line-height:1.3;">${esc(subj)}</div>
+          <div class="muted" style="font-size:12px;margin-top:5px;">${cnt} ชุด</div>`;
+        gridEl.appendChild(card);
+      });
+      if(otherCount>0){
+        const card = document.createElement('div');
+        card.className = 'linkCard subjCard';
+        card.dataset.subj = 'อื่นๆ';
+        card.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
+        card.innerHTML = `${handleHtml}
           <div style="width:54px;height:54px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">📚</div>
           <div style="font-weight:900;font-size:14px;line-height:1.3;">อื่นๆ</div>
-          <div class="muted" style="font-size:12px;margin-top:5px;">${otherCount} ชุด</div>
-        </div>`:'')+
-        `</div>`;
-      subjectGrid.querySelectorAll('[data-subj]').forEach(card=>{
-        card.addEventListener('click',()=>{
-          subjectFilter = card.getAttribute('data-subj');
+          <div class="muted" style="font-size:12px;margin-top:5px;">${otherCount} ชุด</div>`;
+        gridEl.appendChild(card);
+      }
+
+      subjectGrid.innerHTML = '';
+      subjectGrid.appendChild(gridEl);
+
+      // click → เข้าหน้า exam list (ไม่ fire ถ้ากด handle)
+      gridEl.querySelectorAll('[data-subj]').forEach(card=>{
+        card.addEventListener('click', ev=>{
+          if(ev.target.closest('.subj-drag-handle')) return;
+          if(_editMode) return;
+          subjectFilter = card.dataset.subj;
           if(subjLabel) subjLabel.textContent = subjectFilter;
           if(backRow){ backRow.style.display='flex'; }
           subjectGrid.innerHTML = '';
           renderExams();
         });
       });
+
+      // drag handles — pointer events (ทำงานบน mouse + touch + iPad)
+      if(_editMode){
+        gridEl.querySelectorAll('[data-subj]').forEach(card=>{
+          const handle = card.querySelector('.subj-drag-handle');
+          if(!handle) return;
+          let _isDragging=false, _startX=0, _startY=0, _capturedId=null;
+          handle.addEventListener('pointerdown', ev=>{
+            ev.stopPropagation();
+            _startX=ev.clientX; _startY=ev.clientY;
+            _isDragging=false; _capturedId=ev.pointerId;
+            try{ handle.setPointerCapture(ev.pointerId); }catch(e){}
+          });
+          handle.addEventListener('pointermove', ev=>{
+            if(ev.pointerId!==_capturedId) return;
+            const dx=Math.abs(ev.clientX-_startX), dy=Math.abs(ev.clientY-_startY);
+            if(!_isDragging&&(dx>6||dy>6)){ _isDragging=true; card.classList.add('dragging'); }
+            if(!_isDragging) return;
+            card.style.pointerEvents='none';
+            const el=document.elementFromPoint(ev.clientX,ev.clientY);
+            card.style.pointerEvents='';
+            const target=el?.closest('[data-subj]');
+            gridEl.querySelectorAll('.drag-over').forEach(c=>c.classList.remove('drag-over'));
+            if(target&&target!==card) target.classList.add('drag-over');
+          });
+          handle.addEventListener('pointerup', ev=>{
+            if(ev.pointerId!==_capturedId) return;
+            card.classList.remove('dragging');
+            const dropTarget=gridEl.querySelector('.drag-over');
+            gridEl.querySelectorAll('.drag-over').forEach(c=>c.classList.remove('drag-over'));
+            if(_isDragging&&dropTarget&&dropTarget!==card){
+              // reorder DOM
+              const all=[...gridEl.children];
+              const si=all.indexOf(card), di=all.indexOf(dropTarget);
+              if(si>=0&&di>=0){ if(si<di) dropTarget.after(card); else dropTarget.before(card); }
+              // save new order to Store
+              const newOrder=[...gridEl.querySelectorAll('[data-subj]')].map(c=>c.dataset.subj);
+              const s3=Store.load(); s3.subjectDisplayOrder=newOrder; Store.save(s3);
+            }
+            _isDragging=false; _capturedId=null;
+          });
+          handle.addEventListener('pointercancel',()=>{
+            card.classList.remove('dragging');
+            gridEl.querySelectorAll('.drag-over').forEach(c=>c.classList.remove('drag-over'));
+            _isDragging=false; _capturedId=null;
+          });
+        });
+      }
     }
     const listEl = document.getElementById('examsList');
     if(listEl) listEl.innerHTML = '';
@@ -10427,7 +10505,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.88';
+  const CURRENT_VERSION = 'v46.89';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
