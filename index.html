@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.91 -->
+  <!-- APP_VERSION: v46.92 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.91</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.92</div>
     </div>
   </div>
 </div>
@@ -2508,16 +2508,19 @@ const Store = {
               });
             }
 
-            // Merge gamification — admin คือ source of truth, รับ cloud value เสมอถ้าต่าง
+            // Merge gamification — ใช้ _updatedAt เพื่อตัดสินว่า version ไหนใหม่กว่า
+            // (ป้องกัน device อื่น push ข้อมูล stale ทับ admin ที่เพิ่ง set points)
             if (cloudData.gamification) {
               if (!_local.gamification) _local.gamification = {};
               Object.keys(cloudData.gamification).forEach(userId => {
                 const _cloudUser = cloudData.gamification[userId];
                 const _localUser = _local.gamification[userId];
-                if (JSON.stringify(_cloudUser) !== JSON.stringify(_localUser)) {
+                const _cloudGT = (_cloudUser && _cloudUser._updatedAt) || 0;
+                const _localGT = (_localUser && _localUser._updatedAt) || 0;
+                if (_cloudGT > _localGT) {
                   _local.gamification[userId] = _cloudUser;
                   _changed = true;
-                  console.log('[listenDoc] gamification updated for', userId);
+                  console.log('[listenDoc] gamification updated for', userId, 'cloudGT:', _cloudGT, '> localGT:', _localGT);
                 }
               });
             }
@@ -8928,7 +8931,8 @@ function _saveGamificationUser(userId, data) {
     lastStampDate: typeof data.lastStampDate === 'string' ? data.lastStampDate : '',
     dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null,
     bonusQuests: Array.isArray(data.bonusQuests) ? data.bonusQuests.slice() : [],
-    questSalt: Number(data.questSalt) || 0
+    questSalt: Number(data.questSalt) || 0,
+    _updatedAt: Date.now()
   };
   Store.save(s);
 }
@@ -10572,7 +10576,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.91';
+  const CURRENT_VERSION = 'v46.92';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
