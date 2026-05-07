@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.93 -->
+  <!-- APP_VERSION: v46.94 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.93</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.94</div>
     </div>
   </div>
 </div>
@@ -2545,8 +2545,13 @@ const Store = {
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
+      // Re-enable auto-refresh — WHOOP ถูกซ่อนแล้วจึงไม่มี render loop
+      // (updateCoachStreak ไม่ถูกเรียกตอน render home อีกต่อไป)
+      const safeSoftRefresh = ['home','stats','rewards'];
       const pg = window._currentPage;
-      if(pg && pg === 'admin'){
+      if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
+        navigate(pg, window._currentParams||{});
+      } else if(pg && pg === 'admin'){
         // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
         if(!sessionStorage.getItem('_conflictBannerDismissed')){
           let banner = document.getElementById('_syncConflictBanner');
@@ -3099,64 +3104,23 @@ function renderHome(){
     if (!userId) {
       return `<div class="muted" style="padding:18px 4px;text-align:center;font-size:13px;">ยังไม่มีนักเรียนที่จะแสดงข้อมูล</div>`;
     }
-    let m;
-    try { m = getDailyCoachMetricsStage4(userId); } catch(e){ m = null; }
-    const streakCount = (m && m.streak && m.streak.count) || 0;
-    const streakEmoji = (m && m.streak && m.streak.emoji) || '';
-    const activityVal = (m && m.activity && typeof m.activity.activity === 'number') ? m.activity.activity : 0;
-    const scoreVal    = (m && m.score && m.score.hasScoreToday) ? m.score.score : null;
-    const fixesVal    = (m && m.fixes && typeof m.fixes.fixes === 'number') ? m.fixes.fixes : 0;
-    const focusList   = (m && Array.isArray(m.focusSubjects) && m.focusSubjects.length)
-                        ? m.focusSubjects.join(' · ') : '—';
-    const focusSetCount = (m && m.activity && typeof m.activity.focusSetCount === 'number') ? m.activity.focusSetCount : 0;
-    const hasScoreToday = !!(m && m.score && m.score.hasScoreToday);
-    const decisionScore = (m && m.score && typeof m.score.decisionScore === 'number') ? m.score.decisionScore : null;
-    const remaining     = (m && m.fixes && typeof m.fixes.remaining === 'number') ? m.fixes.remaining : 0;
-    const activitySub = `${focusSetCount} ชุดวันนี้`;
-    const scoreSub    = hasScoreToday ? `ต่ำสุด ${decisionScore}%` : 'ยังไม่มีข้อสอบวันนี้';
-    const fixesSub    = `เหลือ ${remaining} ข้อ`;
-    const rec = m && m.recommendation;
-    const recEmojiMap = {
-      fix_weakness: '🧩', fix_mistakes: '🔧', review: '💤',
-      switch_subject: '🔄', start: '🚀', no_focus: '📌', 'default': '✨'
-    };
-    const recHtml = (rec && rec.message)
-      ? `
-      <div style="border-top:1px solid #e5e7eb;margin-top:4px;padding:8px 4px;display:flex;gap:8px;align-items:flex-start;">
-        <span style="font-size:16px;">${recEmojiMap[rec.type] || '✨'}</span>
-        <span style="font-size:13px;color:#374151;line-height:1.4;">${esc(rec.message)}</span>
-      </div>`
-      : '';
-    // Assignment + Notification Bell System
+    // WHOOP card (rings + recommendation) ซ่อนชั่วคราว — ป้องกัน render loop
+    // จาก updateCoachStreak ที่บันทึก _saveCoachStreak ระหว่าง render
+    // เก็บไว้แค่กระดิ่งแจ้งเตือน
     const _notifCount = (() => {
       if (typeof Store === 'undefined') return 0;
       const _s = Store.load();
       const _assignments = _s.assignments || [];
-      if (Auth.isTeacher()) {
-        const _pendingForUser = _assignments.filter(
-          a => a.assignedTo === userId && a.status === 'pending'
-        );
-        console.log('[bell] userId:', userId,
-          'total assignments:', _assignments.length,
-          'pending for user:', _pendingForUser.length,
-          'all assignedTo:', _assignments.map(a => a.assignedTo));
-        return _pendingForUser.length;
-      } else {
-        const _pendingForUser = _assignments.filter(
-          a => a.assignedTo === userId && a.status === 'pending'
-        );
-        console.log('[bell] userId:', userId,
-          'total assignments:', _assignments.length,
-          'pending for user:', _pendingForUser.length,
-          'all assignedTo:', _assignments.map(a => a.assignedTo));
-        return _pendingForUser.length;
-      }
+      const _pendingForUser = _assignments.filter(
+        a => a.assignedTo === userId && a.status === 'pending'
+      );
+      return _pendingForUser.length;
     })();
     const _bellHtml = `
       <div style="position:relative;display:inline-flex;
         align-items:center;cursor:pointer;"
         id="notifBell_${esc(userId)}" onclick="_toggleNotifDropdown('${esc(userId)}')">
-        <span style="font-size:18px;">🔔</span>
+        <span style="font-size:22px;">🔔</span>
         ${_notifCount > 0 ? `
           <span style="position:absolute;top:-4px;right:-6px;
             background:#ef4444;color:#fff;border-radius:99px;
@@ -3167,19 +3131,10 @@ function renderHome(){
       </div>
     `;
     return `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;">
-        <div style="font-weight:800;font-size:15px;">${streakEmoji ? streakEmoji + ' ' : ''}${streakCount} วันต่อเนื่อง</div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div class="muted" style="font-size:12px;">โฟกัส: ${esc(focusList)}</div>
-          ${_bellHtml}
-        </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;">
+        <div style="font-weight:700;font-size:14px;color:#374151;">${esc(userId)}</div>
+        ${_bellHtml}
       </div>
-      <div style="display:flex;gap:10px;justify-content:space-between;padding:6px 0 12px;">
-        ${ringSvg('Activity', activityVal, activitySub)}
-        ${ringSvg('Score', scoreVal, scoreSub)}
-        ${ringSvg('Fixes', fixesVal, fixesSub)}
-      </div>
-      ${recHtml}
     `;
   }
   function tabStyle(active){
@@ -10585,7 +10540,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.93';
+  const CURRENT_VERSION = 'v46.94';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
