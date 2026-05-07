@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.98 -->
+  <!-- APP_VERSION: v46.99 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.98</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.99</div>
     </div>
   </div>
 </div>
@@ -2117,6 +2117,89 @@ function _updateOfflineBanner() {
   } catch(e) {}
 }
 
+// แสดง diagnostic modal เพื่อตรวจสอบสถานะ sync บนเครื่องที่ข้อมูลไม่ตรง
+async function _diagnoseSync() {
+  const lines = [];
+  // 1. Firebase status
+  const _fbReady = (typeof FirebaseSync !== 'undefined') && FirebaseSync.ready && FirebaseSync.ready();
+  lines.push('Firebase ready: ' + (_fbReady ? '✅ YES' : '❌ NO'));
+  // 2. Hostname namespace
+  const _host = location.hostname || '(file)';
+  lines.push('Hostname: ' + _host);
+  if (typeof FirebaseSync !== 'undefined' && FirebaseSync.ns) {
+    lines.push('Namespace: ' + FirebaseSync.ns('mainStore'));
+  }
+  // 3. Auth state
+  const _uid = (typeof Auth !== 'undefined' && Auth.getName) ? Auth.getName() : '?';
+  const _isTeacher = (typeof Auth !== 'undefined' && Auth.isTeacher) ? Auth.isTeacher() : false;
+  lines.push('User: "' + _uid + '" (teacher: ' + (_isTeacher ? 'Y' : 'N') + ')');
+  // 4. Members list (from local)
+  let _local = {};
+  try { _local = JSON.parse(localStorage.getItem(Store.key) || '{}'); } catch(e) {}
+  const _members = (_local.members || []).map(m => m.name + '(' + m.pin + ')').join(', ');
+  lines.push('Members: ' + (_members || '(empty)'));
+  // 5. Local data summary
+  const _lasg = (_local.assignments || []);
+  const _lasgPending = _lasg.filter(a => a.status === 'pending');
+  const _lmine = _lasg.filter(a => a.assignedTo === _uid && a.status === 'pending');
+  lines.push('Local _savedAt: ' + (_local._savedAt ? new Date(_local._savedAt).toLocaleTimeString('th') : '(none)'));
+  lines.push('Local assigns: ' + _lasg.length + ' total, ' + _lasgPending.length + ' pending, ' + _lmine.length + ' for me');
+  if (_lasgPending.length > 0) {
+    lines.push('  pending→: ' + _lasgPending.slice(0,3).map(a => a.assignedTo + '/' + (a.examTitle||'').slice(0,15)).join(' | '));
+  }
+  lines.push('SyncPending flag: ' + (localStorage.getItem('nanont:syncPending') === '1' ? 'YES' : 'no'));
+  // 6. Cloud data
+  let _cloudInfo = '';
+  if (_fbReady) {
+    try {
+      const _cloud = await FirebaseSync.loadDoc('mainStore');
+      if (!_cloud) {
+        _cloudInfo = '(cloud empty)';
+      } else {
+        const _casg = (_cloud.assignments || []);
+        const _casgPending = _casg.filter(a => a.status === 'pending');
+        const _cmine = _casg.filter(a => a.assignedTo === _uid && a.status === 'pending');
+        lines.push('Cloud _savedAt: ' + (_cloud._savedAt ? new Date(_cloud._savedAt).toLocaleTimeString('th') : '(none)'));
+        lines.push('Cloud assigns: ' + _casg.length + ' total, ' + _casgPending.length + ' pending, ' + _cmine.length + ' for me');
+        if (_casgPending.length > 0) {
+          lines.push('  pending→: ' + _casgPending.slice(0,3).map(a => a.assignedTo + '/' + (a.examTitle||'').slice(0,15)).join(' | '));
+        }
+        // Compare timestamps
+        const _lt = _local._savedAt || 0, _ct = _cloud._savedAt || 0;
+        if (_lt > _ct) lines.push('⚠️ LOCAL newer than cloud by ' + Math.round((_lt-_ct)/1000) + 's');
+        else if (_ct > _lt) lines.push('☁️ CLOUD newer than local by ' + Math.round((_ct-_lt)/1000) + 's');
+        else lines.push('= timestamps equal');
+      }
+    } catch(e) { _cloudInfo = 'cloud err: ' + (e && e.message); }
+  } else {
+    _cloudInfo = '(skip — fb not ready)';
+  }
+  if (_cloudInfo) lines.push('Cloud: ' + _cloudInfo);
+  // Render modal
+  const old = document.getElementById('_diagModal');
+  if (old) old.remove();
+  const m = document.createElement('div');
+  m.id = '_diagModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:12px;padding:16px;max-width:480px;width:100%;max-height:80vh;overflow:auto;font-family:monospace;font-size:12px;line-height:1.5;';
+  box.innerHTML = '<div style="font-weight:800;margin-bottom:8px;font-family:sans-serif;">🔍 Sync Diagnostic</div>'
+    + '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;">' + lines.join('\n').replace(/</g,'&lt;') + '</pre>'
+    + '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">'
+    + '<button id="_diagCopy" style="padding:6px 12px;border:1px solid #d1d5db;background:#f3f4f6;border-radius:6px;cursor:pointer;font-family:sans-serif;">📋 copy</button>'
+    + '<button id="_diagClose" style="padding:6px 12px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-family:sans-serif;">ปิด</button>'
+    + '</div>';
+  m.appendChild(box);
+  document.body.appendChild(m);
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  document.getElementById('_diagClose').onclick = () => m.remove();
+  document.getElementById('_diagCopy').onclick = () => {
+    const txt = lines.join('\n');
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast('คัดลอกแล้ว'));
+    else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('คัดลอกแล้ว'); }
+  };
+}
+
 // บังคับโหลดข้อมูลล่าสุดจาก cloud มาทับ local — ใช้เมื่อ 2 device ข้อมูลไม่ตรงกัน
 async function _forcePullFromCloud() {
   if (!FirebaseSync.ready()) {
@@ -3268,6 +3351,7 @@ function renderHome(){
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn" onclick="_testSync()" style="font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
+          <button class="btn" onclick="_diagnoseSync()" style="font-size:12px;color:#0891b2;border-color:#67e8f9;">🔍 diagnose</button>
           <button class="btn" onclick="_forcePullFromCloud()" style="font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
           <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
         </div>
@@ -10637,7 +10721,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.98';
+  const CURRENT_VERSION = 'v46.99';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
