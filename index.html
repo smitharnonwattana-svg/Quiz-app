@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.87 -->
+  <!-- APP_VERSION: v46.88 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.87</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.88</div>
     </div>
   </div>
 </div>
@@ -3895,7 +3895,7 @@ function initExams(){
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-            ${_editMode?'<span class="drag-handle" style="font-size:22px;color:#9ca3af;cursor:grab;padding:2px 6px;touch-action:none;user-select:none;-webkit-user-select:none;">⠿</span>':''}
+            ${_editMode?'<span class="drag-handle" style="font-size:20px;color:#6b7280;cursor:grab;padding:4px 8px;touch-action:none;user-select:none;-webkit-user-select:none;background:#f3f4f6;border-radius:8px;line-height:1;">☰</span>':''}
             ${Auth.isTeacher()?`<button title="คัดลอกลิ้งแชร์ข้อสอบนี้" data-examid="${e.id}" data-title="${esc(e.title)}" onclick="copyExamLink(this,event)"
               style="border:none;background:none;cursor:pointer;padding:2px 4px;font-size:16px;line-height:1;color:#9ca3af;border-radius:6px;"
               onmouseover="this.style.background='#f3f4f6';this.style.color='#3b82f6'"
@@ -10427,7 +10427,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.87';
+  const CURRENT_VERSION = 'v46.88';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
