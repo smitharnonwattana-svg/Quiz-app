@@ -27,12 +27,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.82 -->
+  <!-- APP_VERSION: v46.83 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
-    html,body{margin:0;padding:0;}
+    html,body{margin:0;padding:0;height:100%;overflow:hidden;}
     body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans Thai","Noto Sans","Liberation Sans";color:#111;background:#fff;user-select:none;-webkit-user-select:none;}
+    .page.active{height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
     input,textarea,select,[contenteditable]{user-select:text;-webkit-user-select:text;}
     a{color:inherit;text-decoration:none;}
     .container{max-width:1200px;margin:0 auto;padding:24px;}
@@ -839,7 +840,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.82</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.83</div>
     </div>
   </div>
 </div>
@@ -10413,7 +10414,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.82';
+  const CURRENT_VERSION = 'v46.83';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
