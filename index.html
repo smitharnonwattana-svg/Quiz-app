@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.97 -->
+  <!-- APP_VERSION: v46.98 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.97</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.98</div>
     </div>
   </div>
 </div>
@@ -2123,16 +2123,22 @@ async function _forcePullFromCloud() {
     if (typeof toast === 'function') toast('❌ FirebaseSync ไม่ ready');
     return;
   }
-  if (!confirm('ดึงข้อมูลล่าสุดจาก cloud มาทับ local?\n(ใช้เมื่อ 2 device ข้อมูลไม่ตรงกัน)')) return;
   try {
     if (typeof toast === 'function') toast('⏳ กำลังโหลดจาก cloud...');
-    // Clear pending flag เพื่อไม่ให้ flushPendingSync push local stale ทับ
     localStorage.removeItem('nanont:syncPending');
     const cloudData = await FirebaseSync.loadDoc('mainStore');
-    if (!cloudData) { toast('❌ Cloud ไม่มีข้อมูล'); return; }
+    if (!cloudData) { if (typeof toast === 'function') toast('❌ Cloud ไม่มีข้อมูล'); return; }
     localStorage.setItem(Store.key, JSON.stringify(cloudData));
-    if (typeof toast === 'function') toast('✅ ดึงข้อมูลจาก cloud สำเร็จ');
-    setTimeout(() => location.reload(), 800);
+    // Diagnostic: show current userId and matching assignment count
+    const _uid = (typeof Auth !== 'undefined' && Auth.getName) ? Auth.getName() : '?';
+    const _allAsg = (cloudData.assignments || []).length;
+    const _myAsg = (cloudData.assignments || []).filter(
+      a => a.assignedTo === _uid && a.status === 'pending'
+    ).length;
+    if (typeof toast === 'function') {
+      toast('✅ cloud OK — ผู้ใช้: "' + _uid + '" การบ้าน: ' + _myAsg + '/' + _allAsg);
+    }
+    setTimeout(() => location.reload(), 2500);
   } catch(e) {
     console.error('[forcePullFromCloud] failed', e);
     if (typeof toast === 'function') toast('❌ ล้มเหลว: ' + (e && e.message ? e.message : 'unknown'));
@@ -10631,7 +10637,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.97';
+  const CURRENT_VERSION = 'v46.98';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
