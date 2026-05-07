@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.95 -->
+  <!-- APP_VERSION: v46.96 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.95</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.96</div>
     </div>
   </div>
 </div>
@@ -2395,17 +2395,30 @@ const Store = {
     try {
       const _data = JSON.parse(_raw);
       if (!_data || !Array.isArray(_data.attempts)) return;
-      // ป้องกันการ push gamification stale ทับ admin's update
-      // — fetch cloud, merge gamification by per-user _updatedAt
+      // ป้องกันการ push stale data ทับของใหม่ใน cloud
+      // — fetch cloud, merge gamification (per-user _updatedAt) + assignments (union by id)
       try {
         const cloudSnapshot = await FirebaseSync.loadDoc('mainStore');
-        if (cloudSnapshot && cloudSnapshot.gamification) {
-          _data.gamification = _mergeGamificationByTs(
-            _data.gamification, cloudSnapshot.gamification
-          );
+        if (cloudSnapshot) {
+          // gamification: per-user _updatedAt
+          if (cloudSnapshot.gamification) {
+            _data.gamification = _mergeGamificationByTs(
+              _data.gamification, cloudSnapshot.gamification
+            );
+          }
+          // assignments: union by id (local ทับ cloud สำหรับ id เดียวกัน
+          // เพื่อรักษา status change ของ local เช่น student mark done)
+          if (Array.isArray(cloudSnapshot.assignments)) {
+            const _aMap = new Map();
+            cloudSnapshot.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            (Array.isArray(_data.assignments) ? _data.assignments : [])
+              .forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            _data.assignments = Array.from(_aMap.values());
+          }
           // อัพเดต local ด้วยเพื่อไม่ให้ stale อยู่
           const _localCopy = JSON.parse(localStorage.getItem(this.key) || '{}');
           _localCopy.gamification = _data.gamification;
+          _localCopy.assignments = _data.assignments;
           localStorage.setItem(this.key, JSON.stringify(_localCopy));
         }
       } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
@@ -2502,6 +2515,17 @@ const Store = {
               _local.gamification, cloudData.gamification
             );
             if (_mergedGam) cloudData.gamification = _mergedGam;
+          } catch(e) {}
+          // ป้องกัน assignment ของ local หาย เมื่อ pending — union by id, local ทับ cloud
+          // (เช่น student เพิ่ง mark done แต่ยัง push ไม่ทัน, cloud ยัง pending)
+          try {
+            if (_isPending && _localHasData && Array.isArray(_local.assignments)
+                && Array.isArray(cloudData.assignments)) {
+              const _aMap = new Map();
+              cloudData.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+              _local.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+              cloudData.assignments = Array.from(_aMap.values());
+            }
           } catch(e) {}
           localStorage.setItem(this.key, JSON.stringify(cloudData));
           _updateBellBadge();
@@ -10576,7 +10600,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.95';
+  const CURRENT_VERSION = 'v46.96';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
