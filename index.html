@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.84 -->
+  <!-- APP_VERSION: v46.85 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.84</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.85</div>
     </div>
   </div>
 </div>
@@ -3927,10 +3927,27 @@ function initExams(){
         card.appendChild(assignBtn);
       }
 
-      // drag (edit mode only)
+      // drag (edit mode only) — รองรับทั้ง mouse (desktop) และ touch (iPad/iPhone)
       if(_editMode){
         card.draggable=true;
         card.dataset.examid=e.id;
+
+        // ── helper: reorder DOM + save ──
+        function _doReorder(srcCard, dstCard){
+          if(!srcCard||!dstCard||srcCard===dstCard) return;
+          const all=[...list.children];
+          const si=all.indexOf(srcCard), di=all.indexOf(dstCard);
+          if(si<0||di<0) return;
+          if(si<di) dstCard.after(srcCard); else dstCard.before(srcCard);
+          const s3=Store.load();
+          [...list.children].forEach((c,idx)=>{
+            const ex=s3.exams.find(x=>x.id===c.dataset.examid);
+            if(ex) ex.displayOrder=idx+1;
+          });
+          Store.save(s3);
+        }
+
+        // ── HTML5 drag (desktop mouse) ──
         card.addEventListener('dragstart',ev=>{
           _dragSrcId=card.dataset.examid;
           ev.dataTransfer.effectAllowed='move';
@@ -3941,7 +3958,6 @@ function initExams(){
           card.classList.remove('dragging');
           list.querySelectorAll('.drag-over').forEach(c=>c.classList.remove('drag-over'));
         });
-        // dragover + drop บน card — ใช้ currentTarget เพื่อรับ event จาก child ด้วย
         card.addEventListener('dragover',ev=>{
           ev.preventDefault();
           ev.dataTransfer.dropEffect='move';
@@ -3957,24 +3973,54 @@ function initExams(){
           const srcId=ev.dataTransfer.getData('text/plain')||_dragSrcId;
           const dstId=ev.currentTarget.dataset.examid;
           if(!srcId||srcId===dstId) return;
-          const srcCard=list.querySelector(`[data-examid="${srcId}"]`);
-          const dstCard=list.querySelector(`[data-examid="${dstId}"]`);
-          if(!srcCard||!dstCard) return;
-          const all=[...list.children];
-          const si=all.indexOf(srcCard), di=all.indexOf(dstCard);
-          if(si<0||di<0) return;
-          if(si<di) dstCard.after(srcCard); else dstCard.before(srcCard);
-          const s3=Store.load();
-          [...list.children].forEach((c,idx)=>{
-            const ex=s3.exams.find(x=>x.id===c.dataset.examid);
-            if(ex) ex.displayOrder=idx+1;
-          });
-          Store.save(s3);
+          _doReorder(list.querySelector(`[data-examid="${srcId}"]`), list.querySelector(`[data-examid="${dstId}"]`));
+        });
+
+        // ── Touch drag (iPad/iPhone) ──
+        let _touchMoved=false, _touchStartY=0, _touchStartX=0;
+        card.addEventListener('touchstart',ev=>{
+          _touchMoved=false;
+          _touchStartY=ev.touches[0].clientY;
+          _touchStartX=ev.touches[0].clientX;
+          _dragSrcId=card.dataset.examid;
+        },{passive:true});
+        card.addEventListener('touchmove',ev=>{
+          const dy=Math.abs(ev.touches[0].clientY-_touchStartY);
+          const dx=Math.abs(ev.touches[0].clientX-_touchStartX);
+          if(dy>10||dx>10){
+            _touchMoved=true;
+            ev.preventDefault();
+            card.classList.add('dragging');
+            const touch=ev.touches[0];
+            // ซ่อน card ชั่วคราวเพื่อ elementFromPoint ทะลุได้
+            card.style.pointerEvents='none';
+            const el=document.elementFromPoint(touch.clientX,touch.clientY);
+            card.style.pointerEvents='';
+            const target=el?.closest('.examCard');
+            list.querySelectorAll('.drag-over').forEach(c=>c.classList.remove('drag-over'));
+            if(target&&target!==card) target.classList.add('drag-over');
+          }
+        },{passive:false});
+        card.addEventListener('touchend',()=>{
+          card.classList.remove('dragging');
+          const dropTarget=list.querySelector('.drag-over');
+          list.querySelectorAll('.drag-over').forEach(c=>c.classList.remove('drag-over'));
+          if(_touchMoved&&dropTarget&&dropTarget!==card){
+            _doReorder(card, dropTarget);
+          }
+          // ถ้าเป็น touch drag ให้ block click ที่ตามมา
+          if(_touchMoved){
+            card._blockNextClick=true;
+            setTimeout(()=>{ card._blockNextClick=false; },300);
+          }
+          _touchMoved=false;
+          _dragSrcId=null;
         });
       }
 
       card.onclick=async (ev)=>{
         if(_editMode) return; // ไม่ navigate ตอน edit mode
+        if(card._blockNextClick) return; // block click หลัง touch drag
 
         const resetEl = ev.target.closest('[data-resetweakness]');
         if (resetEl) {
@@ -10415,7 +10461,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.84';
+  const CURRENT_VERSION = 'v46.85';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
