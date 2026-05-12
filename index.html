@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v46.99 -->
+  <!-- APP_VERSION: v47.0 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v46.99</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.0</div>
     </div>
   </div>
 </div>
@@ -4273,11 +4273,10 @@ function initExamDetail(id){
       <span class="muted" style="font-size:14px;">⏱ ${Math.round(exam.durationSeconds/60)} นาที</span>
     </div>
     <div class="hr"></div>
-    <div class="card" style="padding:20px;display:grid;gap:12px;max-width:480px;">
-      <div style="display:flex;gap:10px;align-items:center;">
-        <input id="detailTakerName" class="btn" style="text-align:left;padding:12px 14px;flex:1;font-size:15px;border-radius:14px;" placeholder="ชื่อผู้ทำ (ไม่บังคับ)" />
-        <button class="btn btnPrimary" id="examStartBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;white-space:nowrap;">▶ เริ่มทำ</button>
-      </div>
+    <div class="card" style="padding:20px;display:grid;gap:10px;max-width:480px;">
+      <input id="detailTakerName" class="btn" style="text-align:left;padding:12px 14px;font-size:15px;border-radius:14px;" placeholder="ชื่อผู้ทำ (ไม่บังคับ)" />
+      <button class="btn btnPrimary" id="examStartBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;">▶ เริ่มทำ (จับเวลา)</button>
+      <button class="btn" id="examStartPracticeBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;color:#0891b2;border-color:#67e8f9;">📝 ฝึกซ้อม (ไม่จับเวลา)</button>
       <div class="muted" style="font-size:12px;">ไม่กรอกชื่อก็กดเริ่มได้เลย · ระบบจำชื่อล่าสุดให้อัตโนมัติ</div>
     </div>
   `;
@@ -4297,6 +4296,11 @@ function initExamDetail(id){
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
     navigate('take', {id:exam.id, takerName:name});
+  };
+  document.getElementById('examStartPracticeBtn').onclick=()=>{
+    const name = _memberName || takerEl.value.trim();
+    if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
+    navigate('take', {id:exam.id, takerName:name, practice:true});
   };
   // กด Enter ก็เริ่มได้เลย
   takerEl.addEventListener('keydown', (e)=>{
@@ -4333,14 +4337,16 @@ function initTake(id){
   const LAST_TAKER_KEY='nanont:lastTakerName';
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
   const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||'').trim();
+  const _practiceMode = !!_pageParams.practice;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
-  // LINE notification — เริ่มทำข้อสอบ
-  lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
+  // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
+  if(!_practiceMode) lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
 
   _takeState={s,exam,qsList,total,attemptId,
     currentIndex:0,answers:{},unsure:{},
     started:false,startedAt:null,createdAt:Date.now(),
-    takerName:_takerName
+    takerName:_takerName,
+    practiceMode:_practiceMode
   };
   const st=_takeState;
 
@@ -4465,14 +4471,15 @@ function initTake(id){
       const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
       return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
     });
-    const usedSeconds=st.startedAt?Math.min(Math.floor((Date.now()-st.startedAt)/1000),exam.durationSeconds):0;
+    const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
+    const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
     const takerName = st.takerName || '';
     if (!takerName) {
       toast('⚠️ ไม่พบชื่อผู้สอบ กรุณาออกแล้วเริ่มใหม่');
       return;
     }
     const savedS=Store.load();
-    const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion};
+    const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode};
     savedS.attempts.unshift(_newAttempt);
     if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
     const ok=Store.save(savedS);
@@ -4535,20 +4542,26 @@ function initTake(id){
   newSubmitBtn.addEventListener('click',()=>{if(confirm('ส่งคำตอบตอนนี้?\n\n(คำตอบจะถูกส่งและดูผลคะแนน)')) submit();});
 
   const t1=document.getElementById('takeTimer'),t2=document.getElementById('takeTimer2');
-  function setTimerDisplay(remaining){
-    const fmt=fmtTime(remaining);
+  function setTimerDisplay(value){
+    const fmt=fmtTime(value);
+    if(_practiceMode){
+      const txt='📝 ' + fmt;
+      t1.textContent=txt; t2.textContent=txt;
+      [t1,t2].forEach(t=>{t.style.color='#0891b2';t.style.fontWeight='800';t.style.animation='';});
+      return;
+    }
     t1.textContent=fmt; t2.textContent=fmt;
-    const urgent = remaining <= 600; // 10 นาที
+    const urgent = value <= 600; // 10 นาที
     const color = urgent ? '#dc2626' : '';
     const weight = urgent ? '900' : '';
     [t1,t2].forEach(t=>{t.style.color=color;t.style.fontWeight=weight;});
     // กระพริบเมื่อเหลือ 1 นาที
-    if(remaining <= 60){
+    if(value <= 60){
       t1.style.animation='pulse 1s infinite';
       t2.style.animation='pulse 1s infinite';
     }
   }
-  setTimerDisplay(exam.durationSeconds);
+  setTimerDisplay(_practiceMode ? 0 : exam.durationSeconds);
 
   // _pauseOffset: จำนวนวินาทีที่หยุดนับสะสม (pause-resume offset)
   let _pauseOffset = 0;
@@ -4570,6 +4583,11 @@ function initTake(id){
     render();
     let _lastSaveTs = 0;
     _takeInterval=setInterval(()=>{
+      if(_practiceMode){
+        const elapsed = Math.floor((Date.now() - st.startedAt) / 1000);
+        setTimerDisplay(elapsed);
+        return; // ไม่ auto-submit, ไม่ save resume (ฝึกซ้อม)
+      }
       const remaining = _calcRemaining();
       setTimerDisplay(remaining);
       st._pauseOffset = _pauseOffset; // sync to state for saveTakeResume
@@ -4584,7 +4602,8 @@ function initTake(id){
   }
 
   // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
-  const _resume = typeof loadTakeResume === 'function' ? loadTakeResume(_takerName) : null;
+  // ฝึกซ้อม: ข้าม resume popup เสมอ — เริ่มสด ไม่ผูกกับเวลาเดิม
+  const _resume = (!_practiceMode && typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
   if (_resume && _resume.examId === id && _resume.startedAt) {
 
     // คำนวณเวลาเหลือ ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
@@ -10721,7 +10740,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v46.99';
+  const CURRENT_VERSION = 'v47.0';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
