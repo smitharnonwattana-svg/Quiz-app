@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.0 -->
+  <!-- APP_VERSION: v47.1 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.0</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.1</div>
     </div>
   </div>
 </div>
@@ -4583,16 +4583,21 @@ function initTake(id){
     render();
     let _lastSaveTs = 0;
     _takeInterval=setInterval(()=>{
+      const now = Date.now();
       if(_practiceMode){
-        const elapsed = Math.floor((Date.now() - st.startedAt) / 1000);
+        const elapsed = Math.max(0, Math.floor((now - st.startedAt) / 1000) - _pauseOffset);
         setTimerDisplay(elapsed);
-        return; // ไม่ auto-submit, ไม่ save resume (ฝึกซ้อม)
+        st._pauseOffset = _pauseOffset;
+        if(typeof saveTakeResume === 'function' && now - _lastSaveTs >= 1000){
+          saveTakeResume(st);
+          _lastSaveTs = now;
+        }
+        return; // ไม่ auto-submit (ฝึกซ้อมไม่มีลิมิตเวลา)
       }
       const remaining = _calcRemaining();
       setTimerDisplay(remaining);
       st._pauseOffset = _pauseOffset; // sync to state for saveTakeResume
       // throttle saveTakeResume เป็นทุก 1 วินาที (แทนที่จะ save ทุก 250ms)
-      const now = Date.now();
       if(typeof saveTakeResume === 'function' && now - _lastSaveTs >= 1000){
         saveTakeResume(st);
         _lastSaveTs = now;
@@ -4602,17 +4607,21 @@ function initTake(id){
   }
 
   // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
-  // ฝึกซ้อม: ข้าม resume popup เสมอ — เริ่มสด ไม่ผูกกับเวลาเดิม
-  const _resume = (!_practiceMode && typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
-  if (_resume && _resume.examId === id && _resume.startedAt) {
+  // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
+  const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
+  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode) ? _rawResume : null;
+  if (_resume) {
 
-    // คำนวณเวลาเหลือ ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
+    // คำนวณเวลา ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
     // pausedAt = เวลาที่ save ล่าสุด — เวลาจาก pausedAt ถึงตอนนี้คือ offset เพิ่มเติม
     const _pausedAtOffset = _resume.pausedAt ? Math.floor((Date.now() - _resume.pausedAt) / 1000) : 0;
     const _totalFrozenOffset = (_resume.pauseOffset || 0) + Math.max(0, _pausedAtOffset);
-    const _frozenRem = Math.max(0, exam.durationSeconds - Math.floor((Date.now() - _resume.startedAt) / 1000) + _totalFrozenOffset);
-    const _frozenFmt = String(Math.floor(_frozenRem/60)).padStart(2,'0') + ':' + String(_frozenRem%60).padStart(2,'0');
-    setTimerDisplay(_frozenRem); // แสดงค่า freeze บน take page ด้วย (ไม่เดิน)
+    const _rawSec = Math.max(0, Math.floor((Date.now() - _resume.startedAt) / 1000) - _totalFrozenOffset);
+    const _frozenVal = _practiceMode
+      ? _rawSec                                        // นับขึ้น: เวลาที่ใช้ไปแล้ว
+      : Math.max(0, exam.durationSeconds - _rawSec);   // นับลง: เวลาที่เหลือ
+    const _frozenFmt = String(Math.floor(_frozenVal/60)).padStart(2,'0') + ':' + String(_frozenVal%60).padStart(2,'0');
+    setTimerDisplay(_frozenVal); // แสดงค่า freeze บน take page ด้วย (ไม่เดิน)
 
     // Show resume popup
     const _resumeOverlay = document.createElement('div');
@@ -4620,11 +4629,13 @@ function initTake(id){
     _resumeOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
+    const _resumeLabel = _practiceMode ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
+    const _resumeTitle = _practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : 'ทำค้างอยู่';
     _resumeBox.innerHTML = `
       <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
-      <div style="font-size:18px;font-weight:800;margin-bottom:6px;">ทำค้างอยู่</div>
-      <div style="font-size:14px;color:#6b7280;margin-bottom:4px;">${exam.title}</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">เวลาเหลือ <strong style="color:#111;">${_frozenFmt}</strong></div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:6px;">${_resumeTitle}</div>
+      <div style="font-size:14px;color:#6b7280;margin-bottom:4px;">${esc(exam.title)}</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">${_resumeLabel} <strong style="color:#111;">${_frozenFmt}</strong></div>
     `;
     const _btnContinue = document.createElement('button');
     _btnContinue.textContent = '▶ ทำต่อ';
@@ -8266,6 +8277,7 @@ function saveTakeResume(state) {
       currentIndex: state.currentIndex,
       takerName: state.takerName,
       attemptId: state.attemptId,
+      practiceMode: !!state.practiceMode,
     }));
   } catch(e) {}
 }
@@ -10740,7 +10752,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.0';
+  const CURRENT_VERSION = 'v47.1';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
