@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.2 -->
+  <!-- APP_VERSION: v47.3 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.3</div>
     </div>
   </div>
 </div>
@@ -4424,12 +4424,22 @@ function initTake(id){
       const markUnsure=!!st.unsure[q.id];
       const active=idx===st.currentIndex;
       b.style.fontWeight=active?900:800;
-      b.style.background='#fff';b.style.color='#111';b.style.borderColor='var(--border)';b.style.boxShadow='none';
-      if(done){b.style.background='var(--black)';b.style.borderColor='var(--black)';b.style.color='#fff';}
-      if(markUnsure){b.style.background='var(--warn)';b.style.borderColor='var(--warn)';b.style.color='#111';}
+      b.style.background='#fff';
+      b.style.backgroundImage='none';
+      b.style.color='#111';
+      b.style.borderColor='var(--border)';
+      b.style.boxShadow='none';
+      if(done && markUnsure){
+        // ตอบแล้ว + ไม่แน่ใจ → ตัดทแยง ส้ม(บนซ้าย) / ดำ(ล่างขวา)
+        b.style.backgroundImage='linear-gradient(135deg, var(--warn) 0%, var(--warn) 50%, var(--black) 50%, var(--black) 100%)';
+        b.style.borderColor='var(--black)';
+        b.style.color='#fff';
+      } else if(done){
+        b.style.background='var(--black)';b.style.borderColor='var(--black)';b.style.color='#fff';
+      } else if(markUnsure){
+        b.style.background='var(--warn)';b.style.borderColor='var(--warn)';b.style.color='#111';
+      }
       if(active){b.style.borderColor='#2563eb';b.style.boxShadow='0 0 0 2px rgba(37,99,235,.25)';}
-      if(active&&!done&&!markUnsure){b.style.background='#fff';b.style.color='#111';}
-      if(active&&done){b.style.borderColor='#2563eb';}
     });
   }
 
@@ -4750,7 +4760,17 @@ function initReview(attemptId){
   const wrongUnique=Array.from(new Set(wrongNos)).sort((a,b)=>a-b);
   const wrongCount=Math.max(0,total-correctCount);
   const pct=total?Math.round((correctCount/total)*100):0;
-  document.getElementById('reviewSummaryLine').textContent=`ถูก ${correctCount}/${total} (${pct}%) • ผิด ${wrongCount} ข้อ`;
+  // สถิติข้อที่กดไม่แน่ใจ — ดูว่าเดาถูก/ผิดกี่ข้อ
+  const _unsurePQs=(Array.isArray(att.perQuestion)?att.perQuestion:[]).filter(p=>p&&p.unsure);
+  const _unsureCount=_unsurePQs.length;
+  const _unsureCorrect=_unsurePQs.filter(p=>p.isCorrect).length;
+  const _unsureWrong=_unsureCount-_unsureCorrect;
+  const _unsurePct=total?Math.round((_unsureCount/total)*100):0;
+  let _summaryText=`ถูก ${correctCount}/${total} (${pct}%) • ผิด ${wrongCount} ข้อ`;
+  if(_unsureCount>0){
+    _summaryText+=` • 🤔 ไม่แน่ใจ ${_unsureCount} ข้อ (${_unsurePct}%) — ถูก ${_unsureCorrect} / ผิด ${_unsureWrong}`;
+  }
+  document.getElementById('reviewSummaryLine').textContent=_summaryText;
 
   const wrongListText=document.getElementById('reviewWrongListText');
   if(wrongListText){
@@ -4771,15 +4791,25 @@ function initReview(attemptId){
     const qc=q.correct==null?null:String(q.correct).trim();
     return(cc!=null&&qc!=null&&cc===qc);
   }
+  function isUnsureQ(q){
+    const no=Number(q.no)||0;
+    if(Array.isArray(att.perQuestion)&&att.perQuestion.length){
+      const p=att.perQuestion.find(x=>Number(x.no)===no);
+      if(p) return !!p.unsure;
+    }
+    return false;
+  }
 
   // Nav chips
   const nav=document.getElementById('reviewNavChips');
   nav.innerHTML='';
   qs.forEach(q=>{
     const ok=isCorrectQ(q);
+    const isUns=isUnsureQ(q);
     const b=document.createElement('button');
     b.className='chip '+(ok?'good':'bad');
-    b.textContent=q.no;
+    b.innerHTML=q.no+(isUns?'<span style="font-size:9px;margin-left:1px;vertical-align:super;">🤔</span>':'');
+    if(isUns){ b.title='🤔 ติ๊กไม่แน่ใจ'; }
     b.onclick=()=>{
       if(!_reviewIsGDrive) setPdfPage(q.page||1);
     };
@@ -4795,6 +4825,7 @@ function initReview(attemptId){
     const chosen=(answers[q.id]??answers[String(q.id)]??null);
     const correct=(q.correct==null)?null:String(q.correct).trim();
     const isCorrect=isCorrectQ(q);
+    const isUns=isUnsureQ(q);
     const isFree=!!(q.isFree||(Array.isArray(att.perQuestion)&&att.perQuestion.find(p=>Number(p.no)===Number(q.no))?.isFree));
     const hasText=KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
 
@@ -4821,7 +4852,7 @@ function initReview(attemptId){
     // answer summary (shown in row)
     wrap.innerHTML=`
       <div class="qRow">
-        <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}</span>
+        <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}${isUns?' <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;border:1px solid #fde68a;">🤔 ไม่แน่ใจ</span>':''}</span>
         <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${(Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[])).map(t=>`<span style='color:#6366f1;font-size:10px;background:#ede9fe;border-radius:4px;padding:0 3px;margin-left:2px;'>${esc(t)}</span>`).join('')}</span>
         <div class="qRowPills">${pillsHtml}</div>
         <span class="qBadge ${badgeCls}">${badgeTxt}</span>
@@ -10765,7 +10796,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.2';
+  const CURRENT_VERSION = 'v47.3';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
