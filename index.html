@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.7 -->
+  <!-- APP_VERSION: v47.8 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -842,7 +842,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.7</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.8</div>
     </div>
   </div>
 </div>
@@ -9563,7 +9563,9 @@ function _calcBonusQuestProgress(userId, quest, ctx) {
     if (!Array.isArray(arr) || arr.length === 0) return 0;
     let best = 0, cur = 0;
     arr.forEach(q => {
-      if (q && q.correct === true) { cur += 1; if (cur > best) best = cur; }
+      // perQuestion[i].isCorrect = boolean, perQuestion[i].correct = ตัวอักษรเฉลย (A/B/C/D)
+      // เคยใช้ q.correct === true ผิด → streak ออกเป็น 0 เสมอ (correct เป็นตัวอักษร ไม่ใช่ boolean)
+      if (q && q.isCorrect === true) { cur += 1; if (cur > best) best = cur; }
       else { cur = 0; }
     });
     return best;
@@ -10805,7 +10807,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.7';
+  const CURRENT_VERSION = 'v47.8';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
