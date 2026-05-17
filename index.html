@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.17 -->
+  <!-- APP_VERSION: v47.18 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -845,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.17</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.18</div>
     </div>
   </div>
 </div>
@@ -933,9 +933,9 @@
         <div class="stickyBar">
           <div>
             <div style="font-weight:900;">ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span></div>
-            <div class="muted">เวลา <span id="takeTimer2">--:--</span></div>
+            <div class="muted" style="display:none;">เวลา <span id="takeTimer2">--:--</span></div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;">
             <button class="btn" id="takeExitBtn" style="padding:8px 12px;">ออก</button>
             <button class="btn btnPrimary" id="takeSubmitBtn" disabled>ส่งคำตอบ</button>
           </div>
@@ -11004,7 +11004,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.17';
+  const CURRENT_VERSION = 'v47.18';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
