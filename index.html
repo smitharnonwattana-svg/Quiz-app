@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.13 -->
+  <!-- APP_VERSION: v47.14 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -845,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.13</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.14</div>
     </div>
   </div>
 </div>
@@ -4391,6 +4391,7 @@ function initTake(id){
 
   _takeState={s,exam,qsList,total,attemptId,
     currentIndex:0,answers:{},unsure:{},
+    qElapsedMs:{},answerChanges:{},visitOrder:[],qStartTs:null,
     started:false,startedAt:null,createdAt:Date.now(),
     takerName:_takerName,
     practiceMode:_practiceMode
@@ -4440,6 +4441,30 @@ function initTake(id){
 
   if(qsList[0]) setPdfPage(qsList[0].page||1);
 
+  // ── Question timing & visit tracking ──
+  function leaveQuestion(){
+    if(!st.started || st.qStartTs==null) return;
+    const q=qsList[st.currentIndex]; if(!q) return;
+    const delta=Date.now()-st.qStartTs;
+    if(delta>0 && delta<10*60*1000){ // ignore >10min (likely tab inactive)
+      st.qElapsedMs[q.id]=(st.qElapsedMs[q.id]||0)+delta;
+    }
+    st.qStartTs=null;
+  }
+  function enterQuestion(){
+    if(!st.started) return;
+    const q=qsList[st.currentIndex]; if(!q) return;
+    st.qStartTs=Date.now();
+    const last=st.visitOrder[st.visitOrder.length-1];
+    if(last!==q.id) st.visitOrder.push(q.id);
+  }
+  function gotoQuestion(idx){
+    leaveQuestion();
+    st.currentIndex=idx;
+    enterQuestion();
+    render();
+  }
+
   // build num buttons
   const numsEl=document.getElementById('takeNums');
   numsEl.innerHTML='';
@@ -4447,7 +4472,7 @@ function initTake(id){
     const b=document.createElement('button');
     b.className='btn numBtn';
     b.textContent=q.number||q.no;
-    b.addEventListener('click',()=>{st.currentIndex=idx;render();});
+    b.addEventListener('click',()=>{gotoQuestion(idx);});
     numsEl.appendChild(b);
   });
 
@@ -4498,7 +4523,15 @@ function initTake(id){
       div.className='choice'+((st.answers[q.id]===lab)?' active':'');
       if(!st.started){div.style.opacity='0.6';div.style.pointerEvents='none';}
       div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
-      div.addEventListener('click',()=>{if(!st.started) return;st.answers[q.id]=lab;render();});
+      div.addEventListener('click',()=>{
+        if(!st.started) return;
+        const prev=st.answers[q.id];
+        if(prev && prev!==lab){
+          st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
+        }
+        st.answers[q.id]=lab;
+        render();
+      });
       wrap.appendChild(div);
     });
     document.getElementById('takePrevBtn').disabled=st.currentIndex===0;
@@ -4506,8 +4539,8 @@ function initTake(id){
     setNumStyles();
   }
 
-  document.getElementById('takePrevBtn').onclick=()=>{st.currentIndex=Math.max(0,st.currentIndex-1);render();};
-  document.getElementById('takeNextBtn').onclick=()=>{st.currentIndex=Math.min(total-1,st.currentIndex+1);render();};
+  document.getElementById('takePrevBtn').onclick=()=>{gotoQuestion(Math.max(0,st.currentIndex-1));};
+  document.getElementById('takeNextBtn').onclick=()=>{gotoQuestion(Math.min(total-1,st.currentIndex+1));};
   document.getElementById('takeUnsureBtn').onclick=()=>{
     if(!st.started){toast('กดเริ่มทำข้อสอบก่อน');return;}
     const q=qsList[st.currentIndex];
@@ -4518,6 +4551,7 @@ function initTake(id){
   function submit(){
     if(!st.started){toast('กดเริ่มทำข้อสอบก่อน');return;}
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
+    leaveQuestion(); // flush current question time
     let score=0;
     qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&st.answers[q.id]===q.correct)) score++;});
     const perQuestion=qsList.map(q=>{
@@ -4526,7 +4560,8 @@ function initTake(id){
       const isFree=!!q.isFree;
       const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
       const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
-      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id]};
+      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
+        elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
     });
     const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
@@ -4536,7 +4571,7 @@ function initTake(id){
       return;
     }
     const savedS=Store.load();
-    const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode};
+    const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop'};
     savedS.attempts.unshift(_newAttempt);
     if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
     const ok=Store.save(savedS);
@@ -4637,6 +4672,7 @@ function initTake(id){
     if(restoredOffset) _pauseOffset = restoredOffset;
     _pausedAt = null;
     newSubmitBtn.disabled=false;
+    enterQuestion();
     render();
     let _lastSaveTs = 0;
     _takeInterval=setInterval(()=>{
@@ -4710,6 +4746,9 @@ function initTake(id){
       st.answers = _resume.answers || {};
       st.unsure = _resume.unsure || {};
       st.currentIndex = _resume.currentIndex || 0;
+      st.qElapsedMs = _resume.qElapsedMs || {};
+      st.answerChanges = _resume.answerChanges || {};
+      st.visitOrder = Array.isArray(_resume.visitOrder) ? _resume.visitOrder.slice() : [];
       if (_resume.takerName) st.takerName = _resume.takerName;
       if (_resume.attemptId) st.attemptId = _resume.attemptId;
       render();
@@ -8367,11 +8406,25 @@ function _takeResumeKey(takerName) {
 
 function saveTakeResume(state) {
   try {
+    // flush เวลาข้อปัจจุบันก่อน save เพื่อให้ qElapsedMs accurate
+    if(state.started && state.qStartTs){
+      const q=state.qsList[state.currentIndex];
+      if(q){
+        const delta=Date.now()-state.qStartTs;
+        if(delta>0 && delta<10*60*1000){
+          state.qElapsedMs[q.id]=(state.qElapsedMs[q.id]||0)+delta;
+        }
+        state.qStartTs=Date.now(); // restart timer
+      }
+    }
     const key = _takeResumeKey(state.takerName);
     localStorage.setItem(key, JSON.stringify({
       examId: state.exam.id,
       answers: state.answers,
       unsure: state.unsure,
+      qElapsedMs: state.qElapsedMs || {},
+      answerChanges: state.answerChanges || {},
+      visitOrder: state.visitOrder || [],
       startedAt: state.startedAt,   // เวลาเริ่มจริง (ms) — ไม่เปลี่ยนแม้ refresh
       savedAt: Date.now(),           // เวลาที่ save
       pausedAt: Date.now(),          // เวลาที่ save ล่าสุด — popup คำนวณ offset ต่อจากนี้
@@ -10862,7 +10915,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.13';
+  const CURRENT_VERSION = 'v47.14';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
