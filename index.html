@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.22 -->
+  <!-- APP_VERSION: v47.23 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.22</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.23</div>
     </div>
   </div>
 </div>
@@ -866,14 +866,17 @@
       <div class="linkCard" onclick="navigate('exams')">
         <div style="font-weight:900;">1) ทำข้อสอบ</div>
       </div>
+      <div class="linkCard" onclick="navigate('dashboard')">
+        <div style="font-weight:900;">2) Dashboard</div>
+      </div>
       <div class="linkCard" onclick="navigate('stats')">
-        <div style="font-weight:900;">2) ผลการฝึกซ้อม</div>
+        <div style="font-weight:900;">3) ผลการฝึกซ้อม (เดิม)</div>
       </div>
       <div class="linkCard" onclick="navigate('admin')">
-        <div style="font-weight:900;">3) Admin</div>
+        <div style="font-weight:900;">4) Admin</div>
       </div>
       <div class="linkCard" onclick="navigate('entrance_stats')">
-        <div style="font-weight:900;">4) สถิติการสอบเข้า ม.1</div>
+        <div style="font-weight:900;">5) สถิติการสอบเข้า ม.1</div>
       </div>
     </div>
     <div class="hr"></div>
@@ -1044,6 +1047,11 @@
         <div class="reviewCard" style="margin-top:12px;">
           <div class="muted" style="margin-bottom:6px;">ไปที่ข้อ</div>
           <div class="chips" id="reviewNavChips"></div>
+        </div>
+        <!-- Analytics block -->
+        <div class="reviewCard" style="margin-top:12px;display:none;" id="reviewAnalyticsCard">
+          <div id="reviewCalibration"></div>
+          <div id="reviewAdminAnalytics" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);"></div>
         </div>
         <!-- พัฒนาการ + TOP5 ของชุดนี้ -->
         <div class="reviewCard" style="margin-top:12px;display:none;" id="reviewChartCard">
@@ -1322,6 +1330,47 @@
         <button id="statsConfirmCancel" class="btn-ghost">ยกเลิก</button>
         <button id="statsConfirmOk" class="btn-danger">ลบ</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: DASHBOARD ===================== -->
+<div id="page-dashboard" class="page">
+  <div class="container" style="max-width:900px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:4px;">
+      <div>
+        <h1 class="h1" style="margin:0;">📊 Dashboard</h1>
+        <div class="muted" id="dashUserLabel"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btnPrimary" onclick="navigate('exams')">ไปทำข้อสอบ</button>
+        <button class="btn" onclick="navigate('home')">← กลับ</button>
+      </div>
+    </div>
+    <!-- Student selector (admin only) -->
+    <div id="dashStudentWrap" style="display:none;margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span class="muted" style="font-size:13px;">นักเรียน</span>
+      <select id="dashStudentFilter" class="btn" style="padding:7px 10px;font-size:13px;"></select>
+    </div>
+    <!-- Time filter pills -->
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button class="btn" id="dashPill7" style="border-radius:99px;padding:6px 16px;font-size:13px;" onclick="window.dashSetTime('week')">7 วันล่าสุด</button>
+      <button class="btn" id="dashPill30" style="border-radius:99px;padding:6px 16px;font-size:13px;" onclick="window.dashSetTime('month')">30 วันล่าสุด</button>
+      <button class="btn" id="dashPillAll" style="border-radius:99px;padding:6px 16px;font-size:13px;background:#111;color:#fff;border-color:#111;" onclick="window.dashSetTime('all')">ทั้งหมด</button>
+    </div>
+    <!-- Summary cards -->
+    <div id="dashSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-top:14px;"></div>
+    <!-- Trend chart -->
+    <div style="margin-top:16px;background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;">
+      <div style="font-weight:800;font-size:14px;margin-bottom:10px;color:#374151;">📈 แนวโน้มคะแนน</div>
+      <canvas id="dashChart" height="120" style="width:100%;display:block;"></canvas>
+      <div id="dashChartEmpty" class="muted" style="display:none;text-align:center;padding:20px 0;font-size:13px;">ต้องมีอย่างน้อย 2 ครั้งเพื่อดูแนวโน้ม</div>
+    </div>
+    <!-- Attempt list -->
+    <div style="margin-top:16px;margin-bottom:24px;">
+      <div style="font-weight:800;font-size:14px;color:#374151;margin-bottom:10px;">📋 การสอบล่าสุด</div>
+      <div id="dashAttemptList" style="display:grid;gap:10px;"></div>
+      <div id="dashAttemptEmpty" class="muted" style="display:none;text-align:center;padding:20px 0;font-size:13px;">ยังไม่มีข้อมูลในช่วงนี้</div>
     </div>
   </div>
 </div>
@@ -3859,6 +3908,7 @@ function navigate(page, params={}){
   else if(page==='take') initTake(params.id);
   else if(page==='review') initReview(params.attemptId);
   else if(page==='stats') initStats();
+  else if(page==='dashboard') initDashboard();
   else if(page==='practice'){ if(Auth.isTeacher()){navigate('exams');return;} initPractice(params); }
   else if(page==='admin'){ if(!Auth.isTeacher()){navigate('home');return;} initAdmin(); }
   else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
@@ -4954,6 +5004,55 @@ function initReview(attemptId){
     wrongListText.innerHTML=`<span class="label">ผิดข้อ:</span> <span class="list">${listStr}</span>`;
   }
 
+  // ── Analytics block ──
+  {
+    const analyticsCard=document.getElementById('reviewAnalyticsCard');
+    const calibrationEl=document.getElementById('reviewCalibration');
+    const adminEl=document.getElementById('reviewAdminAnalytics');
+    const cal=calcCalibration(att);
+    if(analyticsCard&&(cal!=null||Auth.isTeacher())){
+      analyticsCard.style.display='';
+      if(cal&&calibrationEl){
+        const diff=cal.diff;
+        const absDiff=Math.abs(diff);
+        const diffColor=absDiff<=3?'#16a34a':absDiff<=7?'#ca8a04':'#dc2626';
+        const diffText=(diff>=0?'+':'')+diff;
+        calibrationEl.innerHTML=`<div style="font-weight:800;font-size:13px;margin-bottom:6px;">🎯 Calibration</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:13px;">
+            <span>ทายไว้ <strong>${cal.prediction}/${cal.total}</strong> ข้อ</span>
+            <span>ได้จริง <strong>${cal.actual}/${cal.total}</strong> ข้อ</span>
+            <span style="font-weight:700;color:${diffColor};">(${diffText} ข้อ)</span>
+          </div>`;
+      }
+      if(Auth.isTeacher()&&adminEl){
+        adminEl.style.display='';
+        const anxiety=calcAnxietyMarkers(att);
+        const das=calcDAS(att);
+        const pct=att.total?Math.round(att.score/att.total*100):0;
+        const expected=att.difficulty==='review'?80:att.difficulty==='hard'?50:65;
+        let html='';
+        if(das!=null){
+          const dasColor=das>=65?'#16a34a':das>=55?'#ca8a04':'#dc2626';
+          html+=`<div style="margin-bottom:8px;">
+            <div style="font-weight:800;font-size:13px;margin-bottom:3px;">📊 DAS</div>
+            <div style="font-size:13px;">จริง <strong>${pct}%</strong> · คาดไว้ <strong>${expected}%</strong> · DAS <span style="font-weight:900;color:${dasColor};">${das}</span>
+              <span class="muted" style="font-size:11px;"> — ${das>=65?'เหนือความคาดหวัง ✅':das>=55?'ใกล้เป้า 🟡':'ต่ำกว่าเป้า ⚠️'}</span>
+            </div>
+          </div>`;
+        }
+        if(anxiety){
+          html+=`<div style="font-weight:800;font-size:13px;margin-bottom:5px;">🧠 Anxiety Markers</div>
+            <div style="display:grid;gap:3px;font-size:12px;">
+              <div>${anxiety.panicChanges?'⚠️':'✅'} Panic Changes — เปลี่ยนคำตอบ ${anxiety.totalChanges} ครั้ง${anxiety.panicChanges?' (สูงผิดปกติ)':' (ปกติ)'}</div>
+              <div>${anxiety.endRushing?'⚠️':'✅'} End Rushing — ${anxiety.endRushing?'เร่งช่วงท้ายผิดปกติ':'ความเร็วสม่ำเสมอ'}</div>
+              <div>${anxiety.unvisited>0?'⚠️':'✅'} Skipping — ${anxiety.unvisited>0?`ข้าม ${anxiety.unvisited} ข้อ`:'เปิดทุกข้อ'}</div>
+            </div>`;
+        }
+        adminEl.innerHTML=html;
+      }
+    }
+  }
+
   const wrongSet=new Set(wrongUnique);
   function isCorrectQ(q){
     const no=Number(q.no)||0;
@@ -5398,6 +5497,212 @@ function initReview(attemptId){
     if(e.target.id==='tagModal') window.closeTagModal();
   });
 })();
+
+// ===================== DASHBOARD HELPERS =====================
+function calcDAS(att){
+  if(!att||!att.total) return null;
+  const pct=Math.round(att.score/att.total*100);
+  const expected=att.difficulty==='review'?80:att.difficulty==='hard'?50:65;
+  return(pct-expected)+65;
+}
+function calcCalibration(att){
+  if(!att||att.prediction==null||!att.total) return null;
+  const pred=Number(att.prediction);
+  if(!Number.isFinite(pred)) return null;
+  const diff=att.score-pred;
+  const diffPct=Math.round((att.score/att.total-pred/att.total)*100);
+  return{prediction:pred,actual:att.score,total:att.total,diff,diffPct};
+}
+function calcAnxietyMarkers(att){
+  const pq=att&&att.perQuestion||[];
+  if(!pq.length) return null;
+  const totalChanges=pq.reduce((s,p)=>s+(p.changes||0),0);
+  const answered=pq.filter(p=>p.chosen).length;
+  const panicRate=answered?totalChanges/answered:0;
+  const unvisited=pq.filter(p=>!p.visited).length;
+  const visitedPqs=pq.filter(p=>p.visited&&p.elapsedMs>0);
+  let endRushing=false;
+  if(visitedPqs.length>=4){
+    const avgMs=visitedPqs.reduce((s,p)=>s+p.elapsedMs,0)/visitedPqs.length;
+    const lastSlice=pq.slice(Math.floor(pq.length*0.75));
+    const lastV=lastSlice.filter(p=>p.visited&&p.elapsedMs>0);
+    const lastAvg=lastV.length?lastV.reduce((s,p)=>s+p.elapsedMs,0)/lastV.length:0;
+    endRushing=lastAvg>0&&lastAvg<avgMs*0.4;
+  }
+  return{panicChanges:panicRate>0.3,endRushing,unvisited,totalChanges};
+}
+
+// ===================== DASHBOARD PAGE =====================
+let _dashChart=null;
+let _dashTime='all';
+window.dashSetTime=function(t){_dashTime=t;_renderDashboard();};
+
+function initDashboard(){
+  _dashTime='all';
+  _renderDashboard();
+}
+
+function _renderDashboard(){
+  const s=Store.load();
+  const isTeacher=Auth.isTeacher();
+  const myName=Auth.getName();
+
+  // student filter
+  const studentWrap=document.getElementById('dashStudentWrap');
+  const studentFilter=document.getElementById('dashStudentFilter');
+  if(isTeacher&&studentWrap){
+    studentWrap.style.display='flex';
+    const names=[...new Set((s.attempts||[]).filter(a=>a.takerName).map(a=>a.takerName))].sort();
+    const cur=studentFilter?studentFilter.value:'all';
+    if(studentFilter){
+      studentFilter.innerHTML='<option value="all">ทั้งหมด</option>'+names.map(n=>`<option value="${esc(n)}"${cur===n?' selected':''}>${esc(n)}</option>`).join('');
+      studentFilter.onchange=_renderDashboard;
+    }
+  } else if(studentWrap){
+    studentWrap.style.display='none';
+  }
+
+  const labelEl=document.getElementById('dashUserLabel');
+  if(labelEl) labelEl.textContent=isTeacher?'ดูผลการสอบนักเรียน':'👤 '+myName;
+
+  // collect attempts
+  let attempts=s.attempts||[];
+  if(isTeacher){
+    const sel=studentFilter?studentFilter.value:'all';
+    if(sel&&sel!=='all') attempts=attempts.filter(a=>a.takerName===sel);
+  } else {
+    attempts=attempts.filter(a=>(a.takerName||'')===(myName||''));
+  }
+
+  // time filter
+  const now=Date.now();
+  const cutoff=_dashTime==='week'?now-7*86400000:_dashTime==='month'?now-30*86400000:0;
+  if(cutoff) attempts=attempts.filter(a=>new Date(a.submittedAt||a.startedAt||0).getTime()>=cutoff);
+
+  // pill styles
+  [['week','dashPill7'],['month','dashPill30'],['all','dashPillAll']].forEach(([t,id])=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    const active=_dashTime===t;
+    el.style.background=active?'#111':'#fff';
+    el.style.color=active?'#fff':'#111';
+    el.style.borderColor=active?'#111':'var(--border)';
+  });
+
+  _renderDashSummary(attempts);
+  _renderDashChart(attempts);
+  _renderDashAttempts(attempts,isTeacher);
+}
+
+function _renderDashSummary(attempts){
+  const el=document.getElementById('dashSummaryCards');
+  if(!el) return;
+  if(!attempts.length){el.innerHTML='';return;}
+  const n=attempts.length;
+  const avgPct=Math.round(attempts.reduce((s,a)=>s+(a.total?a.score/a.total*100:0),0)/n);
+  const dasArr=attempts.map(calcDAS).filter(d=>d!=null);
+  const avgDAS=dasArr.length?Math.round(dasArr.reduce((s,d)=>s+d,0)/dasArr.length):null;
+  const moodMap={};
+  attempts.forEach(a=>{if(a.mood) moodMap[a.mood]=(moodMap[a.mood]||0)+1;});
+  const topMood=Object.entries(moodMap).sort((a,b)=>b[1]-a[1])[0];
+  const calArr=attempts.map(calcCalibration).filter(c=>c!=null);
+  const avgCalErr=calArr.length?Math.round(calArr.reduce((s,c)=>s+Math.abs(c.diffPct),0)/calArr.length):null;
+
+  const cards=[
+    {label:'การสอบ',val:`${n} ครั้ง`,sub:''},
+    {label:'คะแนนเฉลี่ย',val:`${avgPct}%`,sub:'จากทุกชุด'},
+    avgDAS!=null?{label:'DAS เฉลี่ย',val:`${avgDAS}`,sub:avgDAS>=65?'✅ เหนือเป้า':avgDAS>=55?'🟡 ใกล้เป้า':'⚠️ ต่ำกว่าเป้า'}:null,
+    topMood?{label:'อารมณ์ก่อนสอบ',val:topMood[0],sub:`บ่อยสุด (${topMood[1]}/${n})`}:null,
+    avgCalErr!=null?{label:'Calibration',val:`±${avgCalErr}%`,sub:avgCalErr<=10?'✅ แม่นมาก':avgCalErr<=20?'🟡 พอใช้':'⚠️ คลาดเคลื่อน'}:null,
+  ].filter(Boolean);
+
+  el.innerHTML=cards.map(c=>`<div class="stat-card">
+    <div class="sc-label">${c.label}</div>
+    <div class="sc-val" style="font-size:22px;font-weight:900;">${c.val}</div>
+    ${c.sub?`<div class="sc-sub">${c.sub}</div>`:''}
+  </div>`).join('');
+}
+
+function _renderDashChart(attempts){
+  const canvas=document.getElementById('dashChart');
+  const emptyEl=document.getElementById('dashChartEmpty');
+  if(!canvas) return;
+  const sorted=[...attempts].sort((a,b)=>new Date(a.submittedAt||a.startedAt||0)-new Date(b.submittedAt||b.startedAt||0));
+  if(sorted.length<2){
+    canvas.style.display='none';
+    if(emptyEl) emptyEl.style.display='';
+    if(_dashChart){_dashChart.destroy();_dashChart=null;}
+    return;
+  }
+  canvas.style.display='';
+  if(emptyEl) emptyEl.style.display='none';
+  const labels=sorted.map(a=>{const d=new Date(a.submittedAt||a.startedAt||0);return`${d.getDate()}/${d.getMonth()+1}`;});
+  const scores=sorted.map(a=>a.total?Math.round(a.score/a.total*100):0);
+  const dasData=sorted.map(a=>calcDAS(a));
+  if(_dashChart){_dashChart.destroy();_dashChart=null;}
+  _dashChart=new Chart(canvas,{
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'คะแนน (%)',data:scores,borderColor:'#111',backgroundColor:'rgba(17,17,17,0.07)',tension:0.35,fill:true,pointRadius:4,pointBackgroundColor:'#111'},
+        {label:'DAS',data:dasData,borderColor:'#3b82f6',backgroundColor:'transparent',tension:0.35,fill:false,pointRadius:3,borderDash:[4,3],pointBackgroundColor:'#3b82f6'},
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:true,position:'top',labels:{font:{size:12},boxWidth:16}},
+        tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+(ctx.datasetIndex===0?'%':'')}}
+      },
+      scales:{y:{min:0,max:100,ticks:{font:{size:11}}},x:{ticks:{font:{size:11}}}}
+    }
+  });
+}
+
+function _renderDashAttempts(attempts,isTeacher){
+  const el=document.getElementById('dashAttemptList');
+  const emptyEl=document.getElementById('dashAttemptEmpty');
+  if(!el) return;
+  const sorted=[...attempts].sort((a,b)=>new Date(b.submittedAt||b.startedAt||0)-new Date(a.submittedAt||a.startedAt||0));
+  if(!sorted.length){
+    el.innerHTML='';
+    if(emptyEl) emptyEl.style.display='';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display='none';
+  const diffLabel={review:'🔵ทบทวน',develop:'🟡พัฒนา',hard:'🔴ยาก'};
+  el.innerHTML=sorted.map(a=>{
+    const pct=a.total?Math.round(a.score/a.total*100):0;
+    const das=calcDAS(a);
+    const cal=calcCalibration(a);
+    const d=new Date(a.submittedAt||a.startedAt||0);
+    const dateStr=d.toLocaleString('th-TH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const mood=a.mood||'';
+    const dl=diffLabel[a.difficulty]||'';
+    const dasColor=das!=null?(das>=65?'#f0fdf4;border-color:#86efac':das>=55?'#fefce8;border-color:#fde047':'#fef2f2;border-color:#fca5a5'):'';
+    const calBadge=cal?`<span class="badge">🎯 ทาย ${cal.prediction}/${cal.total} → จริง ${cal.actual}/${cal.total} (${cal.diff>=0?'+':''}${cal.diff})</span>`:'';
+    return`<div class="attempt-card" onclick="navigate('review',{attemptId:'${esc(a.id)}'})" style="cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div style="min-width:0;">
+          <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.examTitle||'ข้อสอบ')}</div>
+          <div class="muted" style="font-size:12px;margin-top:2px;">${esc(a.examSubject||'')}${isTeacher?' · '+esc(a.takerName||''):''} · ${dateStr}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-weight:900;font-size:20px;">${pct}%</div>
+          <div class="muted" style="font-size:11px;">${a.score}/${a.total}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+        ${dl?`<span class="badge">${dl}</span>`:''}
+        ${mood?`<span class="badge">${mood}</span>`:''}
+        ${das!=null?`<span class="badge" style="background:${dasColor};">DAS ${das}</span>`:''}
+        ${calBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
 
 // ===================== STATS PAGE =====================
 function initStats(){
