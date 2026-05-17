@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.19 -->
+  <!-- APP_VERSION: v47.20 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -91,12 +91,16 @@
       .takeRoot{height:100vh;overflow:hidden;}
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
-      .takeRight{overflow:auto;}
+      /* takeRight ใช้ flex column: choices ค้างที่บน, nums scroll ได้อย่างเดียว */
+      .takeRight{overflow:hidden !important;display:flex;flex-direction:column;height:100vh;}
+      .takeRight > .stickyBar{flex-shrink:0;}
+      .takeRight > .takeChoicesBlock{flex-shrink:0;border-bottom:1px solid var(--border);}
+      .takeRight > .takeNumsWrap{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
       /* ก ข ค ง แนวนอน desktop/iPad */
       #takeChoices{display:grid;grid-template-columns:repeat(4,1fr) !important;gap:8px !important;}
       .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;text-align:center !important;}
-      /* nav buttons ใหญ่ขึ้น */
-      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;flex:1 !important;}
+      /* nav buttons ใหญ่ขึ้น + equal width */
+      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;flex:1 1 0 !important;white-space:nowrap !important;}
       .takeMobileNav{display:flex !important;flex-direction:row !important;gap:8px !important;width:100% !important;flex-wrap:nowrap !important;}
     }
 
@@ -166,8 +170,8 @@
       /* hide เลือกคำตอบ label */
       .takeRight > div > .muted { display:none !important; }
 
-      /* ROW 2 + ROW 3 wrapper — choices+nav row, then number bar */
-      .takeRight > div {
+      /* ROW 2 — choices + nav (เดิม wrapper ของ choices+nav+nums, ตอนนี้แยก nums ออก) */
+      .takeRight > .takeChoicesBlock {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
@@ -845,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.19</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.20</div>
     </div>
   </div>
 </div>
@@ -932,7 +936,7 @@
       <div class="takeRight">
         <div class="stickyBar">
           <div>
-            <div style="font-weight:900;">ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span></div>
+            <div style="font-weight:900;white-space:nowrap;">ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span></div>
             <div class="muted" style="display:none;">เวลา <span id="takeTimer2">--:--</span></div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;">
@@ -940,19 +944,18 @@
             <button class="btn btnPrimary" id="takeSubmitBtn" disabled>ส่งคำตอบ</button>
           </div>
         </div>
-        <div style="padding:16px;display:grid;gap:12px;">
+        <div class="takeChoicesBlock" style="padding:16px;display:grid;gap:12px;">
           <div class="muted">เลือกคำตอบ</div>
           <div id="takeChoices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
           <div class="takeMobileNav" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <button class="btn" id="takePrevBtn" style="padding:10px 14px;font-size:14px;flex:1;">ก่อนหน้า</button>
-            <button class="btn" id="takeUnsureBtn" style="padding:10px 14px;font-size:14px;flex:1;">ไม่แน่ใจ</button>
-            <button class="btn" id="takeNextBtn" style="padding:10px 14px;font-size:14px;flex:1;">ถัดไป</button>
+            <button class="btn" id="takePrevBtn" style="padding:10px 14px;font-size:14px;flex:1;white-space:nowrap;">ก่อนหน้า</button>
+            <button class="btn" id="takeUnsureBtn" style="padding:10px 14px;font-size:14px;flex:1;white-space:nowrap;">ไม่แน่ใจ</button>
+            <button class="btn" id="takeNextBtn" style="padding:10px 14px;font-size:14px;flex:1;white-space:nowrap;">ถัดไป</button>
           </div>
-          <div class="takeNumsWrap" style="margin-top:6px;">
-            <div class="muted" style="margin-bottom:8px;">ข้ามไปข้อ</div>
-            <div id="takeNums" class="gridNums"></div>
-          </div>
-
+        </div>
+        <div class="takeNumsWrap" style="padding:0 16px 16px;">
+          <div class="muted" style="margin-bottom:8px;">ข้ามไปข้อ</div>
+          <div id="takeNums" class="gridNums"></div>
         </div>
       </div>
     </div>
@@ -11004,7 +11007,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.19';
+  const CURRENT_VERSION = 'v47.20';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
