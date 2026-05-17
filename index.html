@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.32 -->
+  <!-- APP_VERSION: v47.33 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.32</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.33</div>
     </div>
   </div>
 </div>
@@ -1306,7 +1306,8 @@
     <div id="statsRadarWrap"></div>
 
     <!-- ④ รายการชุดข้อสอบ -->
-    <div id="statsRows" style="display:grid;gap:10px;margin-top:16px;margin-bottom:8px;"></div>
+    <div id="statsTabBar" style="display:flex;gap:0;margin-top:16px;border-bottom:2px solid var(--border);"></div>
+    <div id="statsRows" style="margin-top:12px;margin-bottom:8px;"></div>
 
     <!-- ⑤ สถิติการแก้จุดอ่อน -->
     <div id="statsPracticeSection" style="margin-top:16px;margin-bottom:8px;display:none;">
@@ -5683,6 +5684,7 @@ function initStats(){
   let currentTimeFilter='all';
   let currentStudentFilter='all';
   const _statsLimits={real:5,practice:5,weakness:5};
+  let _statsActiveTab='real';
   const filterEl=document.getElementById('statsFilterExam');
   const subjectEl=document.getElementById('statsFilterSubject');
   const studentWrap=document.getElementById('statsStudentFilterWrap');
@@ -6057,6 +6059,8 @@ function initStats(){
     if(currentExamFilter!=='all') weaknessList=weaknessList.filter(a=>a.examId===currentExamFilter);
 
     if(!realList.length&&!practiceList.length&&!weaknessList.length){
+      const tabBar=document.getElementById('statsTabBar');
+      if(tabBar) tabBar.innerHTML='';
       rowsEl.innerHTML=`<div class="muted" style="padding:24px;text-align:center;border:1px solid var(--border);border-radius:14px;">ยังไม่มีสถิติ</div>`;
       return;
     }
@@ -6117,35 +6121,55 @@ function initStats(){
     }
 
     const sections=[
-      {key:'real',title:'⏱ ทำข้อสอบจริง (จับเวลา)',list:realList},
-      {key:'practice',title:'📝 ฝึกซ้อม (ไม่จับเวลา)',list:practiceList},
-      {key:'weakness',title:'🎯 แก้จุดอ่อน',list:weaknessList},
+      {key:'real',title:'จริง',icon:'⏱',list:realList},
+      {key:'practice',title:'ฝึกซ้อม',icon:'📝',list:practiceList},
+      {key:'weakness',title:'แก้จุดอ่อน',icon:'🎯',list:weaknessList},
     ];
+
+    // ── Tab bar ──
+    const tabBar=document.getElementById('statsTabBar');
+    if(tabBar){
+      // auto-switch to first non-empty tab if active tab is empty
+      if(!sections.find(s=>s.key===_statsActiveTab)?.list.length){
+        const first=sections.find(s=>s.list.length);
+        if(first) _statsActiveTab=first.key;
+      }
+      tabBar.innerHTML=sections.map(sec=>{
+        const active=_statsActiveTab===sec.key;
+        const cnt=sec.list.length;
+        return`<button data-tab="${sec.key}" style="padding:10px 16px;font-size:13px;font-weight:${active?800:600};border:none;border-bottom:${active?'2px solid #111':'2px solid transparent'};background:none;cursor:pointer;color:${active?'#111':'#6b7280'};margin-bottom:-2px;white-space:nowrap;">${sec.icon} ${sec.title}${cnt?` <span style="font-size:11px;background:${active?'#111':'#e5e7eb'};color:${active?'#fff':'#6b7280'};border-radius:99px;padding:1px 6px;">${cnt}</span>`:''}</button>`;
+      }).join('');
+      tabBar.querySelectorAll('[data-tab]').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          _statsActiveTab=btn.getAttribute('data-tab');
+          _statsLimits[_statsActiveTab]=_statsLimits[_statsActiveTab]||5;
+          render();
+        });
+      });
+    }
+
+    // ── Active tab content ──
+    const activeSec=sections.find(s=>s.key===_statsActiveTab)||sections[0];
     const _cardUids=[];
     let _secHtml='';
-    sections.forEach(sec=>{
-      if(!sec.list.length) return;
-      const limit=_statsLimits[sec.key]||5;
-      const visible=sec.list.slice(0,limit);
-      const remaining=sec.list.length-limit;
-      _secHtml+=`<div data-cat="${sec.key}" style="margin-top:8px;">
-        <h2 style="font-size:15px;font-weight:800;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          ${sec.title}
-          <span style="color:#9ca3af;font-weight:600;font-size:13px;">(${sec.list.length} ครั้ง)</span>
-        </h2>
-        <div style="display:grid;gap:10px;">`;
+    if(activeSec&&activeSec.list.length){
+      const limit=_statsLimits[activeSec.key]||5;
+      const visible=activeSec.list.slice(0,limit);
+      const remaining=activeSec.list.length-limit;
+      _secHtml+='<div style="display:grid;gap:10px;">';
       visible.forEach((a,i)=>{
-        const uid=`${sec.key}_${i}`;
+        const uid=`${activeSec.key}_${i}`;
         _cardUids.push(uid);
         _secHtml+=buildCardHtml(a,uid);
       });
       _secHtml+='</div>';
       if(remaining>0){
         const nextBatch=Math.min(5,remaining);
-        _secHtml+=`<div style="text-align:center;margin-top:10px;"><button class="btn statsMoreBtn" data-cat="${sec.key}" style="padding:8px 20px;font-size:13px;">▾ เพิ่มเติม (อีก ${nextBatch} · เหลือ ${remaining})</button></div>`;
+        _secHtml+=`<div style="text-align:center;margin-top:10px;"><button class="btn statsMoreBtn" data-cat="${activeSec.key}" style="padding:8px 20px;font-size:13px;">▾ เพิ่มเติม (อีก ${nextBatch} · เหลือ ${remaining})</button></div>`;
       }
-      _secHtml+='</div>';
-    });
+    } else {
+      _secHtml=`<div class="muted" style="padding:24px;text-align:center;border:1px solid var(--border);border-radius:14px;">ยังไม่มีข้อมูลในหมวดนี้</div>`;
+    }
     rowsEl.innerHTML=_secHtml;
 
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
@@ -11331,7 +11355,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.32';
+  const CURRENT_VERSION = 'v47.33';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
