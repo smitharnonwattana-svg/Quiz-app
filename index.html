@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.20 -->
+  <!-- APP_VERSION: v47.21 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -99,9 +99,9 @@
       /* ก ข ค ง แนวนอน desktop/iPad */
       #takeChoices{display:grid;grid-template-columns:repeat(4,1fr) !important;gap:8px !important;}
       .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;text-align:center !important;}
-      /* nav buttons ใหญ่ขึ้น + equal width */
-      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;flex:1 1 0 !important;white-space:nowrap !important;}
-      .takeMobileNav{display:flex !important;flex-direction:row !important;gap:8px !important;width:100% !important;flex-wrap:nowrap !important;}
+      /* nav buttons — grid 3 คอลัมน์ ความกว้างคงที่ ไม่ shift เวลา text เปลี่ยน */
+      #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;white-space:nowrap !important;min-width:0 !important;overflow:hidden !important;}
+      .takeMobileNav{display:grid !important;grid-template-columns:1fr 1fr 1fr !important;gap:8px !important;width:100% !important;}
     }
 
     /* ══ MOBILE: PDF 70% top, controls 30% bottom ══ */
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.20</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.21</div>
     </div>
   </div>
 </div>
@@ -939,9 +939,9 @@
             <div style="font-weight:900;white-space:nowrap;">ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span></div>
             <div class="muted" style="display:none;">เวลา <span id="takeTimer2">--:--</span></div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;">
-            <button class="btn" id="takeExitBtn" style="padding:8px 12px;">ออก</button>
-            <button class="btn btnPrimary" id="takeSubmitBtn" disabled>ส่งคำตอบ</button>
+          <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;flex-shrink:0;">
+            <button class="btn" id="takeExitBtn" style="padding:8px 12px;white-space:nowrap;flex-shrink:0;">ออก</button>
+            <button class="btn btnPrimary" id="takeSubmitBtn" disabled style="white-space:nowrap;flex-shrink:0;">ส่งคำตอบ</button>
           </div>
         </div>
         <div class="takeChoicesBlock" style="padding:16px;display:grid;gap:12px;">
@@ -11007,7 +11007,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.20';
+  const CURRENT_VERSION = 'v47.21';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
