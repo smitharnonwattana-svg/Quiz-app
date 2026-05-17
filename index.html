@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.24 -->
+  <!-- APP_VERSION: v47.25 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.24</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.25</div>
     </div>
   </div>
 </div>
@@ -11322,10 +11322,12 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.22';
+  const CURRENT_VERSION = 'v47.25';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
+  let _prompted = false;
 
   async function checkVersion(){
+    if (_prompted) return;
     try {
       const res = await fetch(
         '/Quiz-app/version.json?t=' + Date.now(),
@@ -11334,6 +11336,7 @@ function initEntranceCompare(params) {
       if (!res.ok) return;
       const data = await res.json();
       if (data.version && data.version !== CURRENT_VERSION) {
+        _prompted = true;
         if (confirm(
           '🆕 มีเวอร์ชันใหม่ (' + data.version + ')\n' +
           'อัพเดทเพื่อใช้ฟีเจอร์ล่าสุดไหม?'
