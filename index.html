@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.28 -->
+  <!-- APP_VERSION: v47.29 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.28</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.29</div>
     </div>
   </div>
 </div>
@@ -4984,19 +4984,7 @@ function initReview(attemptId){
       }
       if(Auth.isTeacher()&&adminEl){
         const anxiety=calcAnxietyMarkers(att);
-        const das=calcDAS(att);
-        const pct=att.total?Math.round(att.score/att.total*100):0;
-        const expected=att.difficulty==='review'?80:att.difficulty==='hard'?50:65;
         let html='';
-        if(das!=null){
-          const dasColor=das>=65?'#16a34a':das>=55?'#ca8a04':'#dc2626';
-          html+=`<div style="margin-bottom:8px;">
-            <div style="font-weight:800;font-size:13px;margin-bottom:3px;">📊 DAS</div>
-            <div style="font-size:13px;">จริง <strong>${pct}%</strong> · คาดไว้ <strong>${expected}%</strong> · DAS <span style="font-weight:900;color:${dasColor};">${das}</span>
-              <span class="muted" style="font-size:11px;"> — ${das>=65?'เหนือความคาดหวัง ✅':das>=55?'ใกล้เป้า 🟡':'ต่ำกว่าเป้า ⚠️'}</span>
-            </div>
-          </div>`;
-        }
         if(anxiety){
           html+=`<div style="font-weight:800;font-size:13px;margin-bottom:5px;">🧠 Anxiety Markers</div>
             <div style="display:grid;gap:3px;font-size:12px;">
@@ -11286,7 +11274,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.28';
+  const CURRENT_VERSION = 'v47.29';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
