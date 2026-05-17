@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.23 -->
+  <!-- APP_VERSION: v47.24 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.23</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.24</div>
     </div>
   </div>
 </div>
@@ -1014,7 +1014,7 @@
         <div class="muted" style="font-size:12px;" id="reviewSub"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn" onclick="navigate('stats')">ผลการฝึกซ้อม</button>
+        <button class="btn" onclick="navigate('dashboard')">← Dashboard</button>
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
       </div>
     </div>
@@ -1348,7 +1348,7 @@
       </div>
     </div>
     <!-- Student selector (admin only) -->
-    <div id="dashStudentWrap" style="display:none;margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div id="dashStudentWrap" style="margin-top:12px;display:none;align-items:center;gap:8px;flex-wrap:wrap;">
       <span class="muted" style="font-size:13px;">นักเรียน</span>
       <select id="dashStudentFilter" class="btn" style="padding:7px 10px;font-size:13px;"></select>
     </div>
@@ -5025,7 +5025,6 @@ function initReview(attemptId){
           </div>`;
       }
       if(Auth.isTeacher()&&adminEl){
-        adminEl.style.display='';
         const anxiety=calcAnxietyMarkers(att);
         const das=calcDAS(att);
         const pct=att.total?Math.round(att.score/att.total*100):0;
@@ -5048,7 +5047,7 @@ function initReview(attemptId){
               <div>${anxiety.unvisited>0?'⚠️':'✅'} Skipping — ${anxiety.unvisited>0?`ข้าม ${anxiety.unvisited} ข้อ`:'เปิดทุกข้อ'}</div>
             </div>`;
         }
-        adminEl.innerHTML=html;
+        if(html){adminEl.style.display='';adminEl.innerHTML=html;}
       }
     }
   }
@@ -5618,7 +5617,7 @@ function _renderDashSummary(attempts){
 
   el.innerHTML=cards.map(c=>`<div class="stat-card">
     <div class="sc-label">${c.label}</div>
-    <div class="sc-val" style="font-size:22px;font-weight:900;">${c.val}</div>
+    <div class="sc-value">${c.val}</div>
     ${c.sub?`<div class="sc-sub">${c.sub}</div>`:''}
   </div>`).join('');
 }
@@ -5656,7 +5655,7 @@ function _renderDashChart(attempts){
         legend:{display:true,position:'top',labels:{font:{size:12},boxWidth:16}},
         tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+(ctx.datasetIndex===0?'%':'')}}
       },
-      scales:{y:{min:0,max:100,ticks:{font:{size:11}}},x:{ticks:{font:{size:11}}}}
+      scales:{y:{suggestedMin:0,suggestedMax:100,ticks:{font:{size:11}}},x:{ticks:{font:{size:11}}}}
     }
   });
 }
