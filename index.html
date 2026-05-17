@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.14 -->
+  <!-- APP_VERSION: v47.15 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -845,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.14</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.15</div>
     </div>
   </div>
 </div>
@@ -4455,8 +4455,9 @@ function initTake(id){
     if(!st.started) return;
     const q=qsList[st.currentIndex]; if(!q) return;
     st.qStartTs=Date.now();
+    const qno=q.no||q.number;
     const last=st.visitOrder[st.visitOrder.length-1];
-    if(last!==q.id) st.visitOrder.push(q.id);
+    if(last!==qno) st.visitOrder.push(qno);
   }
   function gotoQuestion(idx){
     leaveQuestion();
@@ -4560,8 +4561,9 @@ function initTake(id){
       const isFree=!!q.isFree;
       const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
       const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
+      const visited=Object.prototype.hasOwnProperty.call(st.qElapsedMs,q.id);
       return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
-        elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
+        visited,elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
     });
     const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
@@ -4751,7 +4753,6 @@ function initTake(id){
       st.visitOrder = Array.isArray(_resume.visitOrder) ? _resume.visitOrder.slice() : [];
       if (_resume.takerName) st.takerName = _resume.takerName;
       if (_resume.attemptId) st.attemptId = _resume.attemptId;
-      render();
       // offset รวม = pauseOffset เดิม + เวลาตั้งแต่ save ล่าสุดจนถึงตอนกด "ทำต่อ"
       const _resumeExtra = _resume.pausedAt ? Math.floor((Date.now() - _resume.pausedAt) / 1000) : 0;
       const totalOffset = (_resume.pauseOffset || 0) + Math.max(0, _resumeExtra);
@@ -10915,7 +10916,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.14';
+  const CURRENT_VERSION = 'v47.15';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
