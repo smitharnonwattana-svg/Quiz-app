@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.12 -->
+  <!-- APP_VERSION: v47.13 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -845,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.12</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.13</div>
     </div>
   </div>
 </div>
@@ -6406,9 +6406,9 @@ function resetMemeConfig() {
 function initAdminExams(){
   if(!Auth.isTeacher()){navigate('home');return;}
   const s=Store.init();
-  let subjectFilter='';
+  let subjectFilter=window._adminExamsFilter||'';
   const subjFilterEl=document.getElementById('adminSubjFilter');
-  if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderAdmin();};
+  if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._adminExamsFilter=subjectFilter;renderAdmin();};
 
   function renderAdmin(){
     const all=(s.exams||[]).slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
@@ -10862,7 +10862,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.12';
+  const CURRENT_VERSION = 'v47.13';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
