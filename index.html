@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.25 -->
+  <!-- APP_VERSION: v47.26 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.25</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.26</div>
     </div>
   </div>
 </div>
@@ -5500,6 +5500,8 @@ function initReview(attemptId){
 // ===================== DASHBOARD HELPERS =====================
 function calcDAS(att){
   if(!att||!att.total) return null;
+  // Require explicit difficulty tag — old attempts without it shouldn't show DAS
+  if(att.difficulty!=='review'&&att.difficulty!=='develop'&&att.difficulty!=='hard') return null;
   const pct=Math.round(att.score/att.total*100);
   const expected=att.difficulty==='review'?80:att.difficulty==='hard'?50:65;
   return(pct-expected)+65;
@@ -5515,16 +5517,19 @@ function calcCalibration(att){
 function calcAnxietyMarkers(att){
   const pq=att&&att.perQuestion||[];
   if(!pq.length) return null;
+  // Require new data collection fields — old attempts won't have these
+  const hasTracking=pq.some(p=>typeof p.elapsedMs==='number'||typeof p.changes==='number'||typeof p.visited==='boolean');
+  if(!hasTracking) return null;
   const totalChanges=pq.reduce((s,p)=>s+(p.changes||0),0);
   const answered=pq.filter(p=>p.chosen).length;
   const panicRate=answered?totalChanges/answered:0;
-  const unvisited=pq.filter(p=>!p.visited).length;
-  const visitedPqs=pq.filter(p=>p.visited&&p.elapsedMs>0);
+  const unvisited=pq.filter(p=>p.visited===false).length;
+  const visitedPqs=pq.filter(p=>p.visited===true&&p.elapsedMs>0);
   let endRushing=false;
   if(visitedPqs.length>=4){
     const avgMs=visitedPqs.reduce((s,p)=>s+p.elapsedMs,0)/visitedPqs.length;
     const lastSlice=pq.slice(Math.floor(pq.length*0.75));
-    const lastV=lastSlice.filter(p=>p.visited&&p.elapsedMs>0);
+    const lastV=lastSlice.filter(p=>p.visited===true&&p.elapsedMs>0);
     const lastAvg=lastV.length?lastV.reduce((s,p)=>s+p.elapsedMs,0)/lastV.length:0;
     endRushing=lastAvg>0&&lastAvg<avgMs*0.4;
   }
@@ -5564,14 +5569,14 @@ function _renderDashboard(){
   const labelEl=document.getElementById('dashUserLabel');
   if(labelEl) labelEl.textContent=isTeacher?'ดูผลการสอบนักเรียน':'👤 '+myName;
 
-  // collect attempts
-  let attempts=s.attempts||[];
+  // collect attempts — use shared helper to keep user isolation consistent
+  let attempts=getVisibleAttemptsForCurrentUser(s.attempts||[]);
   if(isTeacher){
     const sel=studentFilter?studentFilter.value:'all';
-    if(sel&&sel!=='all') attempts=attempts.filter(a=>a.takerName===sel);
-  } else {
-    attempts=attempts.filter(a=>(a.takerName||'')===(myName||''));
+    if(sel&&sel!=='all') attempts=attempts.filter(a=>(a.takerName||'')===sel);
   }
+  // Guard: if non-teacher with no name, show nothing
+  if(!isTeacher&&!myName) attempts=[];
 
   // time filter
   const now=Date.now();
@@ -11322,7 +11327,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.25';
+  const CURRENT_VERSION = 'v47.26';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
