@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.30 -->
+  <!-- APP_VERSION: v47.31 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.30</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.31</div>
     </div>
   </div>
 </div>
@@ -5800,12 +5800,14 @@ function initStats(){
     const total=attempts.length;
     const avgPct=Math.round(attempts.reduce((s,a)=>s+(a.total?((a.score||0)/a.total)*100:0),0)/total);
     const best=attempts.reduce((b,a)=>(!b||(a.total&&(a.score/a.total)>(b.score/b.total)))?a:b,null);
-    const avgSec=Math.round(attempts.reduce((s,a)=>s+(a.usedSeconds||0),0)/total);
+    const totalSec=attempts.reduce((s,a)=>s+(a.usedSeconds||0),0);
+    const _th=Math.floor(totalSec/3600),_tm=Math.floor((totalSec%3600)/60);
+    const totalTimeStr=_th>0?`${_th} ชม. ${_tm} นาที`:`${_tm} นาที`;
     const cards=[
       {label:'ทำทั้งหมด',value:total+' ครั้ง',sub:'ทุกชุดรวมกัน',accent:false},
       {label:'คะแนนเฉลี่ย',value:avgPct+'%',sub:`${attempts.reduce((s,a)=>s+(a.score||0),0)} / ${attempts.reduce((s,a)=>s+(a.total||0),0)} คะแนน`,accent:false},
       {label:'ทำดีที่สุด',value:best?(Math.round((best.score/best.total)*100))+'%':'—',sub:best?esc(best.examTitle||'—'):'',accent:false},
-      {label:'เวลาเฉลี่ย',value:formatDuration(avgSec),sub:'ต่อครั้ง',accent:false},
+      {label:'เวลาฝึกรวม',value:totalTimeStr,sub:'ทุกชุดรวมกัน',accent:false},
     ];
     el.innerHTML=cards.map(c=>`
       <div class="stat-card">
@@ -11286,7 +11288,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.30';
+  const CURRENT_VERSION = 'v47.31';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
