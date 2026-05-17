@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.21 -->
+  <!-- APP_VERSION: v47.22 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.21</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.22</div>
     </div>
   </div>
 </div>
@@ -941,7 +941,7 @@
           </div>
           <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;flex-shrink:0;">
             <button class="btn" id="takeExitBtn" style="padding:8px 12px;white-space:nowrap;flex-shrink:0;">ออก</button>
-            <button class="btn btnPrimary" id="takeSubmitBtn" disabled style="white-space:nowrap;flex-shrink:0;">ส่งคำตอบ</button>
+            <button class="btn btnPrimary" id="takeSubmitBtn" disabled style="padding:8px 12px;white-space:nowrap;flex-shrink:0;">ส่ง</button>
           </div>
         </div>
         <div class="takeChoicesBlock" style="padding:16px;display:grid;gap:12px;">
@@ -4517,8 +4517,19 @@ function initTake(id){
     if(ub){
       ub.disabled=!st.started;
       const u=!!st.unsure[q.id];
-      ub.textContent=u?'ไม่แน่ใจ ✓':'ไม่แน่ใจ';
-      ub.className=u?'btn btnPrimary':'btn';
+      ub.textContent='ไม่แน่ใจ';
+      ub.className='btn';
+      if(u){
+        ub.style.background='var(--warn)';
+        ub.style.borderColor='var(--warn)';
+        ub.style.color='#111';
+        ub.style.fontWeight='800';
+      } else {
+        ub.style.background='';
+        ub.style.borderColor='';
+        ub.style.color='';
+        ub.style.fontWeight='';
+      }
     }
     setPdfPage(q.page||1);
     const wrap=document.getElementById('takeChoices');
@@ -11007,7 +11018,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.21';
+  const CURRENT_VERSION = 'v47.22';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
