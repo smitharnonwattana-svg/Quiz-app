@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.26 -->
+  <!-- APP_VERSION: v47.27 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.26</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.27</div>
     </div>
   </div>
 </div>
@@ -5010,9 +5010,11 @@ function initReview(attemptId){
     const calibrationEl=document.getElementById('reviewCalibration');
     const adminEl=document.getElementById('reviewAdminAnalytics');
     const cal=calcCalibration(att);
-    if(analyticsCard&&(cal!=null||Auth.isTeacher())){
-      analyticsCard.style.display='';
+    if(analyticsCard){
+      // Build content first — show card only when something exists
+      let _hasContent=false;
       if(cal&&calibrationEl){
+        _hasContent=true;
         const diff=cal.diff;
         const absDiff=Math.abs(diff);
         const diffColor=absDiff<=3?'#16a34a':absDiff<=7?'#ca8a04':'#dc2626';
@@ -5047,8 +5049,9 @@ function initReview(attemptId){
               <div>${anxiety.unvisited>0?'⚠️':'✅'} Skipping — ${anxiety.unvisited>0?`ข้าม ${anxiety.unvisited} ข้อ`:'เปิดทุกข้อ'}</div>
             </div>`;
         }
-        if(html){adminEl.style.display='';adminEl.innerHTML=html;}
+        if(html){_hasContent=true;adminEl.style.display='';adminEl.innerHTML=html;}
       }
+      if(_hasContent) analyticsCard.style.display='';
     }
   }
 
@@ -5691,7 +5694,7 @@ function _renderDashAttempts(attempts,isTeacher){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
         <div style="min-width:0;">
           <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.examTitle||'ข้อสอบ')}</div>
-          <div class="muted" style="font-size:12px;margin-top:2px;">${esc(a.examSubject||'')}${isTeacher?' · '+esc(a.takerName||''):''} · ${dateStr}</div>
+          <div class="muted" style="font-size:12px;margin-top:2px;">${[a.examSubject,isTeacher?a.takerName:null,dateStr].filter(Boolean).map(esc).join(' · ')}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
           <div style="font-weight:900;font-size:20px;">${pct}%</div>
@@ -11327,7 +11330,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.26';
+  const CURRENT_VERSION = 'v47.27';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
