@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.8 -->
+  <!-- APP_VERSION: v47.9 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -45,6 +45,9 @@
     .linkCard:hover{background:var(--bg);}
     .btn{border:1px solid var(--border);background:#fff;padding:10px 12px;border-radius:12px;cursor:pointer;font-size:14px;font-family:inherit;}
     .btnPrimary{background:var(--black);border-color:var(--black);color:#fff;}
+    .diffBtn{transition:box-shadow .15s,opacity .15s;}
+    .diffBtn.active{box-shadow:0 0 0 3px rgba(0,0,0,.18);opacity:1;}
+    .diffBtn:not(.active){opacity:.55;}
     .btn:disabled{opacity:.5;cursor:not-allowed;}
     .list{display:grid;gap:12px;margin-top:16px;}
     .tableWrap{overflow:auto;border:1px solid var(--border);border-radius:14px;margin-top:16px;}
@@ -842,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.8</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.9</div>
     </div>
   </div>
 </div>
@@ -1528,6 +1531,23 @@
         </div>
         <div id="newTopicTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
       </div>
+      <label style="display:grid;gap:6px;">
+        <span style="font-weight:900;">ระดับความยาก</span>
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;cursor:pointer;">
+            <input type="radio" name="newDifficulty" value="review" style="display:none;" />
+            <div class="diffBtn" data-val="review" style="padding:10px 8px;border-radius:12px;border:2px solid #bfdbfe;background:#eff6ff;text-align:center;font-weight:700;font-size:13px;color:#2563eb;">🔵 ทบทวน</div>
+          </label>
+          <label style="flex:1;cursor:pointer;">
+            <input type="radio" name="newDifficulty" value="develop" style="display:none;" checked />
+            <div class="diffBtn" data-val="develop" style="padding:10px 8px;border-radius:12px;border:2px solid #fde68a;background:#fffbeb;text-align:center;font-weight:700;font-size:13px;color:#d97706;">🟡 พัฒนา</div>
+          </label>
+          <label style="flex:1;cursor:pointer;">
+            <input type="radio" name="newDifficulty" value="hard" style="display:none;" />
+            <div class="diffBtn" data-val="hard" style="padding:10px 8px;border-radius:12px;border:2px solid #fecaca;background:#fff1f2;text-align:center;font-weight:700;font-size:13px;color:#dc2626;">🔴 ยาก</div>
+          </label>
+        </div>
+      </label>
       <div class="grid2">
         <label style="display:grid;gap:6px;">
           <span style="font-weight:900;">เวลา (นาที)</span>
@@ -1663,6 +1683,16 @@
                 <button class="btn" id="editorDurationBtn" type="button" title="ยืนยันเวลา" style="padding:8px 14px;font-weight:700;">✓</button>
                 <span id="editorDurationStatus" class="muted" style="font-size:12px;"></span>
               </div>
+            </div>
+          </div>
+
+          <!-- Row 1.5: ระดับความยาก -->
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">ระดับความยาก</div>
+            <div style="display:flex;gap:8px;" id="editorDiffBtns">
+              <button type="button" class="btn diffBtn" data-val="review" style="flex:1;border:2px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-weight:700;font-size:13px;">🔵 ทบทวน</button>
+              <button type="button" class="btn diffBtn" data-val="develop" style="flex:1;border:2px solid #fde68a;background:#fffbeb;color:#d97706;font-weight:700;font-size:13px;">🟡 พัฒนา</button>
+              <button type="button" class="btn diffBtn" data-val="hard" style="flex:1;border:2px solid #fecaca;background:#fff1f2;color:#dc2626;font-weight:700;font-size:13px;">🔴 ยาก</button>
             </div>
           </div>
 
@@ -7506,6 +7536,15 @@ function initAdminNew(){
   const createBtn=document.getElementById('newCreateBtn');
   const newCreateBtn=createBtn.cloneNode(true);
   createBtn.parentNode.replaceChild(newCreateBtn,createBtn);
+  // diffBtn toggle logic for create form
+  document.querySelectorAll('#page-admin_new .diffBtn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.val==='develop');
+    btn.closest('label').addEventListener('click',()=>{
+      document.querySelectorAll('#page-admin_new .diffBtn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
   newCreateBtn.addEventListener('click',()=>{
     const title=document.getElementById('newTitle').value.trim()||'Exam ใหม่';
     const _selVal=document.getElementById('newSubjectSelect')?.value||'';
@@ -7519,7 +7558,9 @@ function initAdminNew(){
     const maxOrder=Math.max(0,...(s.exams||[]).map(e=>(typeof e.order==='number'?e.order:0)));
     const id='exam_'+Math.random().toString(16).slice(2);
     const answerPdfUrl=(document.getElementById('newAnswerPdfUrl')?.value||'').trim();
-    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1});
+    const _activeDiff=document.querySelector('#page-admin_new .diffBtn.active');
+    const difficulty=_activeDiff?_activeDiff.dataset.val:'develop';
+    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty});
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>({id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),choices:{A:'',B:'',C:'',D:''},correct:'A'})):[];
     // apply excel data ถ้ามี
     if(window._newExcelData && window._newExcelData.length > 0){
@@ -7588,6 +7629,20 @@ function initEditor(examId){
     toast('บันทึกวิชาแล้ว');
   }
   subjectBtn.onclick=(e)=>{e.preventDefault();applySubject();};
+
+  // ── Difficulty ──
+  const _diffBtns=document.querySelectorAll('#editorDiffBtns .diffBtn');
+  const _curDiff=exam.difficulty||'develop';
+  _diffBtns.forEach(b=>{
+    b.classList.toggle('active', b.dataset.val===_curDiff);
+    b.onclick=()=>{
+      _diffBtns.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      exam.difficulty=b.dataset.val;
+      Store.save(s);
+      toast('บันทึกระดับความยากแล้ว');
+    };
+  });
 
   // ── Duration ──
   const durationInput=document.getElementById('editorDurationMin');
@@ -10807,7 +10862,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.8';
+  const CURRENT_VERSION = 'v47.9';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
