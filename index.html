@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.31 -->
+  <!-- APP_VERSION: v47.32 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.31</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.32</div>
     </div>
   </div>
 </div>
@@ -5682,6 +5682,7 @@ function initStats(){
   let currentSubjectFilter='all';
   let currentTimeFilter='all';
   let currentStudentFilter='all';
+  const _statsLimits={real:5,practice:5,weakness:5};
   const filterEl=document.getElementById('statsFilterExam');
   const subjectEl=document.getElementById('statsFilterSubject');
   const studentWrap=document.getElementById('statsStudentFilterWrap');
@@ -6047,14 +6048,20 @@ function initStats(){
       }
     }
 
-    // ── attempt cards ──
+    // ── attempt cards (split by category) ──
     const rowsEl=document.getElementById('statsRows');
-    if(!attempts.length){
+    const realList=attempts.filter(a=>!a.practiceMode);
+    const practiceList=attempts.filter(a=>a.practiceMode===true);
+    let weaknessList=filterByTime(practiceAttempts);
+    if(currentSubjectFilter!=='all') weaknessList=weaknessList.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
+    if(currentExamFilter!=='all') weaknessList=weaknessList.filter(a=>a.examId===currentExamFilter);
+
+    if(!realList.length&&!practiceList.length&&!weaknessList.length){
       rowsEl.innerHTML=`<div class="muted" style="padding:24px;text-align:center;border:1px solid var(--border);border-radius:14px;">ยังไม่มีสถิติ</div>`;
       return;
     }
-    rowsEl.innerHTML='';
-    attempts.forEach((a,idx)=>{
+
+    function buildCardHtml(a,uid){
       const exam=(s.exams||[]).find(e=>e.id===a.examId);
       const examTitle=exam?.title||a.examTitle||'—';
       const examSubject=a.examSubject||exam?.subject||'ไม่ระบุ';
@@ -6065,12 +6072,8 @@ function initStats(){
       const usedSec=Number.isFinite(a.usedSeconds)?a.usedSeconds:0;
       const pct=a.total?Math.round((a.score||0)/a.total*100):0;
       const barColor=scoreColor(pct);
-      const card=document.createElement('div');
-      card.className='attempt-card';
-      // หา tier ของ attempt นี้
-      const _tier = MemeScore.getTierByPct ? MemeScore.getTierByPct(pct) : null;
-      const _tierBadge = _tier ? `<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:${_tier.bg};color:${_tier.color};border:1px solid ${_tier.color}22;white-space:nowrap;">${_tier.emoji} ${_tier.title}</span>` : '';
-      // tag breakdown for this attempt
+      const _tier=MemeScore.getTierByPct?MemeScore.getTierByPct(pct):null;
+      const _tierBadge=_tier?`<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:${_tier.bg};color:${_tier.color};border:1px solid ${_tier.color}22;white-space:nowrap;">${_tier.emoji} ${_tier.title}</span>`:'';
       const _tagMap={};
       (a.perQuestion||[]).forEach(p=>{
         const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
@@ -6081,14 +6084,14 @@ function initStats(){
         });
       });
       const _tagsSorted=Object.entries(_tagMap).filter(([,v])=>v.total>0).sort((a,b)=>Math.round(a[1].right/a[1].total*100)-Math.round(b[1].right/b[1].total*100));
-      const _tagCollapseId='atag_'+idx;
+      const _tagCollapseId='atag_'+uid;
       const _tagPanel=_tagsSorted.length?`
         <div id="${_tagCollapseId}" style="display:none;margin-top:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;">
             ${_tagsSorted.map(([t,tv])=>{const p2=Math.round(tv.right/tv.total*100);const bc=p2>=80?'#16a34a':p2>=50?'#f59e0b':'#ef4444';const lbl=p2>=80?'ผ่าน':p2>=50?'ควรฝึก':'วิกฤต';return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;background:#f9fafb;border:1px solid #f3f4f6;"><div style="font-size:12px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${esc(t)}</div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><span style="font-size:12px;font-weight:900;color:${bc};">${p2}%</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;">${lbl}</span></div></div>`;}).join('')}
           </div>
         </div>`:'';
-      card.innerHTML=`
+      return `<div class="attempt-card">
         <div class="ac-top">
           <div style="flex:1;min-width:0;">
             <div class="ac-title">${esc(examTitle)}</div>
@@ -6109,19 +6112,59 @@ function initStats(){
           </div>
           ${Auth.isTeacher()?`<button class="btn-delete" style="padding:6px 12px;" data-del="${a.id}">ลบ</button>`:''}
         </div>
-        ${_tagPanel}`;
-      rowsEl.appendChild(card);
+        ${_tagPanel}
+      </div>`;
+    }
+
+    const sections=[
+      {key:'real',title:'⏱ ทำข้อสอบจริง (จับเวลา)',list:realList},
+      {key:'practice',title:'📝 ฝึกซ้อม (ไม่จับเวลา)',list:practiceList},
+      {key:'weakness',title:'🎯 แก้จุดอ่อน',list:weaknessList},
+    ];
+    const _cardUids=[];
+    let _secHtml='';
+    sections.forEach(sec=>{
+      if(!sec.list.length) return;
+      const limit=_statsLimits[sec.key]||5;
+      const visible=sec.list.slice(0,limit);
+      const remaining=sec.list.length-limit;
+      _secHtml+=`<div data-cat="${sec.key}" style="margin-top:8px;">
+        <h2 style="font-size:15px;font-weight:800;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${sec.title}
+          <span style="color:#9ca3af;font-weight:600;font-size:13px;">(${sec.list.length} ครั้ง)</span>
+        </h2>
+        <div style="display:grid;gap:10px;">`;
+      visible.forEach((a,i)=>{
+        const uid=`${sec.key}_${i}`;
+        _cardUids.push(uid);
+        _secHtml+=buildCardHtml(a,uid);
+      });
+      _secHtml+='</div>';
+      if(remaining>0){
+        const nextBatch=Math.min(5,remaining);
+        _secHtml+=`<div style="text-align:center;margin-top:10px;"><button class="btn statsMoreBtn" data-cat="${sec.key}" style="padding:8px 20px;font-size:13px;">▾ เพิ่มเติม (อีก ${nextBatch} · เหลือ ${remaining})</button></div>`;
+      }
+      _secHtml+='</div>';
     });
+    rowsEl.innerHTML=_secHtml;
+
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
-    attempts.forEach((_,idx)=>{
-      const btn=rowsEl.querySelector(`#atag_${idx}_btn`);
-      const panel=rowsEl.querySelector(`#atag_${idx}`);
+    _cardUids.forEach(uid=>{
+      const btn=rowsEl.querySelector(`#atag_${uid}_btn`);
+      const panel=rowsEl.querySelector(`#atag_${uid}`);
       if(!btn||!panel) return;
       btn.addEventListener('click',()=>{
         const open=panel.style.display!=='none';
         panel.style.display=open?'none':'block';
         btn.textContent=open?'▸ เนื้อหา':'▾ ซ่อน';
+      });
+    });
+    rowsEl.querySelectorAll('.statsMoreBtn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const cat=btn.getAttribute('data-cat');
+        _statsLimits[cat]=(_statsLimits[cat]||5)+5;
+        render();
       });
     });
     renderPracticeStats();
@@ -11288,7 +11331,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.31';
+  const CURRENT_VERSION = 'v47.32';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
