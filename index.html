@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.18 -->
+  <!-- APP_VERSION: v47.19 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -92,9 +92,9 @@
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
       .takeRight{overflow:auto;}
-      /* ก ข ค ง แนวตั้ง desktop */
-      #takeChoices{display:grid;grid-template-columns:1fr !important;gap:8px !important;}
-      .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;}
+      /* ก ข ค ง แนวนอน desktop/iPad */
+      #takeChoices{display:grid;grid-template-columns:repeat(4,1fr) !important;gap:8px !important;}
+      .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;text-align:center !important;}
       /* nav buttons ใหญ่ขึ้น */
       #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;flex:1 !important;}
       .takeMobileNav{display:flex !important;flex-direction:row !important;gap:8px !important;width:100% !important;flex-wrap:nowrap !important;}
@@ -845,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.18</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.19</div>
     </div>
   </div>
 </div>
@@ -11004,7 +11004,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.18';
+  const CURRENT_VERSION = 'v47.19';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
