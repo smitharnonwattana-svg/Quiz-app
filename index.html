@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.29 -->
+  <!-- APP_VERSION: v47.30 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.29</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.30</div>
     </div>
   </div>
 </div>
@@ -1047,7 +1047,8 @@
         </div>
         <!-- Analytics block -->
         <div class="reviewCard" style="margin-top:12px;display:none;" id="reviewAnalyticsCard">
-          <div id="reviewCalibration"></div>
+          <div id="reviewMoodFeeling"></div>
+          <div id="reviewCalibration" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none;"></div>
           <div id="reviewAdminAnalytics" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);"></div>
         </div>
         <!-- พัฒนาการ + TOP5 ของชุดนี้ -->
@@ -4963,14 +4964,25 @@ function initReview(attemptId){
   // ── Analytics block ──
   {
     const analyticsCard=document.getElementById('reviewAnalyticsCard');
+    const moodFeelingEl=document.getElementById('reviewMoodFeeling');
     const calibrationEl=document.getElementById('reviewCalibration');
     const adminEl=document.getElementById('reviewAdminAnalytics');
     const cal=calcCalibration(att);
     if(analyticsCard){
+      const MOOD_LABEL={low:'🪫 หมดแรง',ok:'😐 พอไหว',good:'😊 โอเค',high:'⚡ พร้อมมาก'};
+      const FEEL_LABEL={hard:'😤 ยากเกิน',confused:'😐 พอไหว',ok:'😊 โอเค',confident:'🎯 มั่นใจ'};
       // Build content first — show card only when something exists
       let _hasContent=false;
+      if(moodFeelingEl&&(att.mood||att.feeling)){
+        _hasContent=true;
+        const parts=[];
+        if(att.mood) parts.push(`<span><span style="color:#9ca3af;font-size:12px;">ก่อนสอบ</span> <strong>${MOOD_LABEL[att.mood]||att.mood}</strong></span>`);
+        if(att.feeling) parts.push(`<span><span style="color:#9ca3af;font-size:12px;">หลังสอบ</span> <strong>${FEEL_LABEL[att.feeling]||att.feeling}</strong></span>`);
+        moodFeelingEl.innerHTML=`<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">${parts.join('')}</div>`;
+      }
       if(cal&&calibrationEl){
         _hasContent=true;
+        calibrationEl.style.display='';
         const diff=cal.diff;
         const absDiff=Math.abs(diff);
         const diffColor=absDiff<=3?'#16a34a':absDiff<=7?'#ca8a04':'#dc2626';
@@ -11274,7 +11286,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.29';
+  const CURRENT_VERSION = 'v47.30';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
