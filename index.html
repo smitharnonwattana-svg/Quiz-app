@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.33 -->
+  <!-- APP_VERSION: v47.34 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.33</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.34</div>
     </div>
   </div>
 </div>
@@ -5761,10 +5761,11 @@ function initStats(){
     const names=new Set();
     (s.attempts||[]).forEach(a=>{if(a.takerName) names.add(a.takerName);});
     (s.members||[]).forEach(m=>{if(m && m.name) names.add(m.name);});
+    // preserve current filter even if student has no attempts left after delete
+    if(currentStudentFilter && currentStudentFilter!=='all') names.add(currentStudentFilter);
     const sorted=Array.from(names).sort((a,b)=>a.localeCompare(b,'th'));
     studentEl.innerHTML=`<option value="all">ทั้งหมด</option>`+sorted.map(n=>`<option value="${n}">${n}</option>`).join('');
-    if(names.has(currentStudentFilter)) studentEl.value=currentStudentFilter;
-    else{currentStudentFilter='all';studentEl.value='all';}
+    studentEl.value=currentStudentFilter;
   }
 
   // bind listeners โดยตรง (ไม่ต้อง clone — ป้องกัน bug options หาย)
@@ -11355,7 +11356,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.33';
+  const CURRENT_VERSION = 'v47.34';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
