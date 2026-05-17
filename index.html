@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.34 -->
+  <!-- APP_VERSION: v47.35 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -849,7 +849,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.34</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.35</div>
     </div>
   </div>
 </div>
@@ -5669,6 +5669,8 @@ function _renderDashAttempts(attempts,isTeacher){
 }
 
 // ===================== STATS PAGE =====================
+// state ไว้นอก initStats เพื่อให้ filter คงอยู่เมื่อ initStats ถูกเรียกซ้ำ (เช่น listenDoc refresh)
+const _statsState = { studentFilter: 'all', subjectFilter: 'all', examFilter: 'all', timeFilter: 'all', activeTab: 'real', limits: {real:5, practice:5, weakness:5} };
 function initStats(){
   const teacherBtns = document.getElementById('statsTeacherBtns');
   if(teacherBtns) teacherBtns.style.display = Auth.isTeacher() ? 'flex' : 'none';
@@ -5679,12 +5681,13 @@ function initStats(){
   if(userLabelEl && _myName) userLabelEl.textContent = '👤 ' + _myName + ' · sync ทุกเครื่อง';
 
   let pendingDeleteAttemptId=null;
-  let currentExamFilter='all';
-  let currentSubjectFilter='all';
-  let currentTimeFilter='all';
-  let currentStudentFilter='all';
-  const _statsLimits={real:5,practice:5,weakness:5};
-  let _statsActiveTab='real';
+  // aliases into persistent _statsState (survives initStats re-calls from listenDoc refresh)
+  let currentExamFilter=_statsState.examFilter;
+  let currentSubjectFilter=_statsState.subjectFilter;
+  let currentTimeFilter=_statsState.timeFilter;
+  let currentStudentFilter=_statsState.studentFilter;
+  const _statsLimits=_statsState.limits;
+  let _statsActiveTab=_statsState.activeTab;
   const filterEl=document.getElementById('statsFilterExam');
   const subjectEl=document.getElementById('statsFilterSubject');
   const studentWrap=document.getElementById('statsStudentFilterWrap');
@@ -5712,7 +5715,7 @@ function initStats(){
       return t>0 && t>=cutoff;
     });
   }
-  window.statsSetTime=(t)=>{ currentTimeFilter=t; setTimePills(t); render(); };
+  window.statsSetTime=(t)=>{ currentTimeFilter=_statsState.timeFilter=t; setTimePills(t); render(); };
   setTimePills(currentTimeFilter);
 
   function getExamSubjectById(s,examId){
@@ -5742,7 +5745,7 @@ function initStats(){
     const prev=currentExamFilter;
     filterEl.innerHTML=options.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
     if(options.some(o=>o.value===prev)) filterEl.value=prev;
-    else{currentExamFilter='all';filterEl.value='all';}
+    else{currentExamFilter=_statsState.examFilter='all';filterEl.value='all';}
   }
 
   function rebuildSubjectOptions(s){
@@ -5753,7 +5756,7 @@ function initStats(){
     const opts=['all',...Array.from(subjects).filter(Boolean).sort((a,b)=>a.localeCompare(b,'th'))];
     subjectEl.innerHTML=opts.map(v=>`<option value="${v}">${v==='all'?'ทั้งหมด':v}</option>`).join('');
     if(opts.includes(currentSubjectFilter)) subjectEl.value=currentSubjectFilter;
-    else{currentSubjectFilter='all';subjectEl.value='all';}
+    else{currentSubjectFilter=_statsState.subjectFilter='all';subjectEl.value='all';}
   }
 
   function rebuildStudentOptions(s){
@@ -5769,9 +5772,9 @@ function initStats(){
   }
 
   // bind listeners โดยตรง (ไม่ต้อง clone — ป้องกัน bug options หาย)
-  document.getElementById('statsFilterSubject').onchange=(e)=>{currentSubjectFilter=e.target.value||'all';currentExamFilter='all';document.getElementById('statsFilterExam').value='all';render();};
-  document.getElementById('statsFilterExam').onchange=(e)=>{currentExamFilter=e.target.value||'all';render();};
-  if(studentEl) studentEl.onchange=(e)=>{currentStudentFilter=e.target.value||'all';render();};
+  document.getElementById('statsFilterSubject').onchange=(e)=>{currentSubjectFilter=_statsState.subjectFilter=e.target.value||'all';currentExamFilter=_statsState.examFilter='all';document.getElementById('statsFilterExam').value='all';render();};
+  document.getElementById('statsFilterExam').onchange=(e)=>{currentExamFilter=_statsState.examFilter=e.target.value||'all';render();};
+  if(studentEl) studentEl.onchange=(e)=>{currentStudentFilter=_statsState.studentFilter=e.target.value||'all';render();};
 
   function openConfirm(aId){
     pendingDeleteAttemptId=aId;
@@ -6133,7 +6136,7 @@ function initStats(){
       // auto-switch to first non-empty tab if active tab is empty
       if(!sections.find(s=>s.key===_statsActiveTab)?.list.length){
         const first=sections.find(s=>s.list.length);
-        if(first) _statsActiveTab=first.key;
+        if(first) _statsActiveTab=_statsState.activeTab=first.key;
       }
       tabBar.innerHTML=sections.map(sec=>{
         const active=_statsActiveTab===sec.key;
@@ -6142,7 +6145,7 @@ function initStats(){
       }).join('');
       tabBar.querySelectorAll('[data-tab]').forEach(btn=>{
         btn.addEventListener('click',()=>{
-          _statsActiveTab=btn.getAttribute('data-tab');
+          _statsActiveTab=_statsState.activeTab=btn.getAttribute('data-tab');
           _statsLimits[_statsActiveTab]=_statsLimits[_statsActiveTab]||5;
           render();
         });
@@ -11356,7 +11359,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.34';
+  const CURRENT_VERSION = 'v47.35';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
