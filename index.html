@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.15 -->
+  <!-- APP_VERSION: v47.16 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -845,7 +845,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.15</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.16</div>
     </div>
   </div>
 </div>
@@ -4392,6 +4392,7 @@ function initTake(id){
   _takeState={s,exam,qsList,total,attemptId,
     currentIndex:0,answers:{},unsure:{},
     qElapsedMs:{},answerChanges:{},visitOrder:[],qStartTs:null,
+    mood:null,
     started:false,startedAt:null,createdAt:Date.now(),
     takerName:_takerName,
     practiceMode:_practiceMode
@@ -4549,6 +4550,66 @@ function initTake(id){
     render();
   };
 
+  // ── Pre check-in: mood ──
+  function showMoodCheckIn(onConfirm){
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:20px;padding:28px 20px;width:min(340px,92vw);box-shadow:0 20px 40px rgba(0,0,0,.2);';
+    box.innerHTML=`<div style="font-weight:900;font-size:17px;text-align:center;margin-bottom:6px;">ก่อนเริ่มทำ...</div>
+<div style="color:#6b7280;font-size:14px;text-align:center;margin-bottom:20px;">วันนี้รู้สึกยังไง?</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+${[['low','🪫','หมดแรง'],['ok','😐','พอไหว'],['good','😊','โอเค'],['high','⚡','พร้อมมาก']].map(([v,e,l])=>`<button data-val="${v}" style="padding:14px 8px;border-radius:14px;border:2px solid #e5e7eb;background:#f9fafb;cursor:pointer;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:28px;">${e}</span><span>${l}</span></button>`).join('')}
+</div>`;
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    box.querySelectorAll('button[data-val]').forEach(btn=>{
+      btn.addEventListener('click',()=>{ov.remove();onConfirm(btn.dataset.val);});
+    });
+  }
+
+  // ── Post check-in: feeling + prediction ──
+  function showPostCheckIn(score,total,onComplete){
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(ov);
+
+    function step1(){
+      const box=document.createElement('div');
+      box.style.cssText='background:#fff;border-radius:20px;padding:28px 20px;width:min(340px,92vw);box-shadow:0 20px 40px rgba(0,0,0,.2);';
+      box.innerHTML=`<div style="font-weight:900;font-size:17px;text-align:center;margin-bottom:6px;">ชุดนี้เป็นยังไงบ้าง?</div>
+<div style="color:#6b7280;font-size:14px;text-align:center;margin-bottom:20px;">ก่อนดูผล บอกความรู้สึกก่อนนะ</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+${[['hard','😤','ยากเกิน'],['confused','😐','พอไหว'],['ok','😊','โอเค'],['confident','🎯','มั่นใจ']].map(([v,e,l])=>`<button data-val="${v}" style="padding:14px 8px;border-radius:14px;border:2px solid #e5e7eb;background:#f9fafb;cursor:pointer;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:28px;">${e}</span><span>${l}</span></button>`).join('')}
+</div>`;
+      ov.innerHTML=''; ov.appendChild(box);
+      box.querySelectorAll('button[data-val]').forEach(btn=>{
+        btn.addEventListener('click',()=>step2(btn.dataset.val));
+      });
+    }
+
+    function step2(feeling){
+      const mid=Math.round(total/2);
+      const box=document.createElement('div');
+      box.style.cssText='background:#fff;border-radius:20px;padding:28px 20px;width:min(340px,92vw);box-shadow:0 20px 40px rgba(0,0,0,.2);';
+      box.innerHTML=`<div style="font-weight:900;font-size:17px;text-align:center;margin-bottom:6px;">คิดว่าได้กี่ข้อ?</div>
+<div style="color:#6b7280;font-size:14px;text-align:center;margin-bottom:20px;">จากทั้งหมด ${total} ข้อ (ยังไม่เห็นผล)</div>
+<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;">
+  <button id="_predMinus" style="width:44px;height:44px;border-radius:50%;border:2px solid #e5e7eb;background:#f3f4f6;font-size:22px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;">−</button>
+  <div style="font-size:40px;font-weight:900;min-width:60px;text-align:center;" id="_predVal">${mid}</div>
+  <button id="_predPlus" style="width:44px;height:44px;border-radius:50%;border:2px solid #e5e7eb;background:#f3f4f6;font-size:22px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;">+</button>
+</div>
+<button id="_predConfirm" style="width:100%;padding:13px;background:#111827;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;">ดูผลเลย →</button>`;
+      ov.innerHTML=''; ov.appendChild(box);
+      let _pred=mid;
+      box.querySelector('#_predMinus').onclick=()=>{_pred=Math.max(0,_pred-1);box.querySelector('#_predVal').textContent=_pred;};
+      box.querySelector('#_predPlus').onclick=()=>{_pred=Math.min(total,_pred+1);box.querySelector('#_predVal').textContent=_pred;};
+      box.querySelector('#_predConfirm').onclick=()=>{ov.remove();onComplete(feeling,_pred);};
+    }
+
+    step1();
+  }
+
   function submit(){
     if(!st.started){toast('กดเริ่มทำข้อสอบก่อน');return;}
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
@@ -4572,61 +4633,61 @@ function initTake(id){
       toast('⚠️ ไม่พบชื่อผู้สอบ กรุณาออกแล้วเริ่มใหม่');
       return;
     }
-    const savedS=Store.load();
-    const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop'};
-    savedS.attempts.unshift(_newAttempt);
-    if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
-    const ok=Store.save(savedS);
-    if (!ok) {
-      toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-      return;
-    }
-    WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
-    if (takerName && !Auth.isTeacher()) {
-      updateCoachStreak(takerName);
-    }
-    // Gamification G5: Stamp UI + Points Wiring
-    if (takerName && !Auth.isTeacher()) {
-      processGamificationAfterSubmit(takerName);
-    }
-    if (takerName && !Auth.isTeacher()) {
-      // G8-D: Quest Complete Notification
-      const _completedTiers = updateBonusQuestProgress(takerName);
-      if (_completedTiers && _completedTiers.length > 0) {
-        const _tierNames = {
-          easy: '🟢 Easy', medium: '🟡 Medium',
-          challenge: '🔴 Challenge'
-        };
-        setTimeout(() => {
-          _completedTiers.forEach(tier => {
-            const label = _tierNames[tier] || tier;
-            toast('🎯 ' + label + ' Quest สำเร็จ! กดรับรางวัลที่หน้า Rewards');
-          });
-        }, 3000);
+    function _doSave(feeling, prediction){
+      const savedS=Store.load();
+      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
+      savedS.attempts.unshift(_newAttempt);
+      if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
+      const ok=Store.save(savedS);
+      if (!ok) {
+        toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        return;
       }
-    }
-    if (takerName && !Auth.isTeacher()) {
-      syncDailySummary(takerName); // F2: Daily Summary Firestore Sync
-    }
-    // Assignment + Notification Bell System: auto-dismiss on exam submit
-    if (takerName && !Auth.isTeacher()) {
-      const _s3 = Store.load();
-      const _ai = (_s3.assignments||[]).findIndex(a =>
-        a.assignedTo === takerName &&
-        a.examId === _newAttempt.examId &&
-        a.status === 'pending'
-      );
-      if (_ai !== -1) {
-        _s3.assignments[_ai].status = 'done';
-        Store.save(_s3);
+      WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
+      if (takerName && !Auth.isTeacher()) {
+        updateCoachStreak(takerName);
       }
+      if (takerName && !Auth.isTeacher()) {
+        processGamificationAfterSubmit(takerName);
+      }
+      if (takerName && !Auth.isTeacher()) {
+        const _completedTiers = updateBonusQuestProgress(takerName);
+        if (_completedTiers && _completedTiers.length > 0) {
+          const _tierNames = {easy:'🟢 Easy',medium:'🟡 Medium',challenge:'🔴 Challenge'};
+          setTimeout(() => {
+            _completedTiers.forEach(tier => {
+              toast('🎯 ' + (_tierNames[tier]||tier) + ' Quest สำเร็จ! กดรับรางวัลที่หน้า Rewards');
+            });
+          }, 3000);
+        }
+      }
+      if (takerName && !Auth.isTeacher()) {
+        syncDailySummary(takerName);
+      }
+      if (takerName && !Auth.isTeacher()) {
+        const _s3 = Store.load();
+        const _ai = (_s3.assignments||[]).findIndex(a =>
+          a.assignedTo === takerName &&
+          a.examId === _newAttempt.examId &&
+          a.status === 'pending'
+        );
+        if (_ai !== -1) {
+          _s3.assignments[_ai].status = 'done';
+          Store.save(_s3);
+        }
+      }
+      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
+      MemeScore.show(score, total, () => {
+        navigate('review', {attemptId: st.attemptId});
+      });
     }
-    // 🎉 Show meme popup before going to review
-    // LINE notification — ส่งข้อสอบแล้ว
-    lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
-    MemeScore.show(score, total, () => {
-      navigate('review', {attemptId: st.attemptId});
-    });
+
+    // teacher/admin: skip check-ins ไปบันทึกเลย
+    if(Auth.isTeacher()){
+      _doSave(null, null);
+    } else {
+      showPostCheckIn(score, total, _doSave);
+    }
   }
 
   const submitBtn=document.getElementById('takeSubmitBtn');
@@ -4761,12 +4822,14 @@ function initTake(id){
     _btnRestart.onclick = () => {
       clearTakeResume(_takerName);
       _resumeOverlay.remove();
-      doStart();
+      if(Auth.isTeacher()){doStart();}
+      else{showMoodCheckIn(mood=>{st.mood=mood;doStart();});}
     };
 
   } else {
     // No resume — auto-start normally
-    setTimeout(doStart, 300);
+    if(Auth.isTeacher()){setTimeout(doStart,300);}
+    else{setTimeout(()=>showMoodCheckIn(mood=>{st.mood=mood;doStart();}),300);}
   }
 
   document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะยังถูกบันทึกไว้')){cleanupTake();navigate('exams');}};
@@ -10916,7 +10979,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.15';
+  const CURRENT_VERSION = 'v47.16';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
 
   async function checkVersion(){
