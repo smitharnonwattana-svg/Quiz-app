@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.35 -->
+  <!-- APP_VERSION: v47.36 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -369,7 +369,8 @@
     input[type="number"]{width:72px;}
     .tableBox{overflow:auto;max-height:calc(100vh - 210px);}
     .bar2{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;}
-    .rowActive{background:#f3f4f6;}
+    .rowActive{background:#f3f4f6 !important;}
+    .editorRowAlt{background:#eff6ff;}
     .ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
     .titleInput{min-width:260px;max-width:520px;width:38vw;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;}
     .correctBtns{display:flex;gap:4px;}
@@ -849,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.35</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.36</div>
     </div>
   </div>
 </div>
@@ -8231,7 +8232,7 @@ function initEditor(examId){
   const fieldOrder=['page','correct','free'];
 
   function select(i){selectedIndex=Math.max(0,Math.min(list.length-1,i));highlight();}
-  function highlight(){[...document.getElementById('editorTbody').children].forEach((tr,idx)=>{tr.className=idx===selectedIndex?'rowActive':'';}); }
+  function highlight(){[...document.getElementById('editorTbody').children].forEach((tr,idx)=>{tr.classList.toggle('rowActive',idx===selectedIndex);}); }
   function focusField(ri,field){const el=refs[`${ri}:${field}`];if(el&&el.focus) el.focus();}
   function nextField(ri,field){const i=fieldOrder.indexOf(field);if(i<fieldOrder.length-1) return{rowIndex:ri,field:fieldOrder[i+1]};return{rowIndex:Math.min(ri+1,list.length-1),field:'page'};}
   function prevField(ri,field){const i=fieldOrder.indexOf(field);if(i>0) return{rowIndex:ri,field:fieldOrder[i-1]};return{rowIndex:Math.max(ri-1,0),field:'free'};}
@@ -8247,6 +8248,7 @@ function initEditor(examId){
     Object.keys(refs).forEach(k=>delete refs[k]);
     list.forEach((q,idx)=>{
       const tr=document.createElement('tr');
+      if(Math.floor(idx/5)%2===1) tr.classList.add('editorRowAlt');
       tr.addEventListener('click',()=>select(idx));
       const _qTags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
       const _tagPreview=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'<span style="font-size:11px;color:#9ca3af;">—</span>';
@@ -11359,7 +11361,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.35';
+  const CURRENT_VERSION = 'v47.36';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
