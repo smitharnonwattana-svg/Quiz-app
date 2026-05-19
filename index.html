@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.36 -->
+  <!-- APP_VERSION: v47.37 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.36</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.37</div>
     </div>
   </div>
 </div>
@@ -1281,6 +1281,7 @@
 
     <!-- ① Summary cards -->
     <div id="statsSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px;"></div>
+    <div id="statsDifficultyCards" style="display:none;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;"></div>
 
     <!-- ② filter วิชา (ย้ายขึ้นมาก่อน) -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px;">
@@ -5825,6 +5826,34 @@ function initStats(){
       </div>`).join('');
   }
 
+  function renderDifficultyCards(attempts){
+    const el=document.getElementById('statsDifficultyCards');
+    if(!el) return;
+    const tiers=[
+      {key:'review', label:'🔵 ทบทวน', color:'#2563eb', bg:'#eff6ff', border:'#bfdbfe'},
+      {key:'develop',label:'🟡 พัฒนา', color:'#ca8a04', bg:'#fefce8', border:'#fde047'},
+      {key:'hard',   label:'🔴 ยาก',   color:'#dc2626', bg:'#fff1f2', border:'#fecaca'},
+    ];
+    const byTier={review:[], develop:[], hard:[]};
+    attempts.forEach(a=>{ if(byTier[a.difficulty]) byTier[a.difficulty].push(a); });
+    const anyData=tiers.some(t=>byTier[t.key].length>0);
+    if(!anyData){el.style.display='none';el.innerHTML='';return;}
+    el.style.display='grid';
+    el.innerHTML=tiers.map(t=>{
+      const list=byTier[t.key];
+      const n=list.length;
+      const avg=n?Math.round(list.reduce((s,a)=>s+(a.total?((a.score||0)/a.total)*100:0),0)/n):null;
+      const valStr=avg!=null?avg+'%':'—';
+      const subStr=n?`${n} ครั้ง`:'ยังไม่มีข้อมูล';
+      const dim=n?'':'opacity:.45;';
+      return `<div style="background:${t.bg};border:1px solid ${t.border};border-radius:14px;padding:12px;${dim}">
+        <div style="font-size:12px;font-weight:800;color:${t.color};margin-bottom:4px;">${t.label}</div>
+        <div style="font-size:22px;font-weight:900;color:${t.color};line-height:1.1;">${valStr}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${subStr}</div>
+      </div>`;
+    }).join('');
+  }
+
   // ── ② กราฟพัฒนาการ (Canvas) ──
   function renderChart(attempts){
     const canvas=document.getElementById('statsChart');
@@ -5981,6 +6010,7 @@ function initStats(){
 
     // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น — normal only)
     renderSummaryCards(timeFiltered);
+    renderDifficultyCards(timeFiltered);
 
     // ── Subject + Tag Dashboard (unified) ──
     const subjAvgEl = document.getElementById('statsSubjAvg');
@@ -11361,7 +11391,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.36';
+  const CURRENT_VERSION = 'v47.37';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
