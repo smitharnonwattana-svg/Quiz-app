@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.37 -->
+  <!-- APP_VERSION: v47.38 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.37</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.38</div>
     </div>
   </div>
 </div>
@@ -5835,7 +5835,10 @@ function initStats(){
       {key:'hard',   label:'🔴 ยาก',   color:'#dc2626', bg:'#fff1f2', border:'#fecaca'},
     ];
     const byTier={review:[], develop:[], hard:[]};
-    attempts.forEach(a=>{ if(byTier[a.difficulty]) byTier[a.difficulty].push(a); });
+    attempts.forEach(a=>{
+      const d=a.difficulty||'develop';
+      if(byTier[d]) byTier[d].push(a);
+    });
     const anyData=tiers.some(t=>byTier[t.key].length>0);
     if(!anyData){el.style.display='none';el.innerHTML='';return;}
     el.style.display='grid';
@@ -11391,7 +11394,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.37';
+  const CURRENT_VERSION = 'v47.38';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
