@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.41 -->
+  <!-- APP_VERSION: v47.42 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.41</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.42</div>
     </div>
   </div>
 </div>
@@ -4999,6 +4999,11 @@ function initReview(attemptId){
     const moodFeelingEl=document.getElementById('reviewMoodFeeling');
     const calibrationEl=document.getElementById('reviewCalibration');
     const adminEl=document.getElementById('reviewAdminAnalytics');
+    // Reset ทุก element ก่อน (กัน DOM ค้างจาก attempt ก่อนหน้า)
+    if(analyticsCard) analyticsCard.style.display='none';
+    if(moodFeelingEl) moodFeelingEl.innerHTML='';
+    if(calibrationEl){calibrationEl.style.display='none';calibrationEl.innerHTML='';}
+    if(adminEl){adminEl.style.display='none';adminEl.innerHTML='';}
     const cal=calcCalibration(att);
     if(analyticsCard){
       const MOOD_LABEL={low:'🪫 หมดแรง',ok:'😐 พอไหว',good:'😊 โอเค',high:'⚡ พร้อมมาก'};
@@ -11807,7 +11812,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.41';
+  const CURRENT_VERSION = 'v47.42';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
