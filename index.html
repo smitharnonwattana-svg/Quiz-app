@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.42 -->
+  <!-- APP_VERSION: v47.43 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.42</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.43</div>
     </div>
   </div>
 </div>
@@ -5292,6 +5292,9 @@ function initReview(attemptId){
   // TOP 5 ข้อผิดบ่อย (สะสมทุก attempt ของชุดนี้)
   const wrongCard = document.getElementById('reviewWrongCard');
   const wrongTopEl = document.getElementById('reviewWrongTop');
+  // Reset ก่อน (กัน DOM ค้างจาก attempt ก่อนหน้า)
+  if(wrongCard) wrongCard.style.display='none';
+  if(wrongTopEl) wrongTopEl.innerHTML='';
   if(wrongCard && wrongTopEl && _allExamAttempts.length>=1){
     const wrongCount={};
     _allExamAttempts.forEach(a=>{
@@ -5315,6 +5318,14 @@ function initReview(attemptId){
   const chartCard = document.getElementById('reviewChartCard');
   const chartCanvas = document.getElementById('reviewChart');
   const chartEmpty = document.getElementById('reviewChartEmpty');
+  // Reset ก่อน (กัน DOM ค้างจาก attempt ก่อนหน้า)
+  if(chartCard) chartCard.style.display='none';
+  if(chartCanvas){
+    chartCanvas.style.display='none';
+    const _ctx=chartCanvas.getContext&&chartCanvas.getContext('2d');
+    if(_ctx) _ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+  }
+  if(chartEmpty) chartEmpty.style.display='none';
   if(chartCard && chartCanvas && _chartExamAttempts.length>=2){
     chartCard.style.display='';
     chartEmpty.style.display='none';
@@ -11812,7 +11823,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.42';
+  const CURRENT_VERSION = 'v47.43';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
