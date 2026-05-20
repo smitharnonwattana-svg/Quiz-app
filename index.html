@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.40 -->
+  <!-- APP_VERSION: v47.41 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.40</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.41</div>
     </div>
   </div>
 </div>
@@ -5277,9 +5277,12 @@ function initReview(attemptId){
   }
 
   // ── พัฒนาการ + TOP 5 ข้อผิดบ่อย ของชุดนี้ ──
+  // ใช้ทุก mode สำหรับ TOP 5 (ดูข้อที่ผิดบ่อย)
   const _allExamAttempts = (s.attempts||[])
     .filter(a=>a.examId===att.examId)
     .sort((a,b)=>new Date(a.startedAt||0)-new Date(b.startedAt||0));
+  // กราฟพัฒนาการ: ตัด weakness_practice ออก (total ไม่ตรงชุด) + ซ่อน 0%
+  const _chartExamAttempts = _allExamAttempts.filter(a=>a.mode!=='weakness_practice' && a.total>0 && (a.score||0)>0);
 
   // TOP 5 ข้อผิดบ่อย (สะสมทุก attempt ของชุดนี้)
   const wrongCard = document.getElementById('reviewWrongCard');
@@ -5307,12 +5310,12 @@ function initReview(attemptId){
   const chartCard = document.getElementById('reviewChartCard');
   const chartCanvas = document.getElementById('reviewChart');
   const chartEmpty = document.getElementById('reviewChartEmpty');
-  if(chartCard && chartCanvas && _allExamAttempts.length>=2){
+  if(chartCard && chartCanvas && _chartExamAttempts.length>=2){
     chartCard.style.display='';
     chartEmpty.style.display='none';
     chartCanvas.style.display='block';
     requestAnimationFrame(()=>{
-      const pts=_allExamAttempts.filter(a=>a.total>0).map((a,i)=>({
+      const pts=_chartExamAttempts.map((a,i)=>({
         pct:Math.round((a.score/a.total)*100), idx:i+1
       }));
       if(pts.length<2){ chartCanvas.style.display='none'; chartEmpty.style.display='block'; return; }
@@ -11804,7 +11807,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.40';
+  const CURRENT_VERSION = 'v47.41';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
