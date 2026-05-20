@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.44 -->
+  <!-- APP_VERSION: v47.45 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -387,6 +387,10 @@
     .freeBtn{min-width:38px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;transition:all .12s;padding:0 8px;}
     .freeBtn:hover{border-color:#f59e0b;background:#fffbeb;}
     .freeBtn.active{background:#f59e0b;border-color:#f59e0b;color:#fff;}
+
+    /* tag content grid (สถิติ → เนื้อหา) — desktop 2 col, mobile 1 col */
+    .tag-content-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;}
+    @media (max-width:600px){.tag-content-grid{grid-template-columns:minmax(0,1fr);}}
 
     /* Mobile Admin UI v3 — v45.79 */
     @media (max-width: 600px) {
@@ -850,7 +854,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.44</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.45</div>
     </div>
   </div>
 </div>
@@ -6330,7 +6334,7 @@ function initStats(){
             collapseHtml+=`<div id="${collapseId}" style="display:none;margin-top:2px;">
               <div class="card" style="padding:12px;border-top:3px solid ${c};">
                 <div style="font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;">${esc(subj)} — เนื้อหา</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;">${tagRows}</div>
+                <div class="tag-content-grid">${tagRows}</div>
               </div>
             </div>`;
           }
@@ -11828,7 +11832,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.44';
+  const CURRENT_VERSION = 'v47.45';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
