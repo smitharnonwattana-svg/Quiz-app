@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.43 -->
+  <!-- APP_VERSION: v47.44 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.43</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.44</div>
     </div>
   </div>
 </div>
@@ -5775,20 +5775,23 @@ function _renderDashSummary(attempts){
   if(!el) return;
   if(!attempts.length){el.innerHTML='';return;}
   const n=attempts.length;
-  const avgPct=Math.round(attempts.reduce((s,a)=>s+(a.total?a.score/a.total*100:0),0)/n);
-  const dasArr=attempts.map(calcDAS).filter(d=>d!=null);
+  // กรอง weakness_practice ออกจากเมตริก % (ทำไม่ครบชุด เทียบกันไม่ได้)
+  const realAttempts=attempts.filter(a=>a.mode!=='weakness_practice');
+  const nReal=realAttempts.length;
+  const avgPct=nReal?Math.round(realAttempts.reduce((s,a)=>s+(a.total?a.score/a.total*100:0),0)/nReal):null;
+  const dasArr=realAttempts.map(calcDAS).filter(d=>d!=null);
   const avgDAS=dasArr.length?Math.round(dasArr.reduce((s,d)=>s+d,0)/dasArr.length):null;
   const moodMap={};
-  attempts.forEach(a=>{if(a.mood) moodMap[a.mood]=(moodMap[a.mood]||0)+1;});
+  realAttempts.forEach(a=>{if(a.mood) moodMap[a.mood]=(moodMap[a.mood]||0)+1;});
   const topMood=Object.entries(moodMap).sort((a,b)=>b[1]-a[1])[0];
-  const calArr=attempts.map(calcCalibration).filter(c=>c!=null);
+  const calArr=realAttempts.map(calcCalibration).filter(c=>c!=null);
   const avgCalErr=calArr.length?Math.round(calArr.reduce((s,c)=>s+Math.abs(c.diffPct),0)/calArr.length):null;
 
   const cards=[
     {label:'การสอบ',val:`${n} ครั้ง`,sub:''},
-    {label:'คะแนนเฉลี่ย',val:`${avgPct}%`,sub:'จากทุกชุด'},
+    avgPct!=null?{label:'คะแนนเฉลี่ย',val:`${avgPct}%`,sub:'ไม่รวมแก้จุดอ่อน'}:null,
     avgDAS!=null?{label:'DAS เฉลี่ย',val:`${avgDAS}`,sub:avgDAS>=65?'✅ เหนือเป้า':avgDAS>=55?'🟡 ใกล้เป้า':'⚠️ ต่ำกว่าเป้า'}:null,
-    topMood?{label:'อารมณ์ก่อนสอบ',val:topMood[0],sub:`บ่อยสุด (${topMood[1]}/${n})`}:null,
+    topMood?{label:'อารมณ์ก่อนสอบ',val:topMood[0],sub:`บ่อยสุด (${topMood[1]}/${nReal})`}:null,
     avgCalErr!=null?{label:'Calibration',val:`±${avgCalErr}%`,sub:avgCalErr<=10?'✅ แม่นมาก':avgCalErr<=20?'🟡 พอใช้':'⚠️ คลาดเคลื่อน'}:null,
   ].filter(Boolean);
 
@@ -5803,7 +5806,9 @@ function _renderDashChart(attempts){
   const canvas=document.getElementById('dashChart');
   const emptyEl=document.getElementById('dashChartEmpty');
   if(!canvas) return;
-  const sorted=[...attempts].sort((a,b)=>new Date(a.submittedAt||a.startedAt||0)-new Date(b.submittedAt||b.startedAt||0));
+  // กรอง weakness_practice ออก (% เทียบกันไม่ได้ — ทำไม่ครบชุด)
+  const _real=attempts.filter(a=>a.mode!=='weakness_practice');
+  const sorted=[..._real].sort((a,b)=>new Date(a.submittedAt||a.startedAt||0)-new Date(b.submittedAt||b.startedAt||0));
   if(sorted.length<2){
     canvas.style.display='none';
     if(emptyEl) emptyEl.style.display='';
@@ -11823,7 +11828,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.43';
+  const CURRENT_VERSION = 'v47.44';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
