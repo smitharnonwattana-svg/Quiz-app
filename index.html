@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.39 -->
+  <!-- APP_VERSION: v47.40 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.39</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.40</div>
     </div>
   </div>
 </div>
@@ -1753,6 +1753,24 @@
           </div>
         </div>
         <div id="editorMsg" class="muted" style="padding:12px;display:none;"></div>
+        <!-- Quick Tag Panel -->
+        <div id="editorQuickTag" style="display:none;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;margin-top:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;font-weight:800;color:#374151;">🏷️ Tag หลัก <span style="color:#9ca3af;font-weight:600;font-size:11px;">— คลิก chip เพื่อใส่/ลบ tag กับหลายข้อพร้อมกัน (1 ข้อ มี tag หลักได้ 1 อัน)</span></div>
+            <button id="editorQuickTagAdd" type="button" class="btn" style="font-size:11px;padding:4px 10px;">+ เพิ่ม tag</button>
+          </div>
+          <div id="editorQuickTagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+          <div id="editorQuickTagInputWrap" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb;">
+            <div style="font-size:11px;color:#6b7280;margin-bottom:5px;">📌 ใส่กับข้อที่ tag: <strong id="editorQuickTagSel" style="color:#6366f1;"></strong> — กรอกเลขข้อ เช่น <code style="background:#fff;padding:1px 4px;border-radius:4px;border:1px solid #e5e7eb;">1-5,8,11</code></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <input id="editorQuickTagRange" type="text" placeholder="1-5,8,11" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px;" />
+              <button id="editorQuickTagApply" type="button" class="btn btnPrimary" style="font-size:12px;padding:7px 14px;">+ ใส่ tag</button>
+              <button id="editorQuickTagRemove" type="button" class="btn" style="font-size:12px;padding:7px 14px;color:#dc2626;border-color:#fca5a5;">− ลบ tag</button>
+              <button id="editorQuickTagCancel" type="button" class="btn" style="font-size:12px;padding:7px 10px;">ปิด</button>
+            </div>
+            <div id="editorQuickTagMsg" style="font-size:11px;color:#6b7280;margin-top:5px;min-height:14px;"></div>
+          </div>
+        </div>
         <div class="tableBox">
           <table style="min-width:300px;">
             <thead>
@@ -5371,6 +5389,8 @@ function initReview(attemptId){
     if(!_tmQ) return;
     if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
     if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
+    // single-main: ถ้ามีหลายอัน ให้เก็บแค่อันแรก (กันข้อมูลเก่า)
+    if(_tmQ.tags.length>1) _tmQ.tags=[_tmQ.tags[0]];
     _tmQ.topic=_tmQ.tags[0]||'';
     // กรอง subTags ที่ main tag ถูกลบไปแล้ว
     _tmQ.subTags=_tmQ.subTags.filter(st=>{
@@ -5462,14 +5482,14 @@ function initReview(attemptId){
     if(!_tmQ) return;
     if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
     if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
-    const i=_tmQ.tags.indexOf(t);
-    if(i>=0){
-      _tmQ.tags.splice(i,1);
-      // เอา subTags ที่ผูกกับ main tag นี้ออก
-      const subs=getSubsForMain(t);
-      _tmQ.subTags=_tmQ.subTags.filter(s=>!subs.includes(s));
+    // single-main: ถ้า main เดิม = t → ยกเลิก, ไม่ใช่ → แทนที่ (และ reset subTags)
+    const isSameSingle=_tmQ.tags.length===1 && _tmQ.tags[0]===t;
+    if(isSameSingle){
+      _tmQ.tags=[];
+      _tmQ.subTags=[];
     } else {
-      _tmQ.tags.push(t);
+      _tmQ.tags=[t];
+      _tmQ.subTags=[]; // main เปลี่ยน → ทิ้ง subTags ทั้งหมด (ผูกกับ main เดิม)
     }
     _tmQ.topic=_tmQ.tags[0]||''; // compat
     renderTagPalette();
@@ -5509,10 +5529,14 @@ function initReview(attemptId){
     const newTopics=v.split(/[,،،、]/).map(x=>x.trim()).filter(Boolean);
     newTopics.forEach(t=>{
       if(!_tmS.subjectTopics[_tmSubj].includes(t)) _tmS.subjectTopics[_tmSubj].push(t);
-      if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
-      if(!_tmQ.tags.includes(t)) _tmQ.tags.push(t);
     });
-    if(!_tmQ.topic && _tmQ.tags.length>0) _tmQ.topic=_tmQ.tags[0];
+    // single-main: ถ้ายังไม่มี main → auto-select tag แรกที่เพิ่ม
+    if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
+    if(_tmQ.tags.length===0 && newTopics.length>0){
+      _tmQ.tags=[newTopics[0]];
+      _tmQ.topic=newTopics[0];
+    }
     inp.value='';
     Store.save(_tmS);
     renderTagPalette();
@@ -8566,6 +8590,158 @@ function initEditor(examId){
     select(selectedIndex);
   }
   renderTable();
+
+  // ── Quick Tag Panel (bulk apply/remove main tag by range) ──
+  if(!s.subjectTopics) s.subjectTopics={};
+  if(!s.subjectSubTopics) s.subjectSubTopics={};
+  let _quickTagSelected=null;
+  const _qtWrap=document.getElementById('editorQuickTag');
+  const _qtChipsEl=document.getElementById('editorQuickTagChips');
+  const _qtInputWrap=document.getElementById('editorQuickTagInputWrap');
+  const _qtSelEl=document.getElementById('editorQuickTagSel');
+  const _qtRangeEl=document.getElementById('editorQuickTagRange');
+  const _qtMsgEl=document.getElementById('editorQuickTagMsg');
+
+  function _qtParseRange(str){
+    const out=new Set();
+    String(str||'').split(/[,\s]+/).filter(Boolean).forEach(part=>{
+      const m=part.match(/^(\d+)\s*-\s*(\d+)$/);
+      if(m){ const a=Math.min(+m[1],+m[2]),b=Math.max(+m[1],+m[2]); for(let i=a;i<=b;i++) out.add(i); }
+      else if(/^\d+$/.test(part)){ out.add(+part); }
+    });
+    return [...out].sort((a,b)=>a-b);
+  }
+
+  function _qtRenderChips(){
+    if(!_qtWrap||!_qtChipsEl) return;
+    _qtWrap.style.display='block';
+    const subj=exam.subject||'';
+    const topics=Array.isArray(s.subjectTopics[subj])?s.subjectTopics[subj]:[];
+    if(!topics.length){
+      _qtChipsEl.innerHTML='<span style="font-size:12px;color:#9ca3af;">ยังไม่มี tag ในวิชานี้ — กด "+ เพิ่ม tag" เพื่อสร้าง</span>';
+      return;
+    }
+    _qtChipsEl.innerHTML=topics.map(t=>{
+      const sel=_quickTagSelected===t;
+      const safe=encodeURIComponent(t);
+      return `<span data-qtag-chip="${safe}" style="display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 12px;border-radius:99px;border:2px solid ${sel?'#6366f1':'#e5e7eb'};background:${sel?'#ede9fe':'#fff'};color:${sel?'#4338ca':'#374151'};font-weight:700;font-size:12px;cursor:pointer;">
+        <span data-qtag-label="${safe}">${sel?'✓ ':''}${esc(t)}</span>
+        <button type="button" data-qtag-del="${safe}" title="ลบ tag นี้ออกจากวิชา" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:14px;line-height:1;padding:0 4px;border-radius:4px;">×</button>
+      </span>`;
+    }).join('');
+    _qtChipsEl.querySelectorAll('[data-qtag-chip]').forEach(chip=>{
+      chip.addEventListener('click',e=>{
+        if(e.target.hasAttribute('data-qtag-del')) return;
+        const t=decodeURIComponent(chip.getAttribute('data-qtag-chip'));
+        _quickTagSelected=_quickTagSelected===t?null:t;
+        _qtRenderChips();
+        _qtUpdateInputUI();
+      });
+    });
+    _qtChipsEl.querySelectorAll('[data-qtag-del]').forEach(x=>{
+      x.addEventListener('click',e=>{
+        e.stopPropagation();
+        const t=decodeURIComponent(x.getAttribute('data-qtag-del'));
+        const subj=exam.subject||'';
+        if(!confirm(`ลบ tag "${t}" ออกจากวิชา "${subj}"?\nจะลบ tag นี้ออกจากทุกข้อในวิชาด้วย (รวม sub tag ที่ผูกอยู่)`)) return;
+        s.subjectTopics[subj]=(s.subjectTopics[subj]||[]).filter(x=>x!==t);
+        const subs=Array.isArray(s.subjectSubTopics?.[subj]?.[t])?[...s.subjectSubTopics[subj][t]]:[];
+        if(s.subjectSubTopics&&s.subjectSubTopics[subj]&&s.subjectSubTopics[subj][t]) delete s.subjectSubTopics[subj][t];
+        // ลบจากทุกข้อ
+        let affected=0;
+        list.forEach(q=>{
+          if(Array.isArray(q.tags)&&q.tags.includes(t)){
+            q.tags=q.tags.filter(x=>x!==t);
+            q.topic=q.tags[0]||'';
+            if(Array.isArray(q.subTags)) q.subTags=q.subTags.filter(x=>!subs.includes(x));
+            affected++;
+          }
+        });
+        if(_quickTagSelected===t) _quickTagSelected=null;
+        Store.save(s);
+        _qtRenderChips();
+        _qtUpdateInputUI();
+        renderTable();
+        toast(`ลบ tag "${t}" แล้ว (กระทบ ${affected} ข้อ)`);
+      });
+    });
+  }
+
+  function _qtUpdateInputUI(){
+    if(!_qtInputWrap) return;
+    if(_quickTagSelected){
+      _qtInputWrap.style.display='block';
+      if(_qtSelEl) _qtSelEl.textContent=_quickTagSelected;
+      if(_qtMsgEl) _qtMsgEl.textContent='';
+      if(_qtRangeEl){ _qtRangeEl.focus(); }
+    } else {
+      _qtInputWrap.style.display='none';
+    }
+  }
+
+  function _qtApply(mode){
+    const t=_quickTagSelected; if(!t) return;
+    const nums=_qtParseRange(_qtRangeEl?.value||'');
+    if(!nums.length){ if(_qtMsgEl) _qtMsgEl.textContent='⚠️ ใส่เลขข้อก่อน (เช่น 1-5,8,11)'; return; }
+    const subj=exam.subject||'';
+    const subsOfTag=Array.isArray(s.subjectSubTopics?.[subj]?.[t])?s.subjectSubTopics[subj][t]:[];
+    let affected=0, notFound=[];
+    nums.forEach(no=>{
+      const q=list.find(x=>(x.number||x.no)===no);
+      if(!q){ notFound.push(no); return; }
+      if(!Array.isArray(q.tags)) q.tags=[];
+      if(!Array.isArray(q.subTags)) q.subTags=[];
+      if(mode==='add'){
+        // single-main: replace → ถ้า main เปลี่ยน → reset subTags
+        if(q.tags[0]!==t || q.tags.length!==1){
+          q.subTags=[];
+        }
+        q.tags=[t];
+        q.topic=t;
+        affected++;
+      } else {
+        if(q.tags.includes(t)){
+          q.tags=q.tags.filter(x=>x!==t);
+          q.topic=q.tags[0]||'';
+          q.subTags=q.subTags.filter(x=>!subsOfTag.includes(x));
+          affected++;
+        }
+      }
+    });
+    Store.save(s);
+    renderTable();
+    if(_qtMsgEl){
+      const verb=mode==='add'?'ใส่':'ลบ';
+      const nfMsg=notFound.length?` (ไม่พบข้อ ${notFound.join(',')})`:'';
+      _qtMsgEl.textContent=`✅ ${verb} tag "${t}" ${affected} ข้อ${nfMsg}`;
+    }
+  }
+
+  const _qtAddBtn=document.getElementById('editorQuickTagAdd');
+  if(_qtAddBtn) _qtAddBtn.onclick=()=>{
+    const subj=exam.subject||'';
+    if(!subj){ toast('กรุณาตั้ง "วิชา" ของข้อสอบก่อน'); return; }
+    const v=(prompt('ชื่อ tag หลักใหม่ (คั่นด้วย , ได้):')||'').trim();
+    if(!v) return;
+    if(!s.subjectTopics[subj]) s.subjectTopics[subj]=[];
+    v.split(/[,،、]/).map(x=>x.trim()).filter(Boolean).forEach(t=>{
+      if(!s.subjectTopics[subj].includes(t)) s.subjectTopics[subj].push(t);
+    });
+    Store.save(s);
+    _qtRenderChips();
+  };
+  const _qtApplyBtn=document.getElementById('editorQuickTagApply');
+  if(_qtApplyBtn) _qtApplyBtn.onclick=()=>_qtApply('add');
+  const _qtRemoveBtn=document.getElementById('editorQuickTagRemove');
+  if(_qtRemoveBtn) _qtRemoveBtn.onclick=()=>_qtApply('remove');
+  const _qtCancelBtn=document.getElementById('editorQuickTagCancel');
+  if(_qtCancelBtn) _qtCancelBtn.onclick=()=>{ _quickTagSelected=null; _qtRenderChips(); _qtUpdateInputUI(); };
+  if(_qtRangeEl){
+    _qtRangeEl.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){ e.preventDefault(); _qtApply('add'); }
+    });
+  }
+  _qtRenderChips();
 
   // ── แก้จำนวนข้อ ──
   const qCountInput = document.getElementById('editorQCount');
@@ -11628,7 +11804,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.39';
+  const CURRENT_VERSION = 'v47.40';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
