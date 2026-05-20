@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.38 -->
+  <!-- APP_VERSION: v47.39 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -850,7 +850,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.38</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.39</div>
     </div>
   </div>
 </div>
@@ -1614,13 +1614,18 @@
 
 <!-- ===================== TAG MODAL ===================== -->
 <div id="tagModal" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:9999;align-items:center;justify-content:center;padding:16px;">
-  <div style="background:#fff;border-radius:16px;width:min(480px,96vw);padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:14px;">
+  <div style="background:#fff;border-radius:16px;width:min(520px,96vw);max-height:90vh;overflow-y:auto;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div style="font-weight:900;font-size:16px;">🏷️ เลือกเนื้อหา <span id="tagModalQNo" style="color:#6b7280;font-size:13px;font-weight:600;"></span></div>
       <button onclick="window.closeTagModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;">×</button>
     </div>
-    <!-- chip palette: เลือก tag -->
+    <!-- chip palette: เลือก tag หลัก -->
     <div id="tagModalPalette" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;"></div>
+    <!-- sub-tag palette: เนื้อหาย่อย (per main tag) -->
+    <div id="tagModalSubWrap" style="display:none;border-top:1px dashed #e5e7eb;padding-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:8px;">🔖 เนื้อหาย่อย</div>
+      <div id="tagModalSubPalette" style="display:flex;flex-direction:column;gap:10px;max-height:240px;overflow-y:auto;"></div>
+    </div>
     <!-- edit mode: จัดการ topics ของวิชา -->
     <div id="tagModalEditWrap" style="display:none;border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#f9fafb;">
       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">✏️ จัดการเนื้อหาวิชา</div>
@@ -1628,6 +1633,10 @@
       <div style="display:flex;gap:8px;">
         <input id="tagModalNewInput" style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:13px;" placeholder="ชื่อเนื้อหาใหม่ แล้วกด Enter" />
         <button id="tagModalAddBtn" class="btn">+ เพิ่ม</button>
+      </div>
+      <div id="tagModalSubEditWrap" style="margin-top:14px;border-top:1px dashed #e5e7eb;padding-top:10px;display:none;">
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">🔖 จัดการเนื้อหาย่อย</div>
+        <div id="tagModalSubEditList" style="display:flex;flex-direction:column;gap:10px;max-height:260px;overflow-y:auto;"></div>
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -2343,6 +2352,7 @@ const Store = {
     if(!Array.isArray(s.assignments)) s.assignments=[];
     // migrate: benchmarks
     if(!s.subjectTopics||typeof s.subjectTopics!=='object') s.subjectTopics={};
+    if(!s.subjectSubTopics||typeof s.subjectSubTopics!=='object') s.subjectSubTopics={};
     if(!Array.isArray(s.benchmarks)) s.benchmarks=[];
     // inject preset benchmarks ถ้ายังไม่มีเลย
     if(s.benchmarks.length===0 && typeof PRESET_BENCHMARKS!=='undefined'){
@@ -4671,8 +4681,9 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       const isFree=!!q.isFree;
       const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
       const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
+      const _finalSubTags=Array.isArray(q.subTags)?q.subTags:[];
       const visited=Object.prototype.hasOwnProperty.call(st.qElapsedMs,q.id);
-      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
+      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,subTags:_finalSubTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
         visited,elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
     });
     const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
@@ -5089,7 +5100,7 @@ function initReview(attemptId){
     wrap.innerHTML=`
       <div class="qRow">
         <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}${isUns?' <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;border:1px solid #fde68a;">🤔 ไม่แน่ใจ</span>':''}</span>
-        <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${(Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[])).map(t=>`<span style='color:#6366f1;font-size:10px;background:#ede9fe;border-radius:4px;padding:0 3px;margin-left:2px;'>${esc(t)}</span>`).join('')}</span>
+        <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${(Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[])).map(t=>`<span style='color:#6366f1;font-size:10px;background:#ede9fe;border-radius:4px;padding:0 3px;margin-left:2px;'>${esc(t)}</span>`).join('')}${(Array.isArray(q.subTags)?q.subTags:[]).map(t=>`<span style='color:#7c3aed;font-size:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:4px;padding:0 3px;margin-left:2px;'>↳${esc(t)}</span>`).join('')}</span>
         <div class="qRowPills">${pillsHtml}</div>
         <span class="qBadge ${badgeCls}">${badgeTxt}</span>
         ${hasText?'<span style="font-size:11px;color:#9ca3af;margin-left:2px;">▾</span>':''}
@@ -5339,11 +5350,13 @@ function initReview(attemptId){
   window.openTagModal = function(q, idx, subj, s, renderFn){
     _tmQ=q; _tmSubj=subj; _tmS=s; _tmRenderFn=renderFn; _tmIdx=idx;
     if(!_tmS.subjectTopics) _tmS.subjectTopics={};
+    if(!_tmS.subjectSubTopics) _tmS.subjectSubTopics={};
     const modal=document.getElementById('tagModal');
     const qNoEl=document.getElementById('tagModalQNo');
     if(qNoEl) qNoEl.textContent='ข้อ '+(q.number||q.no);
     modal.style.display='flex';
     renderTagPalette();
+    renderSubTagPalette();
     const inp=document.getElementById('tagModalNewInput');
     if(inp){ inp.value=''; inp.focus(); inp.onkeydown=(e)=>{ if(e.key==='Enter'){e.preventDefault();addTagFromModal();} }; }
     document.getElementById('tagModalAddBtn').onclick=addTagFromModal;
@@ -5357,7 +5370,13 @@ function initReview(attemptId){
   window.saveTagModal = function(){
     if(!_tmQ) return;
     if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
     _tmQ.topic=_tmQ.tags[0]||'';
+    // กรอง subTags ที่ main tag ถูกลบไปแล้ว
+    _tmQ.subTags=_tmQ.subTags.filter(st=>{
+      const main=getMainOfSub(st);
+      return main && _tmQ.tags.includes(main);
+    });
     if(_tmRenderFn) _tmRenderFn();
     Store.save(_tmS);
     window.closeTagModal();
@@ -5368,12 +5387,27 @@ function initReview(attemptId){
     if(!_tmSubj||!_tmS) return [];
     return Array.isArray(_tmS.subjectTopics[_tmSubj])?_tmS.subjectTopics[_tmSubj]:[];
   }
+  function getSubjSubTopicsMap(){
+    if(!_tmSubj||!_tmS) return {};
+    if(!_tmS.subjectSubTopics[_tmSubj]||typeof _tmS.subjectSubTopics[_tmSubj]!=='object') _tmS.subjectSubTopics[_tmSubj]={};
+    return _tmS.subjectSubTopics[_tmSubj];
+  }
+  function getSubsForMain(main){
+    const map=getSubjSubTopicsMap();
+    return Array.isArray(map[main])?map[main]:[];
+  }
+  function getMainOfSub(sub){
+    const map=getSubjSubTopicsMap();
+    for(const m in map){ if(Array.isArray(map[m])&&map[m].includes(sub)) return m; }
+    return null;
+  }
 
   function renderTagPalette(){
     const el=document.getElementById('tagModalPalette');
     if(!el) return;
     const topics=getSubjTopics();
     if(!Array.isArray(_tmQ.tags)) _tmQ.tags=(_tmQ.topic?[_tmQ.topic]:[]);
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
     if(topics.length===0){
       el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0;">ยังไม่มีเนื้อหาในวิชานี้ — เพิ่มด้านล่างได้เลย</div>';
       return;
@@ -5390,13 +5424,81 @@ function initReview(attemptId){
     }).join('');
   }
 
+  function renderSubTagPalette(){
+    const wrap=document.getElementById('tagModalSubWrap');
+    const el=document.getElementById('tagModalSubPalette');
+    if(!wrap||!el) return;
+    if(!Array.isArray(_tmQ.tags)||_tmQ.tags.length===0){ wrap.style.display='none'; el.innerHTML=''; return; }
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
+    const selectedMains=_tmQ.tags.slice();
+    wrap.style.display='block';
+    el.innerHTML=selectedMains.map(main=>{
+      const subs=getSubsForMain(main);
+      const safeMain=encodeURIComponent(main);
+      const chips=subs.length
+        ? subs.map(st=>{
+            const sel=_tmQ.subTags.includes(st);
+            const safe=encodeURIComponent(st);
+            return `<button type="button" onclick="window._toggleSubTag(decodeURIComponent('${safe}'))"
+              style="padding:5px 12px;border-radius:99px;border:1.5px solid ${sel?'#6366f1':'#e5e7eb'};
+              background:${sel?'#ede9fe':'#fff'};color:${sel?'#4338ca':'#6b7280'};
+              font-weight:700;font-size:12px;cursor:pointer;transition:all .12s;">
+              ${sel?'✓ ':''}${esc(st)}
+            </button>`;
+          }).join('')
+        : `<span style="font-size:12px;color:#9ca3af;">ยังไม่มีเนื้อหาย่อย</span>`;
+      return `<div>
+        <div style="font-size:11px;font-weight:800;color:#374151;margin-bottom:5px;">${esc(main)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+          ${chips}
+          <button type="button" onclick="window._quickAddSub(decodeURIComponent('${safeMain}'))" title="เพิ่มเนื้อหาย่อย"
+            style="padding:4px 9px;border-radius:99px;border:1.5px dashed #c7d2fe;background:transparent;color:#6366f1;font-weight:700;font-size:11px;cursor:pointer;">+ เพิ่ม</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
   window._toggleTag = function(t){
     if(!_tmQ) return;
     if(!Array.isArray(_tmQ.tags)) _tmQ.tags=[];
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
     const i=_tmQ.tags.indexOf(t);
-    if(i>=0) _tmQ.tags.splice(i,1); else _tmQ.tags.push(t);
+    if(i>=0){
+      _tmQ.tags.splice(i,1);
+      // เอา subTags ที่ผูกกับ main tag นี้ออก
+      const subs=getSubsForMain(t);
+      _tmQ.subTags=_tmQ.subTags.filter(s=>!subs.includes(s));
+    } else {
+      _tmQ.tags.push(t);
+    }
     _tmQ.topic=_tmQ.tags[0]||''; // compat
     renderTagPalette();
+    renderSubTagPalette();
+  };
+
+  window._toggleSubTag = function(st){
+    if(!_tmQ) return;
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
+    const i=_tmQ.subTags.indexOf(st);
+    if(i>=0) _tmQ.subTags.splice(i,1); else _tmQ.subTags.push(st);
+    renderSubTagPalette();
+  };
+
+  window._quickAddSub = function(main){
+    if(!_tmS||!_tmSubj||!main) return;
+    const v=(prompt('เพิ่มเนื้อหาย่อยใต้ "'+main+'" (คั่นด้วย ,):')||'').trim();
+    if(!v) return;
+    if(!_tmS.subjectSubTopics[_tmSubj]) _tmS.subjectSubTopics[_tmSubj]={};
+    if(!Array.isArray(_tmS.subjectSubTopics[_tmSubj][main])) _tmS.subjectSubTopics[_tmSubj][main]=[];
+    const list=_tmS.subjectSubTopics[_tmSubj][main];
+    if(!Array.isArray(_tmQ.subTags)) _tmQ.subTags=[];
+    v.split(/[,،、]/).map(x=>x.trim()).filter(Boolean).forEach(t=>{
+      if(!list.includes(t)) list.push(t);
+      if(!_tmQ.subTags.includes(t)) _tmQ.subTags.push(t);
+    });
+    Store.save(_tmS);
+    renderSubTagPalette();
+    if(_tagEditMode) renderSubTagEditList();
   };
 
   function addTagFromModal(){
@@ -5414,6 +5516,8 @@ function initReview(attemptId){
     inp.value='';
     Store.save(_tmS);
     renderTagPalette();
+    renderSubTagPalette();
+    if(_tagEditMode) renderSubTagEditList();
   }
 
   // ── Edit mode: จัดการ topics ──
@@ -5428,20 +5532,83 @@ function initReview(attemptId){
       : '<span style="color:#9ca3af;font-size:12px;">ยังไม่มีเนื้อหา</span>';
   }
 
+  function renderSubTagEditList(){
+    const wrap=document.getElementById('tagModalSubEditWrap');
+    const el=document.getElementById('tagModalSubEditList');
+    if(!wrap||!el) return;
+    const topics=getSubjTopics();
+    if(!topics.length){ wrap.style.display='none'; el.innerHTML=''; return; }
+    wrap.style.display='block';
+    el.innerHTML=topics.map(main=>{
+      const subs=getSubsForMain(main);
+      const safeMain=encodeURIComponent(main);
+      const chips=subs.length
+        ? subs.map((st,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:#fee2e2;border:1px solid #fca5a5;border-radius:99px;font-size:11px;font-weight:700;color:#b91c1c;">${esc(st)}<button type="button" onclick="window._deleteSubjSubTopic(decodeURIComponent('${safeMain}'),${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:13px;line-height:1;padding:0 2px;">×</button></span>`).join('')
+        : '<span style="color:#9ca3af;font-size:11px;">—</span>';
+      return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;">
+        <div style="font-size:11px;font-weight:800;color:#374151;margin-bottom:5px;">${esc(main)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;">${chips}</div>
+        <div style="display:flex;gap:6px;">
+          <input data-sub-add-for="${esc(main)}" style="flex:1;padding:5px 9px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:11px;" placeholder="ชื่อเนื้อหาย่อยใหม่ แล้วกด Enter" />
+        </div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('input[data-sub-add-for]').forEach(inp=>{
+      inp.addEventListener('keydown',e=>{
+        if(e.key!=='Enter') return;
+        e.preventDefault();
+        const main=inp.getAttribute('data-sub-add-for');
+        const v=(inp.value||'').trim();
+        if(!v||!main) return;
+        if(!_tmS.subjectSubTopics[_tmSubj]) _tmS.subjectSubTopics[_tmSubj]={};
+        if(!Array.isArray(_tmS.subjectSubTopics[_tmSubj][main])) _tmS.subjectSubTopics[_tmSubj][main]=[];
+        v.split(/[,،、]/).map(x=>x.trim()).filter(Boolean).forEach(t=>{
+          if(!_tmS.subjectSubTopics[_tmSubj][main].includes(t)) _tmS.subjectSubTopics[_tmSubj][main].push(t);
+        });
+        Store.save(_tmS);
+        renderSubTagEditList();
+        renderSubTagPalette();
+      });
+    });
+  }
+
   window._deleteSubjTopic=function(i){
     if(!_tmS||!_tmSubj) return;
     if(!_tmS.subjectTopics[_tmSubj]) return;
     const t=_tmS.subjectTopics[_tmSubj][i];
     _tmS.subjectTopics[_tmSubj].splice(i,1);
+    // ลบ sub-topics ที่ผูกกับ main tag นี้ด้วย
+    const subsOfDeleted=getSubsForMain(t);
+    if(_tmS.subjectSubTopics[_tmSubj]&&_tmS.subjectSubTopics[_tmSubj][t]) delete _tmS.subjectSubTopics[_tmSubj][t];
     // ถ้า tag ที่ลบอยู่ใน _tmQ ให้เอาออกด้วย
     if(_tmQ&&Array.isArray(_tmQ.tags)){
       const qi=_tmQ.tags.indexOf(t);
       if(qi>=0) _tmQ.tags.splice(qi,1);
       _tmQ.topic=_tmQ.tags[0]||'';
     }
+    if(_tmQ&&Array.isArray(_tmQ.subTags)){
+      _tmQ.subTags=_tmQ.subTags.filter(s=>!subsOfDeleted.includes(s));
+    }
     Store.save(_tmS);
     renderTagEditList();
+    renderSubTagEditList();
     renderTagPalette();
+    renderSubTagPalette();
+  };
+
+  window._deleteSubjSubTopic=function(main,i){
+    if(!_tmS||!_tmSubj||!main) return;
+    const map=_tmS.subjectSubTopics[_tmSubj];
+    if(!map||!Array.isArray(map[main])) return;
+    const st=map[main][i];
+    map[main].splice(i,1);
+    if(_tmQ&&Array.isArray(_tmQ.subTags)){
+      const qi=_tmQ.subTags.indexOf(st);
+      if(qi>=0) _tmQ.subTags.splice(qi,1);
+    }
+    Store.save(_tmS);
+    renderSubTagEditList();
+    renderSubTagPalette();
   };
 
   window.toggleTagEdit=function(){
@@ -5450,7 +5617,7 @@ function initReview(attemptId){
     const btn=document.getElementById('tagModalEditBtn');
     if(wrap) wrap.style.display=_tagEditMode?'block':'none';
     if(btn) btn.textContent=_tagEditMode?'✅ เสร็จแล้ว':'✏️ แก้ไขเนื้อหา';
-    if(_tagEditMode) renderTagEditList();
+    if(_tagEditMode){ renderTagEditList(); renderSubTagEditList(); }
   };
 
   // ปิด modal เมื่อคลิก backdrop
@@ -5994,6 +6161,11 @@ function initStats(){
         const currentTags=Array.isArray(p.tags)?p.tags:[];
         const same=qtags.length===currentTags.length&&qtags.every((t,i)=>t===currentTags[i]);
         if(!same){ p.tags=[...qtags]; p.topic=qtags[0]||''; changed=true; }
+        // sync subTags ด้วย
+        const qsubs=Array.isArray(q.subTags)?q.subTags:[];
+        const currentSubs=Array.isArray(p.subTags)?p.subTags:[];
+        const sameSub=qsubs.length===currentSubs.length&&qsubs.every((t,i)=>t===currentSubs[i]);
+        if(!sameSub){ p.subTags=[...qsubs]; changed=true; }
       });
       if(changed) backfilled=true;
     });
@@ -6023,7 +6195,7 @@ function initStats(){
       const subjMap={};
       timeFiltered.forEach(a=>{
         const subj=a.examSubject||'ไม่ระบุ';
-        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0,tagMap:{}};
+        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0,tagMap:{},subTagMap:{}};
         subjMap[subj].sum+=(a.score||0); subjMap[subj].total+=(a.total||0); subjMap[subj].cnt++;
         (a.perQuestion||[]).forEach(p=>{
           const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
@@ -6031,6 +6203,18 @@ function initStats(){
             if(!subjMap[subj].tagMap[t]) subjMap[subj].tagMap[t]={right:0,total:0};
             subjMap[subj].tagMap[t].total++;
             if(p.isCorrect) subjMap[subj].tagMap[t].right++;
+          });
+          const _pst=Array.isArray(p.subTags)?p.subTags:[];
+          _pst.forEach(st=>{
+            // หา main tag ของ sub tag นี้จาก subjectSubTopics
+            let mainOfSub=null;
+            const subMap=(s.subjectSubTopics&&s.subjectSubTopics[subj])||{};
+            for(const m in subMap){ if(Array.isArray(subMap[m])&&subMap[m].includes(st)){ mainOfSub=m; break; } }
+            if(!mainOfSub) return; // sub tag ที่ orphan — ข้าม
+            if(!subjMap[subj].subTagMap[mainOfSub]) subjMap[subj].subTagMap[mainOfSub]={};
+            if(!subjMap[subj].subTagMap[mainOfSub][st]) subjMap[subj].subTagMap[mainOfSub][st]={right:0,total:0};
+            subjMap[subj].subTagMap[mainOfSub][st].total++;
+            if(p.isCorrect) subjMap[subj].subTagMap[mainOfSub][st].right++;
           });
         });
       });
@@ -6062,17 +6246,37 @@ function initStats(){
 
           // tag rows (collapse) — แยกออกมาข้างล่าง
           if(hasTagData){
-            const tagRows=tagsSorted.map(([t,tv])=>{
+            const tagRows=tagsSorted.map(([t,tv],ti)=>{
               const pct=Math.round(tv.right/tv.total*100);
               const bc=pct>=80?'#16a34a':pct>=50?'#f59e0b':'#ef4444';
               const label=pct>=80?'ผ่าน':pct>=50?'ควรฝึก':'วิกฤต';
-              return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:10px;background:#f9fafb;border:1px solid #f3f4f6;">
-                <div style="font-size:13px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${esc(t)}</div>
-                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-                  <span style="font-size:13px;font-weight:900;color:${bc};">${pct}%</span>
-                  <span style="font-size:11px;color:#9ca3af;">${tv.right}/${tv.total}</span>
-                  <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;white-space:nowrap;">${label}</span>
+              const subMap=(v.subTagMap&&v.subTagMap[t])||{};
+              const subEntries=Object.entries(subMap).filter(([,sv])=>sv.total>0).sort((a,b)=>Math.round(a[1].right/a[1].total*100)-Math.round(b[1].right/b[1].total*100));
+              const hasSub=subEntries.length>0;
+              const subId=`${collapseId}_sub_${ti}`;
+              const subRows=hasSub?subEntries.map(([st,sv])=>{
+                const sp=Math.round(sv.right/sv.total*100);
+                const sbc=sp>=80?'#16a34a':sp>=50?'#f59e0b':'#ef4444';
+                const sl=sp>=80?'ผ่าน':sp>=50?'ควรฝึก':'วิกฤต';
+                return `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 10px;border-radius:8px;background:#fff;border:1px solid #f3f4f6;">
+                  <div style="font-size:12px;font-weight:700;color:#4b5563;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">↳ ${esc(st)}</div>
+                  <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                    <span style="font-size:12px;font-weight:900;color:${sbc};">${sp}%</span>
+                    <span style="font-size:10px;color:#9ca3af;">${sv.right}/${sv.total}</span>
+                    <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:${sbc}15;color:${sbc};border:1px solid ${sbc}33;white-space:nowrap;">${sl}</span>
+                  </div>
+                </div>`;
+              }).join(''):'';
+              return `<div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:10px;background:#f9fafb;border:1px solid #f3f4f6;${hasSub?'cursor:pointer;':''}" ${hasSub?`onclick="(function(){const d=document.getElementById('${subId}');const arr=document.getElementById('${subId}_arr');if(!d) return;const open=d.style.display!=='none';d.style.display=open?'none':'flex';if(arr) arr.textContent=open?'▸':'▾';})()"`:''}>
+                  <div style="font-size:13px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${hasSub?`<span id="${subId}_arr" style="color:#6366f1;font-size:11px;margin-right:2px;">▸</span> `:''}${esc(t)}</div>
+                  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                    <span style="font-size:13px;font-weight:900;color:${bc};">${pct}%</span>
+                    <span style="font-size:11px;color:#9ca3af;">${tv.right}/${tv.total}</span>
+                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;white-space:nowrap;">${label}</span>
+                  </div>
                 </div>
+                ${hasSub?`<div id="${subId}" style="display:none;margin-top:4px;margin-left:12px;flex-direction:column;gap:4px;">${subRows}</div>`:''}
               </div>`;
             }).join('');
             collapseHtml+=`<div id="${collapseId}" style="display:none;margin-top:2px;">
@@ -6117,6 +6321,8 @@ function initStats(){
       const _tier=MemeScore.getTierByPct?MemeScore.getTierByPct(pct):null;
       const _tierBadge=_tier?`<span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:${_tier.bg};color:${_tier.color};border:1px solid ${_tier.color}22;white-space:nowrap;">${_tier.emoji} ${_tier.title}</span>`:'';
       const _tagMap={};
+      const _subTagMap={}; // main → { sub → {right,total} }
+      const _subjSubMap=(s.subjectSubTopics&&s.subjectSubTopics[examSubject])||{};
       (a.perQuestion||[]).forEach(p=>{
         const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
         _pt.forEach(t=>{
@@ -6124,13 +6330,38 @@ function initStats(){
           _tagMap[t].total++;
           if(p.isCorrect) _tagMap[t].right++;
         });
+        const _pst=Array.isArray(p.subTags)?p.subTags:[];
+        _pst.forEach(st=>{
+          let mainOfSub=null;
+          for(const m in _subjSubMap){ if(Array.isArray(_subjSubMap[m])&&_subjSubMap[m].includes(st)){ mainOfSub=m; break; } }
+          if(!mainOfSub) return;
+          if(!_subTagMap[mainOfSub]) _subTagMap[mainOfSub]={};
+          if(!_subTagMap[mainOfSub][st]) _subTagMap[mainOfSub][st]={right:0,total:0};
+          _subTagMap[mainOfSub][st].total++;
+          if(p.isCorrect) _subTagMap[mainOfSub][st].right++;
+        });
       });
       const _tagsSorted=Object.entries(_tagMap).filter(([,v])=>v.total>0).sort((a,b)=>Math.round(a[1].right/a[1].total*100)-Math.round(b[1].right/b[1].total*100));
       const _tagCollapseId='atag_'+uid;
       const _tagPanel=_tagsSorted.length?`
         <div id="${_tagCollapseId}" style="display:none;margin-top:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;">
-            ${_tagsSorted.map(([t,tv])=>{const p2=Math.round(tv.right/tv.total*100);const bc=p2>=80?'#16a34a':p2>=50?'#f59e0b':'#ef4444';const lbl=p2>=80?'ผ่าน':p2>=50?'ควรฝึก':'วิกฤต';return`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;background:#f9fafb;border:1px solid #f3f4f6;"><div style="font-size:12px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${esc(t)}</div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><span style="font-size:12px;font-weight:900;color:${bc};">${p2}%</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;">${lbl}</span></div></div>`;}).join('')}
+            ${_tagsSorted.map(([t,tv],ti)=>{
+              const p2=Math.round(tv.right/tv.total*100);
+              const bc=p2>=80?'#16a34a':p2>=50?'#f59e0b':'#ef4444';
+              const lbl=p2>=80?'ผ่าน':p2>=50?'ควรฝึก':'วิกฤต';
+              const subM=_subTagMap[t]||{};
+              const subEntries=Object.entries(subM).filter(([,sv])=>sv.total>0).sort((a,b)=>Math.round(a[1].right/a[1].total*100)-Math.round(b[1].right/b[1].total*100));
+              const hasSub=subEntries.length>0;
+              const subId=`${_tagCollapseId}_sub_${ti}`;
+              const subRows=hasSub?subEntries.map(([st,sv])=>{
+                const sp=Math.round(sv.right/sv.total*100);
+                const sbc=sp>=80?'#16a34a':sp>=50?'#f59e0b':'#ef4444';
+                const sl=sp>=80?'ผ่าน':sp>=50?'ควรฝึก':'วิกฤต';
+                return `<div style="display:flex;align-items:center;justify-content:space-between;gap:5px;padding:4px 8px;border-radius:7px;background:#fff;border:1px solid #f3f4f6;"><div style="font-size:11px;font-weight:700;color:#4b5563;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">↳ ${esc(st)}</div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><span style="font-size:11px;font-weight:900;color:${sbc};">${sp}%</span><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;background:${sbc}15;color:${sbc};border:1px solid ${sbc}33;">${sl}</span></div></div>`;
+              }).join(''):'';
+              return `<div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;background:#f9fafb;border:1px solid #f3f4f6;${hasSub?'cursor:pointer;':''}" ${hasSub?`onclick="(function(){const d=document.getElementById('${subId}');const arr=document.getElementById('${subId}_arr');if(!d) return;const open=d.style.display!=='none';d.style.display=open?'none':'flex';if(arr) arr.textContent=open?'▸':'▾';})()"`:''}><div style="font-size:12px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${hasSub?`<span id="${subId}_arr" style="color:#6366f1;font-size:10px;margin-right:2px;">▸</span> `:''}${esc(t)}</div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><span style="font-size:12px;font-weight:900;color:${bc};">${p2}%</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;">${lbl}</span></div></div>${hasSub?`<div id="${subId}" style="display:none;margin-top:3px;margin-left:10px;flex-direction:column;gap:3px;">${subRows}</div>`:''}</div>`;
+            }).join('')}
           </div>
         </div>`:'';
       return `<div class="attempt-card">
@@ -6681,7 +6912,7 @@ function initPractice(params){
     const alreadyAnswered=st.answers.some(a=>a.questionNo===(q.no||q.number));
     if(!alreadyAnswered){
       st.answers.push({questionNo:q.no||q.number,chosen:lab,correct:q.correct,isCorrect,
-        tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),topic:q.topic||''});
+        tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),subTags:Array.isArray(q.subTags)?q.subTags:[],topic:q.topic||''});
     }
     st.results[st.currentIdx]=isCorrect?'correct':'wrong';
 
@@ -6689,7 +6920,7 @@ function initPractice(params){
     WeaknessTracker.updateWeaknessAfterSubmit({
       examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'',takerName:userId,
       perQuestion:[{no:q.no||q.number,isCorrect,chosen:lab,correct:q.correct,
-        tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),topic:q.topic||''}]
+        tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),subTags:Array.isArray(q.subTags)?q.subTags:[],topic:q.topic||''}]
     });
 
     // Update number box colors
@@ -6767,7 +6998,7 @@ function initPractice(params){
     const attempt={
       id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'',
       takerName:st.userId,score,total,
-      perQuestion:st.answers.map(a=>({no:a.questionNo,isCorrect:a.isCorrect,chosen:a.chosen,correct:a.correct,tags:a.tags,topic:a.topic})),
+      perQuestion:st.answers.map(a=>({no:a.questionNo,isCorrect:a.isCorrect,chosen:a.chosen,correct:a.correct,tags:a.tags,subTags:Array.isArray(a.subTags)?a.subTags:[],topic:a.topic})),
       startedAt:st.startedAt,submittedAt:new Date().toISOString(),
       usedSeconds:Math.round((Date.now()-new Date(st.startedAt).getTime())/1000),
       mode:'weakness_practice',
@@ -8284,7 +8515,10 @@ function initEditor(examId){
       if(Math.floor(idx/5)%2===1) tr.classList.add('editorRowAlt');
       tr.addEventListener('click',()=>select(idx));
       const _qTags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
-      const _tagPreview=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'<span style="font-size:11px;color:#9ca3af;">—</span>';
+      const _qSubTags=Array.isArray(q.subTags)?q.subTags:[];
+      const _mainChips=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'';
+      const _subChips=_qSubTags.length?_qSubTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:99px;color:#6d28d9;font-weight:700;">↳${esc(t)}</span>`).join(' '):'';
+      const _tagPreview=(_qTags.length||_qSubTags.length)?(_mainChips+(_subChips?' '+_subChips:'')):'<span style="font-size:11px;color:#9ca3af;">—</span>';
       tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
       const correctVal = q.correct||'A';
       tr.querySelectorAll('.correctBtn').forEach(btn=>{
@@ -11394,7 +11628,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.38';
+  const CURRENT_VERSION = 'v47.39';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
