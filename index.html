@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.47 -->
+  <!-- APP_VERSION: v47.48 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -854,7 +854,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.47</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.48</div>
     </div>
   </div>
 </div>
@@ -1549,6 +1549,14 @@
         <div id="newTopicTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
       </div>
       <label style="display:grid;gap:6px;">
+        <span style="font-weight:900;">ประเภทข้อสอบ</span>
+        <div style="display:flex;gap:8px;" id="newExamTypeBtns">
+          <button type="button" class="btn examTypeBtn active" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #c7d2fe;background:#eef2ff;font-weight:700;font-size:13px;color:#4338ca;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
+          <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
+        </div>
+        <div style="font-size:11px;color:#9ca3af;">กรอกตัวเลข: ตอบเป็นจำนวนเต็ม 1-3 หลัก (0-999)</div>
+      </label>
+      <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">ระดับความยาก</span>
         <div style="display:flex;gap:8px;">
           <label style="flex:1;cursor:pointer;">
@@ -1660,6 +1668,7 @@
       <div>
         <h1 class="h1" id="editorTitle">Editor</h1>
         <div id="editorMeta" style="display:none;"></div>
+        <div id="editorTypeBadge" style="display:inline-block;margin-top:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="navigate('admin_exams')">← รายการชุดข้อสอบ</button>
@@ -4576,22 +4585,55 @@ function initTake(id){
     setPdfPage(q.page||1);
     const wrap=document.getElementById('takeChoices');
     wrap.innerHTML='';
-    ['A','B','C','D'].forEach(lab=>{
-      const div=document.createElement('label');
-      div.className='choice'+((st.answers[q.id]===lab)?' active':'');
-      if(!st.started){div.style.opacity='0.6';div.style.pointerEvents='none';}
-      div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
-      div.addEventListener('click',()=>{
-        if(!st.started) return;
+    if(exam.examType==='fillblank-num'){
+      // กรอกตัวเลข
+      wrap.style.gridTemplateColumns='1fr';
+      const box=document.createElement('div');
+      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px;';
+      const inp=document.createElement('input');
+      inp.type='text';
+      inp.inputMode='numeric';
+      inp.pattern='[0-9]{1,3}';
+      inp.maxLength=3;
+      inp.placeholder='ตอบ';
+      inp.value=st.answers[q.id]||'';
+      inp.style.cssText='width:180px;height:78px;font-size:42px;font-weight:900;text-align:center;border:3px solid #6366f1;border-radius:16px;font-family:inherit;letter-spacing:6px;color:#111;background:#fff;';
+      if(!st.started){inp.disabled=true;inp.style.opacity='0.5';}
+      inp.addEventListener('input',()=>{
+        const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
+        if(v!==inp.value) inp.value=v;
         const prev=st.answers[q.id];
-        if(prev && prev!==lab){
+        if(prev && prev!==v && v!==''){
           st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
         }
-        st.answers[q.id]=lab;
-        render();
+        st.answers[q.id]=v;
       });
-      wrap.appendChild(div);
-    });
+      box.appendChild(inp);
+      const hint=document.createElement('div');
+      hint.style.cssText='font-size:11px;color:#9ca3af;';
+      hint.textContent='ตัวเลข 1-3 หลัก (0-999)';
+      box.appendChild(hint);
+      wrap.appendChild(box);
+    } else {
+      // เลือกตอบ ก/ข/ค/ง
+      wrap.style.gridTemplateColumns='';
+      ['A','B','C','D'].forEach(lab=>{
+        const div=document.createElement('label');
+        div.className='choice'+((st.answers[q.id]===lab)?' active':'');
+        if(!st.started){div.style.opacity='0.6';div.style.pointerEvents='none';}
+        div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
+        div.addEventListener('click',()=>{
+          if(!st.started) return;
+          const prev=st.answers[q.id];
+          if(prev && prev!==lab){
+            st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
+          }
+          st.answers[q.id]=lab;
+          render();
+        });
+        wrap.appendChild(div);
+      });
+    }
     document.getElementById('takePrevBtn').disabled=st.currentIndex===0;
     document.getElementById('takeNextBtn').disabled=st.currentIndex===total-1;
     setNumStyles();
@@ -4696,12 +4738,13 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
     leaveQuestion(); // flush current question time
     let score=0;
-    qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&st.answers[q.id]===q.correct)) score++;});
+    const _eType=exam.examType||'mc';
+    qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType))) score++;});
     const perQuestion=qsList.map(q=>{
       const chosen=st.answers[q.id]||null;
       const correct=q.correct||null;
       const isFree=!!q.isFree;
-      const isCorrect=isFree||(chosen&&correct?(chosen===correct):false);
+      const isCorrect=isFree||(chosen&&correct?isAnswerCorrect(chosen,correct,_eType):false);
       const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
       const _finalSubTags=Array.isArray(q.subTags)?q.subTags:[];
       const visited=Object.prototype.hasOwnProperty.call(st.qElapsedMs,q.id);
@@ -4717,7 +4760,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     }
     function _doSave(feeling, prediction){
       const savedS=Store.load();
-      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
+      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
       savedS.attempts.unshift(_newAttempt);
       if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
       const ok=Store.save(savedS);
@@ -5053,6 +5096,7 @@ function initReview(attemptId){
   }
 
   const wrongSet=new Set(wrongUnique);
+  const _reviewExamType=att.examType||(exam&&exam.examType)||'mc';
   function isCorrectQ(q){
     const no=Number(q.no)||0;
     if(no&&wrongSet.has(no)) return false;
@@ -5061,9 +5105,7 @@ function initReview(attemptId){
       if(p) return !!p.isCorrect;
     }
     const chosen=(answers[q.id]??answers[String(q.id)]??null);
-    const cc=chosen==null?null:String(chosen).trim();
-    const qc=q.correct==null?null:String(q.correct).trim();
-    return(cc!=null&&qc!=null&&cc===qc);
+    return isAnswerCorrect(chosen,q.correct,_reviewExamType);
   }
   function isUnsureQ(q){
     const no=Number(q.no)||0;
@@ -5101,23 +5143,41 @@ function initReview(attemptId){
     const isCorrect=isCorrectQ(q);
     const isUns=isUnsureQ(q);
     const isFree=!!(q.isFree||(Array.isArray(att.perQuestion)&&att.perQuestion.find(p=>Number(p.no)===Number(q.no))?.isFree));
-    const hasText=KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
+    const _isFillNum=_reviewExamType==='fillblank-num';
+    const hasText=_isFillNum?false:KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
 
     const wrap=document.createElement('div');
     wrap.className='qItem';
     wrap.id=`rq-${q.no}`;
 
-    // ── pills row ──
-    const pillsHtml=KEYS.map(key=>{
-      const letter=KEY_TO_LETTER[key];
-      const isCorr=correct===letter||correct===key;
-      const isChosen=chosen===letter||chosen===key;
-      let cls='qPill';
-      if(isCorr&&isChosen) cls+=' chosen-correct';
-      else if(isChosen&&!isCorr) cls+=' chosen-wrong';
-      else if(isCorr) cls+=' correct';
-      return `<div class="${cls}" title="${isCorr?'เฉลย':''}${isChosen?'  คุณเลือก':''}">${key}</div>`;
-    }).join('');
+    // ── pills row (mc) / answer display (fillblank-num) ──
+    let pillsHtml='';
+    if(_isFillNum){
+      const chosenDisp=chosen!=null&&String(chosen).trim()!==''?String(chosen):'—';
+      const correctDisp=correct||'—';
+      if(isFree){
+        pillsHtml=`<div style="font-size:12px;color:#d97706;font-weight:700;">ฟรี</div>`;
+      } else if(isCorrect){
+        pillsHtml=`<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:900;color:#16a34a;">${esc(chosenDisp)}</div>`;
+      } else {
+        pillsHtml=`<div style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;">
+          <span style="font-weight:900;color:#dc2626;text-decoration:line-through;">${esc(chosenDisp)}</span>
+          <span style="color:#9ca3af;">→</span>
+          <span style="font-weight:900;color:#16a34a;">${esc(correctDisp)}</span>
+        </div>`;
+      }
+    } else {
+      pillsHtml=KEYS.map(key=>{
+        const letter=KEY_TO_LETTER[key];
+        const isCorr=correct===letter||correct===key;
+        const isChosen=chosen===letter||chosen===key;
+        let cls='qPill';
+        if(isCorr&&isChosen) cls+=' chosen-correct';
+        else if(isChosen&&!isCorr) cls+=' chosen-wrong';
+        else if(isCorr) cls+=' correct';
+        return `<div class="${cls}" title="${isCorr?'เฉลย':''}${isChosen?'  คุณเลือก':''}">${key}</div>`;
+      }).join('');
+    }
 
     // badge
     const badgeCls = isFree?'skip':isCorrect?'good':'bad';
@@ -5134,7 +5194,7 @@ function initReview(attemptId){
       </div>
       <div class="qExpand">
         ${isFree?'<div style="font-size:12px;color:#d97706;font-weight:700;padding:2px 0;">★ ข้อฟรี — ทุกคนได้คะแนนข้อนี้</div>':''}
-        ${KEYS.map(key=>{
+        ${_isFillNum?'':KEYS.map(key=>{
           const letter=KEY_TO_LETTER[key];
           const text=(q.choices&&(q.choices[letter]||q.choices[key]))||(q.options&&(q.options[letter]||q.options[key]))||'';
           if(!text.trim()) return '';
@@ -6989,23 +7049,43 @@ function initPractice(params){
     document.getElementById('pracFeedback').style.display='none';
     document.getElementById('pracNextBtn').style.display='none';
 
+    const _pType=exam.examType||'mc';
+    const _isFillNum=_pType==='fillblank-num';
+
     // If this question already answered in this session, show result
     if(st.currentIdx in st.results){
       const prevAnswer=st.answers.find(a=>a.questionNo===(q.no||q.number));
       if(prevAnswer){
         st.confirmed=true;
-        // Re-render choices locked
         const wrap=document.getElementById('pracChoices');
         wrap.innerHTML='';
-        ['A','B','C','D'].forEach(lab=>{
-          const div=document.createElement('label');
-          div.className='choice';
-          if(lab===prevAnswer.chosen) div.classList.add('active');
-          div.style.pointerEvents='none';
-          if(lab!==prevAnswer.chosen) div.style.opacity='0.5';
-          div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
-          wrap.appendChild(div);
-        });
+        if(_isFillNum){
+          wrap.style.gridTemplateColumns='1fr';
+          const box=document.createElement('div');
+          box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px;';
+          const inp=document.createElement('input');
+          inp.type='text';inp.value=prevAnswer.chosen||'';inp.disabled=true;
+          inp.style.cssText='width:180px;height:72px;font-size:38px;font-weight:900;text-align:center;border:3px solid '+(prevAnswer.isCorrect?'#16a34a':'#dc2626')+';border-radius:16px;font-family:inherit;letter-spacing:6px;color:'+(prevAnswer.isCorrect?'#16a34a':'#dc2626')+';background:#fff;opacity:1;';
+          box.appendChild(inp);
+          if(!prevAnswer.isCorrect){
+            const ans=document.createElement('div');
+            ans.style.cssText='font-size:13px;color:#16a34a;font-weight:800;';
+            ans.textContent='เฉลย: '+(q.correct||'—');
+            box.appendChild(ans);
+          }
+          wrap.appendChild(box);
+        } else {
+          wrap.style.gridTemplateColumns='';
+          ['A','B','C','D'].forEach(lab=>{
+            const div=document.createElement('label');
+            div.className='choice';
+            if(lab===prevAnswer.chosen) div.classList.add('active');
+            div.style.pointerEvents='none';
+            if(lab!==prevAnswer.chosen) div.style.opacity='0.5';
+            div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
+            wrap.appendChild(div);
+          });
+        }
         const fb=document.getElementById('pracFeedback');
         if(prevAnswer.isCorrect){
           fb.style.cssText='display:block;padding:14px 16px;border-radius:12px;background:#f0fdf4;border:1px solid #86efac;';
@@ -7023,22 +7103,45 @@ function initPractice(params){
       }
     }
 
-    // Fresh question — render selectable choices
+    // Fresh question — render selectable choices / numeric input
     const wrap=document.getElementById('pracChoices');
     wrap.innerHTML='';
-    ['A','B','C','D'].forEach(lab=>{
-      const div=document.createElement('label');
-      div.className='choice';
-      div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
-      div.addEventListener('click',()=>{
-        if(st.confirmed) return;
-        wrap.querySelectorAll('.choice').forEach(c=>c.classList.remove('active'));
-        div.classList.add('active');
-        st.selected=lab;
-        confirmBtn.disabled=false; confirmBtn.style.opacity='1';
+    if(_isFillNum){
+      wrap.style.gridTemplateColumns='1fr';
+      const box=document.createElement('div');
+      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px;';
+      const inp=document.createElement('input');
+      inp.type='text';inp.inputMode='numeric';inp.pattern='[0-9]{1,3}';inp.maxLength=3;inp.placeholder='ตอบ';
+      inp.style.cssText='width:180px;height:78px;font-size:42px;font-weight:900;text-align:center;border:3px solid #6366f1;border-radius:16px;font-family:inherit;letter-spacing:6px;color:#111;background:#fff;';
+      inp.addEventListener('input',()=>{
+        const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
+        if(v!==inp.value) inp.value=v;
+        st.selected=v;
+        if(v){ confirmBtn.disabled=false; confirmBtn.style.opacity='1'; }
+        else { confirmBtn.disabled=true; confirmBtn.style.opacity='0.5'; }
       });
-      wrap.appendChild(div);
-    });
+      box.appendChild(inp);
+      const hint=document.createElement('div');
+      hint.style.cssText='font-size:11px;color:#9ca3af;';
+      hint.textContent='ตัวเลข 1-3 หลัก (0-999)';
+      box.appendChild(hint);
+      wrap.appendChild(box);
+    } else {
+      wrap.style.gridTemplateColumns='';
+      ['A','B','C','D'].forEach(lab=>{
+        const div=document.createElement('label');
+        div.className='choice';
+        div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
+        div.addEventListener('click',()=>{
+          if(st.confirmed) return;
+          wrap.querySelectorAll('.choice').forEach(c=>c.classList.remove('active'));
+          div.classList.add('active');
+          st.selected=lab;
+          confirmBtn.disabled=false; confirmBtn.style.opacity='1';
+        });
+        wrap.appendChild(div);
+      });
+    }
 
     updateNumBoxes();
   }
@@ -7049,12 +7152,18 @@ function initPractice(params){
     st.confirmed=true;
     const q=st.queue[st.currentIdx];
     const lab=st.selected;
-    const isCorrect=lab===q.correct;
+    const _eType=exam.examType||'mc';
+    const isCorrect=isAnswerCorrect(lab,q.correct,_eType);
 
-    // Lock choices
+    // Lock choices / input
     document.getElementById('pracChoices').querySelectorAll('.choice').forEach(c=>{
       c.style.pointerEvents='none';
       if(!c.classList.contains('active')) c.style.opacity='0.5';
+    });
+    document.getElementById('pracChoices').querySelectorAll('input').forEach(i=>{
+      i.disabled=true;
+      i.style.borderColor=isCorrect?'#16a34a':'#dc2626';
+      i.style.color=isCorrect?'#16a34a':'#dc2626';
     });
     const confirmBtn=document.getElementById('pracConfirmBtn');
     confirmBtn.disabled=true; confirmBtn.style.opacity='0.5';
@@ -7148,6 +7257,7 @@ function initPractice(params){
     const total=st.answers.length;
     const attempt={
       id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'',
+      examType:exam.examType||'mc',
       takerName:st.userId,score,total,
       perQuestion:st.answers.map(a=>({no:a.questionNo,isCorrect:a.isCorrect,chosen:a.chosen,correct:a.correct,tags:a.tags,subTags:Array.isArray(a.subTags)?a.subTags:[],topic:a.topic})),
       startedAt:st.startedAt,submittedAt:new Date().toISOString(),
@@ -8444,6 +8554,28 @@ function initAdminNew(){
     });
   });
 
+  // examType toggle for create form
+  document.querySelectorAll('#newExamTypeBtns .examTypeBtn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('#newExamTypeBtns .examTypeBtn').forEach(b=>{
+        b.classList.remove('active');
+        b.style.background='#fff';
+        b.style.borderColor='#e5e7eb';
+        b.style.color='#6b7280';
+      });
+      btn.classList.add('active');
+      if(btn.dataset.val==='mc'){
+        btn.style.background='#eef2ff';
+        btn.style.borderColor='#c7d2fe';
+        btn.style.color='#4338ca';
+      } else {
+        btn.style.background='#fef3c7';
+        btn.style.borderColor='#fcd34d';
+        btn.style.color='#b45309';
+      }
+    });
+  });
+
   newCreateBtn.addEventListener('click',()=>{
     const title=document.getElementById('newTitle').value.trim()||'Exam ใหม่';
     const _selVal=document.getElementById('newSubjectSelect')?.value||'';
@@ -8459,8 +8591,15 @@ function initAdminNew(){
     const answerPdfUrl=(document.getElementById('newAnswerPdfUrl')?.value||'').trim();
     const _activeDiff=document.querySelector('#page-admin_new .diffBtn.active');
     const difficulty=_activeDiff?_activeDiff.dataset.val:'develop';
-    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty});
-    s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>({id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),choices:{A:'',B:'',C:'',D:''},correct:'A'})):[];
+    const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
+    const examType=_activeType?_activeType.dataset.val:'mc';
+    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType});
+    const _emptyCorrect=examType==='fillblank-num'?'':'A';
+    s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>{
+      const _q={id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),correct:_emptyCorrect};
+      if(examType!=='fillblank-num') _q.choices={A:'',B:'',C:'',D:''};
+      return _q;
+    }):[];
     // apply excel data ถ้ามี
     if(window._newExcelData && window._newExcelData.length > 0){
       window._newExcelData.forEach(row=>{
@@ -8484,8 +8623,25 @@ function initEditor(examId){
   // normalize
   const list=(s.questions[examId]||[]).map(q=>({...q, no:q.no??q.number??0}));
 
+  // examType — default 'mc' for legacy exams
+  if(!exam.examType) exam.examType='mc';
+  const _isFillNum=exam.examType==='fillblank-num';
   document.getElementById('editorTitle').textContent='แก้ไขข้อสอบ: '+exam.title;
   document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
+  const _typeBadge=document.getElementById('editorTypeBadge');
+  if(_typeBadge){
+    if(_isFillNum){
+      _typeBadge.textContent='🔢 ประเภท: กรอกตัวเลข';
+      _typeBadge.style.background='#fef3c7';
+      _typeBadge.style.color='#b45309';
+      _typeBadge.style.border='1px solid #fcd34d';
+    } else {
+      _typeBadge.textContent='📋 ประเภท: เลือกตอบ ก/ข/ค/ง';
+      _typeBadge.style.background='#eef2ff';
+      _typeBadge.style.color='#4338ca';
+      _typeBadge.style.border='1px solid #c7d2fe';
+    }
+  }
 
   const titleInput=document.getElementById('editorExamTitle');
   const renameBtn=document.getElementById('editorRenameBtn');
@@ -8670,18 +8826,33 @@ function initEditor(examId){
       const _mainChips=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'';
       const _subChips=_qSubTags.length?_qSubTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:99px;color:#6d28d9;font-weight:700;">↳${esc(t)}</span>`).join(' '):'';
       const _tagPreview=(_qTags.length||_qSubTags.length)?(_mainChips+(_subChips?' '+_subChips:'')):'<span style="font-size:11px;color:#9ca3af;">—</span>';
-      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td><div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div></td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
-      const correctVal = q.correct||'A';
-      tr.querySelectorAll('.correctBtn').forEach(btn=>{
-        if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
-        btn.addEventListener('click',(e)=>{
-          e.stopPropagation();
-          select(idx);
-          tr.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
-          btn.classList.add('selected');
-          q.correct=btn.getAttribute('data-val');
+      const _correctCellHtml=_isFillNum
+        ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" value="${esc(q.correct||'')}" placeholder="0-999" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
+        : `<div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div>`;
+      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td>${_correctCellHtml}</td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
+      if(_isFillNum){
+        const numInput=tr.querySelector('input[data-field="correctNum"]');
+        if(numInput){
+          numInput.addEventListener('focus',()=>select(idx));
+          numInput.addEventListener('input',()=>{
+            const v=numInput.value.replace(/[^\d]/g,'').slice(0,3);
+            if(v!==numInput.value) numInput.value=v;
+            q.correct=v;
+          });
+        }
+      } else {
+        const correctVal = q.correct||'A';
+        tr.querySelectorAll('.correctBtn').forEach(btn=>{
+          if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
+          btn.addEventListener('click',(e)=>{
+            e.stopPropagation();
+            select(idx);
+            tr.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
+            btn.classList.add('selected');
+            q.correct=btn.getAttribute('data-val');
+          });
         });
-      });
+      }
       const pageInput = tr.querySelector('input[data-field="page"]');
       refs[`${idx}:page`]=pageInput;
       pageInput.addEventListener('focus',()=>select(idx));
@@ -8908,16 +9079,19 @@ function initEditor(examId){
   };
 
   // bind excel import สำหรับ editor
-  bindEditorExcel(examId, list, renderTable);
+  bindEditorExcel(examId, list, renderTable, exam.examType);
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
-function downloadExcelTemplate(qCount, filename, topics) {
+function downloadExcelTemplate(qCount, filename, topics, examType) {
   if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
 
-  const rows = [['ข้อที่', 'หน้า PDF', 'เฉลย (1/2/3/4)', 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
+  const _isFillNum=examType==='fillblank-num';
+  const _correctHeader=_isFillNum?'เฉลย (ตัวเลข 0-999)':'เฉลย (1/2/3/4)';
+  const _correctSample=_isFillNum?42:1;
+  const rows = [['ข้อที่', 'หน้า PDF', _correctHeader, 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
   for (let i = 1; i <= qCount; i++) {
-    rows.push([i, Math.max(1, Math.ceil(i / 5)), 1, '', '']);
+    rows.push([i, Math.max(1, Math.ceil(i / 5)), _correctSample, '', '']);
   }
 
   const wb = XLSX.utils.book_new();
@@ -8964,7 +9138,9 @@ function downloadExcelTemplate(qCount, filename, topics) {
     const subj = document.getElementById('newSubjectSelect')?.value || '';
     const s2 = Store.load();
     const topics = (s2.subjectTopics&&subj&&s2.subjectTopics[subj]) ? s2.subjectTopics[subj] : [];
-    downloadExcelTemplate(qCount, `template_${title}.xlsx`, topics);
+    const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
+    const _examType=_activeType?_activeType.dataset.val:'mc';
+    downloadExcelTemplate(qCount, `template_${title}.xlsx`, topics, _examType);
   });
 })();
 
@@ -8981,14 +9157,35 @@ function normalizeAnswer(v) {
   if (['A','B','C','D'].includes(s)) return s;
   return null;
 }
+// parse คำตอบกรอกตัวเลข — รับ string/number → คืน digit string ('042', '7', '') หรือ null ถ้าไม่ใช่ตัวเลข
+function normalizeNumericAnswer(v){
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(!s) return '';
+  if(!/^\d{1,3}$/.test(s)) return null;
+  return s;
+}
+// type-aware comparison
+function isAnswerCorrect(answer, correct, examType){
+  if(answer==null||correct==null) return false;
+  if(examType==='fillblank-num'){
+    const a=String(answer).trim(); const c=String(correct).trim();
+    if(!a||!c) return false;
+    const an=parseInt(a,10); const cn=parseInt(c,10);
+    if(!Number.isFinite(an)||!Number.isFinite(cn)) return false;
+    return an===cn;
+  }
+  return String(answer)===String(correct);
+}
 
 // อ่าน Excel/CSV แล้วคืน array [{no, page, correct, isFree}]
-function parseExcelFile(file) {
+function parseExcelFile(file, examType) {
   return new Promise((resolve, reject) => {
     if (typeof XLSX === 'undefined') {
       reject(new Error('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่'));
       return;
     }
+    const _isFillNum=examType==='fillblank-num';
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -9009,12 +9206,13 @@ function parseExcelFile(file) {
           const row = rows[i];
           const no = parseInt(row[0]);
           const page = parseInt(row[1]) || 1;
-          const correct = normalizeAnswer(row[2]);
+          const correct=_isFillNum?normalizeNumericAnswer(row[2]):normalizeAnswer(row[2]);
           const topic = String(row[3]||'').trim();
           const isFreeVal = String(row[4]||'').trim();
           const isFree = isFreeVal==='1'||isFreeVal.toLowerCase()==='true'||isFreeVal==='ฟรี';
           if (!isNaN(no) && no > 0 && (correct||isFree)) {
-            result.push({ no, page, correct: correct||'A', topic: topic||'', isFree });
+            const _defaultCorrect=_isFillNum?'':'A';
+            result.push({ no, page, correct: (correct==null?_defaultCorrect:correct), topic: topic||'', isFree });
           }
         }
         resolve(result);
@@ -9043,7 +9241,9 @@ function parseExcelFile(file) {
     status.textContent = '⏳ กำลังอ่าน...';
     preview.style.display = 'none';
     try {
-      const data = await parseExcelFile(file);
+      const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
+      const _examType=_activeType?_activeType.dataset.val:'mc';
+      const data = await parseExcelFile(file, _examType);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
       window._newExcelData = data;
       // อัปเดต qCount ให้ตรงกับ excel
@@ -9061,7 +9261,7 @@ function parseExcelFile(file) {
 })();
 
 // ── admin_editor: bind excel input ──
-function bindEditorExcel(examId, list, renderFn) {
+function bindEditorExcel(examId, list, renderFn, examType) {
   // bind template download
   const dlBtn = document.getElementById('editorDownloadTemplate');
   if (dlBtn) {
@@ -9069,7 +9269,7 @@ function bindEditorExcel(examId, list, renderFn) {
     dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
     newDlBtn.addEventListener('click', () => {
       const _s2=Store.load(); const _topics=(_s2.subjectTopics&&exam.subject&&_s2.subjectTopics[exam.subject])||[];
-      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics);
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, exam.examType);
     });
   }
 
@@ -9086,7 +9286,7 @@ function bindEditorExcel(examId, list, renderFn) {
     if (!file) return;
     status.textContent = '⏳ กำลังอ่าน...';
     try {
-      const data = await parseExcelFile(file);
+      const data = await parseExcelFile(file, examType);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
 
       // merge เข้า list
@@ -11931,7 +12131,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.47';
+  const CURRENT_VERSION = 'v47.48';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
