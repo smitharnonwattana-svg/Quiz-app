@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.46 -->
+  <!-- APP_VERSION: v47.47 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -854,7 +854,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.46</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.47</div>
     </div>
   </div>
 </div>
@@ -5293,15 +5293,16 @@ function initReview(attemptId){
   // กราฟพัฒนาการ: ตัด weakness_practice ออก (total ไม่ตรงชุด) + ซ่อน 0%
   const _chartExamAttempts = _allExamAttempts.filter(a=>a.mode!=='weakness_practice' && a.total>0 && (a.score||0)>0);
 
-  // TOP 5 ข้อผิดบ่อย (สะสมทุก attempt ของชุดนี้)
+  // TOP 5 ข้อผิดบ่อย — ใช้ real+practice (ไม่รวม weakness_practice เพราะนับซ้ำข้อเดิม)
+  const _wrongStatAttempts = _allExamAttempts.filter(a=>a.mode!=='weakness_practice');
   const wrongCard = document.getElementById('reviewWrongCard');
   const wrongTopEl = document.getElementById('reviewWrongTop');
   // Reset ก่อน (กัน DOM ค้างจาก attempt ก่อนหน้า)
   if(wrongCard) wrongCard.style.display='none';
   if(wrongTopEl) wrongTopEl.innerHTML='';
-  if(wrongCard && wrongTopEl && _allExamAttempts.length>=1){
+  if(wrongCard && wrongTopEl && _wrongStatAttempts.length>=1){
     const wrongCount={};
-    _allExamAttempts.forEach(a=>{
+    _wrongStatAttempts.forEach(a=>{
       (a.perQuestion||[]).forEach(p=>{ if(!p.isCorrect&&p.no) wrongCount[p.no]=(wrongCount[p.no]||0)+1; });
     });
     const sorted=Object.entries(wrongCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -5313,7 +5314,7 @@ function initReview(attemptId){
           <div class="wrong-rank${i<3?' top3':''}">${i+1}</div>
           <span style="font-size:13px;min-width:42px;">ข้อ ${no}</span>
           <div class="wrong-bar-wrap"><div class="wrong-bar-fill" style="width:${Math.round(cnt/maxV*100)}%;"></div></div>
-          <span style="font-size:12px;color:#6b7280;min-width:52px;text-align:right;">${cnt}/${_allExamAttempts.length} ครั้ง</span>
+          <span style="font-size:12px;color:#6b7280;min-width:52px;text-align:right;">${cnt}/${_wrongStatAttempts.length} ครั้ง</span>
         </div>`).join('');
     }
   }
@@ -5791,25 +5792,36 @@ function _renderDashSummary(attempts){
   const el=document.getElementById('dashSummaryCards');
   if(!el) return;
   if(!attempts.length){el.innerHTML='';return;}
-  const n=attempts.length;
-  // กรอง weakness_practice ออกจากเมตริก % (ทำไม่ครบชุด เทียบกันไม่ได้)
-  const realAttempts=attempts.filter(a=>a.mode!=='weakness_practice');
-  const nReal=realAttempts.length;
-  const avgPct=nReal?Math.round(realAttempts.reduce((s,a)=>s+(a.total?a.score/a.total*100:0),0)/nReal):null;
-  const dasArr=realAttempts.map(calcDAS).filter(d=>d!=null);
+  // แบ่ง 3 กลุ่ม
+  const realOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&!a.practiceMode);   // สอบจริง
+  const practiceOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&a.practiceMode); // ฝึกชุด
+  const weaknessOnly=attempts.filter(a=>a.mode==='weakness_practice');                 // แก้จุดอ่อน
+  // สำหรับ % metrics ใช้ real+practice (ตัด weakness ออก)
+  const nonWeak=attempts.filter(a=>a.mode!=='weakness_practice');
+  const nNW=nonWeak.length;
+  const avgPct=nNW?Math.round(nonWeak.reduce((s,a)=>s+(a.total?a.score/a.total*100:0),0)/nNW):null;
+  const dasArr=nonWeak.map(calcDAS).filter(d=>d!=null);
   const avgDAS=dasArr.length?Math.round(dasArr.reduce((s,d)=>s+d,0)/dasArr.length):null;
+  // Mood + Calibration ใช้สอบจริงเท่านั้น (ไม่นับ practice mode — ความรู้สึกก่อน "ฝึก" ≠ ก่อน "สอบ", และทาย practice ไม่ใช่ทายของจริง)
+  const nRO=realOnly.length;
   const moodMap={};
-  realAttempts.forEach(a=>{if(a.mood) moodMap[a.mood]=(moodMap[a.mood]||0)+1;});
+  realOnly.forEach(a=>{if(a.mood) moodMap[a.mood]=(moodMap[a.mood]||0)+1;});
   const topMood=Object.entries(moodMap).sort((a,b)=>b[1]-a[1])[0];
-  const calArr=realAttempts.map(calcCalibration).filter(c=>c!=null);
+  const calArr=realOnly.map(calcCalibration).filter(c=>c!=null);
   const avgCalErr=calArr.length?Math.round(calArr.reduce((s,c)=>s+Math.abs(c.diffPct),0)/calArr.length):null;
 
+  // breakdown sub-text สำหรับการ์ดแรก
+  const _bdParts=[];
+  if(practiceOnly.length) _bdParts.push(`ฝึกชุด ${practiceOnly.length}`);
+  if(weaknessOnly.length) _bdParts.push(`แก้จุดอ่อน ${weaknessOnly.length}`);
+  const _bdSub=_bdParts.length?_bdParts.join(' • '):'';
+
   const cards=[
-    {label:'การสอบ',val:`${n} ครั้ง`,sub:''},
-    avgPct!=null?{label:'คะแนนเฉลี่ย',val:`${avgPct}%`,sub:'ไม่รวมแก้จุดอ่อน'}:null,
+    {label:'สอบจริง',val:`${nRO} ครั้ง`,sub:_bdSub},
+    avgPct!=null?{label:'คะแนนเฉลี่ย',val:`${avgPct}%`,sub:'จริง+ฝึกชุด (ไม่รวมแก้จุดอ่อน)'}:null,
     avgDAS!=null?{label:'DAS เฉลี่ย',val:`${avgDAS}`,sub:avgDAS>=65?'✅ เหนือเป้า':avgDAS>=55?'🟡 ใกล้เป้า':'⚠️ ต่ำกว่าเป้า'}:null,
-    topMood?{label:'อารมณ์ก่อนสอบ',val:topMood[0],sub:`บ่อยสุด (${topMood[1]}/${nReal})`}:null,
-    avgCalErr!=null?{label:'Calibration',val:`±${avgCalErr}%`,sub:avgCalErr<=10?'✅ แม่นมาก':avgCalErr<=20?'🟡 พอใช้':'⚠️ คลาดเคลื่อน'}:null,
+    topMood?{label:'อารมณ์ก่อนสอบ',val:topMood[0],sub:`บ่อยสุด (${topMood[1]}/${nRO}) • สอบจริงเท่านั้น`}:null,
+    avgCalErr!=null?{label:'Calibration',val:`±${avgCalErr}%`,sub:(avgCalErr<=10?'✅ แม่นมาก':avgCalErr<=20?'🟡 พอใช้':'⚠️ คลาดเคลื่อน')+' • สอบจริงเท่านั้น'}:null,
   ].filter(Boolean);
 
   el.innerHTML=cards.map(c=>`<div class="stat-card">
@@ -5837,13 +5849,18 @@ function _renderDashChart(attempts){
   const labels=sorted.map(a=>{const d=new Date(a.submittedAt||a.startedAt||0);return`${d.getDate()}/${d.getMonth()+1}`;});
   const scores=sorted.map(a=>a.total?Math.round(a.score/a.total*100):0);
   const dasData=sorted.map(a=>calcDAS(a));
+  // แยก marker/สี ระหว่างสอบจริง vs โหมดฝึก
+  const isPrac=sorted.map(a=>!!a.practiceMode);
+  const ptColors=isPrac.map(p=>p?'#9ca3af':'#111');
+  const ptStyles=isPrac.map(p=>p?'triangle':'circle');
+  const ptRadii=isPrac.map(p=>p?5:4);
   if(_dashChart){_dashChart.destroy();_dashChart=null;}
   _dashChart=new Chart(canvas,{
     type:'line',
     data:{
       labels,
       datasets:[
-        {label:'คะแนน (%)',data:scores,borderColor:'#111',backgroundColor:'rgba(17,17,17,0.07)',tension:0.35,fill:true,pointRadius:4,pointBackgroundColor:'#111'},
+        {label:'คะแนน (%)',data:scores,borderColor:'#111',backgroundColor:'rgba(17,17,17,0.07)',tension:0.35,fill:true,pointRadius:ptRadii,pointBackgroundColor:ptColors,pointStyle:ptStyles,pointBorderColor:ptColors},
         {label:'DAS',data:dasData,borderColor:'#3b82f6',backgroundColor:'transparent',tension:0.35,fill:false,pointRadius:3,borderDash:[4,3],pointBackgroundColor:'#3b82f6'},
       ]
     },
@@ -5852,7 +5869,10 @@ function _renderDashChart(attempts){
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{display:true,position:'top',labels:{font:{size:12},boxWidth:16}},
-        tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+(ctx.datasetIndex===0?'%':'')}}
+        tooltip:{callbacks:{
+          label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+(ctx.datasetIndex===0?'%':''),
+          afterBody:items=>{const i=items[0]&&items[0].dataIndex;return i!=null?(isPrac[i]?'△ โหมดฝึก':'● สอบจริง'):'';}
+        }}
       },
       scales:{y:{suggestedMin:0,suggestedMax:100,ticks:{font:{size:11}}},x:{ticks:{font:{size:11}}}}
     }
@@ -6258,16 +6278,20 @@ function initStats(){
     if(radarEl) radarEl.innerHTML=''; // clear old radar section
     if(subjAvgEl){
       const subjMap={};
+      const _ensureSubj=(subj)=>{
+        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0,tagMap:{},subTagMap:{},weaknessTagMap:{},weaknessSubTagMap:{}};
+        return subjMap[subj];
+      };
       timeFiltered.forEach(a=>{
         const subj=a.examSubject||'ไม่ระบุ';
-        if(!subjMap[subj]) subjMap[subj]={sum:0,cnt:0,total:0,tagMap:{},subTagMap:{}};
-        subjMap[subj].sum+=(a.score||0); subjMap[subj].total+=(a.total||0); subjMap[subj].cnt++;
+        const sm=_ensureSubj(subj);
+        sm.sum+=(a.score||0); sm.total+=(a.total||0); sm.cnt++;
         (a.perQuestion||[]).forEach(p=>{
           const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
           _pt.forEach(t=>{
-            if(!subjMap[subj].tagMap[t]) subjMap[subj].tagMap[t]={right:0,total:0};
-            subjMap[subj].tagMap[t].total++;
-            if(p.isCorrect) subjMap[subj].tagMap[t].right++;
+            if(!sm.tagMap[t]) sm.tagMap[t]={right:0,total:0};
+            sm.tagMap[t].total++;
+            if(p.isCorrect) sm.tagMap[t].right++;
           });
           const _pst=Array.isArray(p.subTags)?p.subTags:[];
           _pst.forEach(st=>{
@@ -6276,10 +6300,35 @@ function initStats(){
             const subMap=(s.subjectSubTopics&&s.subjectSubTopics[subj])||{};
             for(const m in subMap){ if(Array.isArray(subMap[m])&&subMap[m].includes(st)){ mainOfSub=m; break; } }
             if(!mainOfSub) return; // sub tag ที่ orphan — ข้าม
-            if(!subjMap[subj].subTagMap[mainOfSub]) subjMap[subj].subTagMap[mainOfSub]={};
-            if(!subjMap[subj].subTagMap[mainOfSub][st]) subjMap[subj].subTagMap[mainOfSub][st]={right:0,total:0};
-            subjMap[subj].subTagMap[mainOfSub][st].total++;
-            if(p.isCorrect) subjMap[subj].subTagMap[mainOfSub][st].right++;
+            if(!sm.subTagMap[mainOfSub]) sm.subTagMap[mainOfSub]={};
+            if(!sm.subTagMap[mainOfSub][st]) sm.subTagMap[mainOfSub][st]={right:0,total:0};
+            sm.subTagMap[mainOfSub][st].total++;
+            if(p.isCorrect) sm.subTagMap[mainOfSub][st].right++;
+          });
+        });
+      });
+      // ── Recovery signal: aggregate weakness_practice แยก map (ใช้ time filter เดียวกัน) ──
+      const _weaknessTime=filterByTime(practiceAttempts);
+      _weaknessTime.forEach(a=>{
+        const subj=a.examSubject||'ไม่ระบุ';
+        const sm=_ensureSubj(subj);
+        (a.perQuestion||[]).forEach(p=>{
+          const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
+          _pt.forEach(t=>{
+            if(!sm.weaknessTagMap[t]) sm.weaknessTagMap[t]={right:0,total:0};
+            sm.weaknessTagMap[t].total++;
+            if(p.isCorrect) sm.weaknessTagMap[t].right++;
+          });
+          const _pst=Array.isArray(p.subTags)?p.subTags:[];
+          _pst.forEach(st=>{
+            let mainOfSub=null;
+            const subjSubMap=(s.subjectSubTopics&&s.subjectSubTopics[subj])||{};
+            for(const m in subjSubMap){ if(Array.isArray(subjSubMap[m])&&subjSubMap[m].includes(st)){ mainOfSub=m; break; } }
+            if(!mainOfSub) return;
+            if(!sm.weaknessSubTagMap[mainOfSub]) sm.weaknessSubTagMap[mainOfSub]={};
+            if(!sm.weaknessSubTagMap[mainOfSub][st]) sm.weaknessSubTagMap[mainOfSub][st]={right:0,total:0};
+            sm.weaknessSubTagMap[mainOfSub][st].total++;
+            if(p.isCorrect) sm.weaknessSubTagMap[mainOfSub][st].right++;
           });
         });
       });
@@ -6323,15 +6372,24 @@ function initStats(){
                 const sp=Math.round(sv.right/sv.total*100);
                 const sbc=sp>=80?'#16a34a':sp>=50?'#f59e0b':'#ef4444';
                 const sl=sp>=80?'ผ่าน':sp>=50?'ควรฝึก':'วิกฤต';
-                return `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 10px;border-radius:8px;background:#fff;border:1px solid #f3f4f6;">
-                  <div style="font-size:12px;font-weight:700;color:#4b5563;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">↳ ${esc(st)}</div>
-                  <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-                    <span style="font-size:12px;font-weight:900;color:${sbc};">${sp}%</span>
-                    <span style="font-size:10px;color:#9ca3af;">${sv.right}/${sv.total}</span>
-                    <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:${sbc}15;color:${sbc};border:1px solid ${sbc}33;white-space:nowrap;">${sl}</span>
+                // recovery: weakness practice ของ sub-tag นี้
+                const wst=v.weaknessSubTagMap&&v.weaknessSubTagMap[t]&&v.weaknessSubTagMap[t][st];
+                const wstLine=wst&&wst.total>0?`<div style="font-size:10px;color:#6366f1;padding:1px 10px 0 22px;">🔥 ฝึกแก้จุดอ่อน ${wst.right}/${wst.total} (${Math.round(wst.right/wst.total*100)}%)</div>`:'';
+                return `<div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 10px;border-radius:8px;background:#fff;border:1px solid #f3f4f6;">
+                    <div style="font-size:12px;font-weight:700;color:#4b5563;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">↳ ${esc(st)}</div>
+                    <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                      <span style="font-size:12px;font-weight:900;color:${sbc};">${sp}%</span>
+                      <span style="font-size:10px;color:#9ca3af;">${sv.right}/${sv.total}</span>
+                      <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:${sbc}15;color:${sbc};border:1px solid ${sbc}33;white-space:nowrap;">${sl}</span>
+                    </div>
                   </div>
+                  ${wstLine}
                 </div>`;
               }).join(''):'';
+              // recovery: weakness practice ของ tag นี้
+              const wt=v.weaknessTagMap&&v.weaknessTagMap[t];
+              const wtLine=wt&&wt.total>0?`<div style="font-size:11px;color:#6366f1;padding:2px 10px 0 ${hasSub?'24px':'10px'};">🔥 ฝึกแก้จุดอ่อน ${wt.right}/${wt.total} (${Math.round(wt.right/wt.total*100)}%)</div>`:'';
               return `<div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:10px;background:#f9fafb;border:1px solid #f3f4f6;${hasSub?'cursor:pointer;':''}" ${hasSub?`onclick="(function(){const d=document.getElementById('${subId}');const arr=document.getElementById('${subId}_arr');if(!d) return;const open=d.style.display!=='none';d.style.display=open?'none':'flex';if(arr) arr.textContent=open?'▸':'▾';})()"`:''}>
                   <div style="font-size:13px;font-weight:700;color:#374151;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${hasSub?`<span id="${subId}_arr" style="color:#6366f1;font-size:11px;margin-right:2px;">▸</span> `:''}${esc(t)}</div>
@@ -6341,6 +6399,7 @@ function initStats(){
                     <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${bc}15;color:${bc};border:1px solid ${bc}33;white-space:nowrap;">${label}</span>
                   </div>
                 </div>
+                ${wtLine}
                 ${hasSub?`<div id="${subId}" style="display:none;margin-top:4px;margin-left:12px;flex-direction:column;gap:4px;">${subRows}</div>`:''}
               </div>`;
             }).join('');
@@ -11872,7 +11931,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.46';
+  const CURRENT_VERSION = 'v47.47';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
