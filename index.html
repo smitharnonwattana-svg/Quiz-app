@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.58 -->
+  <!-- APP_VERSION: v47.59 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.58</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.59</div>
     </div>
   </div>
 </div>
@@ -2090,7 +2090,10 @@ const PdfViewer = (() => {
       page = page || 1;
       // reset container style ก่อนทุกครั้ง เพื่อป้องกัน layout เสียเมื่อสลับจาก GDrive → PDF ปกติ
       container.style.cssText = 'width:100%;height:100%;background:#525659;display:flex;flex-direction:column;overflow:hidden;';
-      scrollArea.style.cssText = 'flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:8px 8px 24px;display:flex;flex-direction:column;gap:8px;align-items:center;';
+      // มือถือ: overflow-x:auto เพื่อ horizontal scroll ตอน zoom
+      const _ox=_isPhone?'auto':'hidden';
+      scrollArea.style.cssText = 'flex:1;min-height:0;overflow-y:auto;overflow-x:'+_ox+';-webkit-overflow-scrolling:touch;padding:8px 8px 24px;display:flex;flex-direction:column;gap:8px;align-items:center;';
+      if(_isPhone) scrollArea.style.touchAction='pan-x pan-y';
       scrollArea.innerHTML = '';
       scrollArea.appendChild(statusDiv);
       statusDiv.textContent = 'กำลังโหลด PDF...';
@@ -12546,7 +12549,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.58';
+  const CURRENT_VERSION = 'v47.59';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
