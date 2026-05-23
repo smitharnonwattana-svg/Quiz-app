@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.48 -->
+  <!-- APP_VERSION: v47.49 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -854,7 +854,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.48</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.49</div>
     </div>
   </div>
 </div>
@@ -4589,30 +4589,33 @@ function initTake(id){
       // กรอกตัวเลข
       wrap.style.gridTemplateColumns='1fr';
       const box=document.createElement('div');
-      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px;';
+      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 4px;';
       const inp=document.createElement('input');
-      inp.type='text';
-      inp.inputMode='numeric';
-      inp.pattern='[0-9]{1,3}';
-      inp.maxLength=3;
-      inp.placeholder='ตอบ';
+      inp.type='text';inp.inputMode='none';inp.readOnly=true;inp.maxLength=3;inp.placeholder='ตอบ';
       inp.value=st.answers[q.id]||'';
-      inp.style.cssText='width:180px;height:78px;font-size:42px;font-weight:900;text-align:center;border:3px solid #6366f1;border-radius:16px;font-family:inherit;letter-spacing:6px;color:#111;background:#fff;';
-      if(!st.started){inp.disabled=true;inp.style.opacity='0.5';}
-      inp.addEventListener('input',()=>{
-        const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
-        if(v!==inp.value) inp.value=v;
-        const prev=st.answers[q.id];
-        if(prev && prev!==v && v!==''){
-          st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
-        }
-        st.answers[q.id]=v;
-      });
+      inp.style.cssText='width:180px;height:78px;font-size:42px;font-weight:900;text-align:center;border:3px solid #6366f1;border-radius:16px;font-family:inherit;letter-spacing:6px;color:#111;background:#fff;caret-color:transparent;';
+      if(!st.started){inp.style.opacity='0.5';}
       box.appendChild(inp);
       const hint=document.createElement('div');
       hint.style.cssText='font-size:11px;color:#9ca3af;';
       hint.textContent='ตัวเลข 1-3 หลัก (0-999)';
       box.appendChild(hint);
+      // commit helper
+      function _setAns(v){
+        const prev=st.answers[q.id];
+        if(prev && prev!==v && v!==''){
+          st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
+        }
+        st.answers[q.id]=v;
+        inp.value=v;
+      }
+      const kp=createNumericKeypad(
+        d=>{ if(!st.started) return; const cur=inp.value||''; if(cur.length>=3) return; _setAns(cur+d); },
+        ()=>{ if(!st.started) return; const cur=inp.value||''; _setAns(cur.slice(0,-1)); },
+        ()=>{ if(!st.started) return; _setAns(''); }
+      );
+      if(!st.started) kp.style.opacity='0.5';
+      box.appendChild(kp);
       wrap.appendChild(box);
     } else {
       // เลือกตอบ ก/ข/ค/ง
@@ -7109,22 +7112,27 @@ function initPractice(params){
     if(_isFillNum){
       wrap.style.gridTemplateColumns='1fr';
       const box=document.createElement('div');
-      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px;';
+      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 4px;';
       const inp=document.createElement('input');
-      inp.type='text';inp.inputMode='numeric';inp.pattern='[0-9]{1,3}';inp.maxLength=3;inp.placeholder='ตอบ';
-      inp.style.cssText='width:180px;height:78px;font-size:42px;font-weight:900;text-align:center;border:3px solid #6366f1;border-radius:16px;font-family:inherit;letter-spacing:6px;color:#111;background:#fff;';
-      inp.addEventListener('input',()=>{
-        const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
-        if(v!==inp.value) inp.value=v;
-        st.selected=v;
-        if(v){ confirmBtn.disabled=false; confirmBtn.style.opacity='1'; }
-        else { confirmBtn.disabled=true; confirmBtn.style.opacity='0.5'; }
-      });
+      inp.type='text';inp.inputMode='none';inp.readOnly=true;inp.maxLength=3;inp.placeholder='ตอบ';
+      inp.style.cssText='width:180px;height:78px;font-size:42px;font-weight:900;text-align:center;border:3px solid #6366f1;border-radius:16px;font-family:inherit;letter-spacing:6px;color:#111;background:#fff;caret-color:transparent;';
       box.appendChild(inp);
       const hint=document.createElement('div');
       hint.style.cssText='font-size:11px;color:#9ca3af;';
       hint.textContent='ตัวเลข 1-3 หลัก (0-999)';
       box.appendChild(hint);
+      function _setSel(v){
+        inp.value=v;
+        st.selected=v;
+        if(v){ confirmBtn.disabled=false; confirmBtn.style.opacity='1'; }
+        else { confirmBtn.disabled=true; confirmBtn.style.opacity='0.5'; }
+      }
+      const kp=createNumericKeypad(
+        d=>{ if(st.confirmed) return; const cur=inp.value||''; if(cur.length>=3) return; _setSel(cur+d); },
+        ()=>{ if(st.confirmed) return; const cur=inp.value||''; _setSel(cur.slice(0,-1)); },
+        ()=>{ if(st.confirmed) return; _setSel(''); }
+      );
+      box.appendChild(kp);
       wrap.appendChild(box);
     } else {
       wrap.style.gridTemplateColumns='';
@@ -7155,7 +7163,7 @@ function initPractice(params){
     const _eType=exam.examType||'mc';
     const isCorrect=isAnswerCorrect(lab,q.correct,_eType);
 
-    // Lock choices / input
+    // Lock choices / input / keypad
     document.getElementById('pracChoices').querySelectorAll('.choice').forEach(c=>{
       c.style.pointerEvents='none';
       if(!c.classList.contains('active')) c.style.opacity='0.5';
@@ -7164,6 +7172,10 @@ function initPractice(params){
       i.disabled=true;
       i.style.borderColor=isCorrect?'#16a34a':'#dc2626';
       i.style.color=isCorrect?'#16a34a':'#dc2626';
+    });
+    document.getElementById('pracChoices').querySelectorAll('.numKeypad').forEach(k=>{
+      k.style.pointerEvents='none';
+      k.style.opacity='0.4';
     });
     const confirmBtn=document.getElementById('pracConfirmBtn');
     confirmBtn.disabled=true; confirmBtn.style.opacity='0.5';
@@ -9176,6 +9188,27 @@ function isAnswerCorrect(answer, correct, examType){
     return an===cn;
   }
   return String(answer)===String(correct);
+}
+
+// สร้าง numeric keypad inline สำหรับข้อสอบกรอกตัวเลข
+// onDigit(d), onDelete(), onClear() เรียกเมื่อกดปุ่มที่เกี่ยวข้อง
+function createNumericKeypad(onDigit, onDelete, onClear){
+  const grid=document.createElement('div');
+  grid.className='numKeypad';
+  grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:280px;margin-top:4px;';
+  const mkBtn=(label,handler,style)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.textContent=label;
+    b.style.cssText='padding:14px 0;font-size:22px;font-weight:900;border-radius:12px;font-family:inherit;cursor:pointer;touch-action:manipulation;user-select:none;'+(style||'background:#fff;color:#111;border:1px solid #e5e7eb;');
+    b.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();handler();});
+    return b;
+  };
+  ['1','2','3','4','5','6','7','8','9'].forEach(d=>grid.appendChild(mkBtn(d,()=>onDigit(d))));
+  grid.appendChild(mkBtn('ล้าง',()=>onClear(),'background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb;font-size:14px;'));
+  grid.appendChild(mkBtn('0',()=>onDigit('0')));
+  grid.appendChild(mkBtn('⌫',()=>onDelete(),'background:#fef2f2;color:#dc2626;border:1px solid #fecaca;'));
+  return grid;
 }
 
 // อ่าน Excel/CSV แล้วคืน array [{no, page, correct, isFree}]
@@ -12131,7 +12164,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.48';
+  const CURRENT_VERSION = 'v47.49';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
