@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.54 -->
+  <!-- APP_VERSION: v47.55 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.54</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.55</div>
     </div>
   </div>
 </div>
@@ -1903,6 +1903,68 @@ const PdfViewer = (() => {
     scrollArea.appendChild(statusDiv);
     container.appendChild(scrollArea);
 
+    // ── Pinch-to-zoom เฉพาะมือถือ (ไม่กระทบ tablet/desktop) ──
+    let _zoom = 1;
+    let _pinch = null;
+    let _lastTapMs = 0;
+    const _isPhone = window.matchMedia && window.matchMedia('(max-width:600px)').matches;
+    function _getDist(t1, t2){
+      const dx=t1.clientX-t2.clientX, dy=t1.clientY-t2.clientY;
+      return Math.sqrt(dx*dx+dy*dy);
+    }
+    function _applyZoom(){
+      const canvases=scrollArea.querySelectorAll('canvas');
+      canvases.forEach(c=>{
+        if(!c.dataset.baseW){
+          c.dataset.baseW=parseFloat(c.style.width)||0;
+          c.dataset.baseH=parseFloat(c.style.height)||0;
+        }
+        const bw=parseFloat(c.dataset.baseW)||0;
+        const bh=parseFloat(c.dataset.baseH)||0;
+        if(bw) c.style.width=(bw*_zoom)+'px';
+        if(bh) c.style.height=(bh*_zoom)+'px';
+      });
+    }
+    function _resetCanvasBaseDims(){
+      // เรียกหลัง renderAllPages — เคลียร์ base dims เก่า
+      scrollArea.querySelectorAll('canvas').forEach(c=>{
+        delete c.dataset.baseW;
+        delete c.dataset.baseH;
+      });
+      if(_zoom!==1) _applyZoom();
+    }
+    if(_isPhone){
+      scrollArea.style.overflowX='auto';
+      scrollArea.style.touchAction='pan-x pan-y';
+      scrollArea.addEventListener('touchstart',(e)=>{
+        if(e.touches.length===2){
+          _pinch={d:_getDist(e.touches[0],e.touches[1]),z:_zoom};
+        }
+      },{passive:true});
+      scrollArea.addEventListener('touchmove',(e)=>{
+        if(e.touches.length===2 && _pinch){
+          e.preventDefault();
+          const d=_getDist(e.touches[0],e.touches[1]);
+          _zoom=Math.max(0.8,Math.min(3,_pinch.z*(d/_pinch.d)));
+          _applyZoom();
+        }
+      },{passive:false});
+      scrollArea.addEventListener('touchend',(e)=>{
+        if(e.touches.length<2) _pinch=null;
+        // double-tap → reset zoom
+        if(e.touches.length===0 && e.changedTouches.length===1){
+          const now=Date.now();
+          if(now-_lastTapMs<300 && _zoom!==1){
+            _zoom=1;
+            _applyZoom();
+            _lastTapMs=0;
+            return;
+          }
+          _lastTapMs=now;
+        }
+      },{passive:true});
+    }
+
     async function renderAllPages() {
       if (!pdfDoc) return;
       scrollArea.innerHTML = '';
@@ -2031,6 +2093,7 @@ const PdfViewer = (() => {
           cMapPacked: true,
         }).promise;
         await renderAllPages();
+        if(_isPhone) _resetCanvasBaseDims();
         setTimeout(() => scrollToPage(page), 150);
       } catch(e) {
         console.error('loadUrl error', e);
@@ -12454,7 +12517,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.54';
+  const CURRENT_VERSION = 'v47.55';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
