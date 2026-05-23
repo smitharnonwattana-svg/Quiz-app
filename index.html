@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.61 -->
+  <!-- APP_VERSION: v47.62 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.61</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.62</div>
     </div>
   </div>
 </div>
@@ -6622,8 +6622,10 @@ function initStats(){
           });
         });
       });
-      // ── Recovery signal: aggregate weakness_practice แยก map (ใช้ time filter เดียวกัน) ──
-      const _weaknessTime=filterByTime(practiceAttempts);
+      // ── Recovery signal: aggregate weakness_practice (apply เดียวกับ tab "แก้จุดอ่อน") ──
+      let _weaknessTime=filterByTime(practiceAttempts);
+      if(currentSubjectFilter!=='all') _weaknessTime=_weaknessTime.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
+      if(currentExamFilter!=='all') _weaknessTime=_weaknessTime.filter(a=>a.examId===currentExamFilter);
       _weaknessTime.forEach(a=>{
         const subj=a.examSubject||'ไม่ระบุ';
         const sm=_ensureSubj(subj);
@@ -6811,7 +6813,7 @@ function initStats(){
       const _tagCollapseId='atag_'+uid;
       const _tagPanel=_tagsSorted.length?`
         <div id="${_tagCollapseId}" style="display:none;margin-top:8px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;">
+          <div class="tag-content-grid">
             ${_tagsSorted.map(([t,tv],ti)=>{
               const p2=Math.round(tv.right/tv.total*100);
               const bc=p2>=80?'#16a34a':p2>=50?'#f59e0b':'#ef4444';
@@ -6830,6 +6832,10 @@ function initStats(){
             }).join('')}
           </div>
         </div>`:'';
+      const _isWAtt=isWeightedAttempt(a);
+      const _scoreDisp=_isWAtt?fmtPts(a.score||0):(a.score||0);
+      const _totalDisp=_isWAtt?fmtPts(a.total||0):(a.total||0);
+      const _unitLabel=_isWAtt?' คะแนน':'';
       return `<div class="attempt-card">
         <div class="ac-top">
           <div style="flex:1;min-width:0;">
@@ -6839,7 +6845,7 @@ function initStats(){
           <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
             ${_tierBadge}
             <div style="text-align:right;">
-              <div class="ac-score" style="color:${barColor};">${a.score||0}<span style="font-size:14px;font-weight:700;color:#9ca3af;">/${a.total||0}</span></div>
+              <div class="ac-score" style="color:${barColor};">${_scoreDisp}<span style="font-size:14px;font-weight:700;color:#9ca3af;">/${_totalDisp}${_unitLabel}</span></div>
               <div class="ac-pct" style="color:${barColor};">${pct}%</div>
             </div>
           </div>
@@ -12559,7 +12565,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.61';
+  const CURRENT_VERSION = 'v47.62';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
