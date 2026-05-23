@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.55 -->
+  <!-- APP_VERSION: v47.56 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.55</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.56</div>
     </div>
   </div>
 </div>
@@ -1914,6 +1914,7 @@ const PdfViewer = (() => {
     }
     function _applyZoom(){
       const canvases=scrollArea.querySelectorAll('canvas');
+      const zoomedIn=_zoom>1.001;
       canvases.forEach(c=>{
         if(!c.dataset.baseW){
           c.dataset.baseW=parseFloat(c.style.width)||0;
@@ -1923,7 +1924,18 @@ const PdfViewer = (() => {
         const bh=parseFloat(c.dataset.baseH)||0;
         if(bw) c.style.width=(bw*_zoom)+'px';
         if(bh) c.style.height=(bh*_zoom)+'px';
+        // เมื่อ zoom > 1: ปลด max-width เพื่อให้ canvas กว้างได้เกินจอ
+        c.style.maxWidth=zoomedIn?'none':'100%';
+        // wrapper ต้องไม่บีบ canvas
+        const wrap=c.parentElement;
+        if(wrap){
+          wrap.style.width=zoomedIn?'auto':'100%';
+          wrap.style.minWidth=zoomedIn?'100%':'';
+          wrap.style.alignItems=zoomedIn?'flex-start':'center';
+        }
       });
+      // scrollArea ปรับ align ตามสถานะ — center ตอนปกติ, flex-start ตอน zoom-in
+      scrollArea.style.alignItems=zoomedIn?'flex-start':'center';
     }
     function _resetCanvasBaseDims(){
       // เรียกหลัง renderAllPages — เคลียร์ base dims เก่า
@@ -12517,7 +12529,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.55';
+  const CURRENT_VERSION = 'v47.56';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
