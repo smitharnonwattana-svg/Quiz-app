@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.59 -->
+  <!-- APP_VERSION: v47.60 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.59</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.60</div>
     </div>
   </div>
 </div>
@@ -1946,11 +1946,13 @@ const PdfViewer = (() => {
       });
       if(_zoom!==1) _applyZoom();
     }
+    let _gestureHadPinch=false;
     if(_isPhone){
       scrollArea.style.overflowX='auto';
       scrollArea.style.touchAction='pan-x pan-y';
       scrollArea.addEventListener('touchstart',(e)=>{
         if(e.touches.length===2){
+          _gestureHadPinch=true;
           const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
           const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
           const rect=scrollArea.getBoundingClientRect();
@@ -1971,8 +1973,7 @@ const PdfViewer = (() => {
           const d=_getDist(e.touches[0],e.touches[1]);
           _zoom=Math.max(0.8,Math.min(3,_pinch.z*(d/_pinch.d)));
           _applyZoom();
-          // ปรับ scroll ให้จุดพินช์อยู่นิ่ง: เนื้อหา (scrollL+vx) ที่จุดเริ่ม
-          // หลัง scale ratio → ตำแหน่งใหม่ = (scrollL+vx)*ratio → scrollL2 = pos2 - vx
+          // ปรับ scroll ให้จุดพินช์อยู่นิ่ง
           const ratio=_zoom/_pinch.z;
           scrollArea.scrollLeft=(_pinch.scrollL+_pinch.vx)*ratio-_pinch.vx;
           scrollArea.scrollTop=(_pinch.scrollT+_pinch.vy)*ratio-_pinch.vy;
@@ -1980,16 +1981,23 @@ const PdfViewer = (() => {
       },{passive:false});
       scrollArea.addEventListener('touchend',(e)=>{
         if(e.touches.length<2) _pinch=null;
-        // double-tap → reset zoom
-        if(e.touches.length===0 && e.changedTouches.length===1){
-          const now=Date.now();
-          if(now-_lastTapMs<300 && _zoom!==1){
-            _zoom=1;
-            _applyZoom();
-            _lastTapMs=0;
+        // double-tap → reset zoom — เฉพาะ gesture ที่ไม่มี pinch เกิดขึ้น (กัน 2-finger release นับเป็น tap)
+        if(e.touches.length===0){
+          if(_gestureHadPinch){
+            _gestureHadPinch=false;
+            _lastTapMs=0; // กัน tap ถัดไปนับเป็น double-tap
             return;
           }
-          _lastTapMs=now;
+          if(e.changedTouches.length===1){
+            const now=Date.now();
+            if(now-_lastTapMs<300 && _zoom!==1){
+              _zoom=1;
+              _applyZoom();
+              _lastTapMs=0;
+              return;
+            }
+            _lastTapMs=now;
+          }
         }
       },{passive:true});
     }
@@ -8966,6 +8974,7 @@ function initEditor(examId){
         exam.weighted=true;
         list.forEach(q=>{if(q.points==null) q.points=1;});
       }
+      s.questions[examId]=list; // flush list ลง store (กัน points default หาย)
       Store.save(s);
       _syncWeightedUI();
       renderTable();
@@ -8977,6 +8986,7 @@ function initEditor(examId){
       const v=Number(_weightedBulkInput.value);
       if(!Number.isFinite(v)||v<0){toast('กรุณาใส่ตัวเลข ≥ 0');return;}
       list.forEach(q=>{q.points=v;});
+      s.questions[examId]=list; // flush list ลง store
       Store.save(s);
       _syncWeightedUI();
       renderTable();
@@ -12549,7 +12559,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.59';
+  const CURRENT_VERSION = 'v47.60';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
