@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.51 -->
+  <!-- APP_VERSION: v47.52 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -718,6 +718,59 @@
         min-width: 36px !important;
       }
 
+      /* ── เปิดระบบคะแนน weighted (มี 6 คอลัมน์): override nth-child shift ── */
+      /* คอลัมน์ 4 = คะแนน (input) */
+      #page-admin_editor table.weighted th:nth-child(4),
+      #page-admin_editor table.weighted td:nth-child(4) {
+        width: 58px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table.weighted td:nth-child(4) input {
+        width: 48px !important;
+        padding: 4px 4px !important;
+        font-size: 12px !important;
+      }
+      /* คอลัมน์ 5 = ฟรี */
+      #page-admin_editor table.weighted th:nth-child(5),
+      #page-admin_editor table.weighted td:nth-child(5) {
+        width: 40px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table.weighted td:nth-child(5) .freeBtn {
+        font-size: 10px !important;
+        padding: 4px 2px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      /* คอลัมน์ 6 = Tag */
+      #page-admin_editor table.weighted th:nth-child(6),
+      #page-admin_editor table.weighted td:nth-child(6) {
+        width: 38px !important;
+        padding: 6px 2px !important;
+      }
+      #page-admin_editor table.weighted td:nth-child(6) button {
+        overflow: visible !important;
+        font-size: 14px !important;
+        padding: 4px !important;
+        min-width: 0 !important;
+        width: 100% !important;
+      }
+      #page-admin_editor table.weighted td:nth-child(6) button span {
+        display: none !important;
+      }
+      /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
+      #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
+        padding: 5px 6px !important;
+        font-size: 12px !important;
+        min-width: 26px !important;
+      }
+      /* compact bar คะแนน controls */
+      #editorWeightedBar { padding: 8px 10px !important; gap: 6px !important; }
+      #editorWeightedBar > div:first-child { font-size: 11px !important; flex: 1 1 100% !important; }
+      #editorWeightedBulkInput { width: 60px !important; font-size: 12px !important; }
+      #editorWeightedBulkBtn,
+      #editorWeightedToggleBtn { font-size: 10px !important; padding: 4px 8px !important; }
+
       /* Fix 1 — หน้าเริ่มทำ */
       #examDetailWrap .card > div:first-child {
         flex-wrap: wrap !important;
@@ -854,7 +907,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.51</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.52</div>
     </div>
   </div>
 </div>
@@ -8724,6 +8777,9 @@ function initEditor(examId){
     const on=!!exam.weighted;
     if(_weightedBulkWrap) _weightedBulkWrap.style.display=on?'flex':'none';
     if(_ptsTh) _ptsTh.style.display=on?'':'none';
+    // toggle class .weighted บน table เพื่อให้ mobile CSS รู้ว่ามี 6 คอลัมน์
+    const _editorTbl=document.querySelector('#page-admin_editor .tableBox table');
+    if(_editorTbl) _editorTbl.classList.toggle('weighted',on);
     if(_weightedToggleBtn){
       _weightedToggleBtn.textContent=on?'✕ ปิดระบบคะแนน':'⚖️ เปิดระบบคะแนน';
       _weightedToggleBtn.style.background=on?'#fff':'';
@@ -12333,7 +12389,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.51';
+  const CURRENT_VERSION = 'v47.52';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
