@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.49 -->
+  <!-- APP_VERSION: v47.50 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -854,7 +854,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.49</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.50</div>
     </div>
   </div>
 </div>
@@ -1784,6 +1784,16 @@
             <div id="editorQuickTagMsg" style="font-size:11px;color:#6b7280;margin-top:5px;min-height:14px;"></div>
           </div>
         </div>
+        <!-- Weighted scoring controls -->
+        <div id="editorWeightedBar" style="padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+          <div style="font-size:12px;font-weight:800;color:#b45309;flex:1;min-width:160px;">⚖️ ระบบคะแนน <span id="editorWeightedStatus" style="color:#92400e;font-weight:600;font-size:11px;"></span></div>
+          <div id="editorWeightedBulkWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#6b7280;">ตั้งทุกข้อ:</span>
+            <input id="editorWeightedBulkInput" type="number" min="0" step="0.5" placeholder="2.5" style="width:80px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" />
+            <button id="editorWeightedBulkBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;">ใช้</button>
+          </div>
+          <button id="editorWeightedToggleBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;font-weight:700;">⚖️ เปิดระบบคะแนน</button>
+        </div>
         <div class="tableBox">
           <table style="min-width:300px;">
             <thead>
@@ -1791,6 +1801,7 @@
                 <th style="width:56px;">ข้อ</th>
                 <th style="width:56px;">หน้า</th>
                 <th style="width:120px;">เฉลย</th>
+                <th style="width:80px;display:none;" class="editorPtsTh">คะแนน</th>
                 <th style="width:60px;">ฟรี</th>
                 <th style="width:100px;">Tag</th>
               </tr>
@@ -4670,7 +4681,8 @@ ${[['low','🪫','หมดแรง'],['ok','😐','พอไหว'],['good','
   }
 
   // ── Post check-in: feeling + prediction ──
-  function showPostCheckIn(score,total,onComplete){
+  function showPostCheckIn(score,total,onComplete,opts){
+    const _skipPred=!!(opts&&opts.skipPrediction);
     const ov=document.createElement('div');
     ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
     document.body.appendChild(ov);
@@ -4685,7 +4697,14 @@ ${[['hard','😤','ยากเกิน'],['confused','😐','พอไหว']
 </div>`;
       ov.innerHTML=''; ov.appendChild(box);
       box.querySelectorAll('button[data-val]').forEach(btn=>{
-        btn.addEventListener('click',()=>step2(btn.dataset.val));
+        btn.addEventListener('click',()=>{
+          if(_skipPred){
+            ov.remove();
+            onComplete(btn.dataset.val);
+          } else {
+            step2(btn.dataset.val);
+          }
+        });
       });
     }
 
@@ -4740,9 +4759,23 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     if(!st.started){toast('กดเริ่มทำข้อสอบก่อน');return;}
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
     leaveQuestion(); // flush current question time
-    let score=0;
     const _eType=exam.examType||'mc';
-    qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType))) score++;});
+    const _isWeighted=!!exam.weighted;
+    let score=0;
+    let total=qsList.length;
+    if(_isWeighted){
+      // weighted: total = sum points, score = sum points where correct
+      let _sumAll=0,_sumOk=0;
+      qsList.forEach(q=>{
+        const pts=getQPoints(q);
+        _sumAll+=pts;
+        if(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType))) _sumOk+=pts;
+      });
+      total=Math.round(_sumAll*100)/100;
+      score=Math.round(_sumOk*100)/100;
+    } else {
+      qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType))) score++;});
+    }
     const perQuestion=qsList.map(q=>{
       const chosen=st.answers[q.id]||null;
       const correct=q.correct||null;
@@ -4751,8 +4784,10 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       const _finalTags=Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[]);
       const _finalSubTags=Array.isArray(q.subTags)?q.subTags:[];
       const visited=Object.prototype.hasOwnProperty.call(st.qElapsedMs,q.id);
-      return{qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,subTags:_finalSubTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
+      const _pq={qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,subTags:_finalSubTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
         visited,elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
+      if(_isWeighted) _pq.points=getQPoints(q);
+      return _pq;
     });
     const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
@@ -4763,7 +4798,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     }
     function _doSave(feeling, prediction){
       const savedS=Store.load();
-      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
+      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
       savedS.attempts.unshift(_newAttempt);
       if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
       const ok=Store.save(savedS);
@@ -4813,6 +4848,9 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     // teacher/admin: skip check-ins ไปบันทึกเลย
     if(Auth.isTeacher()){
       _doSave(null, null);
+    } else if(_isWeighted){
+      // weighted exam: ทาย "ข้อ" ไม่ตรงกับคะแนนจริง — ขอแค่ feeling พอ
+      showPostCheckIn(score, total, (feeling)=>_doSave(feeling, null), {skipPrediction:true});
     } else {
       showPostCheckIn(score, total, _doSave);
     }
@@ -4998,7 +5036,7 @@ function initReview(attemptId){
   const subj=(exam&&exam.subject)?exam.subject:(att.examSubject||'ไม่ระบุ');
   document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
-  document.getElementById('reviewScore').textContent=`คะแนน ${att.score}/${att.total}`;
+  document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
 
   function fmtDate(iso){try{return new Date(iso).toLocaleString('th-TH');}catch(e){return iso||'';}}
   function fmtDur(sec){sec=Math.max(0,Number(sec||0));const m=Math.floor(sec/60),ss=sec%60;return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
@@ -5748,6 +5786,7 @@ function calcDAS(att){
 }
 function calcCalibration(att){
   if(!att||att.prediction==null||!att.total) return null;
+  if(isWeightedAttempt(att)) return null; // ทาย "ข้อ" เทียบกับคะแนน weighted ไม่ตรง
   const pred=Number(att.prediction);
   if(!Number.isFinite(pred)) return null;
   const diff=att.score-pred;
@@ -8655,6 +8694,62 @@ function initEditor(examId){
     }
   }
 
+  // ── Weighted scoring controls ──
+  if(exam.weighted==null) exam.weighted=false;
+  const _weightedBar=document.getElementById('editorWeightedBar');
+  const _weightedStatus=document.getElementById('editorWeightedStatus');
+  const _weightedBulkWrap=document.getElementById('editorWeightedBulkWrap');
+  const _weightedBulkInput=document.getElementById('editorWeightedBulkInput');
+  const _weightedBulkBtn=document.getElementById('editorWeightedBulkBtn');
+  const _weightedToggleBtn=document.getElementById('editorWeightedToggleBtn');
+  const _ptsTh=document.querySelector('.editorPtsTh');
+  function _syncWeightedUI(){
+    const on=!!exam.weighted;
+    if(_weightedBulkWrap) _weightedBulkWrap.style.display=on?'flex':'none';
+    if(_ptsTh) _ptsTh.style.display=on?'':'none';
+    if(_weightedToggleBtn){
+      _weightedToggleBtn.textContent=on?'✕ ปิดระบบคะแนน':'⚖️ เปิดระบบคะแนน';
+      _weightedToggleBtn.style.background=on?'#fff':'';
+      _weightedToggleBtn.style.borderColor=on?'#fca5a5':'';
+      _weightedToggleBtn.style.color=on?'#dc2626':'';
+    }
+    if(_weightedStatus){
+      if(on){
+        const totalPts=list.reduce((s,q)=>s+getQPoints(q),0);
+        _weightedStatus.textContent=`— เปิดอยู่ (รวม ${fmtPts(totalPts)} คะแนน)`;
+      } else {
+        _weightedStatus.textContent=`— ปิดอยู่ (ข้อละ 1 คะแนน รวม ${list.length} คะแนน)`;
+      }
+    }
+  }
+  if(_weightedToggleBtn){
+    _weightedToggleBtn.onclick=()=>{
+      if(exam.weighted){
+        if(!confirm('ปิดระบบคะแนน?\nคะแนนต่อข้อจะถูกลบทั้งหมด — ใช้ระบบ "ข้อละ 1 คะแนน" แทน')) return;
+        exam.weighted=false;
+        list.forEach(q=>{delete q.points;});
+      } else {
+        exam.weighted=true;
+        list.forEach(q=>{if(q.points==null) q.points=1;});
+      }
+      Store.save(s);
+      _syncWeightedUI();
+      renderTable();
+    };
+  }
+  if(_weightedBulkBtn){
+    _weightedBulkBtn.onclick=()=>{
+      if(!exam.weighted) return;
+      const v=Number(_weightedBulkInput.value);
+      if(!Number.isFinite(v)||v<0){toast('กรุณาใส่ตัวเลข ≥ 0');return;}
+      list.forEach(q=>{q.points=v;});
+      Store.save(s);
+      _syncWeightedUI();
+      renderTable();
+      toast(`ตั้งทุกข้อเป็น ${fmtPts(v)} แล้ว`);
+    };
+  }
+
   const titleInput=document.getElementById('editorExamTitle');
   const renameBtn=document.getElementById('editorRenameBtn');
   if(titleInput) titleInput.value=exam.title||'';
@@ -8841,7 +8936,26 @@ function initEditor(examId){
       const _correctCellHtml=_isFillNum
         ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" value="${esc(q.correct||'')}" placeholder="0-999" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
         : `<div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div>`;
-      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td>${_correctCellHtml}</td><td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
+      const _ptsCellHtml=exam.weighted
+        ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
+        : '';
+      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
+      if(exam.weighted){
+        const ptsInput=tr.querySelector('input[data-field="points"]');
+        if(ptsInput){
+          ptsInput.addEventListener('focus',()=>select(idx));
+          ptsInput.addEventListener('input',()=>{
+            const v=Number(ptsInput.value);
+            if(Number.isFinite(v)&&v>=0){
+              q.points=v;
+              if(_weightedStatus){
+                const totalPts=list.reduce((s,qq)=>s+getQPoints(qq),0);
+                _weightedStatus.textContent=`— เปิดอยู่ (รวม ${fmtPts(totalPts)} คะแนน)`;
+              }
+            }
+          });
+        }
+      }
       if(_isFillNum){
         const numInput=tr.querySelector('input[data-field="correctNum"]');
         if(numInput){
@@ -8900,6 +9014,7 @@ function initEditor(examId){
     select(selectedIndex);
   }
   renderTable();
+  _syncWeightedUI();
 
   // ── Quick Tag Panel (bulk apply/remove main tag by range) ──
   if(!s.subjectTopics) s.subjectTopics={};
@@ -9091,24 +9206,29 @@ function initEditor(examId){
   };
 
   // bind excel import สำหรับ editor
-  bindEditorExcel(examId, list, renderTable, exam.examType);
+  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted);
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
-function downloadExcelTemplate(qCount, filename, topics, examType) {
+function downloadExcelTemplate(qCount, filename, topics, examType, weighted) {
   if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
 
   const _isFillNum=examType==='fillblank-num';
+  const _isWeighted=!!weighted;
   const _correctHeader=_isFillNum?'เฉลย (ตัวเลข 0-999)':'เฉลย (1/2/3/4)';
   const _correctSample=_isFillNum?42:1;
-  const rows = [['ข้อที่', 'หน้า PDF', _correctHeader, 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)']];
+  const _header=['ข้อที่', 'หน้า PDF', _correctHeader, 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)'];
+  if(_isWeighted) _header.push('คะแนน (ค่าเริ่มต้น 1)');
+  const rows = [_header];
   for (let i = 1; i <= qCount; i++) {
-    rows.push([i, Math.max(1, Math.ceil(i / 5)), _correctSample, '', '']);
+    const r=[i, Math.max(1, Math.ceil(i / 5)), _correctSample, '', ''];
+    if(_isWeighted) r.push(1);
+    rows.push(r);
   }
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 18 }, { wch: 16 }];
+  ws['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 14 }];
 
   // dropdown validation สำหรับคอลัมน์ D (เนื้อหา)
   if(topics && topics.length > 0){
@@ -9190,6 +9310,26 @@ function isAnswerCorrect(answer, correct, examType){
   return String(answer)===String(correct);
 }
 
+// ── Weighted scoring helpers ──
+function getQPoints(q){
+  const p=q&&q.points;
+  if(p==null||!Number.isFinite(Number(p))) return 1;
+  return Math.max(0,Number(p));
+}
+function fmtPts(n){
+  if(n==null||!Number.isFinite(Number(n))) return '0';
+  const r=Math.round(Number(n)*100)/100;
+  return String(r);
+}
+function isWeightedAttempt(att){
+  if(!att) return false;
+  if(att.weighted===true) return true;
+  if(Array.isArray(att.perQuestion)){
+    return att.perQuestion.some(p=>p&&p.points!=null&&Number(p.points)!==1);
+  }
+  return false;
+}
+
 // สร้าง numeric keypad inline สำหรับข้อสอบกรอกตัวเลข
 // onDigit(d), onDelete(), onClear() เรียกเมื่อกดปุ่มที่เกี่ยวข้อง
 function createNumericKeypad(onDigit, onDelete, onClear){
@@ -9212,13 +9352,14 @@ function createNumericKeypad(onDigit, onDelete, onClear){
 }
 
 // อ่าน Excel/CSV แล้วคืน array [{no, page, correct, isFree}]
-function parseExcelFile(file, examType) {
+function parseExcelFile(file, examType, weighted) {
   return new Promise((resolve, reject) => {
     if (typeof XLSX === 'undefined') {
       reject(new Error('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่'));
       return;
     }
     const _isFillNum=examType==='fillblank-num';
+    const _isWeighted=!!weighted;
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -9243,9 +9384,18 @@ function parseExcelFile(file, examType) {
           const topic = String(row[3]||'').trim();
           const isFreeVal = String(row[4]||'').trim();
           const isFree = isFreeVal==='1'||isFreeVal.toLowerCase()==='true'||isFreeVal==='ฟรี';
+          let points=null;
+          if(_isWeighted){
+            const pRaw=String(row[5]||'').trim().replace(',','.');
+            const pNum=Number(pRaw);
+            if(pRaw&&Number.isFinite(pNum)&&pNum>=0) points=pNum;
+            else points=1;
+          }
           if (!isNaN(no) && no > 0 && (correct||isFree)) {
             const _defaultCorrect=_isFillNum?'':'A';
-            result.push({ no, page, correct: (correct==null?_defaultCorrect:correct), topic: topic||'', isFree });
+            const entry={ no, page, correct: (correct==null?_defaultCorrect:correct), topic: topic||'', isFree };
+            if(_isWeighted) entry.points=points;
+            result.push(entry);
           }
         }
         resolve(result);
@@ -9294,7 +9444,7 @@ function parseExcelFile(file, examType) {
 })();
 
 // ── admin_editor: bind excel input ──
-function bindEditorExcel(examId, list, renderFn, examType) {
+function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
   // bind template download
   const dlBtn = document.getElementById('editorDownloadTemplate');
   if (dlBtn) {
@@ -9302,7 +9452,7 @@ function bindEditorExcel(examId, list, renderFn, examType) {
     dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
     newDlBtn.addEventListener('click', () => {
       const _s2=Store.load(); const _topics=(_s2.subjectTopics&&exam.subject&&_s2.subjectTopics[exam.subject])||[];
-      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, exam.examType);
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, exam.examType, !!exam.weighted);
     });
   }
 
@@ -9319,7 +9469,8 @@ function bindEditorExcel(examId, list, renderFn, examType) {
     if (!file) return;
     status.textContent = '⏳ กำลังอ่าน...';
     try {
-      const data = await parseExcelFile(file, examType);
+      const _w=typeof getWeighted==='function'?getWeighted():false;
+      const data = await parseExcelFile(file, examType, _w);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
 
       // merge เข้า list
@@ -9331,6 +9482,7 @@ function bindEditorExcel(examId, list, renderFn, examType) {
           q.correct = row.correct;
           q.isFree = !!row.isFree;
           if(row.topic) q.topic = row.topic;
+          if(row.points!=null) q.points = row.points;
           updated++;
         }
       });
@@ -12164,7 +12316,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.49';
+  const CURRENT_VERSION = 'v47.50';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
