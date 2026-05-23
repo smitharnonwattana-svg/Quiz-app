@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.62 -->
+  <!-- APP_VERSION: v47.63 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.62</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.63</div>
     </div>
   </div>
 </div>
@@ -6375,14 +6375,40 @@ function initStats(){
     if(!attempts.length){el.innerHTML='';return;}
     const total=attempts.length;
     const avgPct=Math.round(attempts.reduce((s,a)=>s+(a.total?((a.score||0)/a.total)*100:0),0)/total);
-    const best=attempts.reduce((b,a)=>(!b||(a.total&&(a.score/a.total)>(b.score/b.total)))?a:b,null);
     const totalSec=attempts.reduce((s,a)=>s+(a.usedSeconds||0),0);
     const _th=Math.floor(totalSec/3600),_tm=Math.floor((totalSec%3600)/60);
     const totalTimeStr=_th>0?`${_th} ชม. ${_tm} นาที`:`${_tm} นาที`;
+
+    // ── หาวิชาที่ % ต่ำสุด (จุดอ่อน) ──
+    const _subjStats={};
+    attempts.forEach(a=>{
+      const subj=a.examSubject||'ไม่ระบุ';
+      if(!_subjStats[subj]) _subjStats[subj]={sum:0,total:0};
+      _subjStats[subj].sum+=(a.score||0);
+      _subjStats[subj].total+=(a.total||0);
+    });
+    const _subjPcts=Object.entries(_subjStats)
+      .filter(([,v])=>v.total>0)
+      .map(([s,v])=>({subj:s,pct:Math.round(v.sum/v.total*100)}))
+      .sort((a,b)=>a.pct-b.pct);
+    const _weakest=_subjPcts[0];
+
+    // นับ "ข้อรอแก้" ของวิชานี้จาก WeaknessTracker
+    let _weakCount=0;
+    const _curName=Auth.isTeacher()?currentStudentFilter:(Auth.getName()||'');
+    if(_weakest && _curName && _curName!=='all' && typeof WeaknessTracker!=='undefined'){
+      const _store=Store.load();
+      const _aw=WeaknessTracker.getActiveWeaknessesForUser(_curName)||[];
+      _weakCount=_aw.filter(w=>{
+        const ex=(_store.exams||[]).find(e=>e.id===w.examId);
+        return ex && (ex.subject||'ไม่ระบุ')===_weakest.subj;
+      }).length;
+    }
+
     const cards=[
       {label:'ทำทั้งหมด',value:total+' ครั้ง',sub:'ทุกชุดรวมกัน',accent:false},
       {label:'คะแนนเฉลี่ย',value:avgPct+'%',sub:`${attempts.reduce((s,a)=>s+(a.score||0),0)} / ${attempts.reduce((s,a)=>s+(a.total||0),0)} คะแนน`,accent:false},
-      {label:'ทำดีที่สุด',value:best?(Math.round((best.score/best.total)*100))+'%':'—',sub:best?esc(best.examTitle||'—'):'',accent:false},
+      {label:'🎯 ต้องเน้น',value:_weakest?esc(_weakest.subj):'—',sub:_weakest?`${_weakest.pct}%${_weakCount?` • ${_weakCount} ข้อรอแก้`:''}`:'',accent:false},
       {label:'เวลาฝึกรวม',value:totalTimeStr,sub:'ทุกชุดรวมกัน',accent:false},
     ];
     el.innerHTML=cards.map(c=>`
@@ -12565,7 +12591,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.62';
+  const CURRENT_VERSION = 'v47.63';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
