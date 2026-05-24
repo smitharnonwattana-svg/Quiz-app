@@ -125,3 +125,25 @@ git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 - Re-read your output before saying it's complete
 - Check that every requirement from the spec is addressed
 - If you skipped something, say so explicitly — don't silently omit
+
+---
+
+## Skills ที่ควรเรียกใช้
+
+ระหว่าง session ให้เรียก skill เหล่านี้เมื่อ context ตรง (proactive ไม่ต้องรอ user ขอ)
+
+### โปรเจกต์นี้ — ใช้บ่อย
+- **single-file-spa** — ก่อนเพิ่มฟีเจอร์ใหม่ที่มีอยากแยกไฟล์ JS/CSS (Quiz-app เป็น single-file ตาม design ห้ามแตก)
+- **legacy-data-fallback** — เมื่อเพิ่ม field ใหม่ใน schema (`localStorage`, attempt, question, exam) — ใช้ `||` fallback ที่ read time เสมอ (เคย apply: `examType||'mc'`, `q.points||1`, `att.weighted===true`)
+- **learning-analytics-design** — เมื่อออกแบบ/ปรับเมตริก (calibration, mood, anxiety markers, difficulty, weakness recovery) ก่อนเขียนโค้ด
+- **classlist-toggle-pattern** — เมื่อต้องเปลี่ยน 1 CSS class บน element ที่มี class อื่นด้วย (ใช้ `classList.toggle/add/remove` ไม่ใช่ `className=`)
+- **reactive-state-persistence** — เมื่อแก้ฟังก์ชันที่ Firestore listenDoc อาจ re-trigger (มี `_statsState`, `_dashState` แล้ว — อย่าให้ filter reset ตอน listener ยิงซ้ำ)
+- **pwa-version-polling** — เมื่อแก้ระบบเวอร์ชัน/auto-reload (Quiz-app ใช้ pattern นี้แล้วผ่าน `version.json`)
+
+### On-demand — เรียกตามจังหวะ
+- **scrutinize** — ก่อน wrap up session ที่ทำหลาย versions ติด (≥5 commits) → ตรวจ "ทำ simpler ได้ไหม" + verify end-to-end (ใช้ก่อน user ไปทดสอบ)
+- **debug-mantra** — เจอบัคที่หา root cause ไม่เจอใน 2-3 hypothesis → บังคับ reproduce reliably ก่อนเดา (ตัวอย่าง: ถ้าใช้ตอน pinch zoom รอบ 1 อาจไม่ iterate 5 รอบ)
+
+### Skip — ไม่เหมาะกับ context นี้
+- post-mortem (commit message ละเอียดอยู่แล้ว, solo dev ไม่ต้อง ceremony)
+- management-talk (ไม่มี VP/exec audience)
