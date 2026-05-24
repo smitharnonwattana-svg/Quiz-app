@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.63 -->
+  <!-- APP_VERSION: v47.64 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.63</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.64</div>
     </div>
   </div>
 </div>
@@ -3618,9 +3618,9 @@ function renderHome(){
           <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn" onclick="_testSync()" style="font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
-          <button class="btn" onclick="_diagnoseSync()" style="font-size:12px;color:#0891b2;border-color:#67e8f9;">🔍 diagnose</button>
-          <button class="btn" onclick="_forcePullFromCloud()" style="font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
+          <button class="btn" onclick="_testSync()" style="display:none;font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
+          <button class="btn" onclick="_diagnoseSync()" style="display:none;font-size:12px;color:#0891b2;border-color:#67e8f9;">🔍 diagnose</button>
+          <button class="btn" onclick="_forcePullFromCloud()" style="display:none;font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
           <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
         </div>
       </div>
@@ -12591,7 +12591,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.63';
+  const CURRENT_VERSION = 'v47.64';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
