@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.65 -->
+  <!-- APP_VERSION: v47.66 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.65</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.66</div>
     </div>
   </div>
 </div>
@@ -1804,7 +1804,7 @@
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <input id="editorPdfUrl" class="titleInput" type="text" placeholder="วาง URL (Google Drive / HTTPS)" style="flex:1;min-width:100px;" />
                 <button class="btn" id="editorPdfUrlBtn" type="button" title="ยืนยัน URL" style="padding:8px 14px;font-weight:700;">✓</button>
-                <label class="btn" style="cursor:pointer;padding:8px 12px;" title="อัปโหลด PDF">📎<input id="editorPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+                <label class="btn" style="cursor:pointer;padding:8px 12px;font-weight:700;" title="อัปโหลด PDF จากเครื่อง">📎 อัปโหลด<input id="editorPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
               </div>
               <div id="editorPdfStatus" class="muted" style="font-size:12px;min-height:16px;"></div>
             </div>
@@ -1813,7 +1813,7 @@
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <input id="editorAnswerPdfUrl" class="titleInput" type="text" placeholder="วาง URL หรืออัปโหลด" style="flex:1;min-width:100px;" />
                 <button class="btn" id="editorAnswerPdfUrlBtn" type="button" title="ยืนยัน URL" style="padding:8px 14px;font-weight:700;">✓</button>
-                <label class="btn" style="cursor:pointer;padding:8px 12px;" title="อัปโหลด PDF เฉลย">📎<input id="editorAnswerPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+                <label class="btn" style="cursor:pointer;padding:8px 12px;font-weight:700;" title="อัปโหลด PDF เฉลย จากเครื่อง">📎 อัปโหลด<input id="editorAnswerPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
               </div>
               <div id="editorAnswerPdfStatus" class="muted" style="font-size:12px;min-height:16px;"></div>
             </div>
@@ -12591,7 +12591,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.65';
+  const CURRENT_VERSION = 'v47.66';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
