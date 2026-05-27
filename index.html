@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.66 -->
+  <!-- APP_VERSION: v47.67 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.66</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.67</div>
     </div>
   </div>
 </div>
@@ -1434,6 +1434,9 @@
         <div class="linkCard" onclick="navigate('admin_members')">
           <div style="font-weight:900;">👥 จัดการสมาชิก</div>
         </div>
+        <div class="linkCard" onclick="navigate('admin_rewards')">
+          <div style="font-weight:900;">🏆 จัดการรางวัล</div>
+        </div>
         <div class="linkCard" onclick="navigate('admin_memes')">
           <div style="font-weight:900;">🎭 จัดการมีม</div>
         </div>
@@ -1511,6 +1514,31 @@
       </div>
       <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
       <div id="memberTbody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ADMIN REWARDS ===================== -->
+<div id="page-admin_rewards" class="page">
+  <div class="container" style="max-width:800px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1">🏆 จัดการรางวัล</h1>
+        <div class="muted" style="margin-top:4px;font-size:13px;">ตั้งชื่อรางวัล Study Road + มอบรางวัลที่นักเรียนรอรับ</div>
+      </div>
+      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+    </div>
+
+    <!-- Pending tier claims (inbox) -->
+    <div class="card" style="margin-top:16px;padding:16px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🎁 รายการรอมอบ <span id="adminRewardsPendingCount" style="font-size:12px;color:#6b7280;font-weight:600;"></span></div>
+      <div id="adminRewardsPendingList"></div>
+    </div>
+
+    <!-- Study Road config -->
+    <div class="card" style="margin-top:14px;padding:16px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🗺️ Study Road — ชื่อรางวัลแต่ละระดับ</div>
+      <div id="adminRewardsStudyRoad"></div>
     </div>
   </div>
 </div>
@@ -4098,6 +4126,7 @@ function navigate(page, params={}){
   else if(page==='admin_exams'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminExams(); }
   else if(page==='admin_memes'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMemes(); }
   else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
+  else if(page==='admin_rewards'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminRewards(); }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
@@ -8440,43 +8469,38 @@ function renderRewardsFor(userId) {
   }
 }
 
-function initAdminMembers(){
+// ── ADMIN REWARDS PAGE — Study Road config + pending tier claims ──
+const REWARD_TIERS = [
+  { key: '100',       label: '⚡ Scholar' },
+  { key: '300',       label: '🔥 Pro' },
+  { key: '600',       label: '💎 Elite' },
+  { key: '1000',      label: '👑 Legend' },
+  { key: 'stamps_3',  label: '🥉 Stamp Milestone 1 (3 stamps)' },
+  { key: 'stamps_7',  label: '🥈 Stamp Milestone 2 (7 stamps)' },
+  { key: 'stamps_15', label: '🥇 Stamp Milestone 3 (15 stamps)' }
+];
+const REWARD_TIER_LABELS = {
+  '100':'⚡ Scholar','300':'🔥 Pro','600':'💎 Elite','1000':'👑 Legend',
+  'stamps_3':'🥉 Stamp Milestone 1','stamps_7':'🥈 Stamp Milestone 2','stamps_15':'🥇 Stamp Milestone 3'
+};
+
+function initAdminRewards(){
   if(!Auth.isTeacher()){navigate('home');return;}
 
-  // Gamification G3: Study Road Admin UI — inject once above #memberTbody
-  function renderStudyRoadSettings() {
-    const tbody = document.getElementById('memberTbody');
-    if (!tbody || !tbody.parentNode) return;
-    let host = document.getElementById('studyRoadSettings');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'studyRoadSettings';
-      host.style.cssText = 'background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:4px 0 14px;';
-      tbody.parentNode.insertBefore(host, tbody);
-    }
-    // Trophy Road UI — G6
-    const tiers = [
-      { key: '100',       label: '⚡ Scholar' },
-      { key: '300',       label: '🔥 Pro' },
-      { key: '600',       label: '💎 Elite' },
-      { key: '1000',      label: '👑 Legend' },
-      { key: 'stamps_3',  label: '🥉 Stamp Milestone 1 (3 stamps)' },
-      { key: 'stamps_7',  label: '🥈 Stamp Milestone 2 (7 stamps)' },
-      { key: 'stamps_15', label: '🥇 Stamp Milestone 3 (15 stamps)' }
-    ];
+  function _renderStudyRoadConfig(){
+    const host = document.getElementById('adminRewardsStudyRoad');
+    if(!host) return;
     const rewards = getStudyRoadRewards();
     const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    host.innerHTML =
-      '<div style="font-weight:800;font-size:14px;margin-bottom:8px;">🗺️ Study Road — รางวัลแต่ละระดับ</div>' +
-      tiers.map(t => {
-        const v = escAttr(rewards[t.key] || '');
-        const head = /^\d+$/.test(t.key) ? (t.key + ' pt → ' + t.label) : t.label;
-        return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;">' +
-                 '<div style="min-width:130px;font-weight:700;font-size:13px;color:#374151;">' + head + '</div>' +
-                 '<input class="titleInput" type="text" placeholder="ชื่อรางวัล" style="flex:1;min-width:160px;" data-srtier="' + t.key + '" value="' + v + '" />' +
-                 '<button type="button" class="btn" data-srsave="' + t.key + '">บันทึก</button>' +
-               '</div>';
-      }).join('');
+    host.innerHTML = REWARD_TIERS.map(t => {
+      const v = escAttr(rewards[t.key] || '');
+      const head = /^\d+$/.test(t.key) ? (t.key + ' pt → ' + t.label) : t.label;
+      return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;">' +
+               '<div style="min-width:160px;font-weight:700;font-size:13px;color:#374151;">' + head + '</div>' +
+               '<input class="titleInput" type="text" placeholder="ชื่อรางวัล" style="flex:1;min-width:160px;" data-srtier="' + t.key + '" value="' + v + '" />' +
+               '<button type="button" class="btn" data-srsave="' + t.key + '">บันทึก</button>' +
+             '</div>';
+    }).join('');
     host.querySelectorAll('[data-srsave]').forEach(btn => {
       btn.onclick = () => {
         const tier = btn.getAttribute('data-srsave');
@@ -8488,12 +8512,71 @@ function initAdminMembers(){
     });
   }
 
+  function _renderPendingClaims(){
+    const host = document.getElementById('adminRewardsPendingList');
+    const counterEl = document.getElementById('adminRewardsPendingCount');
+    if(!host) return;
+    const s = Store.load();
+    const members = s.members || [];
+    const srRewards = (typeof getStudyRoadRewards === 'function') ? getStudyRoadRewards() : {};
+    // รวบรวมรายการรอมอบ — group ตามคน
+    const groups = [];
+    members.forEach(m => {
+      const gRec = (typeof _getGamificationUser === 'function') ? _getGamificationUser(m.name) : null;
+      const pendingKeys = (gRec && Array.isArray(gRec.pendingTiers)) ? gRec.pendingTiers : [];
+      if(pendingKeys.length){
+        groups.push({name: m.name, keys: pendingKeys});
+      }
+    });
+    if(counterEl) counterEl.textContent = groups.length ? `(${groups.reduce((s,g)=>s+g.keys.length,0)} รายการ)` : '— ไม่มี';
+    if(!groups.length){
+      host.innerHTML = '<div class="muted" style="padding:16px;text-align:center;font-size:13px;">🎉 ไม่มีรายการรอมอบ — นักเรียนทุกคนได้รับรางวัลครบแล้ว</div>';
+      return;
+    }
+    host.innerHTML = groups.map(g => {
+      const items = g.keys.map(k => {
+        const lbl = REWARD_TIER_LABELS[k] || k;
+        const rwd = srRewards[k] || '';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:6px 0;border-bottom:1px solid #fde68a;">
+          <div style="min-width:0;flex:1;">
+            <span style="font-weight:700;font-size:13px;">${lbl}</span>
+            ${rwd ? '<span style="font-size:12px;color:#92400e;margin-left:6px;">🎁 ' + esc(rwd) + '</span>' : '<span class="muted" style="font-size:11px;margin-left:6px;">(ยังไม่ตั้งชื่อรางวัล)</span>'}
+          </div>
+          <button type="button" class="btn" style="padding:4px 12px;font-size:12px;border-color:#16a34a;color:#15803d;font-weight:700;" data-admin-claim="${k}" data-claim-user="${esc(g.name)}">มอบแล้ว ✓</button>
+        </div>`;
+      }).join('');
+      return `<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+        <div style="font-weight:800;font-size:14px;margin-bottom:6px;color:#92400e;">👤 ${esc(g.name)} <span style="font-size:11px;color:#b45309;font-weight:600;">(${g.keys.length} รายการ)</span></div>
+        ${items}
+      </div>`;
+    }).join('');
+    host.querySelectorAll('[data-admin-claim]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tierKey = btn.getAttribute('data-admin-claim');
+        const targetUser = btn.getAttribute('data-claim-user');
+        const res = adminClaimTierReward(targetUser, tierKey);
+        if (res && res.ok) {
+          toast('✅ มอบรางวัล ' + (REWARD_TIER_LABELS[tierKey] || tierKey) + ' ให้ "' + targetUser + '" แล้ว');
+          _renderPendingClaims();
+        } else {
+          toast('⚠️ ไม่สำเร็จ: ' + ((res && res.reason) || ''));
+        }
+      });
+    });
+  }
+
+  _renderStudyRoadConfig();
+  _renderPendingClaims();
+}
+
+function initAdminMembers(){
+  if(!Auth.isTeacher()){navigate('home');return;}
+
   function renderMembers() {
     const s = Store.load();
     const members = s.members || [{pin:'311257',name:'ณนนท์'}];
     const tbody = document.getElementById('memberTbody');
     if (!tbody) return;
-    renderStudyRoadSettings();
     tbody.innerHTML = '';
     // Focus Subjects UI — Stage 5
     const validSubjects = (typeof _getValidSubjects === 'function') ? _getValidSubjects() : [];
@@ -8587,45 +8670,6 @@ function initAdminMembers(){
           toast((!_current ? '🔔' : '🔕') + ' LINE ' + (!_current ? 'เปิด' : 'ปิด') + ' สำหรับ ' + m.name);
           renderMembers();
         };
-      }
-
-      // G7: Pending tier rewards box
-      const gRec = (typeof _getGamificationUser === 'function') ? _getGamificationUser(m.name) : null;
-      const pendingKeys = (gRec && Array.isArray(gRec.pendingTiers)) ? gRec.pendingTiers : [];
-      if (pendingKeys.length > 0) {
-        const adminTierLabelMap = {
-          '100':'⚡ Scholar','300':'🔥 Pro','600':'💎 Elite','1000':'👑 Legend',
-          'stamps_3':'🥉 Stamp Milestone 1','stamps_7':'🥈 Stamp Milestone 2','stamps_15':'🥇 Stamp Milestone 3'
-        };
-        const srRewards = (typeof getStudyRoadRewards === 'function') ? getStudyRoadRewards() : {};
-        const pendingBox = document.createElement('div');
-        pendingBox.style.cssText = 'background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:10px 12px;margin:0 0 8px;';
-        const pendingItems = pendingKeys.map(k => {
-          const lbl = adminTierLabelMap[k] || k;
-          const rwd = srRewards[k] || '';
-          return `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:4px 0;border-bottom:1px solid #fde68a;">
-            <div>
-              <span style="font-weight:700;font-size:13px;">${lbl}</span>
-              ${rwd ? '<span style="font-size:12px;color:#92400e;margin-left:6px;">🎁 ' + rwd + '</span>' : ''}
-            </div>
-            <button type="button" class="btn" style="padding:3px 10px;font-size:12px;border-color:#16a34a;color:#15803d;" data-admin-claim="${k}" data-claim-user="${m.name}">มอบแล้ว ✓</button>
-          </div>`;
-        }).join('');
-        pendingBox.innerHTML = `<div style="font-weight:800;font-size:13px;margin-bottom:6px;">🎁 รอรับรางวัล (${pendingKeys.length})</div>` + pendingItems;
-        tbody.appendChild(pendingBox);
-        pendingBox.querySelectorAll('[data-admin-claim]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const tierKey = btn.getAttribute('data-admin-claim');
-            const targetUser = btn.getAttribute('data-claim-user');
-            const res = adminClaimTierReward(targetUser, tierKey);
-            if (res && res.ok) {
-              toast('✅ มอบรางวัล ' + (adminTierLabelMap[tierKey] || tierKey) + ' ให้ "' + targetUser + '" แล้ว');
-              renderMembers();
-            } else {
-              toast('⚠️ ไม่สำเร็จ: ' + ((res && res.reason) || ''));
-            }
-          });
-        });
       }
 
       // Wire up checkbox enforcement (max 2)
@@ -12591,7 +12635,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.66';
+  const CURRENT_VERSION = 'v47.67';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
