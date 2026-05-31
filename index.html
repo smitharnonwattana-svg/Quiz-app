@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.67 -->
+  <!-- APP_VERSION: v47.68 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.67</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.68</div>
     </div>
   </div>
 </div>
@@ -1533,6 +1533,13 @@
     <div class="card" style="margin-top:16px;padding:16px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🎁 รายการรอมอบ <span id="adminRewardsPendingCount" style="font-size:12px;color:#6b7280;font-weight:600;"></span></div>
       <div id="adminRewardsPendingList"></div>
+    </div>
+
+    <!-- Per-student progress: Trophy Road + Stamp Road + Admin Tools -->
+    <div class="card" style="margin-top:14px;padding:16px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">👤 ความคืบหน้านักเรียน</div>
+      <div id="adminRewardsStudentTabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+      <div id="adminRewardsStudentView"></div>
     </div>
 
     <!-- Study Road config -->
@@ -8045,11 +8052,13 @@ function initRewards() {
   });
 }
 
-function renderRewardsFor(userId) {
-  const bodyEl = document.getElementById('rewardsBody');
-  if (!bodyEl) return;
-  let host = document.getElementById('rewardsContent');
+function renderRewardsFor(userId, opts) {
+  opts = opts || {};
+  const showAdminTools = !!opts.adminTools;
+  let host = opts.host || document.getElementById('rewardsContent');
   if (!host) {
+    const bodyEl = document.getElementById('rewardsBody');
+    if (!bodyEl) return;
     host = document.createElement('div');
     host.id = 'rewardsContent';
     bodyEl.appendChild(host);
@@ -8322,7 +8331,7 @@ function renderRewardsFor(userId) {
       const result = requestTierReward(userId, key);
       if (result && result.ok) {
         toast('📨 แจ้ง Admin แล้ว รอรับรางวัล 🕐');
-        renderRewardsFor(userId);
+        renderRewardsFor(userId, opts);
       } else {
         toast('⚠️ ' + ((result && result.reason) || 'ไม่สำเร็จ'));
       }
@@ -8336,7 +8345,7 @@ function renderRewardsFor(userId) {
       const result = claimQuestReward(userId);
       if (result && result.ok) {
         toast('🎉 รับ +' + result.pointsAwarded + 'pt แล้ว!');
-        renderRewardsFor(userId);
+        renderRewardsFor(userId, opts);
       }
     });
   }
@@ -8349,14 +8358,14 @@ function renderRewardsFor(userId) {
         const result = claimBonusQuestReward(userId, tier);
         if (result && result.ok) {
           toast('🎉 รับ +' + result.pointsAwarded + 'pt แล้ว!');
-          renderRewardsFor(userId);
+          renderRewardsFor(userId, opts);
         }
       });
     }
   });
 
-  // Admin Tools Panel — teacher only
-  if (Auth.isTeacher()) {
+  // Admin Tools Panel — shown only when explicitly requested (admin_rewards page)
+  if (showAdminTools) {
     const adminToolsDiv = document.createElement('div');
     adminToolsDiv.style.cssText =
       'background:#f9fafb;border:1px solid #e5e7eb;' +
@@ -8384,7 +8393,7 @@ function renderRewardsFor(userId) {
     adminToolsDiv.querySelector('#rt_addPt').onclick = () => {
       awardPoints(userId, 1, 'admin_test');
       toast('🧪 +1pt ให้ ' + userId);
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     adminToolsDiv.querySelector('#rt_addStamp').onclick = () => {
@@ -8395,7 +8404,7 @@ function renderRewardsFor(userId) {
         lastStampDate: getDateKey(new Date())
       });
       toast('🧪 +1 stamp ให้ ' + userId);
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     adminToolsDiv.querySelector('#rt_resetPts').onclick = () => {
@@ -8403,7 +8412,7 @@ function renderRewardsFor(userId) {
       const cur = _getGamificationUser(userId);
       _saveGamificationUser(userId, { ...cur, points: 0, lastPointDate: '' });
       toast('✅ Reset Points ของ ' + userId);
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     adminToolsDiv.querySelector('#rt_resetTrophy').onclick = () => {
@@ -8415,7 +8424,7 @@ function renderRewardsFor(userId) {
         pendingTiers: (cur.pendingTiers||[]).filter(k => !trophyKeys.includes(k))
       });
       toast('✅ Reset Trophy ของ ' + userId);
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     adminToolsDiv.querySelector('#rt_resetStamps').onclick = () => {
@@ -8427,7 +8436,7 @@ function renderRewardsFor(userId) {
         pendingTiers: (cur.pendingTiers||[]).filter(k => !stampKeys.includes(k))
       });
       toast('✅ Reset Stamps ของ ' + userId);
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     adminToolsDiv.querySelector('#rt_resetQuests').onclick = () => {
@@ -8439,7 +8448,7 @@ function renderRewardsFor(userId) {
         questSalt: (Number(cur.questSalt) || 0) + 1
       });
       toast('✅ Reset Quests ของ ' + userId);
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     adminToolsDiv.querySelector('#rt_completeQuests').onclick = () => {
@@ -8462,11 +8471,13 @@ function renderRewardsFor(userId) {
         ...cur, bonusQuests: updatedBonus, dailyQuest: updatedMain
       });
       toast('🧪 Complete Quests ของ ' + userId + ' แล้ว');
-      renderRewardsFor(userId);
+      renderRewardsFor(userId, opts);
     };
 
     host.appendChild(adminToolsDiv);
   }
+
+  if (typeof opts.afterRender === 'function') opts.afterRender();
 }
 
 // ── ADMIN REWARDS PAGE — Study Road config + pending tier claims ──
@@ -8565,8 +8576,38 @@ function initAdminRewards(){
     });
   }
 
+  // Per-student progress view — reuse renderRewardsFor (Trophy/Stamp Road + Admin Tools)
+  function _renderStudentView(){
+    const tabsHost = document.getElementById('adminRewardsStudentTabs');
+    const viewHost = document.getElementById('adminRewardsStudentView');
+    if(!tabsHost || !viewHost) return;
+    const members = (typeof Auth.getMembers === 'function') ? (Auth.getMembers() || []) : [];
+    if(!members.length){
+      tabsHost.innerHTML = '';
+      viewHost.innerHTML = '<div class="muted" style="padding:16px;text-align:center;font-size:13px;">ยังไม่มีสมาชิก</div>';
+      return;
+    }
+    const tabStyle = (active) => (active
+      ? 'background:#111;color:#fff;border:1px solid #111;'
+      : 'background:#fff;color:#111;border:1px solid #d1d5db;')
+      + 'padding:6px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;';
+    const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    function show(name){
+      Array.from(tabsHost.children).forEach(b => { b.style.cssText = tabStyle(b.getAttribute('data-name') === name); });
+      renderRewardsFor(name, { host: viewHost, adminTools: true, afterRender: _renderPendingClaims });
+    }
+    tabsHost.innerHTML = members.map((mb,i) =>
+      '<button type="button" data-name="' + esc(mb.name) + '" style="' + tabStyle(i===0) + '">' + esc(mb.name) + '</button>'
+    ).join('');
+    Array.from(tabsHost.children).forEach(btn => {
+      btn.addEventListener('click', () => show(btn.getAttribute('data-name')));
+    });
+    show(members[0].name);
+  }
+
   _renderStudyRoadConfig();
   _renderPendingClaims();
+  _renderStudentView();
 }
 
 function initAdminMembers(){
@@ -12635,7 +12676,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.67';
+  const CURRENT_VERSION = 'v47.68';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
