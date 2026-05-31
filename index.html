@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.69 -->
+  <!-- APP_VERSION: v47.70 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.69</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.70</div>
     </div>
   </div>
 </div>
@@ -8612,61 +8612,79 @@ function initAdminRewards(){
     show(members[0].name);
   }
 
-  // Daily Quest config editor — edit reward/target/description + enable toggle (main + bonus)
+  // Daily Quest config editor — Main: edit target/reward per coach-rec type; Bonus: edit desc/target/reward + enable toggle
   function _renderQuestConfig(){
     const host = document.getElementById('adminRewardsQuestConfig');
     if(!host) return;
     const cfg = getQuestConfig();
     const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    const tierBadge = (tier) => {
-      if(!tier) return '';
-      const c = { easy:'#16a34a', medium:'#b45309', challenge:'#dc2626' }[tier] || '#6b7280';
-      return '<span style="font-size:10px;font-weight:800;color:' + c + ';border:1px solid ' + c + ';border-radius:6px;padding:1px 5px;margin-right:6px;">' + tier + '</span>';
-    };
-    const rowHtml = (r) => {
-      return '<div class="qcfgRow" data-type="' + escAttr(r.type) + '" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #f1f5f9;' + (r.enabled ? '' : 'opacity:0.5;') + '">' +
-        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="เปิด/ปิดเควสนี้">' +
-          '<input type="checkbox" class="qcfgEn" ' + (r.enabled ? 'checked' : '') + ' />' +
-        '</label>' +
-        tierBadge(r.tier) +
-        '<input class="titleInput qcfgDesc" type="text" value="' + escAttr(r.description) + '" style="flex:1;min-width:180px;font-size:13px;" />' +
-        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">เป้า<input class="titleInput qcfgTarget" type="number" min="1" value="' + r.target + '" style="width:56px;font-size:13px;" /></label>' +
-        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">รางวัล<input class="titleInput qcfgReward" type="number" min="0" value="' + r.reward + '" style="width:64px;font-size:13px;" />pt</label>' +
-      '</div>';
-    };
-    const mainRows = _questEditorRows(MAIN_QUEST_POOL, cfg.main);
-    const bonusRows = _questEditorRows(BONUS_QUEST_POOL, cfg.bonus);
-    host.innerHTML =
-      '<div style="font-weight:700;font-size:13px;color:#374151;margin:4px 0 2px;">📌 Main Quest (สุ่มวันละ 1)</div>' +
-      '<div data-qgroup="main">' + mainRows.map(rowHtml).join('') + '</div>' +
-      '<div style="font-weight:700;font-size:13px;color:#374151;margin:14px 0 2px;">⭐ Bonus Quest (สุ่มวันละ 3 — easy/medium/challenge อย่างละ 1)</div>' +
-      '<div data-qgroup="bonus">' + bonusRows.map(rowHtml).join('') + '</div>' +
-      '<div style="display:flex;justify-content:flex-end;margin-top:14px;">' +
-        '<button type="button" class="btn btnPrimary" id="qcfgSaveAll">💾 บันทึกทั้งหมด</button>' +
-      '</div>';
+    const tierColor = { easy:'#16a34a', medium:'#b45309', challenge:'#dc2626' };
 
-    const collectGroup = (groupName) => {
-      const out = {};
-      host.querySelectorAll('[data-qgroup="' + groupName + '"] .qcfgRow').forEach(row => {
-        const type = row.getAttribute('data-type');
-        const enabled = row.querySelector('.qcfgEn').checked;
-        const description = String(row.querySelector('.qcfgDesc').value || '').trim();
-        let target = parseInt(row.querySelector('.qcfgTarget').value, 10);
-        let reward = parseInt(row.querySelector('.qcfgReward').value, 10);
-        target = (isNaN(target) || target < 1) ? 1 : target;
-        reward = (isNaN(reward) || reward < 0) ? 0 : reward;
-        out[type] = { enabled, description, target, reward };
-      });
-      return out;
+    // Main quest rows — target + reward only (description is auto-generated from the student's weakness)
+    const mainRowHtml = (d) => {
+      const o = (cfg.main && cfg.main[d.type]) || {};
+      const tgt = (typeof o.target === 'number' && o.target >= 1) ? o.target : d.target;
+      const rwd = (typeof o.reward === 'number' && o.reward >= 0) ? o.reward : d.reward;
+      return '<div class="qcfgRow" data-type="' + escAttr(d.type) + '" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
+        '<div style="flex:1;min-width:160px;font-size:13px;font-weight:600;color:#374151;">' + escAttr(d.label) + '</div>' +
+        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">เป้า<input class="titleInput qcfgTarget" type="number" min="1" value="' + tgt + '" style="width:56px;font-size:13px;" /></label>' +
+        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">รางวัล<input class="titleInput qcfgReward" type="number" min="0" value="' + rwd + '" style="width:64px;font-size:13px;" />pt</label>' +
+      '</div>';
     };
+
+    // Bonus quest rows — enable + description + target + reward
+    const bonusRowHtml = (def) => {
+      const o = (cfg.bonus && cfg.bonus[def.type]) || {};
+      const en = (o.enabled !== false);
+      const desc = (o.description != null && o.description !== '') ? o.description : def.description;
+      const tgt = (typeof o.target === 'number' && o.target >= 1) ? o.target : def.target;
+      const rwd = (typeof o.reward === 'number' && o.reward >= 0) ? o.reward : def.reward;
+      return '<div class="qcfgRow" data-type="' + escAttr(def.type) + '" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #f1f5f9;' + (en ? '' : 'opacity:0.5;') + '">' +
+        '<label style="cursor:pointer;" title="เปิด/ปิดเควสนี้"><input type="checkbox" class="qcfgEn" ' + (en ? 'checked' : '') + ' /></label>' +
+        '<input class="titleInput qcfgDesc" type="text" value="' + escAttr(desc) + '" style="flex:1;min-width:160px;font-size:13px;" />' +
+        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">เป้า<input class="titleInput qcfgTarget" type="number" min="1" value="' + tgt + '" style="width:52px;font-size:13px;" /></label>' +
+        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">รางวัล<input class="titleInput qcfgReward" type="number" min="0" value="' + rwd + '" style="width:60px;font-size:13px;" />pt</label>' +
+      '</div>';
+    };
+
+    let html =
+      '<div style="font-weight:700;font-size:13px;color:#374151;margin:4px 0 2px;">📌 Main Quest <span class="muted" style="font-weight:400;font-size:11px;">(โค้ชเลือกให้ตามจุดอ่อนนักเรียน — ปรับเป้า/รางวัลได้)</span></div>' +
+      '<div data-qgroup="main">' + MAIN_QUEST_DEFS.map(mainRowHtml).join('') + '</div>';
+    ['easy','medium','challenge'].forEach(tier => {
+      html += '<div style="font-weight:700;font-size:13px;color:' + tierColor[tier] + ';margin:14px 0 2px;">⭐ Bonus — ' + tier + '</div>' +
+        '<div data-qgroup="bonus">' + (BONUS_QUEST_POOL[tier] || []).map(bonusRowHtml).join('') + '</div>';
+    });
+    html += '<div style="display:flex;justify-content:flex-end;margin-top:14px;">' +
+      '<button type="button" class="btn btnPrimary" id="qcfgSaveAll">💾 บันทึกทั้งหมด</button></div>';
+    host.innerHTML = html;
 
     const saveBtn = host.querySelector('#qcfgSaveAll');
     if(saveBtn){
       saveBtn.onclick = () => {
-        const mainCfg = collectGroup('main');
-        const enabledMain = Object.values(mainCfg).filter(v => v.enabled).length;
-        if(enabledMain === 0){ toast('⚠️ ต้องเปิด Main Quest อย่างน้อย 1 อัน'); return; }
-        saveQuestConfig({ main: mainCfg, bonus: collectGroup('bonus') });
+        const mainCfg = {};
+        host.querySelectorAll('[data-qgroup="main"] .qcfgRow').forEach(row => {
+          const type = row.getAttribute('data-type');
+          let t = parseInt(row.querySelector('.qcfgTarget').value, 10);
+          let r = parseInt(row.querySelector('.qcfgReward').value, 10);
+          t = (isNaN(t) || t < 1) ? 1 : t;
+          r = (isNaN(r) || r < 0) ? 0 : r;
+          mainCfg[type] = { target: t, reward: r };
+        });
+        const bonusCfg = {};
+        let enabledBonus = 0;
+        host.querySelectorAll('[data-qgroup="bonus"] .qcfgRow').forEach(row => {
+          const type = row.getAttribute('data-type');
+          const enabled = row.querySelector('.qcfgEn').checked;
+          if(enabled) enabledBonus++;
+          const description = String(row.querySelector('.qcfgDesc').value || '').trim();
+          let t = parseInt(row.querySelector('.qcfgTarget').value, 10);
+          let r = parseInt(row.querySelector('.qcfgReward').value, 10);
+          t = (isNaN(t) || t < 1) ? 1 : t;
+          r = (isNaN(r) || r < 0) ? 0 : r;
+          bonusCfg[type] = { enabled, description, target: t, reward: r };
+        });
+        if(enabledBonus === 0){ toast('⚠️ ต้องเปิด Bonus Quest อย่างน้อย 1 อัน'); return; }
+        saveQuestConfig({ main: mainCfg, bonus: bonusCfg });
         toast('✅ บันทึกการตั้งค่า Daily Quest แล้ว');
         _renderQuestConfig();
         _renderStudentView();
@@ -11232,6 +11250,71 @@ function processGamificationAfterSubmit(userId /*, attemptData */) {
   return { pointsAwarded, stampsAwarded: stampResult.newStamps };
 }
 
+// ── Quest config overrides (admin-tunable) — localStorage + fallback to hardcoded defaults ──
+// Main quest comes from the coach recommendation (getCoachRecommendation → rec.type).
+// Admin can tune target/reward per rec.type; description is auto-built from target.
+const MAIN_QUEST_DEFS = [
+  { type:'fix_weakness',   label:'แก้จุดอ่อน (วิชาที่อ่อน)',     target:3, reward:15 },
+  { type:'fix_mistakes',   label:'แก้จุดอ่อนจากชุดล่าสุด',       target:2, reward:10 },
+  { type:'review',         label:'ทบทวน (ทำข้อสอบ)',            target:1, reward:10 },
+  { type:'switch_subject', label:'สลับไปทำอีกวิชา',              target:1, reward:15 },
+  { type:'start',          label:'เริ่มทำข้อสอบวันนี้',          target:1, reward:15 },
+  { type:'default',        label:'ทำข้อสอบเพิ่ม',                target:1, reward:10 }
+];
+
+function getQuestConfig() {
+  try {
+    const raw = localStorage.getItem('questConfig_v1');
+    if (!raw) return { main:{}, bonus:{} };
+    const p = JSON.parse(raw) || {};
+    return { main: p.main || {}, bonus: p.bonus || {} };
+  } catch (e) { return { main:{}, bonus:{} }; }
+}
+function saveQuestConfig(cfg) {
+  try { localStorage.setItem('questConfig_v1', JSON.stringify({ main: cfg.main||{}, bonus: cfg.bonus||{} })); } catch (e) {}
+}
+
+// Effective target/reward for a main quest rec.type (override → default fallback)
+function getMainQuestParams(recType) {
+  const def = MAIN_QUEST_DEFS.find(d => d.type === recType) || { target:1, reward:10 };
+  const o = (getQuestConfig().main || {})[recType] || {};
+  return {
+    target: (typeof o.target === 'number' && o.target >= 1) ? o.target : def.target,
+    reward: (typeof o.reward === 'number' && o.reward >= 0) ? o.reward : def.reward
+  };
+}
+// Build main quest fields (target/reward + auto description that reflects target)
+function _mainQuestFields(recType, subj) {
+  const p = getMainQuestParams(recType);
+  const t = p.target;
+  let description;
+  switch (recType) {
+    case 'fix_weakness':   description = ('แก้จุดอ่อนใน ' + (subj||'') + ' ' + t + ' ข้อ').trim(); break;
+    case 'fix_mistakes':   description = 'แก้จุดอ่อน ' + t + ' ข้อจากชุดล่าสุด'; break;
+    case 'review':         description = 'ทำข้อสอบ ' + t + ' ชุดวันนี้'; break;
+    case 'switch_subject': description = ('ทำข้อสอบวิชา ' + (subj||'') + ' ' + t + ' ชุด').trim(); break;
+    case 'start':          description = 'เริ่มทำข้อสอบ ' + t + ' ชุดวันนี้'; break;
+    default:               description = 'ทำข้อสอบเพิ่มอีก ' + t + ' ชุด'; break;
+  }
+  return { target: t, reward: p.reward, description };
+}
+
+// Bonus quest effective definition (override desc/target/reward + enabled)
+function _effectiveBonusDef(def) {
+  const o = (getQuestConfig().bonus || {})[def.type] || {};
+  return {
+    type: def.type,
+    enabled: (o.enabled !== false),
+    description: (o.description != null && o.description !== '') ? o.description : def.description,
+    target: (typeof o.target === 'number' && o.target >= 1) ? o.target : Number(def.target) || 1,
+    reward: (typeof o.reward === 'number' && o.reward >= 0) ? o.reward : Number(def.reward) || 0
+  };
+}
+// Enabled bonus quests for a tier, overrides applied
+function _effectiveBonusTier(tier) {
+  return (BONUS_QUEST_POOL[tier] || []).map(_effectiveBonusDef).filter(d => d.enabled);
+}
+
 // ===================== GAMIFICATION G2: Daily Quest Engine =====================
 // Pure additive engine. No UI, no submit-flow wiring.
 
@@ -11243,42 +11326,15 @@ function _generateQuestFromRecommendation(userId) {
 
   const today = getDateKey(new Date());
   const subj = rec.subject || null;
-  let target = 1, reward = 10, description = '';
-  switch (rec.type) {
-    case 'fix_weakness':
-      target = 3; reward = 15;
-      description = `แก้จุดอ่อนใน ${subj || ''} 3 ข้อ`.trim();
-      break;
-    case 'fix_mistakes':
-      target = 2; reward = 10;
-      description = 'แก้จุดอ่อน 2 ข้อจากชุดล่าสุด';
-      break;
-    case 'review':
-      target = 1; reward = 10;
-      description = 'ทำข้อสอบ 1 ชุดวันนี้';
-      break;
-    case 'switch_subject':
-      target = 1; reward = 15;
-      description = `ทำข้อสอบวิชา ${subj || ''} 1 ชุด`.trim();
-      break;
-    case 'start':
-      target = 1; reward = 15;
-      description = 'เริ่มทำข้อสอบ 1 ชุดวันนี้';
-      break;
-    case 'default':
-    default:
-      target = 1; reward = 10;
-      description = 'ทำข้อสอบเพิ่มอีก 1 ชุด';
-      break;
-  }
+  const f = _mainQuestFields(rec.type, subj);
   return {
     date: today,
     type: rec.type,
     subject: subj,
-    description,
-    target,
+    description: f.description,
+    target: f.target,
     progress: 0,
-    reward,
+    reward: f.reward,
     claimed: false
   };
 }
@@ -11321,9 +11377,15 @@ function getDailyQuest(userId) {
   let quest = state.dailyQuest;
 
   if (quest && quest.date === todayKey) {
-    const newProgress = _calculateQuestProgress(userId, quest);
-    if (newProgress !== quest.progress) {
-      quest = { ...quest, progress: newProgress };
+    // Live-refresh definition from latest admin config (keep progress/claimed)
+    const f = _mainQuestFields(quest.type, quest.subject);
+    const refreshed = { ...quest, description: f.description, target: f.target, reward: f.reward };
+    const newProgress = _calculateQuestProgress(userId, refreshed);
+    quest = { ...refreshed, progress: newProgress };
+    if (quest.description !== state.dailyQuest.description ||
+        quest.target !== state.dailyQuest.target ||
+        quest.reward !== state.dailyQuest.reward ||
+        quest.progress !== state.dailyQuest.progress) {
       _saveGamificationUser(userId, { ...state, dailyQuest: quest });
     }
     return quest;
@@ -11433,7 +11495,7 @@ function _pickRandomBonusQuests(userId) {
   const _remaining = (_ctx && _ctx.weakness && _ctx.weakness.focusRemaining) || 0;
 
   tiers.forEach((tier, ti) => {
-    const pool = BONUS_QUEST_POOL[tier] || [];
+    const pool = _effectiveBonusTier(tier);
     if (pool.length === 0) return;
     const _gState = _getGamificationUser(userId);
     const _salt = _gState.questSalt || 0;
@@ -11588,14 +11650,26 @@ function getBonusQuests(userId) {
   let quests = Array.isArray(state.bonusQuests) ? state.bonusQuests.slice() : [];
 
   const valid = quests.length === 3 && quests.every(q => q && q.date === todayKey);
+  let defChanged = false;
   if (!valid) {
     quests = _pickRandomBonusQuests(userId);
+  } else {
+    // Live-refresh definition from latest admin config (keep progress/claimed; fix_10_weakness keeps dynamic target)
+    const defMap = {};
+    ['easy','medium','challenge'].forEach(t => _effectiveBonusTier(t).forEach(d => { defMap[d.type] = d; }));
+    quests = quests.map(q => {
+      const d = defMap[q.type];
+      if (!d) return q;
+      const tgt = (q.type === 'fix_10_weakness') ? q.target : d.target;
+      if (q.description !== d.description || q.target !== tgt || q.reward !== d.reward) defChanged = true;
+      return { ...q, description: d.description, target: tgt, reward: d.reward };
+    });
   }
 
   let ctx = null;
   try { ctx = getTodayContext(userId); } catch { ctx = null; }
 
-  let mutated = !valid;
+  let mutated = !valid || defChanged;
   quests = quests.map(q => {
     const progress = _calcBonusQuestProgress(userId, q, ctx);
     if (progress !== q.progress) {
@@ -12746,7 +12820,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.69';
+  const CURRENT_VERSION = 'v47.70';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
