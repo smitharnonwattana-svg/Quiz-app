@@ -1,0 +1,8 @@
+=== git log ===
+6620c83 v47.69 — เพิ่ม Daily Quest config editor ในหน้าจัดการรางวัล
+e9e1229 v47.68 — ย้าย Admin Tools จากหน้า Rewards หลัก → หน้าจัดการรางวัล (admin_rewards)
+2ef017d v47.67 — แยกหน้า admin_rewards (Study Road config + Pending tier claims) ออกจาก admin_members → admin nav เพิ่ม '🏆 จัดการรางวัล' หน้า members สะอาดขึ้นเหลือเฉพาะ member CRUD + per-member action
+=== status ===
+?? _gitstate.txt
+=== branch ===
+claude/analyze-project-structure-Ct2RY
