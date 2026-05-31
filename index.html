@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.68 -->
+  <!-- APP_VERSION: v47.69 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -920,7 +920,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.68</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.69</div>
     </div>
   </div>
 </div>
@@ -1546,6 +1546,13 @@
     <div class="card" style="margin-top:14px;padding:16px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🗺️ Study Road — ชื่อรางวัลแต่ละระดับ</div>
       <div id="adminRewardsStudyRoad"></div>
+    </div>
+
+    <!-- Daily Quest config -->
+    <div class="card" style="margin-top:14px;padding:16px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🎯 ปรับแต่ง Daily Quest</div>
+      <div class="muted" style="font-size:12px;margin-bottom:10px;">แก้รางวัล/เป้า/ข้อความ และเปิด-ปิดแต่ละเควส — มีผลกับทุกคนตั้งแต่เควสรอบถัดไป (เควสที่นักเรียนถืออยู่วันนี้จะอัปเดตค่าให้อัตโนมัติ)</div>
+      <div id="adminRewardsQuestConfig"></div>
     </div>
   </div>
 </div>
@@ -8605,9 +8612,72 @@ function initAdminRewards(){
     show(members[0].name);
   }
 
+  // Daily Quest config editor — edit reward/target/description + enable toggle (main + bonus)
+  function _renderQuestConfig(){
+    const host = document.getElementById('adminRewardsQuestConfig');
+    if(!host) return;
+    const cfg = getQuestConfig();
+    const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const tierBadge = (tier) => {
+      if(!tier) return '';
+      const c = { easy:'#16a34a', medium:'#b45309', challenge:'#dc2626' }[tier] || '#6b7280';
+      return '<span style="font-size:10px;font-weight:800;color:' + c + ';border:1px solid ' + c + ';border-radius:6px;padding:1px 5px;margin-right:6px;">' + tier + '</span>';
+    };
+    const rowHtml = (r) => {
+      return '<div class="qcfgRow" data-type="' + escAttr(r.type) + '" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #f1f5f9;' + (r.enabled ? '' : 'opacity:0.5;') + '">' +
+        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="เปิด/ปิดเควสนี้">' +
+          '<input type="checkbox" class="qcfgEn" ' + (r.enabled ? 'checked' : '') + ' />' +
+        '</label>' +
+        tierBadge(r.tier) +
+        '<input class="titleInput qcfgDesc" type="text" value="' + escAttr(r.description) + '" style="flex:1;min-width:180px;font-size:13px;" />' +
+        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">เป้า<input class="titleInput qcfgTarget" type="number" min="1" value="' + r.target + '" style="width:56px;font-size:13px;" /></label>' +
+        '<label style="font-size:12px;color:#6b7280;display:inline-flex;align-items:center;gap:4px;">รางวัล<input class="titleInput qcfgReward" type="number" min="0" value="' + r.reward + '" style="width:64px;font-size:13px;" />pt</label>' +
+      '</div>';
+    };
+    const mainRows = _questEditorRows(MAIN_QUEST_POOL, cfg.main);
+    const bonusRows = _questEditorRows(BONUS_QUEST_POOL, cfg.bonus);
+    host.innerHTML =
+      '<div style="font-weight:700;font-size:13px;color:#374151;margin:4px 0 2px;">📌 Main Quest (สุ่มวันละ 1)</div>' +
+      '<div data-qgroup="main">' + mainRows.map(rowHtml).join('') + '</div>' +
+      '<div style="font-weight:700;font-size:13px;color:#374151;margin:14px 0 2px;">⭐ Bonus Quest (สุ่มวันละ 3 — easy/medium/challenge อย่างละ 1)</div>' +
+      '<div data-qgroup="bonus">' + bonusRows.map(rowHtml).join('') + '</div>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:14px;">' +
+        '<button type="button" class="btn btnPrimary" id="qcfgSaveAll">💾 บันทึกทั้งหมด</button>' +
+      '</div>';
+
+    const collectGroup = (groupName) => {
+      const out = {};
+      host.querySelectorAll('[data-qgroup="' + groupName + '"] .qcfgRow').forEach(row => {
+        const type = row.getAttribute('data-type');
+        const enabled = row.querySelector('.qcfgEn').checked;
+        const description = String(row.querySelector('.qcfgDesc').value || '').trim();
+        let target = parseInt(row.querySelector('.qcfgTarget').value, 10);
+        let reward = parseInt(row.querySelector('.qcfgReward').value, 10);
+        target = (isNaN(target) || target < 1) ? 1 : target;
+        reward = (isNaN(reward) || reward < 0) ? 0 : reward;
+        out[type] = { enabled, description, target, reward };
+      });
+      return out;
+    };
+
+    const saveBtn = host.querySelector('#qcfgSaveAll');
+    if(saveBtn){
+      saveBtn.onclick = () => {
+        const mainCfg = collectGroup('main');
+        const enabledMain = Object.values(mainCfg).filter(v => v.enabled).length;
+        if(enabledMain === 0){ toast('⚠️ ต้องเปิด Main Quest อย่างน้อย 1 อัน'); return; }
+        saveQuestConfig({ main: mainCfg, bonus: collectGroup('bonus') });
+        toast('✅ บันทึกการตั้งค่า Daily Quest แล้ว');
+        _renderQuestConfig();
+        _renderStudentView();
+      };
+    }
+  }
+
   _renderStudyRoadConfig();
   _renderPendingClaims();
   _renderStudentView();
+  _renderQuestConfig();
 }
 
 function initAdminMembers(){
@@ -12676,7 +12746,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.68';
+  const CURRENT_VERSION = 'v47.69';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
