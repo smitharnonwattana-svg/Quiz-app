@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.70 -->
+  <!-- APP_VERSION: v47.71 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -685,13 +685,24 @@
         width: auto !important;
         padding: 6px 2px !important;
       }
+      /* v47.71 fix: บังคับให้ปุ่ม ก ข ค ง ใช้ grid 4 คอลัมน์ fill 100% ของ cell
+         แก้ปัญหา .correctBtn ที่มี width:34px fixed + padding ล้น overflow ไปทับปุ่ม "ฟรี" */
+      #page-admin_editor table td:nth-child(3) {
+        overflow: hidden !important;
+      }
       #page-admin_editor table td:nth-child(3) .correctBtns {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
         gap: 3px !important;
+        width: 100% !important;
+        min-width: 0 !important;
       }
       #page-admin_editor table td:nth-child(3) .correctBtn {
-        padding: 6px 8px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 6px 0 !important;
         font-size: 13px !important;
-        min-width: 30px !important;
+        box-sizing: border-box !important;
       }
       #page-admin_editor table th:nth-child(4),
       #page-admin_editor table td:nth-child(4) {
@@ -773,9 +784,11 @@
       }
       /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
       #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
-        padding: 5px 6px !important;
+        padding: 5px 0 !important;
         font-size: 12px !important;
-        min-width: 26px !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
       }
       /* compact bar คะแนน controls */
       #editorWeightedBar { padding: 8px 10px !important; gap: 6px !important; }
@@ -920,7 +933,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.70</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.71</div>
     </div>
   </div>
 </div>
@@ -12820,7 +12833,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.70';
+  const CURRENT_VERSION = 'v47.71';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
