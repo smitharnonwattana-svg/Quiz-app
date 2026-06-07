@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.71 -->
+  <!-- APP_VERSION: v47.72 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -933,7 +933,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.71</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.72</div>
     </div>
   </div>
 </div>
@@ -4394,7 +4394,7 @@ function initExams(){
     const _myResume = typeof loadTakeResume === 'function' ? loadTakeResume(_myName) : null;
 
     exams.forEach(e=>{
-      const _examAttempts=allAttempts.filter(a=>a.examId===e.id);
+      const _examAttempts=allAttempts.filter(a=>a.examId===e.id && a.mode!=='weakness_practice');
       const myAttempts=isTeacher?_examAttempts:_examAttempts.filter(a=>(a.takerName||'')===_myName);
       const last=myAttempts[0];
       const bestScore=myAttempts.length?Math.max(...myAttempts.map(a=>a.score)):null;
@@ -12833,7 +12833,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.71';
+  const CURRENT_VERSION = 'v47.72';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
