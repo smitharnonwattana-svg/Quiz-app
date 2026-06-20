@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.83 -->
+  <!-- APP_VERSION: v47.84 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -869,7 +869,7 @@
 
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
-      position: fixed; left: 18px; bottom: 24px;
+      position: fixed; right: 18px; bottom: 24px;
       width: 56px; height: 56px; border-radius: 50%;
       background: #1f2937; color: #fff; border: none;
       font-size: 24px; cursor: pointer; z-index: 8500;
@@ -880,21 +880,22 @@
     #scratchToggleBtn.visible { display: block; }
     #scratchToggleBtn:active { transform: scale(0.95); }
     #scratchPad {
-      position: fixed; top: 0; left: 0;
-      /* ฝั่งซ้าย ครอบพื้นที่ PDF เก็บ right pane (ปุ่ม ส่ง/ออก) ไว้ให้เห็น
-         takeGrid ใน iPad ใช้ 8fr/2fr → right pane กว้าง 20% ของ viewport
-         จำกัด pad max ที่ ~78vw ให้เหลือ right pane มองเห็นได้เสมอ */
-      width: 50vw; max-width: 720px; height: 100vh;
-      background: #fffef9; border-right: 2px solid #1f2937;
-      box-shadow: 8px 0 24px rgba(0,0,0,0.18);
+      /* takeGrid ใน iPad ใช้ 8fr/2fr → right pane (ปุ่ม ส่ง/ออก) กว้าง 20vw
+         anchor pad ที่ right:20vw เพื่อให้สไลด์เข้าระหว่าง PDF กับ right pane
+         right pane มองเห็นเสมอ — ไม่ถูก pad ครอบ */
+      position: fixed; top: 0; right: 20vw;
+      width: 60vw; max-width: 720px; height: 100vh;
+      background: #fffef9; border-left: 2px solid #1f2937;
+      box-shadow: -8px 0 24px rgba(0,0,0,0.18);
       z-index: 9000;
-      transform: translateX(-100%);
+      /* off-screen ทางขวา: เลื่อนเกินตำแหน่งของตัวเอง 100% + offset (20vw) */
+      transform: translateX(calc(100% + 20vw));
       transition: transform .25s ease-out, width .2s ease-out, max-width .2s ease-out;
       display: flex; flex-direction: column;
     }
     #scratchPad.open { transform: translateX(0); }
-    /* .full = เต็มพื้นที่ PDF (78vw) ไม่ครอบ right pane (~20vw) */
-    #scratchPad.full { width: 78vw; max-width: none; }
+    /* .full = เต็มพื้นที่ PDF (80vw) ไม่ครอบ right pane */
+    #scratchPad.full { width: 80vw; max-width: none; }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1008,7 +1009,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.83</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.84</div>
     </div>
   </div>
 </div>
