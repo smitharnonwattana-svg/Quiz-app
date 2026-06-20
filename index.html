@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.75 -->
+  <!-- APP_VERSION: v47.76 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -925,7 +925,16 @@
     #scratchCanvas {
       display: block; width: 100%; height: 100%;
       touch-action: none; cursor: crosshair;
+      -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
     }
+    #scratchCursor {
+      position: absolute; pointer-events: none;
+      border: 1.5px solid #ef4444; border-radius: 50%;
+      background: rgba(239,68,68,0.12);
+      transform: translate(-50%, -50%);
+      display: none; z-index: 10;
+    }
+    #scratchCursor.show { display: block; }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -993,7 +1002,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.75</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.76</div>
     </div>
   </div>
 </div>
@@ -12899,7 +12908,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.75';
+  const CURRENT_VERSION = 'v47.76';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -12977,7 +12986,7 @@ function initEntranceCompare(params) {
       '<button type="button" class="scratch-tool danger" id="scratchClearBtn" style="margin-left:auto;">🗑 ล้าง</button>' +
       '<button type="button" class="scratch-tool" id="scratchCloseBtn">✕</button>' +
     '</div>' +
-    '<div id="scratchCanvasWrap"><canvas id="scratchCanvas"></canvas></div>';
+    '<div id="scratchCanvasWrap"><canvas id="scratchCanvas"></canvas><div id="scratchCursor"></div></div>';
   document.body.appendChild(pad);
 
   const canvas = document.getElementById('scratchCanvas');
@@ -13049,6 +13058,16 @@ function initEntranceCompare(params) {
     ctx.stroke();
     lastX = x; lastY = y;
   }
+  const cursorEl = document.getElementById('scratchCursor');
+  function updateCursor(x, y) {
+    if (tool !== 'eraser') { cursorEl.classList.remove('show'); return; }
+    cursorEl.style.left = x + 'px';
+    cursorEl.style.top = y + 'px';
+    cursorEl.style.width = eraserSize + 'px';
+    cursorEl.style.height = eraserSize + 'px';
+    cursorEl.classList.add('show');
+  }
+  function hideCursor() { cursorEl.classList.remove('show'); }
   function onPointerDown(e) {
     if (e.pointerType !== 'pen') return; // Apple Pencil only — กันนิ้ว/ฝ่ามือ
     e.preventDefault();
@@ -13056,26 +13075,31 @@ function initEntranceCompare(params) {
     const p = getPos(e);
     lastX = p.x; lastY = p.y;
     drawDot(p.x, p.y); // mark start so quick taps/start of stroke ไม่หาย
+    updateCursor(p.x, p.y);
   }
   function onPointerMove(e) {
-    if (!drawing || e.pointerType !== 'pen') return;
+    if (e.pointerType !== 'pen') return;
+    const p = getPos(e);
+    updateCursor(p.x, p.y);
+    if (!drawing) return;
     e.preventDefault();
     // Apple Pencil sample rate สูงมาก (240Hz) — ใช้ coalesced events กันจุดหาย
     const evs = (typeof e.getCoalescedEvents === 'function')
       ? e.getCoalescedEvents() : [e];
     for (let i = 0; i < evs.length; i++) {
-      const p = getPos(evs[i]);
-      drawSegment(p.x, p.y);
+      const ep = getPos(evs[i]);
+      drawSegment(ep.x, ep.y);
     }
   }
   function onPointerUp(e) {
     if (e.pointerType !== 'pen') return;
     drawing = false;
   }
-  canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('pointermove', onPointerMove);
-  canvas.addEventListener('pointerup', onPointerUp);
-  canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('pointerdown', onPointerDown, {passive:false});
+  canvas.addEventListener('pointermove', onPointerMove, {passive:false});
+  canvas.addEventListener('pointerup', onPointerUp, {passive:false});
+  canvas.addEventListener('pointercancel', onPointerUp, {passive:false});
+  canvas.addEventListener('pointerleave', hideCursor);
 
   const eraserSizesEl = document.getElementById('scratchEraserSizes');
   pad.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
@@ -13085,6 +13109,7 @@ function initEntranceCompare(params) {
         x.classList.toggle('active', x === b)
       );
       eraserSizesEl.classList.toggle('show', tool === 'eraser');
+      if (tool !== 'eraser') hideCursor();
     });
   });
   pad.querySelectorAll('.scratch-size').forEach(b => {
