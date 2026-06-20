@@ -12885,48 +12885,9 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.73';
-  const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
-  let _prompted = false;
-
-  async function checkVersion(){
-    if (_prompted) return;
-    try {
-      const res = await fetch(
-        '/Quiz-app/version.json?t=' + Date.now(),
-        { cache: 'no-store' }
-      );
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.version && data.version !== CURRENT_VERSION) {
-        _prompted = true;
-        if (confirm(
-          '🆕 มีเวอร์ชันใหม่ (' + data.version + ')\n' +
-          'อัพเดทเพื่อใช้ฟีเจอร์ล่าสุดไหม?'
-        )) {
-          window.location.reload(true);
-        }
-      }
-    } catch(e) {
-      // silent fail — offline or fetch error
-    }
-  }
-
-  // Check on app open
-  window.addEventListener('load', () => {
-    setTimeout(checkVersion, 3000);
-  });
-
-  // Check every 5 minutes while app is open
-  window.checkVersion = checkVersion;
-  window._versionCheckInterval = setInterval(checkVersion, CHECK_INTERVAL);
-
-  // Check when app comes back to foreground
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      checkVersion();
-    }
-  });
+  // index_preview.html — ไฟล์ทดสอบชั่วคราว (Scratch Pad), ใช้ version.json ร่วมกับ
+  // index.html จริงที่ root ทำให้เทียบเวอร์ชันไม่ตรงกันเสมอ — ปิด version-check ในไฟล์นี้
+  window.checkVersion = function(){};
 })();
 
 // ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil ทดเขียนระหว่างสอบ) ──
