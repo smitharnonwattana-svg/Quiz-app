@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.80 -->
+  <!-- APP_VERSION: v47.81 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -923,13 +923,11 @@
                         linear-gradient(90deg, rgba(99,102,241,0.07) 1px, transparent 1px);
       background-size: 24px 24px;
       overflow: hidden;
-      touch-action: none;
     }
     #scratchCanvas {
       display: block; width: 100%; height: 100%;
       touch-action: none; cursor: crosshair;
       -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
-      transform-origin: 0 0;
     }
     #scratchCursor {
       position: absolute; pointer-events: none;
@@ -1006,7 +1004,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.80</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.81</div>
     </div>
   </div>
 </div>
@@ -12964,11 +12962,6 @@ function initEntranceCompare(params) {
   let dpr = window.devicePixelRatio || 1;
   let penSize = 2;
   let eraserSize = 28;
-  let scale = 1, panX = 0, panY = 0;
-  function applyTransform() {
-    canvas.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
-  }
-  function resetTransform() { scale = 1; panX = 0; panY = 0; canvas.style.transform = ''; }
 
   function resizeCanvas(preserve) {
     const r = wrap.getBoundingClientRect();
@@ -13030,16 +13023,12 @@ function initEntranceCompare(params) {
     lastX = x; lastY = y;
   }
   const cursorEl = document.getElementById('scratchCursor');
-  function updateCursor(canvasX, canvasY) {
+  function updateCursor(x, y) {
     if (tool !== 'eraser') { cursorEl.classList.remove('show'); return; }
-    // canvasX/Y = logical canvas coords. แปลงเป็น wrap-screen coords:
-    // screen = canvas.rect.left + canvasX * scale; wrap-rel = screen - wrap.rect.left
-    const cr = canvas.getBoundingClientRect();
-    const wr = wrap.getBoundingClientRect();
-    cursorEl.style.left = ((cr.left + canvasX * scale) - wr.left) + 'px';
-    cursorEl.style.top = ((cr.top + canvasY * scale) - wr.top) + 'px';
-    cursorEl.style.width = (eraserSize * scale) + 'px';
-    cursorEl.style.height = (eraserSize * scale) + 'px';
+    cursorEl.style.left = x + 'px';
+    cursorEl.style.top = y + 'px';
+    cursorEl.style.width = eraserSize + 'px';
+    cursorEl.style.height = eraserSize + 'px';
     cursorEl.classList.add('show');
   }
   function hideCursor() { cursorEl.classList.remove('show'); }
@@ -13062,10 +13051,8 @@ function initEntranceCompare(params) {
     return null;
   }
   function getPosFromTouch(t) {
-    // canvas.getBoundingClientRect() คืน rect ที่รวม transform แล้ว — หารด้วย
-    // scale ได้ canvas coords ที่ถูกต้อง
     const r = canvas.getBoundingClientRect();
-    return { x: (t.clientX - r.left) / scale, y: (t.clientY - r.top) / scale };
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
   }
   function onTouchStart(e) {
     const t = findStylus(e.touches);
@@ -13073,7 +13060,6 @@ function initEntranceCompare(params) {
     e.preventDefault();
     drawing = true;
     activeStylusId = t.identifier;
-    _gesture = null; // ปากกาเข้ามา = ยกเลิก gesture ใดๆ ที่ค้างอยู่
     const p = getPosFromTouch(t);
     lastX = p.x; lastY = p.y;
     drawDot(p.x, p.y);
@@ -13109,8 +13095,8 @@ function initEntranceCompare(params) {
   // บน iPad Pro รุ่นรองรับ) — ไม่ใช้สำหรับวาด
   function onPointerHover(e) {
     if (e.pointerType !== 'pen') return;
-    const r = wrap.getBoundingClientRect();
-    updateCursor((e.clientX - r.left - panX) / scale, (e.clientY - r.top - panY) / scale);
+    const r = canvas.getBoundingClientRect();
+    updateCursor(e.clientX - r.left, e.clientY - r.top);
   }
   canvas.addEventListener('pointermove', onPointerHover);
   canvas.addEventListener('pointerleave', hideCursor);
@@ -13139,78 +13125,40 @@ function initEntranceCompare(params) {
   });
   document.getElementById('scratchExpandBtn').addEventListener('click', () => {
     pad.classList.toggle('full');
-    resetTransform(); // กัน geometry เพี้ยน ตอนพื้นที่เปลี่ยน
+    // รอ transition จบก่อน resize เพื่อให้ canvas เต็มพื้นที่ใหม่
     setTimeout(() => resizeCanvas(true), 220);
   });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
   });
 
-  // ── 2-finger gesture: tap (สลับ pen/eraser), pinch (zoom), drag (pan) ──
-  // disambiguate: ถ้านิ้วเคลื่อนที่ระหว่างจับ = pinch/pan (ยกเลิก tap)
-  //                ถ้าวางแล้วยกภายใน 300ms ไม่ขยับ = tap สลับเครื่องมือ
-  function nonStylusTouches(touches) {
-    const out = [];
-    for (let i = 0; i < touches.length; i++) {
-      if (touches[i].touchType !== 'stylus') out.push(touches[i]);
+  // 2-finger tap บนกระดาษทด → สลับ pen ↔ eraser
+  // (ทดแทน squeeze ของ Apple Pencil Pro ที่ Safari ยังไม่เปิด API)
+  let _twoFingerStartTime = 0;
+  let _twoFingerStartFingers = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    // นับเฉพาะนิ้ว (ไม่ใช่ปากกา)
+    let fingers = 0;
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].touchType !== 'stylus') fingers++;
     }
-    return out;
-  }
-  function pairDist(a, b) {
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  }
-  let _gesture = null;
-  wrap.addEventListener('touchstart', (e) => {
-    if (drawing) return; // ปากกากำลังวาด — ไม่รับ gesture
-    const fs = nonStylusTouches(e.touches);
-    if (fs.length !== 2) { _gesture = null; return; }
-    _gesture = {
-      type: 'tap',
-      startTime: Date.now(),
-      startDist: pairDist(fs[0], fs[1]),
-      startMidX: (fs[0].clientX + fs[1].clientX) / 2,
-      startMidY: (fs[0].clientY + fs[1].clientY) / 2,
-      startScale: scale, startPanX: panX, startPanY: panY,
-      moved: false
-    };
-  }, {passive: true});
-  wrap.addEventListener('touchmove', (e) => {
-    if (!_gesture) return;
-    const fs = nonStylusTouches(e.touches);
-    if (fs.length !== 2) return;
-    const d = pairDist(fs[0], fs[1]);
-    const mx = (fs[0].clientX + fs[1].clientX) / 2;
-    const my = (fs[0].clientY + fs[1].clientY) / 2;
-    const moveDist = Math.hypot(mx - _gesture.startMidX, my - _gesture.startMidY);
-    const scaleRatio = d / _gesture.startDist;
-    if (!_gesture.moved && (moveDist > 8 || Math.abs(scaleRatio - 1) > 0.05)) {
-      _gesture.moved = true;
-      _gesture.type = 'pinch';
-    }
-    if (_gesture.type !== 'pinch') return;
-    e.preventDefault();
-    const newScale = Math.max(0.5, Math.min(4, _gesture.startScale * scaleRatio));
-    const wrapRect = wrap.getBoundingClientRect();
-    // canvas coords ของ midpoint ตอน gesture เริ่ม → ต้องคงตำแหน่งนี้ไว้ระหว่าง zoom
-    const cmX = (_gesture.startMidX - wrapRect.left - _gesture.startPanX) / _gesture.startScale;
-    const cmY = (_gesture.startMidY - wrapRect.top - _gesture.startPanY) / _gesture.startScale;
-    panX = mx - wrapRect.left - cmX * newScale;
-    panY = my - wrapRect.top - cmY * newScale;
-    scale = newScale;
-    applyTransform();
-  }, {passive: false});
-  wrap.addEventListener('touchend', (e) => {
-    if (!_gesture) return;
-    const wasTap = _gesture.type === 'tap' && !_gesture.moved
-                   && (Date.now() - _gesture.startTime < 300);
-    _gesture = null;
-    if (wasTap) {
-      const next = (tool === 'pen') ? 'eraser' : 'pen';
-      const nextBtn = pad.querySelector('.scratch-tool[data-tool="' + next + '"]');
-      if (nextBtn) nextBtn.click();
+    if (fingers === 2) {
+      _twoFingerStartTime = Date.now();
+      _twoFingerStartFingers = 2;
+    } else {
+      _twoFingerStartFingers = 0;
     }
   }, {passive: true});
-  wrap.addEventListener('touchcancel', () => { _gesture = null; }, {passive: true});
+  canvas.addEventListener('touchend', (e) => {
+    if (_twoFingerStartFingers !== 2) return;
+    const elapsed = Date.now() - _twoFingerStartTime;
+    _twoFingerStartFingers = 0;
+    if (elapsed > 300) return; // long-press ไม่นับ
+    // สลับ tool
+    const next = (tool === 'pen') ? 'eraser' : 'pen';
+    const nextBtn = pad.querySelector('.scratch-tool[data-tool="' + next + '"]');
+    if (nextBtn) nextBtn.click();
+  }, {passive: true});
   btn.addEventListener('click', () => {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
@@ -13226,7 +13174,6 @@ function initEntranceCompare(params) {
     btn.classList.remove('visible');
     pad.classList.remove('open');
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
-    resetTransform();
   };
 })();
 </script>
