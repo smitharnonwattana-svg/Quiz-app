@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.84 -->
+  <!-- APP_VERSION: v47.85 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -896,6 +896,13 @@
     #scratchPad.open { transform: translateX(0); }
     /* .full = เต็มพื้นที่ PDF (80vw) ไม่ครอบ right pane */
     #scratchPad.full { width: 80vw; max-width: none; }
+    /* defensive: ตอน pad เปิด ยก right pane ขึ้นเหนือ pad (z 9100 > 9000)
+       กันกรณี sub-pixel overlap หรือ viewport math เพี้ยน */
+    body.scratch-pad-open #page-take .takeRight,
+    body.scratch-pad-open #page-practice .takeRight {
+      position: relative;
+      z-index: 9100;
+    }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1009,7 +1016,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.84</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.85</div>
     </div>
   </div>
 </div>
@@ -12915,7 +12922,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.84';
+  const CURRENT_VERSION = 'v47.85';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -13174,6 +13181,7 @@ function initEntranceCompare(params) {
   });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
+    document.body.classList.remove('scratch-pad-open');
   });
 
   // 2-finger tap บนกระดาษทด → สลับ pen ↔ eraser
@@ -13206,6 +13214,7 @@ function initEntranceCompare(params) {
   btn.addEventListener('click', () => {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
+    document.body.classList.toggle('scratch-pad-open', willOpen);
     if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
   });
   window.addEventListener('resize', () => {
@@ -13217,6 +13226,7 @@ function initEntranceCompare(params) {
   window.scratchHide = function() {
     btn.classList.remove('visible');
     pad.classList.remove('open');
+    document.body.classList.remove('scratch-pad-open');
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
   };
 })();
