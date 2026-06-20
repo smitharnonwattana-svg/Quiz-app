@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.72 -->
+  <!-- APP_VERSION: v47.73 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -866,7 +866,53 @@
         order: -1 !important;
       }
     }
-  </style>
+
+    /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
+    #scratchToggleBtn {
+      position: fixed; right: 18px; bottom: 100px;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #1f2937; color: #fff; border: none;
+      font-size: 24px; cursor: pointer; z-index: 8500;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+      display: none;
+      touch-action: manipulation;
+    }
+    #scratchToggleBtn.visible { display: block; }
+    #scratchToggleBtn:active { transform: scale(0.95); }
+    #scratchPad {
+      position: fixed; top: 0; right: 0;
+      width: 50vw; max-width: 720px; height: 100vh;
+      background: #fffef9; border-left: 2px solid #1f2937;
+      box-shadow: -8px 0 24px rgba(0,0,0,0.18);
+      z-index: 9000;
+      transform: translateX(100%); transition: transform .25s ease-out;
+      display: flex; flex-direction: column;
+    }
+    #scratchPad.open { transform: translateX(0); }
+    #scratchPadHeader {
+      padding: 10px 14px; background: #1f2937; color: #fff;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    #scratchPadHeader .scratch-title { font-weight: 900; font-size: 14px; margin-right: 4px; }
+    .scratch-tool {
+      padding: 7px 12px; border-radius: 8px;
+      border: 1px solid #4b5563; background: #374151; color: #fff;
+      cursor: pointer; font-weight: 700; font-size: 13px;
+      font-family: inherit;
+    }
+    .scratch-tool.active { background: #fbbf24; color: #111; border-color: #fbbf24; }
+    .scratch-tool.danger { background: #7f1d1d; border-color: #7f1d1d; }
+    #scratchCanvasWrap {
+      flex: 1; position: relative;
+      background-image: linear-gradient(rgba(99,102,241,0.07) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(99,102,241,0.07) 1px, transparent 1px);
+      background-size: 24px 24px;
+      overflow: hidden;
+    }
+    #scratchCanvas {
+      display: block; width: 100%; height: 100%;
+      touch-action: none; cursor: crosshair;
+    }
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -933,7 +979,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.72</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.73</div>
     </div>
   </div>
 </div>
@@ -4159,6 +4205,12 @@ function navigate(page, params={}){
   else if(page==='entrance_year') initEntranceYear(params);
   else if(page==='entrance_compare') initEntranceCompare(params);
   else if(page==='rewards') initRewards();
+
+  // Scratch pad lifecycle (Phase 1 — iPad-only, no-op on other devices)
+  if (typeof window.scratchShow === 'function') {
+    if (page === 'take' || page === 'practice') window.scratchShow();
+    else window.scratchHide();
+  }
 
   if(!params._noScroll) window.scrollTo(0,0);
 }
@@ -12833,7 +12885,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.72';
+  const CURRENT_VERSION = 'v47.73';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -12875,6 +12927,145 @@ function initEntranceCompare(params) {
       checkVersion();
     }
   });
+})();
+
+// ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil ทดเขียนระหว่างสอบ) ──
+(function initScratchPad(){
+  // iPad detection: real iPad UA, or iPadOS 13+ reporting Macintosh w/ touch, or large touch screen
+  const isIPad = (
+    /iPad/.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) ||
+    (navigator.maxTouchPoints > 1 && Math.min(window.screen.width, window.screen.height) >= 768)
+  );
+  if (!isIPad) return; // hide forever on non-iPad
+
+  // Inject UI once
+  const btn = document.createElement('button');
+  btn.id = 'scratchToggleBtn';
+  btn.type = 'button';
+  btn.title = 'กระดาษทด (ใช้ Apple Pencil)';
+  btn.textContent = '📝';
+  document.body.appendChild(btn);
+
+  const pad = document.createElement('div');
+  pad.id = 'scratchPad';
+  pad.setAttribute('role','dialog');
+  pad.innerHTML =
+    '<div id="scratchPadHeader">' +
+      '<span class="scratch-title">📝 กระดาษทด</span>' +
+      '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
+      '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
+      '<button type="button" class="scratch-tool danger" id="scratchClearBtn" style="margin-left:auto;">🗑 ล้าง</button>' +
+      '<button type="button" class="scratch-tool" id="scratchCloseBtn">✕</button>' +
+    '</div>' +
+    '<div id="scratchCanvasWrap"><canvas id="scratchCanvas"></canvas></div>';
+  document.body.appendChild(pad);
+
+  const canvas = document.getElementById('scratchCanvas');
+  const wrap = document.getElementById('scratchCanvasWrap');
+  const ctx = canvas.getContext('2d');
+  let tool = 'pen';
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+  let dpr = window.devicePixelRatio || 1;
+
+  function resizeCanvas(preserve) {
+    const r = wrap.getBoundingClientRect();
+    const w = Math.max(10, Math.floor(r.width));
+    const h = Math.max(10, Math.floor(r.height));
+    let img = null;
+    if (preserve && canvas.width > 0 && canvas.height > 0) {
+      try { img = canvas.toDataURL(); } catch(e) {}
+    }
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (img && img.length > 100) {
+      const i = new Image();
+      i.onload = () => ctx.drawImage(i, 0, 0, w, h);
+      i.src = img;
+    }
+  }
+  function clearCanvas() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function onPointerDown(e) {
+    if (e.pointerType !== 'pen') return; // Apple Pencil only — กันนิ้ว/ฝ่ามือ
+    e.preventDefault();
+    drawing = true;
+    const p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+  }
+  function onPointerMove(e) {
+    if (!drawing || e.pointerType !== 'pen') return;
+    e.preventDefault();
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(p.x, p.y);
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = 20;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 2;
+    }
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  }
+  function onPointerUp(e) {
+    if (e.pointerType !== 'pen') return;
+    drawing = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch(_) {}
+  }
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
+
+  pad.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
+    b.addEventListener('click', () => {
+      tool = b.dataset.tool;
+      pad.querySelectorAll('.scratch-tool[data-tool]').forEach(x =>
+        x.classList.toggle('active', x === b)
+      );
+    });
+  });
+  document.getElementById('scratchClearBtn').addEventListener('click', () => {
+    if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
+  });
+  document.getElementById('scratchCloseBtn').addEventListener('click', () => {
+    pad.classList.remove('open');
+  });
+  btn.addEventListener('click', () => {
+    const willOpen = !pad.classList.contains('open');
+    pad.classList.toggle('open', willOpen);
+    if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
+  });
+  window.addEventListener('resize', () => {
+    if (pad.classList.contains('open')) resizeCanvas(true);
+  });
+
+  // Lifecycle API — เรียกจาก navigate()
+  window.scratchShow = function() { btn.classList.add('visible'); };
+  window.scratchHide = function() {
+    btn.classList.remove('visible');
+    pad.classList.remove('open');
+    clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
+  };
 })();
 </script>
 </body>
