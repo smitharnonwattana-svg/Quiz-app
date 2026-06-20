@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.77 -->
+  <!-- APP_VERSION: v47.78 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -885,10 +885,12 @@
       background: #fffef9; border-left: 2px solid #1f2937;
       box-shadow: -8px 0 24px rgba(0,0,0,0.18);
       z-index: 9000;
-      transform: translateX(100%); transition: transform .25s ease-out;
+      transform: translateX(100%);
+      transition: transform .25s ease-out, width .2s ease-out, max-width .2s ease-out;
       display: flex; flex-direction: column;
     }
     #scratchPad.open { transform: translateX(0); }
+    #scratchPad.full { width: 100vw; max-width: none; }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1002,7 +1004,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.77</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.78</div>
     </div>
   </div>
 </div>
@@ -12945,6 +12947,7 @@ function initEntranceCompare(params) {
         '<button type="button" class="scratch-size" data-size="60" title="ลบใหญ่"><span style="width:20px;height:20px;"></span></button>' +
       '</span>' +
       '<button type="button" class="scratch-tool danger" id="scratchClearBtn" style="margin-left:auto;">🗑 ล้าง</button>' +
+      '<button type="button" class="scratch-tool" id="scratchExpandBtn" title="ขยาย/ย่อ">⛶</button>' +
       '<button type="button" class="scratch-tool" id="scratchCloseBtn">✕</button>' +
     '</div>' +
     '<div id="scratchCanvasWrap"><canvas id="scratchCanvas"></canvas><div id="scratchCursor"></div></div>';
@@ -13120,9 +13123,42 @@ function initEntranceCompare(params) {
   document.getElementById('scratchClearBtn').addEventListener('click', () => {
     if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
   });
+  document.getElementById('scratchExpandBtn').addEventListener('click', () => {
+    pad.classList.toggle('full');
+    // รอ transition จบก่อน resize เพื่อให้ canvas เต็มพื้นที่ใหม่
+    setTimeout(() => resizeCanvas(true), 220);
+  });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
   });
+
+  // 2-finger tap บนกระดาษทด → สลับ pen ↔ eraser
+  // (ทดแทน squeeze ของ Apple Pencil Pro ที่ Safari ยังไม่เปิด API)
+  let _twoFingerStartTime = 0;
+  let _twoFingerStartFingers = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    // นับเฉพาะนิ้ว (ไม่ใช่ปากกา)
+    let fingers = 0;
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].touchType !== 'stylus') fingers++;
+    }
+    if (fingers === 2) {
+      _twoFingerStartTime = Date.now();
+      _twoFingerStartFingers = 2;
+    } else {
+      _twoFingerStartFingers = 0;
+    }
+  }, {passive: true});
+  canvas.addEventListener('touchend', (e) => {
+    if (_twoFingerStartFingers !== 2) return;
+    const elapsed = Date.now() - _twoFingerStartTime;
+    _twoFingerStartFingers = 0;
+    if (elapsed > 300) return; // long-press ไม่นับ
+    // สลับ tool
+    const next = (tool === 'pen') ? 'eraser' : 'pen';
+    const nextBtn = pad.querySelector('.scratch-tool[data-tool="' + next + '"]');
+    if (nextBtn) nextBtn.click();
+  }, {passive: true});
   btn.addEventListener('click', () => {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
