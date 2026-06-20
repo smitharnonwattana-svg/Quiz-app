@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.79 -->
+  <!-- APP_VERSION: v47.80 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -925,16 +925,11 @@
       overflow: hidden;
       touch-action: none;
     }
-    #scratchCanvasInner {
-      position: absolute; top: 0; left: 0;
-      width: 100%; height: 100%;
-      transform-origin: 0 0;
-      will-change: transform;
-    }
     #scratchCanvas {
       display: block; width: 100%; height: 100%;
       touch-action: none; cursor: crosshair;
       -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+      transform-origin: 0 0;
     }
     #scratchCursor {
       position: absolute; pointer-events: none;
@@ -1011,7 +1006,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.79</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.80</div>
     </div>
   </div>
 </div>
@@ -12957,12 +12952,11 @@ function initEntranceCompare(params) {
       '<button type="button" class="scratch-tool" id="scratchExpandBtn" title="ขยาย/ย่อ">⛶</button>' +
       '<button type="button" class="scratch-tool" id="scratchCloseBtn">✕</button>' +
     '</div>' +
-    '<div id="scratchCanvasWrap"><div id="scratchCanvasInner"><canvas id="scratchCanvas"></canvas></div><div id="scratchCursor"></div></div>';
+    '<div id="scratchCanvasWrap"><canvas id="scratchCanvas"></canvas><div id="scratchCursor"></div></div>';
   document.body.appendChild(pad);
 
   const canvas = document.getElementById('scratchCanvas');
   const wrap = document.getElementById('scratchCanvasWrap');
-  const innerEl = document.getElementById('scratchCanvasInner');
   const ctx = canvas.getContext('2d');
   let tool = 'pen';
   let drawing = false;
@@ -12972,9 +12966,9 @@ function initEntranceCompare(params) {
   let eraserSize = 28;
   let scale = 1, panX = 0, panY = 0;
   function applyTransform() {
-    innerEl.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
+    canvas.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
   }
-  function resetTransform() { scale = 1; panX = 0; panY = 0; applyTransform(); }
+  function resetTransform() { scale = 1; panX = 0; panY = 0; canvas.style.transform = ''; }
 
   function resizeCanvas(preserve) {
     const r = wrap.getBoundingClientRect();
@@ -13038,10 +13032,12 @@ function initEntranceCompare(params) {
   const cursorEl = document.getElementById('scratchCursor');
   function updateCursor(canvasX, canvasY) {
     if (tool !== 'eraser') { cursorEl.classList.remove('show'); return; }
-    // canvasX/Y เป็น coords ใน canvas space (หาร scale แล้ว) — แปลงกลับเป็น
-    // wrap-screen coords เพื่อให้ cursor วางตรงปลายปากกาตอน zoom/pan
-    cursorEl.style.left = (canvasX * scale + panX) + 'px';
-    cursorEl.style.top = (canvasY * scale + panY) + 'px';
+    // canvasX/Y = logical canvas coords. แปลงเป็น wrap-screen coords:
+    // screen = canvas.rect.left + canvasX * scale; wrap-rel = screen - wrap.rect.left
+    const cr = canvas.getBoundingClientRect();
+    const wr = wrap.getBoundingClientRect();
+    cursorEl.style.left = ((cr.left + canvasX * scale) - wr.left) + 'px';
+    cursorEl.style.top = ((cr.top + canvasY * scale) - wr.top) + 'px';
     cursorEl.style.width = (eraserSize * scale) + 'px';
     cursorEl.style.height = (eraserSize * scale) + 'px';
     cursorEl.classList.add('show');
@@ -13066,27 +13062,24 @@ function initEntranceCompare(params) {
     return null;
   }
   function getPosFromTouch(t) {
-    // ใช้ wrap เป็น reference (ไม่ scale) แล้ว map → canvas coords ผ่าน transform
-    const r = wrap.getBoundingClientRect();
-    return {
-      x: (t.clientX - r.left - panX) / scale,
-      y: (t.clientY - r.top - panY) / scale
-    };
+    // canvas.getBoundingClientRect() คืน rect ที่รวม transform แล้ว — หารด้วย
+    // scale ได้ canvas coords ที่ถูกต้อง
+    const r = canvas.getBoundingClientRect();
+    return { x: (t.clientX - r.left) / scale, y: (t.clientY - r.top) / scale };
   }
   function onTouchStart(e) {
-    if (_gesture) return; // กำลัง pinch/pan/tap-รอตัดสิน — ไม่วาด
     const t = findStylus(e.touches);
     if (!t) return; // ไม่มีปากกาแตะ — ปล่อยให้ touch อื่น (นิ้ว) ทำอะไรก็ได้
     e.preventDefault();
     drawing = true;
     activeStylusId = t.identifier;
+    _gesture = null; // ปากกาเข้ามา = ยกเลิก gesture ใดๆ ที่ค้างอยู่
     const p = getPosFromTouch(t);
     lastX = p.x; lastY = p.y;
     drawDot(p.x, p.y);
     updateCursor(p.x, p.y);
   }
   function onTouchMove(e) {
-    if (_gesture) return; // กำลังทำ gesture — ไม่วาด
     // อัพเดท cursor ตามตำแหน่งปากกาก่อน
     const stylus = findStylus(e.touches);
     if (stylus) {
