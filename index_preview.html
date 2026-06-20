@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.85 -->
+  <!-- APP_VERSION: v47.86 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -869,7 +869,7 @@
 
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
-      position: fixed; right: 18px; bottom: 24px;
+      position: fixed; right: 18px; bottom: 100px;
       width: 56px; height: 56px; border-radius: 50%;
       background: #1f2937; color: #fff; border: none;
       font-size: 24px; cursor: pointer; z-index: 8500;
@@ -880,29 +880,17 @@
     #scratchToggleBtn.visible { display: block; }
     #scratchToggleBtn:active { transform: scale(0.95); }
     #scratchPad {
-      /* takeGrid ใน iPad ใช้ 8fr/2fr → right pane (ปุ่ม ส่ง/ออก) กว้าง 20vw
-         anchor pad ที่ right:20vw เพื่อให้สไลด์เข้าระหว่าง PDF กับ right pane
-         right pane มองเห็นเสมอ — ไม่ถูก pad ครอบ */
-      position: fixed; top: 0; right: 20vw;
-      width: 60vw; max-width: 720px; height: 100vh;
+      position: fixed; top: 0; right: 0;
+      width: 50vw; max-width: 720px; height: 100vh;
       background: #fffef9; border-left: 2px solid #1f2937;
       box-shadow: -8px 0 24px rgba(0,0,0,0.18);
       z-index: 9000;
-      /* off-screen ทางขวา: เลื่อนเกินตำแหน่งของตัวเอง 100% + offset (20vw) */
-      transform: translateX(calc(100% + 20vw));
+      transform: translateX(100%);
       transition: transform .25s ease-out, width .2s ease-out, max-width .2s ease-out;
       display: flex; flex-direction: column;
     }
     #scratchPad.open { transform: translateX(0); }
-    /* .full = เต็มพื้นที่ PDF (80vw) ไม่ครอบ right pane */
-    #scratchPad.full { width: 80vw; max-width: none; }
-    /* defensive: ตอน pad เปิด ยก right pane ขึ้นเหนือ pad (z 9100 > 9000)
-       กันกรณี sub-pixel overlap หรือ viewport math เพี้ยน */
-    body.scratch-pad-open #page-take .takeRight,
-    body.scratch-pad-open #page-practice .takeRight {
-      position: relative;
-      z-index: 9100;
-    }
+    #scratchPad.full { width: 100vw; max-width: none; }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1016,7 +1004,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.85</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.86</div>
     </div>
   </div>
 </div>
@@ -13142,7 +13130,6 @@ function initEntranceCompare(params) {
   });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
-    document.body.classList.remove('scratch-pad-open');
   });
 
   // 2-finger tap บนกระดาษทด → สลับ pen ↔ eraser
@@ -13175,7 +13162,6 @@ function initEntranceCompare(params) {
   btn.addEventListener('click', () => {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
-    document.body.classList.toggle('scratch-pad-open', willOpen);
     if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
   });
   window.addEventListener('resize', () => {
@@ -13187,7 +13173,6 @@ function initEntranceCompare(params) {
   window.scratchHide = function() {
     btn.classList.remove('visible');
     pad.classList.remove('open');
-    document.body.classList.remove('scratch-pad-open');
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
   };
 })();
