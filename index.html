@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.87 -->
+  <!-- APP_VERSION: v47.88 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -91,16 +91,24 @@
       .takeRoot{height:100vh;overflow:hidden;}
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
-      /* takeRight ใช้ grid 3-row (auto auto 1fr): stickyBar + choices + nums scroll
-         ใช้ grid แทน flex เพราะ Safari iOS มีบัค flex min-height:0 ที่ทำให้
-         child flex:1 ที่มี content ยาว (เช่น takeNums หลายข้อ) ขยายตามขนาด
-         content แล้วดัน sibling (stickyBar) ขึ้นเหนือ viewport ปุ่ม ส่ง/ออก หาย
-         grid ไม่มี quirk นี้ — row 1fr จำกัดที่ remaining space เสมอ */
-      .takeRight{overflow:hidden !important;display:grid !important;
-                 grid-template-rows: auto auto minmax(0, 1fr) !important;
+      /* takeRight: lock stickyBar (ส่ง/ออก) ด้วย position:absolute
+         กัน Safari iPad ทุก flex/grid quirk ที่ทำให้ปุ่มหาย ตอนข้อเยอะ
+         - parent position:relative เป็น anchor
+         - stickyBar absolute top:0 → fixed in place เสมอ
+         - choicesBlock + numsWrap ใช้ grid 2-row พร้อม margin-top เผื่อ stickyBar
+         - numsWrap scroll ภายในตัวเอง */
+      .takeRight{position:relative !important;overflow:hidden !important;
+                 display:grid !important;
+                 grid-template-rows: auto minmax(0, 1fr) !important;
                  height:100vh;}
-      .takeRight > .stickyBar{}
-      .takeRight > .takeChoicesBlock{border-bottom:1px solid var(--border);}
+      .takeRight > .stickyBar{
+        position: absolute !important; top: 0 !important; left: 0; right: 0;
+        z-index: 50; background: #fff;
+      }
+      .takeRight > .takeChoicesBlock{
+        margin-top: 64px !important;  /* clear absolute stickyBar */
+        border-bottom: 1px solid var(--border);
+      }
       .takeRight > .takeNumsWrap{overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
       /* ก ข ค ง แนวนอน desktop/iPad */
       #takeChoices{display:grid;grid-template-columns:repeat(4,1fr) !important;gap:8px !important;}
@@ -875,7 +883,8 @@
 
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
-      position: fixed; right: 18px; bottom: 100px;
+      /* ฝั่งซ้ายล่าง (พื้นที่ PDF) ไม่บังเลขข้อใน right pane */
+      position: fixed; left: 18px; bottom: 24px;
       width: 56px; height: 56px; border-radius: 50%;
       background: #1f2937; color: #fff; border: none;
       font-size: 24px; cursor: pointer; z-index: 8500;
@@ -1010,7 +1019,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.87</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.88</div>
     </div>
   </div>
 </div>
@@ -12916,7 +12925,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.87';
+  const CURRENT_VERSION = 'v47.88';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
