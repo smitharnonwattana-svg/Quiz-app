@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.74 -->
+  <!-- APP_VERSION: v47.75 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -902,6 +902,19 @@
     }
     .scratch-tool.active { background: #fbbf24; color: #111; border-color: #fbbf24; }
     .scratch-tool.danger { background: #7f1d1d; border-color: #7f1d1d; }
+    #scratchEraserSizes { display: none; gap: 4px; align-items: center; }
+    #scratchEraserSizes.show { display: inline-flex; }
+    .scratch-size {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid #4b5563; background: #374151;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0;
+    }
+    .scratch-size span {
+      display: block; border-radius: 50%; background: #fff;
+    }
+    .scratch-size.active { border-color: #fbbf24; background: #fbbf24; }
+    .scratch-size.active span { background: #111; }
     #scratchCanvasWrap {
       flex: 1; position: relative;
       background-image: linear-gradient(rgba(99,102,241,0.07) 1px, transparent 1px),
@@ -980,7 +993,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.74</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.75</div>
     </div>
   </div>
 </div>
@@ -12917,6 +12930,11 @@ function initEntranceCompare(params) {
       '<span class="scratch-title">📝 กระดาษทด</span>' +
       '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
       '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
+      '<span id="scratchEraserSizes">' +
+        '<button type="button" class="scratch-size" data-size="12" title="ลบเล็ก"><span style="width:6px;height:6px;"></span></button>' +
+        '<button type="button" class="scratch-size active" data-size="28" title="ลบกลาง"><span style="width:12px;height:12px;"></span></button>' +
+        '<button type="button" class="scratch-size" data-size="60" title="ลบใหญ่"><span style="width:20px;height:20px;"></span></button>' +
+      '</span>' +
       '<button type="button" class="scratch-tool danger" id="scratchClearBtn" style="margin-left:auto;">🗑 ล้าง</button>' +
       '<button type="button" class="scratch-tool" id="scratchCloseBtn">✕</button>' +
     '</div>' +
@@ -12930,6 +12948,8 @@ function initEntranceCompare(params) {
   let drawing = false;
   let lastX = 0, lastY = 0;
   let dpr = window.devicePixelRatio || 1;
+  let penSize = 2;
+  let eraserSize = 28;
 
   function resizeCanvas(preserve) {
     const r = wrap.getBoundingClientRect();
@@ -12962,46 +12982,76 @@ function initEntranceCompare(params) {
     const r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
+  function applyStrokeStyle() {
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = eraserSize;
+      ctx.strokeStyle = '#000';
+      ctx.fillStyle = '#000';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineWidth = penSize;
+      ctx.strokeStyle = '#111827';
+      ctx.fillStyle = '#111827';
+    }
+  }
+  function drawDot(x, y) {
+    applyStrokeStyle();
+    const r = (tool === 'eraser' ? eraserSize : penSize) / 2;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawSegment(x, y) {
+    applyStrokeStyle();
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    lastX = x; lastY = y;
+  }
   function onPointerDown(e) {
     if (e.pointerType !== 'pen') return; // Apple Pencil only — กันนิ้ว/ฝ่ามือ
     e.preventDefault();
     drawing = true;
     const p = getPos(e);
     lastX = p.x; lastY = p.y;
-    try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    drawDot(p.x, p.y); // mark start so quick taps/start of stroke ไม่หาย
   }
   function onPointerMove(e) {
     if (!drawing || e.pointerType !== 'pen') return;
     e.preventDefault();
-    const p = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(p.x, p.y);
-    if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 20;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = '#111827';
-      ctx.lineWidth = 2;
+    // Apple Pencil sample rate สูงมาก (240Hz) — ใช้ coalesced events กันจุดหาย
+    const evs = (typeof e.getCoalescedEvents === 'function')
+      ? e.getCoalescedEvents() : [e];
+    for (let i = 0; i < evs.length; i++) {
+      const p = getPos(evs[i]);
+      drawSegment(p.x, p.y);
     }
-    ctx.stroke();
-    lastX = p.x; lastY = p.y;
   }
   function onPointerUp(e) {
     if (e.pointerType !== 'pen') return;
     drawing = false;
-    try { canvas.releasePointerCapture(e.pointerId); } catch(_) {}
   }
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', onPointerUp);
 
+  const eraserSizesEl = document.getElementById('scratchEraserSizes');
   pad.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
     b.addEventListener('click', () => {
       tool = b.dataset.tool;
       pad.querySelectorAll('.scratch-tool[data-tool]').forEach(x =>
+        x.classList.toggle('active', x === b)
+      );
+      eraserSizesEl.classList.toggle('show', tool === 'eraser');
+    });
+  });
+  pad.querySelectorAll('.scratch-size').forEach(b => {
+    b.addEventListener('click', () => {
+      eraserSize = parseInt(b.dataset.size, 10) || 28;
+      pad.querySelectorAll('.scratch-size').forEach(x =>
         x.classList.toggle('active', x === b)
       );
     });
