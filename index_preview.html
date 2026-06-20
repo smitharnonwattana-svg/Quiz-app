@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.76 -->
+  <!-- APP_VERSION: v47.77 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1002,7 +1002,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.76</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.77</div>
     </div>
   </div>
 </div>
@@ -13029,37 +13029,73 @@ function initEntranceCompare(params) {
     cursorEl.classList.add('show');
   }
   function hideCursor() { cursorEl.classList.remove('show'); }
-  function onPointerDown(e) {
-    if (e.pointerType !== 'pen') return; // Apple Pencil only — กันนิ้ว/ฝ่ามือ
+
+  // ── Drawing: Touch Events ตรงๆ + touchType==='stylus' (Safari API) ──
+  // เหตุผล: Safari สร้าง Pointer Events จาก Touch ใต้ฮูด — มี race condition
+  // เวลายกปากกาแล้วลงใหม่เร็วๆ pointerdown ตัวใหม่หาย แอพวาดรูปจริง
+  // (Procreate/GoodNotes) ใช้ touch.touchType === 'stylus' โดยตรง
+  let activeStylusId = null;
+  function findStylus(touchList) {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].touchType === 'stylus') return touchList[i];
+    }
+    return null;
+  }
+  function findTouchById(touchList, id) {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].identifier === id) return touchList[i];
+    }
+    return null;
+  }
+  function getPosFromTouch(t) {
+    const r = canvas.getBoundingClientRect();
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function onTouchStart(e) {
+    const t = findStylus(e.touches);
+    if (!t) return; // ไม่มีปากกาแตะ — ปล่อยให้ touch อื่น (นิ้ว) ทำอะไรก็ได้
     e.preventDefault();
     drawing = true;
-    const p = getPos(e);
+    activeStylusId = t.identifier;
+    const p = getPosFromTouch(t);
     lastX = p.x; lastY = p.y;
-    drawDot(p.x, p.y); // mark start so quick taps/start of stroke ไม่หาย
+    drawDot(p.x, p.y);
     updateCursor(p.x, p.y);
   }
-  function onPointerMove(e) {
-    if (e.pointerType !== 'pen') return;
-    const p = getPos(e);
-    updateCursor(p.x, p.y);
-    if (!drawing) return;
-    e.preventDefault();
-    // Apple Pencil sample rate สูงมาก (240Hz) — ใช้ coalesced events กันจุดหาย
-    const evs = (typeof e.getCoalescedEvents === 'function')
-      ? e.getCoalescedEvents() : [e];
-    for (let i = 0; i < evs.length; i++) {
-      const ep = getPos(evs[i]);
-      drawSegment(ep.x, ep.y);
+  function onTouchMove(e) {
+    // อัพเดท cursor ตามตำแหน่งปากกาก่อน
+    const stylus = findStylus(e.touches);
+    if (stylus) {
+      const sp = getPosFromTouch(stylus);
+      updateCursor(sp.x, sp.y);
     }
+    if (!drawing || activeStylusId === null) return;
+    const t = findTouchById(e.touches, activeStylusId);
+    if (!t || t.touchType !== 'stylus') return;
+    e.preventDefault();
+    const p = getPosFromTouch(t);
+    drawSegment(p.x, p.y);
   }
-  function onPointerUp(e) {
-    if (e.pointerType !== 'pen') return;
+  function onTouchEnd(e) {
+    if (activeStylusId === null) return;
+    const t = findTouchById(e.changedTouches, activeStylusId);
+    if (!t) return;
     drawing = false;
+    activeStylusId = null;
   }
-  canvas.addEventListener('pointerdown', onPointerDown, {passive:false});
-  canvas.addEventListener('pointermove', onPointerMove, {passive:false});
-  canvas.addEventListener('pointerup', onPointerUp, {passive:false});
-  canvas.addEventListener('pointercancel', onPointerUp, {passive:false});
+  canvas.addEventListener('touchstart', onTouchStart, {passive:false});
+  canvas.addEventListener('touchmove', onTouchMove, {passive:false});
+  canvas.addEventListener('touchend', onTouchEnd, {passive:false});
+  canvas.addEventListener('touchcancel', onTouchEnd, {passive:false});
+
+  // Pointer Events เก็บไว้เฉพาะ hover cursor (Apple Pencil 2/Pro hover preview
+  // บน iPad Pro รุ่นรองรับ) — ไม่ใช้สำหรับวาด
+  function onPointerHover(e) {
+    if (e.pointerType !== 'pen') return;
+    const r = canvas.getBoundingClientRect();
+    updateCursor(e.clientX - r.left, e.clientY - r.top);
+  }
+  canvas.addEventListener('pointermove', onPointerHover);
   canvas.addEventListener('pointerleave', hideCursor);
 
   const eraserSizesEl = document.getElementById('scratchEraserSizes');
