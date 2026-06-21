@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.92 -->
+  <!-- APP_VERSION: v47.93 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -108,22 +108,19 @@
         z-index: 100; background: #fff;
         border-bottom: 1px solid var(--border);
       }
-      /* takeLeft: contain layout เพื่อ isolate จาก takeRight
-         (PDF render async แล้วเคย trigger reflow ไปบีบ ก ข ค ง ใน takeRight) */
+      /* CRITICAL: ห้ามใช้ contain:layout บน takeLeft/takeRight — มันสร้าง
+         containing block สำหรับ position:fixed ทำให้ stickyBars หลุดจาก viewport
+         เวลา parent reflow แทนที่จะอยู่กับ viewport (CSS Containment spec)
+         ใช้ pixel locks อย่างเดียวเพื่อกัน Safari recalculate */
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;
                 display:flex;flex-direction:column;padding-top:64px;
-                box-sizing:border-box;
-                contain: layout style;}
-      /* takeRight: PIXEL-LOCKED grid (ไม่ใช้ fr/auto ที่ Safari อาจ recalculate)
-         + contain: layout เพื่อ isolate จาก PDF reflow ใน takeLeft
-         + choicesBlock height คงที่ 220px → ก ข ค ง ใหญ่พอเสมอ */
+                box-sizing:border-box;}
       .takeRight{overflow:hidden !important;display:grid !important;
                  grid-template-rows: 220px 1fr !important;
-                 height:100vh; padding-top:64px; box-sizing:border-box;
-                 contain: layout style;}
+                 height:100vh; padding-top:64px; box-sizing:border-box;}
       .takeRight > .takeChoicesBlock{
         border-bottom: 1px solid var(--border);
-        height: 220px; overflow: hidden;  /* lock pixel height — ไม่ให้ recalculate */
+        height: 220px; overflow: hidden;
         box-sizing: border-box;
       }
       .takeRight > .takeNumsWrap{overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
@@ -1036,7 +1033,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.92</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.93</div>
     </div>
   </div>
 </div>
@@ -12942,7 +12939,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.92';
+  const CURRENT_VERSION = 'v47.93';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
