@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.95 -->
+  <!-- APP_VERSION: v47.96 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -90,55 +90,12 @@
     @media (min-width: 901px) {
       .takeRoot{height:100vh;overflow:hidden;}
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
-      /* ULTIMATE FIX: lock stickyBars ด้วย position:FIXED (อิง viewport เลย ไม่ใช่
-         parent) — position:absolute ก่อนหน้านี้ไม่ work บน iPad Safari จริง อาจมี
-         quirk เรื่อง absolute inside overflow:hidden parent ตอน content ยาวมาก
-         position:fixed bypass ทุก parent quirk แน่นอน
-         - takeLeft sb: left:0 width:80vw (ตรง takeGrid 8fr/(8+2))
-         - takeRight sb: right:0 width:20vw (ตรง takeGrid 2fr/(8+2)) */
-      .takeLeft > .stickyBar{
-        position: fixed !important; top: 0 !important;
-        left: 0 !important; width: 80vw !important;
-        z-index: 100; background: #fff;
-        border-bottom: 1px solid var(--border);
-      }
-      .takeRight > .stickyBar{
-        position: fixed !important; top: 0 !important;
-        right: 0 !important; width: 20vw !important;
-        z-index: 100; background: #fff;
-        border-bottom: 1px solid var(--border);
-      }
-      /* LIFTED stickyBars: ตอน JS ย้ายมาเป็นลูกตรงของ #page-take/#page-practice
-         พ้นจาก takeLeft/takeRight reflow path — fixed กับ viewport ไม่ขึ้นกับ
-         parent layout เลย */
-      .lifted-sb {
-        position: fixed !important; top: 0 !important;
-        z-index: 100; background: #fff;
-        border-bottom: 1px solid var(--border);
-        box-sizing: border-box;
-      }
-      .lifted-sb-left { left: 0 !important; width: 80vw !important; }
-      .lifted-sb-right { right: 0 !important; width: 20vw !important; }
-      /* contain:layout บน takeLeft/takeRight = isolate layout จากกัน → PDF
-         reflow ใน takeLeft ไม่กระจายมาบีบ choicesBlock ใน takeRight
-         OK ปลอดภัยตอนนี้ เพราะ stickyBars ถูก JS LIFT ออกไปอยู่ที่ #page-take
-         แล้ว ไม่ใช่ descendant ของ takeLeft/takeRight อีก (contain:layout
-         จะสร้าง containing block สำหรับ position:fixed descendants — ถ้า
-         stickyBars ยังอยู่ข้างใน fixed จะหลุด) */
-      .takeLeft{border-right:1px solid var(--border);overflow:hidden;
-                display:flex;flex-direction:column;padding-top:64px;
-                box-sizing:border-box;
-                contain: layout style;}
-      .takeRight{overflow:hidden !important;display:grid !important;
-                 grid-template-rows: 220px 1fr !important;
-                 height:100vh; padding-top:64px; box-sizing:border-box;
-                 contain: layout style;}
-      .takeRight > .takeChoicesBlock{
-        border-bottom: 1px solid var(--border);
-        height: 220px; overflow: hidden;
-        box-sizing: border-box;
-      }
-      .takeRight > .takeNumsWrap{overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
+      .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
+      /* takeRight ใช้ flex column: choices ค้างที่บน, nums scroll ได้อย่างเดียว */
+      .takeRight{overflow:hidden !important;display:flex;flex-direction:column;height:100vh;}
+      .takeRight > .stickyBar{flex-shrink:0;}
+      .takeRight > .takeChoicesBlock{flex-shrink:0;border-bottom:1px solid var(--border);}
+      .takeRight > .takeNumsWrap{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
       /* ก ข ค ง แนวนอน desktop/iPad */
       #takeChoices{display:grid;grid-template-columns:repeat(4,1fr) !important;gap:8px !important;}
       .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;text-align:center !important;}
@@ -912,8 +869,7 @@
 
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
-      /* ฝั่งซ้ายล่าง (พื้นที่ PDF) ไม่บังเลขข้อใน right pane */
-      position: fixed; left: 18px; bottom: 24px;
+      position: fixed; right: 18px; bottom: 100px;
       width: 56px; height: 56px; border-radius: 50%;
       background: #1f2937; color: #fff; border: none;
       font-size: 24px; cursor: pointer; z-index: 8500;
@@ -1048,7 +1004,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.95</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.96</div>
     </div>
   </div>
 </div>
@@ -4281,38 +4237,7 @@ function navigate(page, params={}){
     else window.scratchHide();
   }
 
-  // LIFT stickyBars ออกจาก takeLeft/takeRight ขึ้นไปเป็นลูกตรงของ page-take
-  // เพื่อกัน Safari iPad reflow (จาก PDF render / many number buttons) ที่ทำให้
-  // stickyBars หลุดจาก viewport ตอนข้อเยอะ → ที่ใหม่ไม่อยู่ในเส้น reflow
-  if (page === 'take' || page === 'practice') {
-    requestAnimationFrame(() => _liftTakeStickyBars(page));
-  }
-
   if(!params._noScroll) window.scrollTo(0,0);
-}
-
-// LIFT stickyBars จาก takeLeft/takeRight ขึ้นไปเป็นลูกตรงของ #page-take หรือ
-// #page-practice — เพื่อให้พ้นจากเส้น reflow ของ PDF/numbers ที่ Safari iPad
-// recalculate layout ผิดตอนข้อเยอะ
-function _liftTakeStickyBars(page) {
-  const root = document.getElementById('page-' + page);
-  if (!root) return;
-  // ไม่ทำซ้ำ
-  if (root.dataset.sbLifted) return;
-  const left = root.querySelector('.takeLeft');
-  const right = root.querySelector('.takeRight');
-  if (!left || !right) return;
-  const leftSb = left.querySelector(':scope > .stickyBar');
-  const rightSb = right.querySelector(':scope > .stickyBar');
-  if (leftSb) {
-    leftSb.classList.add('lifted-sb', 'lifted-sb-left');
-    root.insertBefore(leftSb, root.firstChild);
-  }
-  if (rightSb) {
-    rightSb.classList.add('lifted-sb', 'lifted-sb-right');
-    root.insertBefore(rightSb, root.firstChild);
-  }
-  root.dataset.sbLifted = '1';
 }
 
 // ===================== EXAMS PAGE =====================
@@ -12985,7 +12910,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.95';
+  const CURRENT_VERSION = 'v47.96';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
