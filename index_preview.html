@@ -4404,11 +4404,15 @@ function initExams(){
 
       // ── Admin: per-student blocks (max 3, latest activity first) ──
       const _adminBlocksHtml=isTeacher?(()=>{
-        const ru=getRecentAttemptUsersByExam(allAttempts,e.id,3);
+        // FIX: ใช้ _examAttempts (ตัด weakness_practice แล้ว) ไม่ใช่ allAttempts
+        // เดิม pass allAttempts → ติด user ที่ทำแค่ weakness_practice → ภายใน
+        // วน filter ด้วย _examAttempts กลับว่าง → uLast undefined → throw
+        const ru=getRecentAttemptUsersByExam(_examAttempts,e.id,3);
         if(!ru.length) return '<div style="font-size:12px;color:#9ca3af;margin-top:6px;">ยังไม่มีใครทำ</div>';
         return ru.map(latestAtt=>{
           const uName=latestAtt.takerName||'?';
           const uAtts=_examAttempts.filter(a=>(a.takerName||'')===uName);
+          if(!uAtts.length) return ''; // defensive guard
           const uBest=Math.max(...uAtts.map(a=>a.score||0));
           const uLast=uAtts[0];
           const uPct=uLast&&uLast.total?Math.round((uLast.score||0)/uLast.total*100):0;
