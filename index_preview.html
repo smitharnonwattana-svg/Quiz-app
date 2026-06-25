@@ -4394,6 +4394,7 @@ function initExams(){
     const _myResume = typeof loadTakeResume === 'function' ? loadTakeResume(_myName) : null;
 
     exams.forEach(e=>{
+      try {
       const _examAttempts=allAttempts.filter(a=>a.examId===e.id && a.mode!=='weakness_practice');
       const myAttempts=isTeacher?_examAttempts:_examAttempts.filter(a=>(a.takerName||'')===_myName);
       const last=myAttempts[0];
@@ -4584,6 +4585,17 @@ function initExams(){
         navigate('exam',{id:e.id});
       };
       list.appendChild(card);
+      } catch(_err) {
+        // กัน 1 exam ที่ data เสีย ทำลายทั้ง list (bug: admin เห็นแค่ 4/13 ข้อ
+        // เพราะ uncaught exception ใน iteration ทำให้ forEach หยุด)
+        console.error('[renderExams] exam render failed, examId=' + e.id + ' title=' + (e.title||'?'), _err);
+        const errCard = document.createElement('div');
+        errCard.className = 'examCard';
+        errCard.style.cssText = 'border:2px dashed #fca5a5;background:#fef2f2;';
+        errCard.innerHTML = '<div class="title" style="color:#b91c1c;">⚠️ ' + (e.title||'?') + '</div>'
+          + '<div class="meta" style="color:#b91c1c;">render error — เปิด DevTools console ดูรายละเอียด</div>';
+        list.appendChild(errCard);
+      }
     });
     if(!list.children.length) list.innerHTML=`<div class="muted" style="padding:20px;">ยังไม่มีข้อสอบที่เผยแพร่</div>`;
 
