@@ -4592,8 +4592,15 @@ function initExams(){
         const errCard = document.createElement('div');
         errCard.className = 'examCard';
         errCard.style.cssText = 'border:2px dashed #fca5a5;background:#fef2f2;';
+        const _msg = (_err && _err.message) ? _err.message : String(_err);
+        const _stack = (_err && _err.stack) ? String(_err.stack).split('\n').slice(0,3).join('\n') : '';
         errCard.innerHTML = '<div class="title" style="color:#b91c1c;">⚠️ ' + (e.title||'?') + '</div>'
-          + '<div class="meta" style="color:#b91c1c;">render error — เปิด DevTools console ดูรายละเอียด</div>';
+          + '<div class="meta" style="color:#b91c1c;">render error</div>'
+          + '<div style="font-size:11px;color:#7f1d1d;background:#fff;padding:6px 8px;margin-top:6px;border-radius:6px;font-family:monospace;word-break:break-word;white-space:pre-wrap;">'
+          + 'examId: ' + (e.id||'?') + '\n\n'
+          + 'Error: ' + _msg
+          + (_stack ? '\n\nStack:\n' + _stack : '')
+          + '</div>';
         list.appendChild(errCard);
       }
     });
