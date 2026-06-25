@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.72 -->
+  <!-- APP_VERSION: v47.73 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -933,7 +933,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.72</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.73</div>
     </div>
   </div>
 </div>
@@ -4403,11 +4403,16 @@ function initExams(){
 
       // ── Admin: per-student blocks (max 3, latest activity first) ──
       const _adminBlocksHtml=isTeacher?(()=>{
-        const ru=getRecentAttemptUsersByExam(allAttempts,e.id,3);
+        // FIX (v47.73): ใช้ _examAttempts (ตัด weakness_practice แล้ว) ไม่ใช่ allAttempts
+        // เดิม pass allAttempts → ติด user ที่ทำแค่ weakness_practice → ภายใน
+        // วน filter ด้วย _examAttempts กลับว่าง → uLast undefined → throw
+        // → forEach หยุด → cards หลังจากนั้นไม่ render → admin เห็นข้อสอบไม่ครบ
+        const ru=getRecentAttemptUsersByExam(_examAttempts,e.id,3);
         if(!ru.length) return '<div style="font-size:12px;color:#9ca3af;margin-top:6px;">ยังไม่มีใครทำ</div>';
         return ru.map(latestAtt=>{
           const uName=latestAtt.takerName||'?';
           const uAtts=_examAttempts.filter(a=>(a.takerName||'')===uName);
+          if(!uAtts.length) return ''; // defensive guard
           const uBest=Math.max(...uAtts.map(a=>a.score||0));
           const uLast=uAtts[0];
           const uPct=uLast&&uLast.total?Math.round((uLast.score||0)/uLast.total*100):0;
@@ -12833,7 +12838,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.72';
+  const CURRENT_VERSION = 'v47.73';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
