@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.73 -->
+  <!-- APP_VERSION: v47.74 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -933,7 +933,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.73</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.74</div>
     </div>
   </div>
 </div>
@@ -4398,6 +4398,9 @@ function initExams(){
       const myAttempts=isTeacher?_examAttempts:_examAttempts.filter(a=>(a.takerName||'')===_myName);
       const last=myAttempts[0];
       const bestScore=myAttempts.length?Math.max(...myAttempts.map(a=>a.score)):null;
+      // FIX (v47.74): หา total ของ attempt ที่ได้ bestScore (กัน weighted exam)
+      const bestAtt=bestScore!=null?myAttempts.find(a=>a.score===bestScore):null;
+      const bestTotal=(bestAtt&&bestAtt.total)||(last&&last.total)||e.questionCount;
       const card=document.createElement('div');
       card.className='examCard';
 
@@ -4415,6 +4418,9 @@ function initExams(){
           if(!uAtts.length) return ''; // defensive guard
           const uBest=Math.max(...uAtts.map(a=>a.score||0));
           const uLast=uAtts[0];
+          // FIX (v47.74): หา total ของ attempt ที่ได้คะแนนสูงสุด (กัน weighted exam)
+          const uBestAtt=uAtts.find(a=>(a.score||0)===uBest)||uLast;
+          const uBestTotal=(uBestAtt&&uBestAtt.total)||e.questionCount;
           const uPct=uLast&&uLast.total?Math.round((uLast.score||0)/uLast.total*100):0;
           const uWc=WeaknessTracker.countWeaknessesByExam(uName,e.id);
           const wLine = uWc > 0
@@ -4423,7 +4429,7 @@ function initExams(){
           const resetBtnHtml = `<button data-resetweakness="${esc(uName)}" style="margin-top:4px;padding:3px 8px;font-size:11px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-weight:600;">🧹 ล้างจุดอ่อนชุดนี้${uWc>0?' ('+uWc+')':''}</button>`;
           return `<div style="margin-top:6px;padding:6px 8px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
             <div style="font-size:12px;font-weight:700;color:#374151;">${esc(uName)}</div>
-            <div style="font-size:11px;color:#6b7280;margin-top:1px;">🏆 ${uBest}/${e.questionCount} &nbsp;•&nbsp; ล่าสุด ${uLast.score||0}/${uLast.total||0} (${uPct}%) &nbsp;•&nbsp; ${uAtts.length} ครั้ง</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:1px;">🏆 ${uBest}/${uBestTotal} &nbsp;•&nbsp; ล่าสุด ${uLast.score||0}/${uLast.total||0} (${uPct}%) &nbsp;•&nbsp; ${uAtts.length} ครั้ง</div>
             ${wLine}
             ${resetBtnHtml}
           </div>`;
@@ -4432,7 +4438,7 @@ function initExams(){
 
       // ── Student: own stats ──
       const scoreHtml=!isTeacher?(last
-        ?`<div class="score-badge">🏆 สูงสุด <b>${bestScore}/${e.questionCount}</b> &nbsp;•&nbsp; ล่าสุด <b>${last.score}/${last.total}</b> (${Math.round(last.score/last.total*100)}%) &nbsp;•&nbsp; ทำแล้ว ${myAttempts.length} ครั้ง</div>`
+        ?`<div class="score-badge">🏆 สูงสุด <b>${bestScore}/${bestTotal}</b> &nbsp;•&nbsp; ล่าสุด <b>${last.score}/${last.total}</b> (${Math.round(last.score/last.total*100)}%) &nbsp;•&nbsp; ทำแล้ว ${myAttempts.length} ครั้ง</div>`
         :`<div class="score-badge" style="color:var(--muted);">ยังไม่เคยทำ</div>`):'';
       const _wc=(!isTeacher&&_myName)?WeaknessTracker.countWeaknessesByExam(_myName,e.id):0;
       const weaknessHtml=(!isTeacher&&_wc>0)?`<div style="margin-top:4px;font-size:12px;color:#dc2626;font-weight:600;">⚠️ จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>`:'';
@@ -12838,7 +12844,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.73';
+  const CURRENT_VERSION = 'v47.74';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
