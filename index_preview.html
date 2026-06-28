@@ -8478,10 +8478,13 @@ function renderRewardsFor(userId, opts) {
     };
 
     adminToolsDiv.querySelector('#rt_resetStamps').onclick = () => {
+      if (!confirm('Reset Stamps ของ "' + userId + '"?')) return;
       const cur = _getGamificationUser(userId);
       const stampKeys = ['stamps_3','stamps_7','stamps_15'];
       _saveGamificationUser(userId, {
         ...cur,
+        stamps: 0,
+        lastStampDate: '',
         claimedTiers: (cur.claimedTiers||[]).filter(k => !stampKeys.includes(k)),
         pendingTiers: (cur.pendingTiers||[]).filter(k => !stampKeys.includes(k))
       });

@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.74 -->
+  <!-- APP_VERSION: v47.75 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -933,7 +933,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.74</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.75</div>
     </div>
   </div>
 </div>
@@ -8459,10 +8459,13 @@ function renderRewardsFor(userId, opts) {
     };
 
     adminToolsDiv.querySelector('#rt_resetStamps').onclick = () => {
+      if (!confirm('Reset Stamps ของ "' + userId + '"?')) return;
       const cur = _getGamificationUser(userId);
       const stampKeys = ['stamps_3','stamps_7','stamps_15'];
       _saveGamificationUser(userId, {
         ...cur,
+        stamps: 0,
+        lastStampDate: '',
         claimedTiers: (cur.claimedTiers||[]).filter(k => !stampKeys.includes(k)),
         pendingTiers: (cur.pendingTiers||[]).filter(k => !stampKeys.includes(k))
       });
@@ -12844,7 +12847,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.74';
+  const CURRENT_VERSION = 'v47.75';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
