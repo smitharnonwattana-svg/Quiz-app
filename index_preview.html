@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.81p -->
+  <!-- APP_VERSION: v47.82p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1036,7 +1036,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.81p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.82p</div>
     </div>
   </div>
 </div>
@@ -13110,9 +13110,13 @@ function initEntranceCompare(params) {
     const r = wrap.getBoundingClientRect();
     const w = Math.max(10, Math.floor(r.width));
     const h = Math.max(10, Math.floor(r.height));
-    let img = null;
+    let img = null, oldW = 0, oldH = 0;
     if (preserve && canvas.width > 0 && canvas.height > 0) {
-      try { img = canvas.toDataURL(); } catch(e) {}
+      try {
+        img = canvas.toDataURL();
+        oldW = canvas.width / dpr;
+        oldH = canvas.height / dpr;
+      } catch(e) {}
     }
     canvas.width = w * dpr;
     canvas.height = h * dpr;
@@ -13123,7 +13127,9 @@ function initEntranceCompare(params) {
     ctx.lineJoin = 'round';
     if (img && img.length > 100) {
       const i = new Image();
-      i.onload = () => ctx.drawImage(i, 0, 0, w, h);
+      // วาดที่ขนาดเดิม (ไม่ยืดตามพื้นที่ใหม่) — ขยาย/ย่อ = เพิ่ม/ลดพื้นที่เขียนว่างๆ
+      // ข้างๆ ของเดิม ไม่ใช่ซูมของที่เขียนไว้แล้วให้ใหญ่ขึ้น
+      i.onload = () => ctx.drawImage(i, 0, 0, oldW, oldH);
       i.src = img;
     }
   }
