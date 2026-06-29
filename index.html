@@ -27,13 +27,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.75 -->
+  <!-- APP_VERSION: v47.84 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
     html,body{margin:0;padding:0;height:100%;overflow:hidden;}
     body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans Thai","Noto Sans","Liberation Sans";color:#111;background:#fff;user-select:none;-webkit-user-select:none;}
-    .page.active{height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    .page.active{height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
     input,textarea,select,[contenteditable]{user-select:text;-webkit-user-select:text;}
     a{color:inherit;text-decoration:none;}
     .container{max-width:1200px;margin:0 auto;padding:24px;}
@@ -66,7 +66,7 @@
 
     /* take page */
     /* Desktop layout */
-    .takeRoot{height:100vh;width:100vw;overflow:hidden;}
+    .takeRoot{height:100dvh;width:100vw;overflow:hidden;}
     .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
     .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
     .takeRight{overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
@@ -88,11 +88,11 @@
 
     /* ══ DESKTOP: side-by-side ══ */
     @media (min-width: 901px) {
-      .takeRoot{height:100vh;overflow:hidden;}
+      .takeRoot{height:100dvh;overflow:hidden;}
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
       /* takeRight ใช้ flex column: choices ค้างที่บน, nums scroll ได้อย่างเดียว */
-      .takeRight{overflow:hidden !important;display:flex;flex-direction:column;height:100vh;}
+      .takeRight{overflow:hidden !important;display:flex;flex-direction:column;height:100dvh;}
       .takeRight > .stickyBar{flex-shrink:0;}
       .takeRight > .takeChoicesBlock{flex-shrink:0;border-bottom:1px solid var(--border);}
       .takeRight > .takeNumsWrap{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
@@ -102,12 +102,25 @@
       /* nav buttons — grid 3 คอลัมน์ ความกว้างคงที่ ไม่ shift เวลา text เปลี่ยน */
       #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;white-space:nowrap !important;min-width:0 !important;overflow:hidden !important;}
       .takeMobileNav{display:grid !important;grid-template-columns:1fr 1fr 1fr !important;gap:8px !important;width:100% !important;}
+      /* Safari iPad ไม่ honor min-height:0 ตอน .pdfWrapTake/.takeNumsWrap เนื้อหายาว
+         (PDF หลายหน้า/เลขข้อเยอะ) — pane ขยายเกิน viewport แล้ว stickyBar (header)
+         หลุดจากที่มองเห็น แก้โดย JS ย้าย .stickyBar ออกจาก flex flow ไปเป็น
+         position:fixed ลูกตรงของ #page-take/#page-practice (ดู _liftTakeStickyBars) */
+      .lifted-sb{position:fixed !important;top:0;z-index:60;}
+      .lifted-sb-left{left:0;width:80vw;}
+      .lifted-sb-right{right:0;width:20vw;}
+      /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
+         พอ Safari ย่อ address bar ลง (มักเกิดอัตโนมัติ ~1s หลังเปิดหน้า) viewport
+         จริงโตขึ้นแต่ 100vh ไม่รีคำนวณตามทันที ทำให้ .takeRoot/.takeRight ที่ใช้
+         100vh ค้างขนาดเดิมไว้ก่อนแล้วค่อยขยับ เห็นเป็น PDF/ก ข ค ง เลื่อนตำแหน่ง
+         ทั้งที่ logic ของ stickyBar ไม่ได้เปลี่ยน — ใช้ 100dvh แทนเพราะมันรีคำนวณ
+         ตาม visual viewport จริงเสมอ (รองรับ Safari 15.4+) */
     }
 
     /* ══ MOBILE: PDF 70% top, controls 30% bottom ══ */
     /* Take page mobile redesign — controls zone */
     @media (max-width: 900px) {
-      .takeRoot{height:100vh;overflow:hidden;}
+      .takeRoot{height:100dvh;overflow:hidden;}
       .takeGrid{height:100%;display:flex;flex-direction:column;}
 
       /* PDF zone: 80% */
@@ -866,6 +879,105 @@
         order: -1 !important;
       }
     }
+
+    /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
+    #scratchToggleBtn {
+      position: fixed; right: 18px; bottom: 100px;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #1f2937; color: #fff; border: none;
+      font-size: 24px; cursor: pointer; z-index: 8500;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+      display: none;
+      touch-action: manipulation;
+    }
+    #scratchToggleBtn.visible { display: block; }
+    #scratchToggleBtn:active { transform: scale(0.95); }
+    /* Mobile/portrait take-page layout pins .takeRight nav controls to the bottom 20vh band
+       (see @media max-width:900px above) — float the toggle above that band so it never
+       overlaps #takeUnsureBtn/#takeNextBtn. Does not touch .takeRight/.takeMobileNav rules. */
+    @media (max-width: 900px) {
+      #scratchToggleBtn { bottom: calc(20vh + 12px); right: 14px; }
+    }
+    /* Desktop/landscape: ตารางเลขข้ออยู่ฝั่งขวาเต็มความสูง ปุ่มลอย bottom-right (ค่า
+       default ด้านบน) จะมาทับเลขข้อแถวล่าง — ย้ายขึ้นไปแถบบนสุด วางซ้ายของ "เวลาเหลือ"
+       แทน ชิดกับคำว่า "เวลาเหลือ" (เอา "📝 " ออกจากหน้าตัวจับเวลาแล้ว — ทำให้ความกว้าง
+       เท่ากันทั้งโหมดปกติและฝึกซ้อม ระยะห่างนี้จึงคงที่ไม่ขึ้นกับ viewport). 20vw คือ
+       ความกว้างของ .lifted-sb-right, 147px ชดเชยความกว้างจริงของ "เวลาเหลือ"+ตัวเลข+
+       padding ให้เหลือช่องว่างกระชับ ~10px จากตัวจับเวลา (ฝั่งชื่อข้อสอบมีที่ว่างเหลือ
+       มากกว่าเยอะ แม้ตอนชื่อยาวสุด+ฝึกซ้อม) */
+    @media (min-width: 901px) {
+      #scratchToggleBtn {
+        top: 12px; bottom: auto; right: calc(20vw + 147px);
+        width: 40px; height: 40px; font-size: 18px;
+      }
+    }
+    #scratchPad {
+      /* width ใช้ min() แทน max-width แยก property — max-width เดิมค่าเป็น
+         none<->720px ข้ามฝั่ง "none" ไม่มีค่าตัวเลขให้ transition แทรกระหว่างกลาง
+         ได้ บราวเซอร์เลยสลับค่าแบบ discrete (กระโดดทันที) ทำให้ตอนย่อกลับ
+         (full->ปกติ) width กระโดดจาก 100vw ไป 720px ทันที แล้วค่อยไหลต่อจาก 720
+         ไป 50vw ช้าๆ — ดูไม่สมูท ส่วนตอนขยายบังเอิญดูสมูทเพราะกระโดดไปทาง none
+         (ไม่จำกัด) ตั้งแต่ต้น ไม่มีการ clamp ระหว่าง transition เลย */
+      position: fixed; top: 0; right: 0;
+      width: min(50vw, 720px); height: 100vh;
+      background: #fffef9; border-left: 2px solid #1f2937;
+      box-shadow: -8px 0 24px rgba(0,0,0,0.18);
+      z-index: 9000;
+      transform: translateX(100%);
+      transition: transform .25s ease-out, width .2s ease-out;
+      display: flex; flex-direction: column;
+    }
+    #scratchPad.open { transform: translateX(0); }
+    #scratchPad.full { width: 100vw; }
+    #scratchPadHeader {
+      padding: 10px 14px; background: #1f2937; color: #fff;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    #scratchPadHeader .scratch-title { font-weight: 900; font-size: 14px; margin-right: 4px; }
+    .scratch-tool {
+      padding: 7px 12px; border-radius: 8px;
+      border: 1px solid #4b5563; background: #374151; color: #fff;
+      cursor: pointer; font-weight: 700; font-size: 13px;
+      font-family: inherit;
+    }
+    .scratch-tool.active { background: #fbbf24; color: #111; border-color: #fbbf24; }
+    .scratch-tool.danger { background: #7f1d1d; border-color: #7f1d1d; }
+    #scratchEraserSizes { display: none; gap: 4px; align-items: center; }
+    #scratchEraserSizes.show { display: inline-flex; }
+    .scratch-size {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid #4b5563; background: #374151;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0;
+    }
+    .scratch-size span {
+      display: block; border-radius: 50%; background: #fff;
+    }
+    .scratch-size.active { border-color: #fbbf24; background: #fbbf24; }
+    .scratch-size.active span { background: #111; }
+    #scratchCanvasWrap {
+      flex: 1; position: relative;
+      background-image: linear-gradient(rgba(99,102,241,0.07) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(99,102,241,0.07) 1px, transparent 1px);
+      background-size: 24px 24px;
+      overflow: hidden;
+    }
+    #scratchCanvas {
+      /* ขนาดจริงตั้งโดย JS ให้เท่ากับ "เต็มจอ" เสมอ (ดู resizeCanvas) ไม่ผูกกับ
+         ความกว้าง wrap ปัจจุบัน — ตอนพับครึ่งจอ wrap (overflow:hidden) จะบังฝั่งขวา
+         ไว้เฉยๆ ไม่ตัดเนื้อหาทิ้ง กางออกมาใหม่จะเห็นครบเหมือนเดิม */
+      display: block; position: absolute; top: 0; left: 0;
+      touch-action: none; cursor: crosshair;
+      -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+    }
+    #scratchCursor {
+      position: absolute; pointer-events: none;
+      border: 1.5px solid #ef4444; border-radius: 50%;
+      background: rgba(239,68,68,0.12);
+      transform: translate(-50%, -50%);
+      display: none; z-index: 10;
+    }
+    #scratchCursor.show { display: block; }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -933,7 +1045,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.75</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.84</div>
     </div>
   </div>
 </div>
@@ -4160,8 +4272,92 @@ function navigate(page, params={}){
   else if(page==='entrance_compare') initEntranceCompare(params);
   else if(page==='rewards') initRewards();
 
+  // Scratch pad lifecycle (Phase 1 — iPad-only, no-op on other devices)
+  if (typeof window.scratchShow === 'function') {
+    if (page === 'take' || page === 'practice') window.scratchShow();
+    else window.scratchHide();
+  }
+
+  // กัน Safari iPad header หาย (.stickyBar) ตอนข้อ/หน้า PDF เยอะ บน desktop/
+  // landscape breakpoint — ดู _liftTakeStickyBars
+  // เรียก sync ตรงนี้ (ไม่รอ requestAnimationFrame) — ถ้ารอ rAF จะถูก pdf.js
+  // (ใช้ rAF เองตอน render หน้า PDF จริง) แซงคิวบนเครื่องจริง ทำให้ lift ช้าไป
+  // เกือบ 1s ผู้ใช้เห็น PDF/ก ข ค ง อยู่ตำแหน่งเดิมแวบหนึ่งแล้วขยับ (เห็นใน
+  // sandbox ทดสอบไม่ได้เพราะใช้ pdfUrl:'about:blank' ไม่มี pdf.js render จริง)
+  // ตอนนี้ #page-take/#page-practice ถูก add class active ไปแล้ว (บรรทัด
+  // ~4219) ก่อน initTake/initPractice จะรันด้วยซ้ำ จึง getBoundingClientRect()
+  // ได้ขนาดจริงทันทีไม่ต้องรอ frame ใหม่
+  if (page === 'take' || page === 'practice') {
+    _liftTakeStickyBars(page);
+  }
+
   if(!params._noScroll) window.scrollTo(0,0);
 }
+
+// ย้าย .stickyBar ออกจาก .takeLeft/.takeRight (flex flow ที่ Safari iPad
+// คำนวณ reflow ผิดตอนเนื้อหายาว) ไปเป็นลูกตรงของ #page-take/#page-practice
+// แบบ position:fixed ผูกกับ viewport ตรง ๆ — ใช้เฉพาะ desktop/landscape
+// (min-width:901px) เพราะ mobile/portrait breakpoint แก้ปัญหานี้ไปแล้วด้วย
+// โครงสร้าง flex:0 0 20vh ของตัวเอง (ไม่เกี่ยวกับ flex:1+min-height:0)
+function _liftTakeStickyBars(page) {
+  if (!window.matchMedia('(min-width: 901px)').matches) return;
+  const root = document.getElementById('page-' + page);
+  if (!root || root.dataset.sbLifted) return;
+  const left = root.querySelector('.takeLeft');
+  const right = root.querySelector('.takeRight');
+  if (!left || !right) return;
+  const leftSb = left.querySelector(':scope > .stickyBar');
+  const rightSb = right.querySelector(':scope > .stickyBar');
+  if (leftSb) {
+    leftSb.classList.add('lifted-sb', 'lifted-sb-left');
+    root.insertBefore(leftSb, root.firstChild);
+    left.style.paddingTop = leftSb.getBoundingClientRect().height + 'px';
+  }
+  if (rightSb) {
+    rightSb.classList.add('lifted-sb', 'lifted-sb-right');
+    root.insertBefore(rightSb, root.firstChild);
+    right.style.paddingTop = rightSb.getBoundingClientRect().height + 'px';
+  }
+  root.dataset.sbLifted = '1';
+}
+
+// คืน .stickyBar กลับที่เดิมตอนหมุนจอกลับไป mobile/portrait breakpoint —
+// ต้องคืนจริง ๆ (ไม่ใช่แค่ถอด class) เพราะ CSS ของ mobile breakpoint
+// (.takeRight .stickyBar ฯลฯ) เป็น descendant selector ที่ต้องให้
+// stickyBar อยู่ใน .takeLeft/.takeRight เหมือนเดิมถึงจะ match
+function _unliftTakeStickyBars(page) {
+  const root = document.getElementById('page-' + page);
+  if (!root || !root.dataset.sbLifted) return;
+  const left = root.querySelector('.takeLeft');
+  const right = root.querySelector('.takeRight');
+  const leftSb = root.querySelector('.lifted-sb-left');
+  const rightSb = root.querySelector('.lifted-sb-right');
+  if (left && leftSb) {
+    leftSb.classList.remove('lifted-sb', 'lifted-sb-left');
+    left.insertBefore(leftSb, left.firstChild);
+    left.style.paddingTop = '';
+  }
+  if (right && rightSb) {
+    rightSb.classList.remove('lifted-sb', 'lifted-sb-right');
+    right.insertBefore(rightSb, right.firstChild);
+    right.style.paddingTop = '';
+  }
+  delete root.dataset.sbLifted;
+}
+
+// หมุนจอ iPad ระหว่างทำข้อสอบ (mobile <-> desktop breakpoint) ต้อง lift/unlift
+// ใหม่ให้ตรง breakpoint ปัจจุบัน — ของเดิม (v47.94 saga) lift ครั้งเดียวตอน
+// navigate() เท่านั้น ไม่รองรับหมุนจอกลางคัน
+function _syncTakeStickyBarLift() {
+  if (_currentPage !== 'take' && _currentPage !== 'practice') return;
+  if (window.matchMedia('(min-width: 901px)').matches) {
+    _liftTakeStickyBars(_currentPage);
+  } else {
+    _unliftTakeStickyBars(_currentPage);
+  }
+}
+window.addEventListener('resize', _syncTakeStickyBarLift);
+window.addEventListener('orientationchange', _syncTakeStickyBarLift);
 
 // ===================== EXAMS PAGE =====================
 function initExams(){
@@ -4394,6 +4590,7 @@ function initExams(){
     const _myResume = typeof loadTakeResume === 'function' ? loadTakeResume(_myName) : null;
 
     exams.forEach(e=>{
+      try {
       const _examAttempts=allAttempts.filter(a=>a.examId===e.id && a.mode!=='weakness_practice');
       const myAttempts=isTeacher?_examAttempts:_examAttempts.filter(a=>(a.takerName||'')===_myName);
       const last=myAttempts[0];
@@ -4595,6 +4792,24 @@ function initExams(){
         navigate('exam',{id:e.id});
       };
       list.appendChild(card);
+      } catch(_err) {
+        // กัน 1 exam ที่ data เสีย ทำลายทั้ง list (bug: admin เห็นแค่ 4/13 ข้อ
+        // เพราะ uncaught exception ใน iteration ทำให้ forEach หยุด)
+        console.error('[renderExams] exam render failed, examId=' + e.id + ' title=' + (e.title||'?'), _err);
+        const errCard = document.createElement('div');
+        errCard.className = 'examCard';
+        errCard.style.cssText = 'border:2px dashed #fca5a5;background:#fef2f2;';
+        const _msg = (_err && _err.message) ? _err.message : String(_err);
+        const _stack = (_err && _err.stack) ? String(_err.stack).split('\n').slice(0,3).join('\n') : '';
+        errCard.innerHTML = '<div class="title" style="color:#b91c1c;">⚠️ ' + (e.title||'?') + '</div>'
+          + '<div class="meta" style="color:#b91c1c;">render error</div>'
+          + '<div style="font-size:11px;color:#7f1d1d;background:#fff;padding:6px 8px;margin-top:6px;border-radius:6px;font-family:monospace;word-break:break-word;white-space:pre-wrap;">'
+          + 'examId: ' + (e.id||'?') + '\n\n'
+          + 'Error: ' + _msg
+          + (_stack ? '\n\nStack:\n' + _stack : '')
+          + '</div>';
+        list.appendChild(errCard);
+      }
     });
     if(!list.children.length) list.innerHTML=`<div class="muted" style="padding:20px;">ยังไม่มีข้อสอบที่เผยแพร่</div>`;
 
@@ -4700,7 +4915,7 @@ function initTake(id){
   };
   const st=_takeState;
 
-  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '📝 [ฝึกซ้อม] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : '') + exam.title;
   document.getElementById('takeQTotal').textContent=total;
 
   // PDF.js viewer for take page
@@ -5129,8 +5344,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   function setTimerDisplay(value){
     const fmt=fmtTime(value);
     if(_practiceMode){
-      const txt='📝 ' + fmt;
-      t1.textContent=txt; t2.textContent=txt;
+      t1.textContent=fmt; t2.textContent=fmt;
       [t1,t2].forEach(t=>{t.style.color='#0891b2';t.style.fontWeight='800';t.style.animation='';});
       return;
     }
@@ -12847,7 +13061,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.75';
+  const CURRENT_VERSION = 'v47.84';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -12889,6 +13103,260 @@ function initEntranceCompare(params) {
       checkVersion();
     }
   });
+})();
+</script>
+<script>
+// ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil ทดเขียนระหว่างสอบ) ──
+(function initScratchPad(){
+  const isIPad = (
+    /iPad/.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) ||
+    (navigator.maxTouchPoints > 1 && Math.min(window.screen.width, window.screen.height) >= 768)
+  );
+  if (!isIPad) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'scratchToggleBtn';
+  btn.type = 'button';
+  btn.title = 'กระดาษทด (ใช้ Apple Pencil)';
+  btn.textContent = '📝';
+  document.body.appendChild(btn);
+
+  const pad = document.createElement('div');
+  pad.id = 'scratchPad';
+  pad.setAttribute('role','dialog');
+  pad.innerHTML =
+    '<div id="scratchPadHeader">' +
+      '<span class="scratch-title">📝 กระดาษทด</span>' +
+      '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
+      '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
+      '<span id="scratchEraserSizes">' +
+        '<button type="button" class="scratch-size" data-size="12" title="ลบเล็ก"><span style="width:6px;height:6px;"></span></button>' +
+        '<button type="button" class="scratch-size active" data-size="28" title="ลบกลาง"><span style="width:12px;height:12px;"></span></button>' +
+        '<button type="button" class="scratch-size" data-size="60" title="ลบใหญ่"><span style="width:20px;height:20px;"></span></button>' +
+      '</span>' +
+      '<button type="button" class="scratch-tool danger" id="scratchClearBtn" style="margin-left:auto;">🗑 ล้าง</button>' +
+      '<button type="button" class="scratch-tool" id="scratchExpandBtn" title="ขยาย/ย่อ">⛶</button>' +
+      '<button type="button" class="scratch-tool" id="scratchCloseBtn">✕</button>' +
+    '</div>' +
+    '<div id="scratchCanvasWrap"><canvas id="scratchCanvas"></canvas><div id="scratchCursor"></div></div>';
+  document.body.appendChild(pad);
+
+  const canvas = document.getElementById('scratchCanvas');
+  const wrap = document.getElementById('scratchCanvasWrap');
+  const ctx = canvas.getContext('2d');
+  let tool = 'pen';
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+  let dpr = window.devicePixelRatio || 1;
+  let penSize = 2;
+  let eraserSize = 28;
+
+  function resizeCanvas(preserve) {
+    const w = Math.max(10, Math.floor(window.innerWidth));
+    const r = wrap.getBoundingClientRect();
+    const h = Math.max(10, Math.floor(r.height));
+    if (canvas.width === w * dpr && canvas.height === h * dpr) return;
+    let img = null, oldW = 0, oldH = 0;
+    if (preserve && canvas.width > 0 && canvas.height > 0) {
+      try {
+        img = canvas.toDataURL();
+        oldW = canvas.width / dpr;
+        oldH = canvas.height / dpr;
+      } catch(e) {}
+    }
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (img && img.length > 100) {
+      const i = new Image();
+      i.onload = () => ctx.drawImage(i, 0, 0, oldW, oldH);
+      i.src = img;
+    }
+  }
+  function clearCanvas() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function applyStrokeStyle() {
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = eraserSize;
+      ctx.strokeStyle = '#000';
+      ctx.fillStyle = '#000';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineWidth = penSize;
+      ctx.strokeStyle = '#111827';
+      ctx.fillStyle = '#111827';
+    }
+  }
+  function drawDot(x, y) {
+    applyStrokeStyle();
+    const r = (tool === 'eraser' ? eraserSize : penSize) / 2;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawSegment(x, y) {
+    applyStrokeStyle();
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    lastX = x; lastY = y;
+  }
+  const cursorEl = document.getElementById('scratchCursor');
+  function updateCursor(x, y) {
+    if (tool !== 'eraser') { cursorEl.classList.remove('show'); return; }
+    cursorEl.style.left = x + 'px';
+    cursorEl.style.top = y + 'px';
+    cursorEl.style.width = eraserSize + 'px';
+    cursorEl.style.height = eraserSize + 'px';
+    cursorEl.classList.add('show');
+  }
+  function hideCursor() { cursorEl.classList.remove('show'); }
+
+  let activeStylusId = null;
+  function findStylus(touchList) {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].touchType === 'stylus') return touchList[i];
+    }
+    return null;
+  }
+  function findTouchById(touchList, id) {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].identifier === id) return touchList[i];
+    }
+    return null;
+  }
+  function getPosFromTouch(t) {
+    const r = canvas.getBoundingClientRect();
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function onTouchStart(e) {
+    const t = findStylus(e.touches);
+    if (!t) return;
+    e.preventDefault();
+    drawing = true;
+    activeStylusId = t.identifier;
+    const p = getPosFromTouch(t);
+    lastX = p.x; lastY = p.y;
+    drawDot(p.x, p.y);
+    updateCursor(p.x, p.y);
+  }
+  function onTouchMove(e) {
+    const stylus = findStylus(e.touches);
+    if (stylus) {
+      const sp = getPosFromTouch(stylus);
+      updateCursor(sp.x, sp.y);
+    }
+    if (!drawing || activeStylusId === null) return;
+    const t = findTouchById(e.touches, activeStylusId);
+    if (!t || t.touchType !== 'stylus') return;
+    e.preventDefault();
+    const p = getPosFromTouch(t);
+    drawSegment(p.x, p.y);
+  }
+  function onTouchEnd(e) {
+    if (activeStylusId === null) return;
+    const t = findTouchById(e.changedTouches, activeStylusId);
+    if (!t) return;
+    drawing = false;
+    activeStylusId = null;
+  }
+  canvas.addEventListener('touchstart', onTouchStart, {passive:false});
+  canvas.addEventListener('touchmove', onTouchMove, {passive:false});
+  canvas.addEventListener('touchend', onTouchEnd, {passive:false});
+  canvas.addEventListener('touchcancel', onTouchEnd, {passive:false});
+
+  function onPointerHover(e) {
+    if (e.pointerType !== 'pen') return;
+    const r = canvas.getBoundingClientRect();
+    updateCursor(e.clientX - r.left, e.clientY - r.top);
+  }
+  canvas.addEventListener('pointermove', onPointerHover);
+  canvas.addEventListener('pointerleave', hideCursor);
+
+  const eraserSizesEl = document.getElementById('scratchEraserSizes');
+  pad.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
+    b.addEventListener('click', () => {
+      tool = b.dataset.tool;
+      pad.querySelectorAll('.scratch-tool[data-tool]').forEach(x =>
+        x.classList.toggle('active', x === b)
+      );
+      eraserSizesEl.classList.toggle('show', tool === 'eraser');
+      if (tool !== 'eraser') hideCursor();
+    });
+  });
+  pad.querySelectorAll('.scratch-size').forEach(b => {
+    b.addEventListener('click', () => {
+      eraserSize = parseInt(b.dataset.size, 10) || 28;
+      pad.querySelectorAll('.scratch-size').forEach(x =>
+        x.classList.toggle('active', x === b)
+      );
+    });
+  });
+  document.getElementById('scratchClearBtn').addEventListener('click', () => {
+    if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
+  });
+  document.getElementById('scratchExpandBtn').addEventListener('click', () => {
+    pad.classList.toggle('full');
+  });
+  document.getElementById('scratchCloseBtn').addEventListener('click', () => {
+    pad.classList.remove('open');
+  });
+
+  let _twoFingerStartTime = 0;
+  let _twoFingerStartFingers = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    let fingers = 0;
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].touchType !== 'stylus') fingers++;
+    }
+    if (fingers === 2) {
+      _twoFingerStartTime = Date.now();
+      _twoFingerStartFingers = 2;
+    } else {
+      _twoFingerStartFingers = 0;
+    }
+  }, {passive: true});
+  canvas.addEventListener('touchend', (e) => {
+    if (_twoFingerStartFingers !== 2) return;
+    const elapsed = Date.now() - _twoFingerStartTime;
+    _twoFingerStartFingers = 0;
+    if (elapsed > 300) return; // long-press ไม่นับ
+    // สลับ tool
+    const next = (tool === 'pen') ? 'eraser' : 'pen';
+    const nextBtn = pad.querySelector('.scratch-tool[data-tool="' + next + '"]');
+    if (nextBtn) nextBtn.click();
+  }, {passive: true});
+  btn.addEventListener('click', () => {
+    const willOpen = !pad.classList.contains('open');
+    pad.classList.toggle('open', willOpen);
+    if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
+  });
+  window.addEventListener('resize', () => {
+    if (pad.classList.contains('open')) resizeCanvas(true);
+  });
+
+  // Lifecycle API — เรียกจาก navigate()
+  window.scratchShow = function() { btn.classList.add('visible'); };
+  window.scratchHide = function() {
+    btn.classList.remove('visible');
+    pad.classList.remove('open');
+    clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
+  };
 })();
 </script>
 </body>
