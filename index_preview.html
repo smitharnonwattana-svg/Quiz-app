@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.83p -->
+  <!-- APP_VERSION: v47.84p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -912,17 +912,23 @@
       }
     }
     #scratchPad {
+      /* width ใช้ min() แทน max-width แยก property — max-width เดิมค่าเป็น
+         none<->720px ข้ามฝั่ง "none" ไม่มีค่าตัวเลขให้ transition แทรกระหว่างกลาง
+         ได้ บราวเซอร์เลยสลับค่าแบบ discrete (กระโดดทันที) ทำให้ตอนย่อกลับ
+         (full->ปกติ) width กระโดดจาก 100vw ไป 720px ทันที แล้วค่อยไหลต่อจาก 720
+         ไป 50vw ช้าๆ — ดูไม่สมูท ส่วนตอนขยายบังเอิญดูสมูทเพราะกระโดดไปทาง none
+         (ไม่จำกัด) ตั้งแต่ต้น ไม่มีการ clamp ระหว่าง transition เลย */
       position: fixed; top: 0; right: 0;
-      width: 50vw; max-width: 720px; height: 100vh;
+      width: min(50vw, 720px); height: 100vh;
       background: #fffef9; border-left: 2px solid #1f2937;
       box-shadow: -8px 0 24px rgba(0,0,0,0.18);
       z-index: 9000;
       transform: translateX(100%);
-      transition: transform .25s ease-out, width .2s ease-out, max-width .2s ease-out;
+      transition: transform .25s ease-out, width .2s ease-out;
       display: flex; flex-direction: column;
     }
     #scratchPad.open { transform: translateX(0); }
-    #scratchPad.full { width: 100vw; max-width: none; }
+    #scratchPad.full { width: 100vw; }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1039,7 +1045,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.83p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.84p</div>
     </div>
   </div>
 </div>
