@@ -879,6 +879,12 @@
     }
     #scratchToggleBtn.visible { display: block; }
     #scratchToggleBtn:active { transform: scale(0.95); }
+    /* Mobile/portrait take-page layout pins .takeRight nav controls to the bottom 20vh band
+       (see @media max-width:900px above) — float the toggle above that band so it never
+       overlaps #takeUnsureBtn/#takeNextBtn. Does not touch .takeRight/.takeMobileNav rules. */
+    @media (max-width: 900px) {
+      #scratchToggleBtn { bottom: calc(20vh + 12px); right: 14px; }
+    }
     #scratchPad {
       position: fixed; top: 0; right: 0;
       width: 50vw; max-width: 720px; height: 100vh;
