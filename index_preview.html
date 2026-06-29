@@ -27,13 +27,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.77p -->
+  <!-- APP_VERSION: v47.78p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
     html,body{margin:0;padding:0;height:100%;overflow:hidden;}
     body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans Thai","Noto Sans","Liberation Sans";color:#111;background:#fff;user-select:none;-webkit-user-select:none;}
-    .page.active{height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    .page.active{height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
     input,textarea,select,[contenteditable]{user-select:text;-webkit-user-select:text;}
     a{color:inherit;text-decoration:none;}
     .container{max-width:1200px;margin:0 auto;padding:24px;}
@@ -66,7 +66,7 @@
 
     /* take page */
     /* Desktop layout */
-    .takeRoot{height:100vh;width:100vw;overflow:hidden;}
+    .takeRoot{height:100dvh;width:100vw;overflow:hidden;}
     .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
     .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
     .takeRight{overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
@@ -88,11 +88,11 @@
 
     /* ══ DESKTOP: side-by-side ══ */
     @media (min-width: 901px) {
-      .takeRoot{height:100vh;overflow:hidden;}
+      .takeRoot{height:100dvh;overflow:hidden;}
       .takeGrid{height:100%;display:grid;grid-template-columns:8fr 2fr;}
       .takeLeft{border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
       /* takeRight ใช้ flex column: choices ค้างที่บน, nums scroll ได้อย่างเดียว */
-      .takeRight{overflow:hidden !important;display:flex;flex-direction:column;height:100vh;}
+      .takeRight{overflow:hidden !important;display:flex;flex-direction:column;height:100dvh;}
       .takeRight > .stickyBar{flex-shrink:0;}
       .takeRight > .takeChoicesBlock{flex-shrink:0;border-bottom:1px solid var(--border);}
       .takeRight > .takeNumsWrap{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
@@ -109,12 +109,18 @@
       .lifted-sb{position:fixed !important;top:0;z-index:60;}
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
+      /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
+         พอ Safari ย่อ address bar ลง (มักเกิดอัตโนมัติ ~1s หลังเปิดหน้า) viewport
+         จริงโตขึ้นแต่ 100vh ไม่รีคำนวณตามทันที ทำให้ .takeRoot/.takeRight ที่ใช้
+         100vh ค้างขนาดเดิมไว้ก่อนแล้วค่อยขยับ เห็นเป็น PDF/ก ข ค ง เลื่อนตำแหน่ง
+         ทั้งที่ logic ของ stickyBar ไม่ได้เปลี่ยน — ใช้ 100dvh แทนเพราะมันรีคำนวณ
+         ตาม visual viewport จริงเสมอ (รองรับ Safari 15.4+) */
     }
 
     /* ══ MOBILE: PDF 70% top, controls 30% bottom ══ */
     /* Take page mobile redesign — controls zone */
     @media (max-width: 900px) {
-      .takeRoot{height:100vh;overflow:hidden;}
+      .takeRoot{height:100dvh;overflow:hidden;}
       .takeGrid{height:100%;display:flex;flex-direction:column;}
 
       /* PDF zone: 80% */
@@ -1017,7 +1023,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.77p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.78p</div>
     </div>
   </div>
 </div>
