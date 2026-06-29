@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.79p -->
+  <!-- APP_VERSION: v47.80p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -901,11 +901,13 @@
     /* Desktop/landscape: ตารางเลขข้ออยู่ฝั่งขวาเต็มความสูง ปุ่มลอย bottom-right (ค่า
        default ด้านบน) จะมาทับเลขข้อแถวล่าง — ย้ายขึ้นไปแถบบนสุด วางซ้ายของ "เวลาเหลือ"
        แทน (ฝั่งนั้นมีที่ว่างเหลือเยอะกว่าฝั่งปุ่ม ออก/ส่ง ที่แน่นอยู่แล้ว). 20vw คือความกว้าง
-       ของ .lifted-sb-right, 147px ชดเชยความกว้างจริงของ "เวลาเหลือ"+ตัวเลข+padding
-       ให้เหลือช่องว่าง ~10px ก่อนถึงตัวจับเวลา (ดู .lifted-sb-left) */
+       ของ .lifted-sb-right, 173px ชดเชยความกว้างจริงของ "เวลาเหลือ"+ตัวเลข+padding
+       (รวมส่วนกว้างสุดตอนโหมดฝึกซ้อมที่มี "📝 " นำหน้าเวลาด้วย) — เลขนี้คือจุดกึ่งกลาง
+       ที่ดีที่สุดของช่องว่างระหว่างชื่อข้อสอบ (ยาวสุด) กับตัวจับเวลา ตอนจอแคบสุดที่
+       breakpoint นี้ยังทำงาน (901px) ซึ่งช่องว่างเหลือไม่มาก (ดู .lifted-sb-left) */
     @media (min-width: 901px) {
       #scratchToggleBtn {
-        top: 12px; bottom: auto; right: calc(20vw + 147px);
+        top: 12px; bottom: auto; right: calc(20vw + 173px);
         width: 40px; height: 40px; font-size: 18px;
       }
     }
@@ -1034,7 +1036,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.79p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.80p</div>
     </div>
   </div>
 </div>
