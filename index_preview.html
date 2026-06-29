@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.85p -->
+  <!-- APP_VERSION: v47.86p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -109,9 +109,11 @@
       .lifted-sb{position:fixed !important;top:0;z-index:60;}
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
-      /* PDF Annotate toolbar/overlay — สร้างขึ้นด้วย JS เฉพาะตอน ≥901px อยู่แล้ว
-         (ดู initPdfAnnotate) กฎ display นี้กันไว้อีกชั้นเผื่อ resize ข้าม breakpoint */
-      .pdfAnnotateToolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:#1f2937;flex-shrink:0;}
+      /* PDF Annotate toolbar — สร้างขึ้นด้วย JS เฉพาะตอน ≥901px อยู่แล้ว (ดู
+         initPdfAnnotate) กฎ display นี้กันไว้อีกชั้นเผื่อ resize ข้าม breakpoint
+         ปุ่มอยู่ใน .stickyBar (header เดิม) ไม่กินพื้นที่แนวตั้งของ PDF เพิ่ม */
+      .pdfAnnotateToolbar{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;}
+      .pdfAnnotateToolbar .scratch-tool{padding:5px 8px;font-size:14px;line-height:1;}
       .pdfAnnotateStage{position:relative;display:block;width:100%;}
       .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
@@ -1058,7 +1060,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.85p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.86p</div>
     </div>
   </div>
 </div>
@@ -13525,11 +13527,10 @@ function initEntranceCompare(params) {
     const bar = document.createElement('div');
     bar.className = 'pdfAnnotateToolbar';
     bar.innerHTML =
-      '<span style="color:#fff;font-weight:900;font-size:13px;">เขียน/Highlight</span>' +
-      '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
-      '<button type="button" class="scratch-tool" data-tool="highlighter">🖍️ Highlight</button>' +
-      '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
-      '<button type="button" class="scratch-tool danger" data-action="clearAll" style="margin-left:auto;">🗑 ล้างทั้งหมด</button>';
+      '<button type="button" class="scratch-tool active" data-tool="pen" title="ปากกา">✏️</button>' +
+      '<button type="button" class="scratch-tool" data-tool="highlighter" title="Highlight">🖍️</button>' +
+      '<button type="button" class="scratch-tool" data-tool="eraser" title="ยางลบ">🩹</button>' +
+      '<button type="button" class="scratch-tool danger" data-action="clearAll" title="ล้างทั้งหมด">🗑</button>';
     bar.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
       b.addEventListener('click', () => {
         tool = b.dataset.tool;
@@ -13549,6 +13550,16 @@ function initEntranceCompare(params) {
     return bar;
   }
 
+  // หา .stickyBar (header เดิมที่มีชื่อข้อสอบ/เวลา) ที่คู่กับ containerId — หาด้วย
+  // anchor element ที่อยู่ใน header นั้นแน่ๆ ไม่ใช่ query DOM tree ตรงๆ เพราะ
+  // _liftTakeStickyBars อาจย้าย .stickyBar ออกจาก .takeLeft ไปเป็น position:fixed
+  // ลูกตรงของ #page-take/#page-practice แล้วก่อนหน้านี้ (ดู navigate())
+  const HEADER_ANCHOR_ID = { takePdfViewer: 'takeExamTitle', pracPdfViewer: 'pracExamTitle' };
+  function findHeaderBar(containerId) {
+    const anchor = document.getElementById(HEADER_ANCHOR_ID[containerId] || '');
+    return anchor ? anchor.closest('.stickyBar') : null;
+  }
+
   // ── สร้าง toolbar + overlay canvas ต่อหน้า ให้กับ container ที่ระบุ ──
   function buildOverlaysFor(containerId) {
     const container = document.getElementById(containerId);
@@ -13557,7 +13568,9 @@ function initEntranceCompare(params) {
     if (!pageWrappers.length) return null; // GDrive iframe embed หรือยังไม่ render — ไม่ต้องมี toolbar
 
     const toolbar = buildToolbar();
-    container.insertBefore(toolbar, container.firstChild);
+    const headerBar = findHeaderBar(containerId);
+    if (headerBar) headerBar.insertBefore(toolbar, headerBar.children[1] || null); // ไว้ระหว่างชื่อข้อสอบกับเวลา
+    else container.insertBefore(toolbar, container.firstChild); // fallback กันเหนียว
 
     const overlays = pageWrappers.map(wrapper => {
       const pdfCanvas = wrapper.querySelector('canvas');
