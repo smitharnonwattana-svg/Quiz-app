@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.84p -->
+  <!-- APP_VERSION: v47.85p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -109,6 +109,11 @@
       .lifted-sb{position:fixed !important;top:0;z-index:60;}
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
+      /* PDF Annotate toolbar/overlay — สร้างขึ้นด้วย JS เฉพาะตอน ≥901px อยู่แล้ว
+         (ดู initPdfAnnotate) กฎ display นี้กันไว้อีกชั้นเผื่อ resize ข้าม breakpoint */
+      .pdfAnnotateToolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:#1f2937;flex-shrink:0;}
+      .pdfAnnotateStage{position:relative;display:block;width:100%;}
+      .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
          พอ Safari ย่อ address bar ลง (มักเกิดอัตโนมัติ ~1s หลังเปิดหน้า) viewport
          จริงโตขึ้นแต่ 100vh ไม่รีคำนวณตามทันที ทำให้ .takeRoot/.takeRight ที่ใช้
@@ -978,6 +983,14 @@
       display: none; z-index: 10;
     }
     #scratchCursor.show { display: block; }
+    #pdfAnnotateCursor {
+      position: fixed; pointer-events: none;
+      border: 1.5px solid #ef4444; border-radius: 50%;
+      background: rgba(239,68,68,0.12);
+      transform: translate(-50%, -50%);
+      display: none; z-index: 9500;
+    }
+    #pdfAnnotateCursor.show { display: block; }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1045,7 +1058,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.84p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.85p</div>
     </div>
   </div>
 </div>
@@ -4278,6 +4291,13 @@ function navigate(page, params={}){
     else window.scratchHide();
   }
 
+  // PDF Annotate lifecycle (desktop/iPad ≥901px เท่านั้น, no-op on mobile)
+  if (typeof window.pdfAnnotateShow === 'function') {
+    if (page === 'take') window.pdfAnnotateShow('takePdfViewer');
+    else if (page === 'practice') window.pdfAnnotateShow('pracPdfViewer');
+    else window.pdfAnnotateHide();
+  }
+
   // กัน Safari iPad header หาย (.stickyBar) ตอนข้อ/หน้า PDF เยอะ บน desktop/
   // landscape breakpoint — ดู _liftTakeStickyBars
   // เรียก sync ตรงนี้ (ไม่รอ requestAnimationFrame) — ถ้ารอ rAF จะถูก pdf.js
@@ -4948,6 +4968,7 @@ function initTake(id){
       }
       const url = pdfUrl.startsWith('localpdf:') ? await getPdfBlobUrl(pdfUrl) : pdfUrl;
       await _takePdfViewer.loadUrl(url, 1);
+      if (typeof window.pdfAnnotateInit === 'function') window.pdfAnnotateInit('takePdfViewer');
     } catch(err){ toast(err?.message||String(err)); }
   }
 
@@ -7566,6 +7587,7 @@ function initPractice(params){
         pdfUrl=URL.createObjectURL(blob);
       }
       await _pracPdfViewer.loadUrl(pdfUrl,1);
+      if (typeof window.pdfAnnotateInit === 'function') window.pdfAnnotateInit('pracPdfViewer');
     }catch(err){toast(err?.message||String(err));}
   }
 
@@ -13338,6 +13360,304 @@ function initEntranceCompare(params) {
     pad.classList.remove('open');
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
   };
+})();
+
+// ── PDF ANNOTATE — เขียน/Highlight ทับ PDF ข้อสอบ (desktop/iPad ≥901px เท่านั้น) ──
+(function initPdfAnnotate(){
+  const MQ = window.matchMedia('(min-width:901px)');
+  const PEN = { size: 3, color: '#111827', alpha: 1 };
+  const HI  = { size: 18, color: '#fbbf24', alpha: 0.35 };
+  const ERASER_SIZE = 28;
+  let tool = 'pen';
+  const instances = {}; // containerId -> {toolbar, overlays:[{pdfCanvas,overlay,ctx,ro,clear}]}
+  let activeContainerId = null;
+
+  let cursorEl = null;
+  function ensureCursor() {
+    if (!cursorEl) {
+      cursorEl = document.createElement('div');
+      cursorEl.id = 'pdfAnnotateCursor';
+      document.body.appendChild(cursorEl);
+    }
+    return cursorEl;
+  }
+  function updateCursor(clientX, clientY) {
+    if (tool !== 'eraser') { hideCursor(); return; }
+    const c = ensureCursor();
+    c.style.left = clientX + 'px';
+    c.style.top = clientY + 'px';
+    c.style.width = ERASER_SIZE + 'px';
+    c.style.height = ERASER_SIZE + 'px';
+    c.classList.add('show');
+  }
+  function hideCursor() { if (cursorEl) cursorEl.classList.remove('show'); }
+
+  function applyStrokeStyle(ctx) {
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = ERASER_SIZE;
+      ctx.strokeStyle = '#000'; ctx.fillStyle = '#000';
+    } else if (tool === 'highlighter') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = HI.alpha;
+      ctx.lineWidth = HI.size;
+      ctx.strokeStyle = HI.color; ctx.fillStyle = HI.color;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = PEN.alpha;
+      ctx.lineWidth = PEN.size;
+      ctx.strokeStyle = PEN.color; ctx.fillStyle = PEN.color;
+    }
+  }
+  function currentToolSize() {
+    return tool === 'eraser' ? ERASER_SIZE : (tool === 'highlighter' ? HI.size : PEN.size);
+  }
+
+  // ── ต่อ overlay canvas หนึ่งอัน: stylus touch (วาด) + mouse pointer (วาด) ──
+  function wireDrawing(overlay, ctx) {
+    let drawing = false, lastX = 0, lastY = 0, activeStylusId = null, activePointerId = null;
+    function getPosFromClient(clientX, clientY) {
+      const r = overlay.getBoundingClientRect();
+      return { x: clientX - r.left, y: clientY - r.top };
+    }
+    function drawDot(x, y) {
+      applyStrokeStyle(ctx);
+      ctx.beginPath();
+      ctx.arc(x, y, currentToolSize() / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    function drawSegment(x, y) {
+      applyStrokeStyle(ctx);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x; lastY = y;
+    }
+    function findStylus(touchList) {
+      for (let i = 0; i < touchList.length; i++) {
+        if (touchList[i].touchType === 'stylus') return touchList[i];
+      }
+      return null;
+    }
+    function findTouchById(touchList, id) {
+      for (let i = 0; i < touchList.length; i++) {
+        if (touchList[i].identifier === id) return touchList[i];
+      }
+      return null;
+    }
+    function onTouchStart(e) {
+      const t = findStylus(e.touches);
+      if (!t) return; // ไม่มีปากกาแตะ — ปล่อยให้นิ้ว scroll ได้ตามปกติ
+      e.preventDefault();
+      drawing = true;
+      activeStylusId = t.identifier;
+      const p = getPosFromClient(t.clientX, t.clientY);
+      lastX = p.x; lastY = p.y;
+      drawDot(p.x, p.y);
+      updateCursor(t.clientX, t.clientY);
+    }
+    function onTouchMove(e) {
+      const stylus = findStylus(e.touches);
+      if (stylus) updateCursor(stylus.clientX, stylus.clientY);
+      if (!drawing || activeStylusId === null) return;
+      const t = findTouchById(e.touches, activeStylusId);
+      if (!t || t.touchType !== 'stylus') return;
+      e.preventDefault();
+      const p = getPosFromClient(t.clientX, t.clientY);
+      drawSegment(p.x, p.y);
+    }
+    function onTouchEnd(e) {
+      if (activeStylusId === null) return;
+      const t = findTouchById(e.changedTouches, activeStylusId);
+      if (!t) return;
+      drawing = false;
+      activeStylusId = null;
+    }
+    overlay.addEventListener('touchstart', onTouchStart, { passive: false });
+    overlay.addEventListener('touchmove', onTouchMove, { passive: false });
+    overlay.addEventListener('touchend', onTouchEnd, { passive: false });
+    overlay.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    // Pointer Events เฉพาะเมาส์ (desktop) — แยกจาก touch path ข้างบนชัดเจน
+    // กัน Safari สร้าง pointer event ปลอมจาก touch มาชนกัน
+    function onPointerDown(e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      e.preventDefault();
+      drawing = true;
+      activePointerId = e.pointerId;
+      const p = getPosFromClient(e.clientX, e.clientY);
+      lastX = p.x; lastY = p.y;
+      drawDot(p.x, p.y);
+      updateCursor(e.clientX, e.clientY);
+    }
+    function onPointerMove(e) {
+      if (e.pointerType !== 'mouse') return;
+      updateCursor(e.clientX, e.clientY);
+      if (!drawing || e.pointerId !== activePointerId) return;
+      const p = getPosFromClient(e.clientX, e.clientY);
+      drawSegment(p.x, p.y);
+    }
+    function onPointerUp(e) {
+      if (e.pointerType !== 'mouse' || e.pointerId !== activePointerId) return;
+      drawing = false;
+      activePointerId = null;
+    }
+    function onPointerLeave(e) {
+      if (e.pointerType === 'mouse') hideCursor();
+    }
+    overlay.addEventListener('pointerdown', onPointerDown);
+    overlay.addEventListener('pointermove', onPointerMove);
+    overlay.addEventListener('pointerup', onPointerUp);
+    overlay.addEventListener('pointerleave', onPointerLeave);
+    overlay.addEventListener('pointercancel', onPointerUp);
+  }
+
+  function clearOverlay(overlay, ctx) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    ctx.restore();
+  }
+
+  function buildToolbar() {
+    const bar = document.createElement('div');
+    bar.className = 'pdfAnnotateToolbar';
+    bar.innerHTML =
+      '<span style="color:#fff;font-weight:900;font-size:13px;">เขียน/Highlight</span>' +
+      '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
+      '<button type="button" class="scratch-tool" data-tool="highlighter">🖍️ Highlight</button>' +
+      '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
+      '<button type="button" class="scratch-tool danger" data-action="clearAll" style="margin-left:auto;">🗑 ล้างทั้งหมด</button>';
+    bar.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
+      b.addEventListener('click', () => {
+        tool = b.dataset.tool;
+        document.querySelectorAll('.pdfAnnotateToolbar .scratch-tool[data-tool]').forEach(x =>
+          x.classList.toggle('active', x.dataset.tool === tool)
+        );
+        if (tool !== 'eraser') hideCursor();
+      });
+    });
+    bar.querySelector('[data-action="clearAll"]').addEventListener('click', () => {
+      if (confirm('ล้างทั้งหมดที่เขียน/highlight ไว้บน PDF นี้?')) {
+        Object.keys(instances).forEach(cid => {
+          instances[cid].overlays.forEach(o => clearOverlay(o.overlay, o.ctx));
+        });
+      }
+    });
+    return bar;
+  }
+
+  // ── สร้าง toolbar + overlay canvas ต่อหน้า ให้กับ container ที่ระบุ ──
+  function buildOverlaysFor(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return null;
+    const pageWrappers = Array.from(container.querySelectorAll('[id^="' + containerId + '-page-"]'));
+    if (!pageWrappers.length) return null; // GDrive iframe embed หรือยังไม่ render — ไม่ต้องมี toolbar
+
+    const toolbar = buildToolbar();
+    container.insertBefore(toolbar, container.firstChild);
+
+    const overlays = pageWrappers.map(wrapper => {
+      const pdfCanvas = wrapper.querySelector('canvas');
+      if (!pdfCanvas) return null;
+      const stage = document.createElement('div');
+      stage.className = 'pdfAnnotateStage';
+      pdfCanvas.parentNode.insertBefore(stage, pdfCanvas);
+      stage.appendChild(pdfCanvas);
+      pdfCanvas.style.margin = '0 auto'; // เก็บ centering เดิมที่มาจาก wrapper{align-items:center}
+
+      const overlay = document.createElement('canvas');
+      overlay.className = 'pdfAnnotateCanvas';
+      stage.appendChild(overlay);
+      const ctx = overlay.getContext('2d');
+
+      // วัดขนาด/ตำแหน่งของ canvas PDF จริงแบบสดทุกครั้ง (ไม่ cache) เพราะ
+      // canvas PDF ตั้ง style.width/height เป็น px ตายตัวครั้งเดียว มี
+      // max-width:100% เป็นแค่ clamp ให้หดได้ ขนาดที่เห็นจริงอาจเปลี่ยนได้
+      // โดยค่า style ไม่เปลี่ยน — ต้องอ่าน offsetWidth/Height สดเสมอ
+      function syncGeometry() {
+        const w = pdfCanvas.offsetWidth, h = pdfCanvas.offsetHeight;
+        if (!w || !h) return;
+        overlay.style.left = pdfCanvas.offsetLeft + 'px';
+        overlay.style.top = pdfCanvas.offsetTop + 'px';
+        overlay.style.width = w + 'px';
+        overlay.style.height = h + 'px';
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+        if (overlay.width === bw && overlay.height === bh) return;
+        let img = null;
+        if (overlay.width > 0 && overlay.height > 0) {
+          try { img = overlay.toDataURL(); } catch (e) {}
+        }
+        overlay.width = bw; overlay.height = bh;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        if (img && img.length > 100) {
+          const i = new Image();
+          i.onload = () => ctx.drawImage(i, 0, 0, w, h);
+          i.src = img;
+        }
+      }
+      syncGeometry();
+      const ro = new ResizeObserver(syncGeometry);
+      ro.observe(pdfCanvas);
+
+      wireDrawing(overlay, ctx);
+      return { pdfCanvas, overlay, ctx, ro };
+    }).filter(Boolean);
+
+    return { toolbar, overlays };
+  }
+
+  // เอา toolbar/overlay ออกจาก DOM ทั้งหมด คืน canvas PDF กลับที่เดิม
+  function teardown(containerId) {
+    const inst = instances[containerId];
+    if (!inst) return;
+    inst.overlays.forEach(o => {
+      try { o.ro.disconnect(); } catch (e) {}
+      const stage = o.overlay.parentNode;
+      if (stage && stage.parentNode) {
+        stage.parentNode.insertBefore(o.pdfCanvas, stage);
+        stage.parentNode.removeChild(stage);
+      }
+    });
+    if (inst.toolbar && inst.toolbar.parentNode) inst.toolbar.parentNode.removeChild(inst.toolbar);
+    delete instances[containerId];
+  }
+
+  function pdfAnnotateInit(containerId) {
+    if (!MQ.matches) return;
+    teardown(containerId); // กันซ้ำ เผื่อ initTake/loadPdf ถูกเรียกใหม่ (สอบรอบใหม่)
+    const built = buildOverlaysFor(containerId);
+    if (built) instances[containerId] = built;
+  }
+
+  window.pdfAnnotateInit = pdfAnnotateInit;
+  window.pdfAnnotateShow = function(containerId) {
+    activeContainerId = containerId;
+    if (MQ.matches && !instances[containerId]) pdfAnnotateInit(containerId);
+  };
+  window.pdfAnnotateHide = function() {
+    // ทดหายเมื่อออกจากข้อสอบ/ส่งคำตอบ (เหมือนกระดาษทด) — เคลียร์ทุก instance
+    // ที่มีอยู่ (ทั้ง take + practice เผื่อยังไม่ถูก teardown)
+    Object.keys(instances).forEach(cid => {
+      instances[cid].overlays.forEach(o => clearOverlay(o.overlay, o.ctx));
+    });
+    hideCursor();
+  };
+
+  // หมุนจอ iPad ข้าม breakpoint กลางรอบสอบ — เปิด/ปิดฟีเจอร์ตามจริง
+  window.addEventListener('resize', () => {
+    if (!activeContainerId) return;
+    if (MQ.matches) {
+      if (!instances[activeContainerId]) pdfAnnotateInit(activeContainerId);
+    } else if (instances[activeContainerId]) {
+      instances[activeContainerId].overlays.forEach(o => clearOverlay(o.overlay, o.ctx));
+      teardown(activeContainerId);
+    }
+  });
 })();
 </script>
 </body>
