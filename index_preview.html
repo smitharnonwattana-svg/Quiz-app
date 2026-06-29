@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.75p -->
+  <!-- APP_VERSION: v47.76p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -102,6 +102,13 @@
       /* nav buttons — grid 3 คอลัมน์ ความกว้างคงที่ ไม่ shift เวลา text เปลี่ยน */
       #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;white-space:nowrap !important;min-width:0 !important;overflow:hidden !important;}
       .takeMobileNav{display:grid !important;grid-template-columns:1fr 1fr 1fr !important;gap:8px !important;width:100% !important;}
+      /* Safari iPad ไม่ honor min-height:0 ตอน .pdfWrapTake/.takeNumsWrap เนื้อหายาว
+         (PDF หลายหน้า/เลขข้อเยอะ) — pane ขยายเกิน viewport แล้ว stickyBar (header)
+         หลุดจากที่มองเห็น แก้โดย JS ย้าย .stickyBar ออกจาก flex flow ไปเป็น
+         position:fixed ลูกตรงของ #page-take/#page-practice (ดู _liftTakeStickyBars) */
+      .lifted-sb{position:fixed !important;top:0;z-index:60;}
+      .lifted-sb-left{left:0;width:80vw;}
+      .lifted-sb-right{right:0;width:20vw;}
     }
 
     /* ══ MOBILE: PDF 70% top, controls 30% bottom ══ */
@@ -1010,7 +1017,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.75p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.76p</div>
     </div>
   </div>
 </div>
@@ -4243,8 +4250,79 @@ function navigate(page, params={}){
     else window.scratchHide();
   }
 
+  // กัน Safari iPad header หาย (.stickyBar) ตอนข้อ/หน้า PDF เยอะ บน desktop/
+  // landscape breakpoint — ดู _liftTakeStickyBars
+  if (page === 'take' || page === 'practice') {
+    requestAnimationFrame(() => _liftTakeStickyBars(page));
+  }
+
   if(!params._noScroll) window.scrollTo(0,0);
 }
+
+// ย้าย .stickyBar ออกจาก .takeLeft/.takeRight (flex flow ที่ Safari iPad
+// คำนวณ reflow ผิดตอนเนื้อหายาว) ไปเป็นลูกตรงของ #page-take/#page-practice
+// แบบ position:fixed ผูกกับ viewport ตรง ๆ — ใช้เฉพาะ desktop/landscape
+// (min-width:901px) เพราะ mobile/portrait breakpoint แก้ปัญหานี้ไปแล้วด้วย
+// โครงสร้าง flex:0 0 20vh ของตัวเอง (ไม่เกี่ยวกับ flex:1+min-height:0)
+function _liftTakeStickyBars(page) {
+  if (!window.matchMedia('(min-width: 901px)').matches) return;
+  const root = document.getElementById('page-' + page);
+  if (!root || root.dataset.sbLifted) return;
+  const left = root.querySelector('.takeLeft');
+  const right = root.querySelector('.takeRight');
+  if (!left || !right) return;
+  const leftSb = left.querySelector(':scope > .stickyBar');
+  const rightSb = right.querySelector(':scope > .stickyBar');
+  if (leftSb) {
+    leftSb.classList.add('lifted-sb', 'lifted-sb-left');
+    root.insertBefore(leftSb, root.firstChild);
+    left.style.paddingTop = leftSb.getBoundingClientRect().height + 'px';
+  }
+  if (rightSb) {
+    rightSb.classList.add('lifted-sb', 'lifted-sb-right');
+    root.insertBefore(rightSb, root.firstChild);
+    right.style.paddingTop = rightSb.getBoundingClientRect().height + 'px';
+  }
+  root.dataset.sbLifted = '1';
+}
+
+// คืน .stickyBar กลับที่เดิมตอนหมุนจอกลับไป mobile/portrait breakpoint —
+// ต้องคืนจริง ๆ (ไม่ใช่แค่ถอด class) เพราะ CSS ของ mobile breakpoint
+// (.takeRight .stickyBar ฯลฯ) เป็น descendant selector ที่ต้องให้
+// stickyBar อยู่ใน .takeLeft/.takeRight เหมือนเดิมถึงจะ match
+function _unliftTakeStickyBars(page) {
+  const root = document.getElementById('page-' + page);
+  if (!root || !root.dataset.sbLifted) return;
+  const left = root.querySelector('.takeLeft');
+  const right = root.querySelector('.takeRight');
+  const leftSb = root.querySelector('.lifted-sb-left');
+  const rightSb = root.querySelector('.lifted-sb-right');
+  if (left && leftSb) {
+    leftSb.classList.remove('lifted-sb', 'lifted-sb-left');
+    left.insertBefore(leftSb, left.firstChild);
+    left.style.paddingTop = '';
+  }
+  if (right && rightSb) {
+    rightSb.classList.remove('lifted-sb', 'lifted-sb-right');
+    right.insertBefore(rightSb, right.firstChild);
+    right.style.paddingTop = '';
+  }
+  delete root.dataset.sbLifted;
+}
+
+// หมุนจอ iPad ระหว่างทำข้อสอบ (mobile <-> desktop breakpoint) ต้อง lift/unlift
+// ใหม่ให้ตรง breakpoint ปัจจุบัน — ของเดิม (v47.94 saga) lift ครั้งเดียวตอน
+// navigate() เท่านั้น ไม่รองรับหมุนจอกลางคัน
+function _syncTakeStickyBarLift() {
+  if (_currentPage !== 'take' && _currentPage !== 'practice') return;
+  if (window.matchMedia('(min-width: 901px)').matches) {
+    _liftTakeStickyBars(_currentPage);
+  } else {
+    _unliftTakeStickyBars(_currentPage);
+  }
+}
+window.addEventListener('resize', _syncTakeStickyBarLift);
+window.addEventListener('orientationchange', _syncTakeStickyBarLift);
 
 // ===================== EXAMS PAGE =====================
 function initExams(){
