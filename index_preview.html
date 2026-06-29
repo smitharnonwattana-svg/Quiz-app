@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.76p -->
+  <!-- APP_VERSION: v47.77p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1017,7 +1017,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.76p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.77p</div>
     </div>
   </div>
 </div>
@@ -4252,8 +4252,15 @@ function navigate(page, params={}){
 
   // กัน Safari iPad header หาย (.stickyBar) ตอนข้อ/หน้า PDF เยอะ บน desktop/
   // landscape breakpoint — ดู _liftTakeStickyBars
+  // เรียก sync ตรงนี้ (ไม่รอ requestAnimationFrame) — ถ้ารอ rAF จะถูก pdf.js
+  // (ใช้ rAF เองตอน render หน้า PDF จริง) แซงคิวบนเครื่องจริง ทำให้ lift ช้าไป
+  // เกือบ 1s ผู้ใช้เห็น PDF/ก ข ค ง อยู่ตำแหน่งเดิมแวบหนึ่งแล้วขยับ (เห็นใน
+  // sandbox ทดสอบไม่ได้เพราะใช้ pdfUrl:'about:blank' ไม่มี pdf.js render จริง)
+  // ตอนนี้ #page-take/#page-practice ถูก add class active ไปแล้ว (บรรทัด
+  // ~4219) ก่อน initTake/initPractice จะรันด้วยซ้ำ จึง getBoundingClientRect()
+  // ได้ขนาดจริงทันทีไม่ต้องรอ frame ใหม่
   if (page === 'take' || page === 'practice') {
-    requestAnimationFrame(() => _liftTakeStickyBars(page));
+    _liftTakeStickyBars(page);
   }
 
   if(!params._noScroll) window.scrollTo(0,0);
