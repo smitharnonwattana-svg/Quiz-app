@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.78p -->
+  <!-- APP_VERSION: v47.79p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -898,6 +898,17 @@
     @media (max-width: 900px) {
       #scratchToggleBtn { bottom: calc(20vh + 12px); right: 14px; }
     }
+    /* Desktop/landscape: ตารางเลขข้ออยู่ฝั่งขวาเต็มความสูง ปุ่มลอย bottom-right (ค่า
+       default ด้านบน) จะมาทับเลขข้อแถวล่าง — ย้ายขึ้นไปแถบบนสุด วางซ้ายของ "เวลาเหลือ"
+       แทน (ฝั่งนั้นมีที่ว่างเหลือเยอะกว่าฝั่งปุ่ม ออก/ส่ง ที่แน่นอยู่แล้ว). 20vw คือความกว้าง
+       ของ .lifted-sb-right, 147px ชดเชยความกว้างจริงของ "เวลาเหลือ"+ตัวเลข+padding
+       ให้เหลือช่องว่าง ~10px ก่อนถึงตัวจับเวลา (ดู .lifted-sb-left) */
+    @media (min-width: 901px) {
+      #scratchToggleBtn {
+        top: 12px; bottom: auto; right: calc(20vw + 147px);
+        width: 40px; height: 40px; font-size: 18px;
+      }
+    }
     #scratchPad {
       position: fixed; top: 0; right: 0;
       width: 50vw; max-width: 720px; height: 100vh;
@@ -1023,7 +1034,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.78p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.79p</div>
     </div>
   </div>
 </div>
