@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.82p -->
+  <!-- APP_VERSION: v47.83p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -957,7 +957,10 @@
       overflow: hidden;
     }
     #scratchCanvas {
-      display: block; width: 100%; height: 100%;
+      /* ขนาดจริงตั้งโดย JS ให้เท่ากับ "เต็มจอ" เสมอ (ดู resizeCanvas) ไม่ผูกกับ
+         ความกว้าง wrap ปัจจุบัน — ตอนพับครึ่งจอ wrap (overflow:hidden) จะบังฝั่งขวา
+         ไว้เฉยๆ ไม่ตัดเนื้อหาทิ้ง กางออกมาใหม่จะเห็นครบเหมือนเดิม */
+      display: block; position: absolute; top: 0; left: 0;
       touch-action: none; cursor: crosshair;
       -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
     }
@@ -1036,7 +1039,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.82p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.83p</div>
     </div>
   </div>
 </div>
@@ -13107,9 +13110,14 @@ function initEntranceCompare(params) {
   let eraserSize = 28;
 
   function resizeCanvas(preserve) {
+    // canvas ตั้งขนาดเท่า "เต็มจอ" เสมอ (เท่ากับโหมดขยาย) ไม่ใช่ขนาด wrap ปัจจุบัน
+    // — ตอนพับครึ่งจอ wrap (overflow:hidden) จะบังฝั่งขวาไว้เฉยๆ ไม่ตัดเนื้อหา
+    // ทิ้งจริง ฟังก์ชันนี้จึงรันแค่ตอนเปิดครั้งแรก/หน้าจอเปลี่ยนขนาดจริง (ไม่ใช่
+    // ทุกครั้งที่กดปุ่มขยาย/ย่อ — ดู scratchExpandBtn handler ด้านล่าง)
+    const w = Math.max(10, Math.floor(window.innerWidth));
     const r = wrap.getBoundingClientRect();
-    const w = Math.max(10, Math.floor(r.width));
     const h = Math.max(10, Math.floor(r.height));
+    if (canvas.width === w * dpr && canvas.height === h * dpr) return;
     let img = null, oldW = 0, oldH = 0;
     if (preserve && canvas.width > 0 && canvas.height > 0) {
       try {
@@ -13273,9 +13281,9 @@ function initEntranceCompare(params) {
     if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
   });
   document.getElementById('scratchExpandBtn').addEventListener('click', () => {
+    // canvas ขนาดเท่าเต็มจอเสมอแล้ว (ดู resizeCanvas) แค่ toggle class ให้ wrap
+    // เปลี่ยนความกว้างที่ "เผย" ออกมา ไม่ต้อง resize canvas เลย
     pad.classList.toggle('full');
-    // รอ transition จบก่อน resize เพื่อให้ canvas เต็มพื้นที่ใหม่
-    setTimeout(() => resizeCanvas(true), 220);
   });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
