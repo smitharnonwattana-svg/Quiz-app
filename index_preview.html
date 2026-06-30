@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.90p -->
+  <!-- APP_VERSION: v47.91p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -113,15 +113,16 @@
       #pdfAnnotateToggleBtn{position:fixed;top:12px;right:calc(20vw + 195px);width:40px;height:40px;border-radius:50%;background:#1f2937;color:#e5e7eb;border:none;font-size:18px;cursor:pointer;z-index:8500;display:none;transition:background .15s,color .15s,box-shadow .15s;line-height:1;font-family:inherit;}
       #pdfAnnotateToggleBtn.toolbar-open{background:#fbbf24;color:#111;}
       #pdfAnnotateToggleBtn.draw-on{background:#374151;color:#fbbf24;box-shadow:0 0 0 2px #fbbf24;}
-      #pdfAnnotateToolbar{position:fixed;bottom:20px;left:16px;display:none;align-items:center;gap:4px;background:rgba(31,41,55,0.96);backdrop-filter:blur(12px);border-radius:20px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:9200;}
+      #pdfAnnotateToolbar{position:fixed;top:60px;right:calc(20vw + 195px);display:none;align-items:center;gap:4px;background:rgba(31,41,55,0.96);backdrop-filter:blur(12px);border-radius:20px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:9200;}
       #pdfAnnotateToolbar.open{display:flex;}
       .pa-tool{width:38px;height:38px;border-radius:10px;border:none;background:transparent;color:#d1d5db;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
       .pa-tool.active{background:#374151;color:#fbbf24;}
       .pa-sep{width:1px;height:28px;background:#4b5563;margin:0 4px;flex-shrink:0;}
       .pa-color{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;}
       .pa-color.active{box-shadow:0 0 0 2.5px #fbbf24;}
-      .pa-size{padding:3px 9px;border-radius:8px;border:1px solid #4b5563;background:#374151;color:#d1d5db;font-size:12px;cursor:pointer;font-family:inherit;}
-      .pa-size.active{background:#fbbf24;color:#111;border-color:#fbbf24;}
+      .pa-size{width:32px;height:32px;border-radius:50%;border:1px solid #4b5563;background:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;}
+      .pa-size.active{border-color:#fbbf24;background:#fbbf24;}
+      .pa-size.active span{background:#111 !important;}
       .pdfAnnotateStage{position:relative;display:block;width:100%;}
       .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
@@ -1068,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.90p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.91p</div>
     </div>
   </div>
 </div>
@@ -13605,10 +13606,13 @@ function initEntranceCompare(params) {
         paSubEl.appendChild(b);
       });
     } else if (tool === 'eraser') {
-      [[12,'S'],[28,'M'],[60,'L']].forEach(([sz, label]) => {
+      [[12,6],[28,12],[60,20]].forEach(([sz, dotPx]) => {
         const b = document.createElement('button');
         b.className = 'pa-size' + (eraserSize === sz ? ' active' : '');
-        b.textContent = label;
+        b.title = sz + 'px'; b.dataset.size = sz;
+        const dot = document.createElement('span');
+        dot.style.cssText = 'display:block;border-radius:50%;background:#fff;width:' + dotPx + 'px;height:' + dotPx + 'px;';
+        b.appendChild(dot);
         b.addEventListener('click', () => { eraserSize = sz; updateSubArea(); });
         paSubEl.appendChild(b);
       });
