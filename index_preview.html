@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.86p -->
+  <!-- APP_VERSION: v47.87p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -109,11 +109,13 @@
       .lifted-sb{position:fixed !important;top:0;z-index:60;}
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
-      /* PDF Annotate toolbar — สร้างขึ้นด้วย JS เฉพาะตอน ≥901px อยู่แล้ว (ดู
-         initPdfAnnotate) กฎ display นี้กันไว้อีกชั้นเผื่อ resize ข้าม breakpoint
-         ปุ่มอยู่ใน .stickyBar (header เดิม) ไม่กินพื้นที่แนวตั้งของ PDF เพิ่ม */
-      .pdfAnnotateToolbar{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;}
-      .pdfAnnotateToolbar .scratch-tool{padding:5px 8px;font-size:14px;line-height:1;}
+      /* PDF Annotate — ปุ่มเดียวใน header (toggle) + palette ลอย */
+      .pdfAnnotateToggleBtn{padding:5px 9px;border-radius:8px;border:1px solid #4b5563;background:#374151;color:#fff;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;font-family:inherit;}
+      .pdfAnnotateToggleBtn.active{background:#fbbf24;color:#111;border-color:#fbbf24;}
+      #pdfAnnotatePalette{position:fixed;z-index:9200;background:#1f2937;border-radius:12px;padding:8px 10px;display:flex;gap:6px;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,.3);transform:translateY(-6px) scale(.95);opacity:0;transition:transform .18s ease,opacity .15s ease;pointer-events:none;}
+      #pdfAnnotatePalette.open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto;}
+      .pdfAnnotatePenBtn{border-radius:50%;width:26px;height:26px;padding:0;border:2px solid rgba(255,255,255,.25);cursor:pointer;flex-shrink:0;}
+      .pdfAnnotatePenBtn.active{box-shadow:0 0 0 2.5px #fbbf24;}
       .pdfAnnotateStage{position:relative;display:block;width:100%;}
       .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
@@ -1060,7 +1062,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.86p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.87p</div>
     </div>
   </div>
 </div>
@@ -13367,12 +13369,17 @@ function initEntranceCompare(params) {
 // ── PDF ANNOTATE — เขียน/Highlight ทับ PDF ข้อสอบ (desktop/iPad ≥901px เท่านั้น) ──
 (function initPdfAnnotate(){
   const MQ = window.matchMedia('(min-width:901px)');
-  const PEN = { size: 3, color: '#111827', alpha: 1 };
-  const HI  = { size: 18, color: '#fbbf24', alpha: 0.35 };
+  const PEN = { size: 3, alpha: 1 };
+  const HI  = { size: 18, color: '#fbbf24' };
   const ERASER_SIZE = 28;
   let tool = 'pen';
-  const instances = {}; // containerId -> {toolbar, overlays:[{pdfCanvas,overlay,ctx,ro,clear}]}
+  let penColor = '#111111'; // สีปากกาปัจจุบัน
+  const instances = {}; // containerId -> {toolbar, overlays:[{pdfCanvas,overlay,ctx,hlCanvas,hlCtx,ro}]}
   let activeContainerId = null;
+
+  // ── Palette singleton ──
+  let palette = null;
+  let currentToggleBtn = null;
 
   let cursorEl = null;
   function ensureCursor() {
@@ -13400,25 +13407,19 @@ function initEntranceCompare(params) {
       ctx.globalAlpha = 1;
       ctx.lineWidth = ERASER_SIZE;
       ctx.strokeStyle = '#000'; ctx.fillStyle = '#000';
-    } else if (tool === 'highlighter') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = HI.alpha;
-      ctx.lineWidth = HI.size;
-      ctx.strokeStyle = HI.color; ctx.fillStyle = HI.color;
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = PEN.alpha;
       ctx.lineWidth = PEN.size;
-      ctx.strokeStyle = PEN.color; ctx.fillStyle = PEN.color;
+      ctx.strokeStyle = penColor; ctx.fillStyle = penColor;
     }
   }
-  function currentToolSize() {
-    return tool === 'eraser' ? ERASER_SIZE : (tool === 'highlighter' ? HI.size : PEN.size);
-  }
 
-  // ── ต่อ overlay canvas หนึ่งอัน: stylus touch (วาด) + mouse pointer (วาด) ──
-  function wireDrawing(overlay, ctx) {
+  // ── overlay canvas: stylus touch + mouse + hlCanvas buffer สำหรับ highlighter ──
+  function wireDrawing(overlay, ctx, hlCanvas, hlCtx) {
     let drawing = false, lastX = 0, lastY = 0, activeStylusId = null, activePointerId = null;
+    let hlPoints = null; // buffer สำหรับ highlighter stroke ที่กำลังลากอยู่
+
     function getPosFromClient(clientX, clientY) {
       const r = overlay.getBoundingClientRect();
       return { x: clientX - r.left, y: clientY - r.top };
@@ -13426,7 +13427,7 @@ function initEntranceCompare(params) {
     function drawDot(x, y) {
       applyStrokeStyle(ctx);
       ctx.beginPath();
-      ctx.arc(x, y, currentToolSize() / 2, 0, Math.PI * 2);
+      ctx.arc(x, y, (tool === 'eraser' ? ERASER_SIZE : PEN.size) / 2, 0, Math.PI * 2);
       ctx.fill();
     }
     function drawSegment(x, y) {
@@ -13437,6 +13438,47 @@ function initEntranceCompare(params) {
       ctx.stroke();
       lastX = x; lastY = y;
     }
+    // Highlighter: redraw ทั้ง path ใน hlCanvas ทุกครั้ง — กัน alpha accumulation ดวงๆ
+    function hlMove(x, y) {
+      hlPoints.push({x, y});
+      hlCtx.save();
+      hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+      hlCtx.clearRect(0, 0, hlCanvas.width, hlCanvas.height);
+      hlCtx.restore();
+      hlCtx.beginPath();
+      hlCtx.moveTo(hlPoints[0].x, hlPoints[0].y);
+      for (let i = 1; i < hlPoints.length; i++) hlCtx.lineTo(hlPoints[i].x, hlPoints[i].y);
+      hlCtx.strokeStyle = HI.color;
+      hlCtx.lineWidth = HI.size;
+      hlCtx.lineCap = 'round'; hlCtx.lineJoin = 'round';
+      hlCtx.stroke();
+    }
+    function hlEnd() {
+      if (!hlPoints || !hlPoints.length) return;
+      hlPoints = null;
+      // Composite hlCanvas → main canvas ด้วย alpha 0.35
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 0.35;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(hlCanvas, 0, 0);
+      ctx.restore();
+      hlCtx.save();
+      hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+      hlCtx.clearRect(0, 0, hlCanvas.width, hlCanvas.height);
+      hlCtx.restore();
+    }
+
+    function startStroke(x, y) {
+      if (tool === 'highlighter') { hlPoints = [{x, y}]; hlMove(x, y); }
+      else { lastX = x; lastY = y; drawDot(x, y); }
+    }
+    function continueStroke(x, y) {
+      if (tool === 'highlighter') hlMove(x, y);
+      else drawSegment(x, y);
+    }
+    function endStroke() { if (tool === 'highlighter') hlEnd(); }
+
     function findStylus(touchList) {
       for (let i = 0; i < touchList.length; i++) {
         if (touchList[i].touchType === 'stylus') return touchList[i];
@@ -13451,13 +13493,11 @@ function initEntranceCompare(params) {
     }
     function onTouchStart(e) {
       const t = findStylus(e.touches);
-      if (!t) return; // ไม่มีปากกาแตะ — ปล่อยให้นิ้ว scroll ได้ตามปกติ
+      if (!t) return;
       e.preventDefault();
-      drawing = true;
-      activeStylusId = t.identifier;
+      drawing = true; activeStylusId = t.identifier;
       const p = getPosFromClient(t.clientX, t.clientY);
-      lastX = p.x; lastY = p.y;
-      drawDot(p.x, p.y);
+      startStroke(p.x, p.y);
       updateCursor(t.clientX, t.clientY);
     }
     function onTouchMove(e) {
@@ -13468,30 +13508,27 @@ function initEntranceCompare(params) {
       if (!t || t.touchType !== 'stylus') return;
       e.preventDefault();
       const p = getPosFromClient(t.clientX, t.clientY);
-      drawSegment(p.x, p.y);
+      continueStroke(p.x, p.y);
     }
     function onTouchEnd(e) {
       if (activeStylusId === null) return;
       const t = findTouchById(e.changedTouches, activeStylusId);
       if (!t) return;
-      drawing = false;
-      activeStylusId = null;
+      endStroke();
+      drawing = false; activeStylusId = null;
+      hideCursor(); // แก้บัค: cursor ต้องหายตอน Apple Pencil ยก
     }
     overlay.addEventListener('touchstart', onTouchStart, { passive: false });
     overlay.addEventListener('touchmove', onTouchMove, { passive: false });
     overlay.addEventListener('touchend', onTouchEnd, { passive: false });
     overlay.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
-    // Pointer Events เฉพาะเมาส์ (desktop) — แยกจาก touch path ข้างบนชัดเจน
-    // กัน Safari สร้าง pointer event ปลอมจาก touch มาชนกัน
     function onPointerDown(e) {
       if (e.pointerType !== 'mouse' || e.button !== 0) return;
       e.preventDefault();
-      drawing = true;
-      activePointerId = e.pointerId;
+      drawing = true; activePointerId = e.pointerId;
       const p = getPosFromClient(e.clientX, e.clientY);
-      lastX = p.x; lastY = p.y;
-      drawDot(p.x, p.y);
+      startStroke(p.x, p.y);
       updateCursor(e.clientX, e.clientY);
     }
     function onPointerMove(e) {
@@ -13499,15 +13536,17 @@ function initEntranceCompare(params) {
       updateCursor(e.clientX, e.clientY);
       if (!drawing || e.pointerId !== activePointerId) return;
       const p = getPosFromClient(e.clientX, e.clientY);
-      drawSegment(p.x, p.y);
+      continueStroke(p.x, p.y);
     }
     function onPointerUp(e) {
       if (e.pointerType !== 'mouse' || e.pointerId !== activePointerId) return;
-      drawing = false;
-      activePointerId = null;
+      endStroke();
+      drawing = false; activePointerId = null;
     }
     function onPointerLeave(e) {
-      if (e.pointerType === 'mouse') hideCursor();
+      if (e.pointerType !== 'mouse') return;
+      if (drawing) { endStroke(); drawing = false; activePointerId = null; }
+      hideCursor();
     }
     overlay.addEventListener('pointerdown', onPointerDown);
     overlay.addEventListener('pointermove', onPointerMove);
@@ -13516,61 +13555,114 @@ function initEntranceCompare(params) {
     overlay.addEventListener('pointercancel', onPointerUp);
   }
 
-  function clearOverlay(overlay, ctx) {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, overlay.width, overlay.height);
-    ctx.restore();
+  function clearOverlayFull(o) {
+    o.ctx.save();
+    o.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    o.ctx.clearRect(0, 0, o.overlay.width, o.overlay.height);
+    o.ctx.restore();
+    if (o.hlCtx) {
+      o.hlCtx.save();
+      o.hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+      o.hlCtx.clearRect(0, 0, o.hlCanvas.width, o.hlCanvas.height);
+      o.hlCtx.restore();
+    }
   }
 
-  function buildToolbar() {
-    const bar = document.createElement('div');
-    bar.className = 'pdfAnnotateToolbar';
-    bar.innerHTML =
-      '<button type="button" class="scratch-tool active" data-tool="pen" title="ปากกา">✏️</button>' +
-      '<button type="button" class="scratch-tool" data-tool="highlighter" title="Highlight">🖍️</button>' +
-      '<button type="button" class="scratch-tool" data-tool="eraser" title="ยางลบ">🩹</button>' +
-      '<button type="button" class="scratch-tool danger" data-action="clearAll" title="ล้างทั้งหมด">🗑</button>';
-    bar.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
+  // ── Palette (floating tool picker) — สร้างครั้งเดียว append ไป body ──
+  function buildPalette() {
+    const p = document.createElement('div');
+    p.id = 'pdfAnnotatePalette';
+    p.innerHTML =
+      '<button class="pdfAnnotatePenBtn active" data-tool="pen" data-color="#111111" title="ปากกาดำ" style="background:#111111;"></button>' +
+      '<button class="pdfAnnotatePenBtn" data-tool="pen" data-color="#dc2626" title="ปากกาแดง" style="background:#dc2626;"></button>' +
+      '<button class="pdfAnnotatePenBtn" data-tool="pen" data-color="#2563eb" title="ปากกาน้ำเงิน" style="background:#2563eb;"></button>' +
+      '<button class="scratch-tool" data-tool="highlighter" title="Highlight">🖍️</button>' +
+      '<button class="scratch-tool" data-tool="eraser" title="ยางลบ">🩹</button>' +
+      '<button class="scratch-tool danger" data-action="clearAll" title="ล้างทั้งหมด" style="margin-left:4px;">🗑</button>';
+    p.querySelectorAll('[data-tool]').forEach(b => {
       b.addEventListener('click', () => {
         tool = b.dataset.tool;
-        document.querySelectorAll('.pdfAnnotateToolbar .scratch-tool[data-tool]').forEach(x =>
-          x.classList.toggle('active', x.dataset.tool === tool)
-        );
+        if (b.dataset.color) penColor = b.dataset.color;
+        p.querySelectorAll('[data-tool]').forEach(x => {
+          if (x.classList.contains('pdfAnnotatePenBtn'))
+            x.classList.toggle('active', x.dataset.tool === tool && x.dataset.color === penColor);
+          else
+            x.classList.toggle('active', x.dataset.tool === tool);
+        });
         if (tool !== 'eraser') hideCursor();
       });
     });
-    bar.querySelector('[data-action="clearAll"]').addEventListener('click', () => {
+    p.querySelector('[data-action="clearAll"]').addEventListener('click', () => {
       if (confirm('ล้างทั้งหมดที่เขียน/highlight ไว้บน PDF นี้?')) {
-        Object.keys(instances).forEach(cid => {
-          instances[cid].overlays.forEach(o => clearOverlay(o.overlay, o.ctx));
-        });
+        Object.keys(instances).forEach(cid =>
+          instances[cid].overlays.forEach(clearOverlayFull));
       }
     });
-    return bar;
+    document.body.appendChild(p);
+    return p;
   }
 
-  // หา .stickyBar (header เดิมที่มีชื่อข้อสอบ/เวลา) ที่คู่กับ containerId — หาด้วย
-  // anchor element ที่อยู่ใน header นั้นแน่ๆ ไม่ใช่ query DOM tree ตรงๆ เพราะ
-  // _liftTakeStickyBars อาจย้าย .stickyBar ออกจาก .takeLeft ไปเป็น position:fixed
-  // ลูกตรงของ #page-take/#page-practice แล้วก่อนหน้านี้ (ดู navigate())
+  function setOverlayPointerEvents(containerId, enabled) {
+    if (!containerId || !instances[containerId]) return;
+    instances[containerId].overlays.forEach(o =>
+      o.overlay.style.pointerEvents = enabled ? 'auto' : 'none');
+  }
+
+  function openPalette(toggleBtn) {
+    if (!palette) palette = buildPalette();
+    const rect = toggleBtn.getBoundingClientRect();
+    palette.style.top = (rect.bottom + 6) + 'px';
+    palette.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
+    palette.classList.add('open');
+    toggleBtn.classList.add('active');
+    currentToggleBtn = toggleBtn;
+    setOverlayPointerEvents(activeContainerId, true);
+  }
+
+  function closePalette() {
+    if (palette) palette.classList.remove('open');
+    if (currentToggleBtn) { currentToggleBtn.classList.remove('active'); currentToggleBtn = null; }
+    setOverlayPointerEvents(activeContainerId, false);
+    hideCursor();
+  }
+
+  // Click-outside ปิด palette
+  document.addEventListener('click', e => {
+    if (!palette || !palette.classList.contains('open')) return;
+    if (!palette.contains(e.target) && !e.target.closest('.pdfAnnotateToggleBtn') && !e.target.closest('.pdfAnnotateCanvas')) closePalette();
+  }, true);
+
+  function buildToolbar() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pdfAnnotateToggleBtn';
+    btn.title = 'ขีดเขียนบน PDF';
+    btn.textContent = '✏️';
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (palette && palette.classList.contains('open')) closePalette();
+      else openPalette(btn);
+    });
+    return btn;
+  }
+
+  // หา .stickyBar ด้วย anchor element (รองรับ _liftTakeStickyBars ที่ย้าย DOM ก่อน)
   const HEADER_ANCHOR_ID = { takePdfViewer: 'takeExamTitle', pracPdfViewer: 'pracExamTitle' };
   function findHeaderBar(containerId) {
     const anchor = document.getElementById(HEADER_ANCHOR_ID[containerId] || '');
     return anchor ? anchor.closest('.stickyBar') : null;
   }
 
-  // ── สร้าง toolbar + overlay canvas ต่อหน้า ให้กับ container ที่ระบุ ──
   function buildOverlaysFor(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return null;
     const pageWrappers = Array.from(container.querySelectorAll('[id^="' + containerId + '-page-"]'));
-    if (!pageWrappers.length) return null; // GDrive iframe embed หรือยังไม่ render — ไม่ต้องมี toolbar
+    if (!pageWrappers.length) return null; // GDrive iframe embed — ไม่ต้องมี toolbar
 
     const toolbar = buildToolbar();
     const headerBar = findHeaderBar(containerId);
-    if (headerBar) headerBar.insertBefore(toolbar, headerBar.children[1] || null); // ไว้ระหว่างชื่อข้อสอบกับเวลา
-    else container.insertBefore(toolbar, container.firstChild); // fallback กันเหนียว
+    if (headerBar) headerBar.insertBefore(toolbar, headerBar.children[1] || null);
+    else container.insertBefore(toolbar, container.firstChild);
 
     const overlays = pageWrappers.map(wrapper => {
       const pdfCanvas = wrapper.querySelector('canvas');
@@ -13579,55 +13671,66 @@ function initEntranceCompare(params) {
       stage.className = 'pdfAnnotateStage';
       pdfCanvas.parentNode.insertBefore(stage, pdfCanvas);
       stage.appendChild(pdfCanvas);
-      pdfCanvas.style.margin = '0 auto'; // เก็บ centering เดิมที่มาจาก wrapper{align-items:center}
+      pdfCanvas.style.margin = '0 auto';
 
       const overlay = document.createElement('canvas');
       overlay.className = 'pdfAnnotateCanvas';
+      overlay.style.pointerEvents = 'none'; // เปิดเฉพาะตอน palette open
       stage.appendChild(overlay);
       const ctx = overlay.getContext('2d');
 
-      // วัดขนาด/ตำแหน่งของ canvas PDF จริงแบบสดทุกครั้ง (ไม่ cache) เพราะ
-      // canvas PDF ตั้ง style.width/height เป็น px ตายตัวครั้งเดียว มี
-      // max-width:100% เป็นแค่ clamp ให้หดได้ ขนาดที่เห็นจริงอาจเปลี่ยนได้
-      // โดยค่า style ไม่เปลี่ยน — ต้องอ่าน offsetWidth/Height สดเสมอ
+      // hlCanvas: buffer สำหรับ highlighter stroke ปัจจุบัน
+      // CSS opacity:0.35 กัน alpha accumulation (ดวงๆ) โดยไม่ต้อง drawImage ซ้ำซ้อน
+      const hlCanvas = document.createElement('canvas');
+      hlCanvas.style.cssText = 'display:block;position:absolute;top:0;left:0;pointer-events:none;opacity:0.35;';
+      stage.appendChild(hlCanvas);
+      const hlCtx = hlCanvas.getContext('2d');
+
       function syncGeometry() {
         const w = pdfCanvas.offsetWidth, h = pdfCanvas.offsetHeight;
         if (!w || !h) return;
-        overlay.style.left = pdfCanvas.offsetLeft + 'px';
-        overlay.style.top = pdfCanvas.offsetTop + 'px';
-        overlay.style.width = w + 'px';
-        overlay.style.height = h + 'px';
+        const left = pdfCanvas.offsetLeft + 'px', top = pdfCanvas.offsetTop + 'px';
+        overlay.style.left = left; overlay.style.top = top;
+        overlay.style.width = w + 'px'; overlay.style.height = h + 'px';
+        hlCanvas.style.left = left; hlCanvas.style.top = top;
+        hlCanvas.style.width = w + 'px'; hlCanvas.style.height = h + 'px';
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
-        if (overlay.width === bw && overlay.height === bh) return;
-        let img = null;
-        if (overlay.width > 0 && overlay.height > 0) {
-          try { img = overlay.toDataURL(); } catch (e) {}
+        if (overlay.width !== bw || overlay.height !== bh) {
+          let img = null;
+          if (overlay.width > 0 && overlay.height > 0) {
+            try { img = overlay.toDataURL(); } catch (e) {}
+          }
+          overlay.width = bw; overlay.height = bh;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          if (img && img.length > 100) {
+            const i = new Image();
+            i.onload = () => ctx.drawImage(i, 0, 0, w, h);
+            i.src = img;
+          }
         }
-        overlay.width = bw; overlay.height = bh;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        if (img && img.length > 100) {
-          const i = new Image();
-          i.onload = () => ctx.drawImage(i, 0, 0, w, h);
-          i.src = img;
+        if (hlCanvas.width !== bw || hlCanvas.height !== bh) {
+          hlCanvas.width = bw; hlCanvas.height = bh;
+          hlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          hlCtx.lineCap = 'round'; hlCtx.lineJoin = 'round';
         }
       }
       syncGeometry();
       const ro = new ResizeObserver(syncGeometry);
       ro.observe(pdfCanvas);
 
-      wireDrawing(overlay, ctx);
-      return { pdfCanvas, overlay, ctx, ro };
+      wireDrawing(overlay, ctx, hlCanvas, hlCtx);
+      return { pdfCanvas, overlay, ctx, hlCanvas, hlCtx, ro };
     }).filter(Boolean);
 
     return { toolbar, overlays };
   }
 
-  // เอา toolbar/overlay ออกจาก DOM ทั้งหมด คืน canvas PDF กลับที่เดิม
   function teardown(containerId) {
     const inst = instances[containerId];
     if (!inst) return;
+    if (activeContainerId === containerId) closePalette();
     inst.overlays.forEach(o => {
       try { o.ro.disconnect(); } catch (e) {}
       const stage = o.overlay.parentNode;
@@ -13642,32 +13745,30 @@ function initEntranceCompare(params) {
 
   function pdfAnnotateInit(containerId) {
     if (!MQ.matches) return;
-    teardown(containerId); // กันซ้ำ เผื่อ initTake/loadPdf ถูกเรียกใหม่ (สอบรอบใหม่)
+    teardown(containerId);
     const built = buildOverlaysFor(containerId);
     if (built) instances[containerId] = built;
   }
 
   window.pdfAnnotateInit = pdfAnnotateInit;
   window.pdfAnnotateShow = function(containerId) {
+    if (activeContainerId !== containerId) closePalette();
     activeContainerId = containerId;
     if (MQ.matches && !instances[containerId]) pdfAnnotateInit(containerId);
   };
   window.pdfAnnotateHide = function() {
-    // ทดหายเมื่อออกจากข้อสอบ/ส่งคำตอบ (เหมือนกระดาษทด) — เคลียร์ทุก instance
-    // ที่มีอยู่ (ทั้ง take + practice เผื่อยังไม่ถูก teardown)
-    Object.keys(instances).forEach(cid => {
-      instances[cid].overlays.forEach(o => clearOverlay(o.overlay, o.ctx));
-    });
+    closePalette();
+    Object.keys(instances).forEach(cid =>
+      instances[cid].overlays.forEach(clearOverlayFull));
     hideCursor();
   };
 
-  // หมุนจอ iPad ข้าม breakpoint กลางรอบสอบ — เปิด/ปิดฟีเจอร์ตามจริง
   window.addEventListener('resize', () => {
     if (!activeContainerId) return;
     if (MQ.matches) {
       if (!instances[activeContainerId]) pdfAnnotateInit(activeContainerId);
     } else if (instances[activeContainerId]) {
-      instances[activeContainerId].overlays.forEach(o => clearOverlay(o.overlay, o.ctx));
+      instances[activeContainerId].overlays.forEach(clearOverlayFull);
       teardown(activeContainerId);
     }
   });
