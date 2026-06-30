@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.88 -->
+  <!-- APP_VERSION: v47.89 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.88</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.89</div>
     </div>
   </div>
 </div>
@@ -2787,6 +2787,14 @@ const Store = {
   },
   load(){
     if (this._cache) return this._cache;
+    // Warm start: read localStorage as render cache while Firebase loads
+    try {
+      const _lsRaw = localStorage.getItem(this.key);
+      if (_lsRaw) {
+        const _ls = JSON.parse(_lsRaw);
+        if (_ls && Array.isArray(_ls.exams)) { this._cache = _ls; return this._cache; }
+      }
+    } catch(e) {}
     return {exams:[],questions:{},attempts:[],members:[],assignments:[],benchmarks:[]};
   },
   // อัปเดต in-memory cache เท่านั้น (ไม่ write Firebase — ใช้ใน migrate())
@@ -2803,8 +2811,11 @@ const Store = {
         return false;
       }
       data._savedAt = Date.now();
-      this._cache = data;           // update in-memory cache
+      this._cache = data;
+      // Write to localStorage as fast render cache for next page load
+      try { localStorage.setItem(this.key, JSON.stringify(data)); } catch(e) {}
       if(FirebaseSync.ready()) {
+        localStorage.removeItem('nanont:syncPending');
         FirebaseSync.saveDoc('mainStore', data).catch(e => {
           console.error('[Store.save] cloud sync FAILED', e);
           if (typeof toast === 'function') toast('⚠️ ไม่ได้ sync ขึ้น cloud — ตรวจ network');
@@ -2858,6 +2869,8 @@ const Store = {
       }
     }catch(e){ console.warn('[Store] localStorage recovery err',e); }
     this._cache = cloud;
+    // Update localStorage render cache to match Firebase
+    try { localStorage.setItem(this.key, JSON.stringify(cloud)); } catch(e) {}
     console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
     // Always refresh current page so stale empty-state render is replaced with real data
     if(typeof navigate==='function' && window._currentPage){
@@ -3058,12 +3071,7 @@ const Store = {
       }
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
-    // Initialize empty cache if not yet set; syncFromCloud() will populate it
-    if (!this._cache) {
-      this._cache = {exams:[],questions:{},attempts:[],benchmarks:[],members:[],assignments:[],adminLoggedIn:false};
-    }
-    // Note: localStorage cleanup is handled by syncFromCloud() AFTER verifying
-    // all exams are in Firestore — never delete here to avoid data loss
+    // Note: localStorage is kept as render cache; syncFromCloud() updates it after Firebase sync
     return this.migrate(this.load());
   }
 };
@@ -12915,7 +12923,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.88';
+  const CURRENT_VERSION = 'v47.89';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
