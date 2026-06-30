@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.85 -->
+  <!-- APP_VERSION: v47.86 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.85</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.86</div>
     </div>
   </div>
 </div>
@@ -2729,7 +2729,8 @@ function _mergeGamificationByTs(localGam, cloudGam) {
 // ===================== STORE =====================
 const Store = {
   lastError:null,
-  key:"quizSciDemoStoreV1",
+  key:"quizSciDemoStoreV1",   // kept for migration cleanup only
+  _cache:null,                 // in-memory store — Firebase is source of truth
   migrate(s){
     if(!s||typeof s!=='object') return s;
     if(!Array.isArray(s.exams)) s.exams=[];
@@ -2784,15 +2785,15 @@ const Store = {
     }
     return s;
   },
-  load(){try{return JSON.parse(localStorage.getItem(this.key)||"{}");}catch{return {};}},
-  // บันทึกเฉพาะ localStorage ไม่ sync Firebase — ใช้ใน migrate() และ seed
-  saveLocalOnly(data){
-    try{ localStorage.setItem(this.key, JSON.stringify(data)); }catch(e){}
+  load(){
+    if (this._cache) return this._cache;
+    return {exams:[],questions:{},attempts:[],members:[],assignments:[],benchmarks:[]};
   },
+  // อัปเดต in-memory cache เท่านั้น (ไม่ write Firebase — ใช้ใน migrate())
+  saveLocalOnly(data){ this._cache = data; },
   save(data){
     try{
       this.lastError=null;
-      // Guard: reject invalid data structures
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
         console.warn('Store.save: invalid data structure rejected', typeof data);
         return false;
@@ -2802,13 +2803,9 @@ const Store = {
         return false;
       }
       data._savedAt = Date.now();
-      localStorage.setItem(this.key,JSON.stringify(data));
-      // async sync to Firestore (fire-and-forget, non-blocking)
+      this._cache = data;           // update in-memory cache
       if(FirebaseSync.ready()) {
-        localStorage.setItem('nanont:syncPending', '1');
-        FirebaseSync.saveDoc('mainStore', data).then(() => {
-          localStorage.removeItem('nanont:syncPending');
-        }).catch(e => {
+        FirebaseSync.saveDoc('mainStore', data).catch(e => {
           console.error('[Store.save] cloud sync FAILED', e);
           if (typeof toast === 'function') toast('⚠️ ไม่ได้ sync ขึ้น cloud — ตรวจ network');
         });
@@ -2820,96 +2817,38 @@ const Store = {
       return true;
     } catch(e){this.lastError=String(e&&e.message?e.message:e);console.warn('Store.save failed',e);return false;}
   },
-  // Load from Firestore and overwrite localStorage (called once on startup)
+  // Pull from Firestore and populate in-memory cache — Firebase is always source of truth
   async syncFromCloud(){
     const cloud = await FirebaseSync.loadDoc('mainStore');
     if(!cloud) return;
     try{
-      // Only overwrite local if cloud is strictly newer
-      const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
-      let _localTs = _local._savedAt || 0;
-      const _cloudTs = cloud._savedAt || 0;
-      const _now = Date.now();
-      if (_localTs > _now + 300000) {
-        console.warn('[sync] stuck timestamp detected, resetting');
-        _local._savedAt = 0;
-        _localTs = 0;
-        localStorage.setItem(this.key, JSON.stringify(_local));
-      }
-      const _localHasData = _localTs > 0;
-      if (!_localHasData || _cloudTs > _localTs) {
-        // Cloud is newer — but merge attempts to prevent data loss
-        try {
-          const _localIds = new Set((_local.attempts||[]).map(a => a.id));
-          const _missingAttempts = (cloud.attempts||[])
-            .filter(a => !_localIds.has(a.id));
-          if (_missingAttempts.length > 0 && _localHasData) {
-            // Merge missing attempts from cloud into local
-            const _all = [
-              ...(_missingAttempts),
-              ...(cloud.attempts||[]).filter(a => _localIds.has(a.id))
-            ];
-            const _seen = new Set();
-            cloud.attempts = _all.filter(a => {
-              if (_seen.has(a.id)) return false;
-              _seen.add(a.id);
-              return true;
-            });
-            console.log('[Store] merged', _missingAttempts.length,
-              'local attempts into cloud');
-          }
-        } catch(e) {}
-        localStorage.setItem(this.key, JSON.stringify(cloud));
-      } else {
-        console.log('[Store] syncFromCloud: local is newer, keeping local');
-        // Merge any attempts from cloud not in local
-        try {
-          const _cloudIds = new Set((cloud.attempts||[]).map(a => a.id));
-          const _missingFromCloud = (_local.attempts||[])
-            .filter(a => !_cloudIds.has(a.id));
-          if (_missingFromCloud.length > 0) {
-            const _all = [
-              ...(_missingFromCloud),
-              ...(_local.attempts||[])
-            ];
-            const _seen = new Set();
-            _local.attempts = _all.filter(a => {
-              if (_seen.has(a.id)) return false;
-              _seen.add(a.id);
-              return true;
-            });
-            console.log('[Store] merged', _missingFromCloud.length,
-              'cloud attempts into local');
-          }
-        } catch(e) {}
-        // Push merged local back to cloud
-        _local._savedAt = Date.now();
-        localStorage.setItem(this.key, JSON.stringify(_local));
-        if(FirebaseSync.ready())
-          FirebaseSync.saveDoc('mainStore', _local).catch(e => console.error('[syncFromCloud] cloud push FAILED', e));
+      // Merge any in-memory attempts not yet in cloud (submitted before Firebase loaded)
+      if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
+        const _cloudIds = new Set(cloud.attempts.map(a => a.id));
+        const _localOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+        if (_localOnly.length > 0) {
+          cloud.attempts = [..._localOnly, ...cloud.attempts];
+          console.log('[Store] merged', _localOnly.length, 'in-memory attempts into cloud');
+        }
       }
     }catch(e){}
-    console.log('[Store] synced from cloud');
-    // Only refresh safe pages after initial sync
-    const safeSyncPages = ['stats'];
+    this._cache = cloud;
+    console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
+    const safeSyncPages = ['stats', 'exams', 'home'];
     if(typeof navigate==='function' && window._currentPage && safeSyncPages.includes(window._currentPage)){
       navigate(window._currentPage, window._currentParams||{});
     }
   },
   // Force pull cloud data — bypass timestamp guard. Union-merges any
-  // local-only attempts so nothing the user already submitted is lost.
+  // in-memory attempts so nothing the user already submitted is lost.
   async forcePullFromCloud(){
     const cloud = await FirebaseSync.loadDoc('mainStore');
     if(!cloud) throw new Error('cloud empty or unreachable');
-    const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
     const _cloudCount = Array.isArray(cloud.attempts) ? cloud.attempts.length : 0;
-    const _localCountBefore = Array.isArray(_local.attempts) ? _local.attempts.length : 0;
-    let _preserved = 0;
-    const _isPending = localStorage.getItem('nanont:syncPending') === '1';
-    if (_isPending && Array.isArray(cloud.attempts) && Array.isArray(_local.attempts)) {
+    const _memCount = this._cache ? (Array.isArray(this._cache.attempts) ? this._cache.attempts.length : 0) : 0;
+    if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
       const _cloudIds = new Set(cloud.attempts.map(a => a.id));
-      const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
-      _preserved = _localOnly.length;
+      const _localOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
       if (_localOnly.length > 0) {
         const _all = [..._localOnly, ...cloud.attempts];
         const _seen = new Set();
@@ -2918,88 +2857,67 @@ const Store = {
           _seen.add(a.id);
           return true;
         });
-        console.log('[forcePull] preserved', _localOnly.length, 'unpushed local-only attempts');
+        console.log('[forcePull] preserved', _localOnly.length, 'in-memory attempts');
       }
     }
-    // else: pendingSync='' → trust cloud as-is; deletions propagate
-    cloud._savedAt = Date.now();
-    localStorage.setItem(this.key, JSON.stringify(cloud));
-    console.log('[forcePull] complete — cloud:', _cloudCount, 'localBefore:', _localCountBefore, 'preserved:', _preserved);
-    return { cloudAttempts: _cloudCount, localAttemptsBefore: _localCountBefore, preserved: _preserved };
+    this._cache = cloud;
+    console.log('[forcePull] complete — cloud:', _cloudCount, 'memBefore:', _memCount);
+    return { cloudAttempts: _cloudCount, localAttemptsBefore: _memCount, preserved: 0 };
   },
-  // Force push local mainStore + verify server actually received it
-  // by reading back from {source:'server'} and comparing _savedAt.
+  // Force push in-memory store to Firebase + verify server received it.
   // Returns {written, serverTs, match, localAttempts, serverAttempts}.
   async forcePushToCloud(){
     if (!FirebaseSync.ready()) throw new Error('Firebase ไม่พร้อม');
-    const _raw = localStorage.getItem(this.key);
-    if (!_raw) throw new Error('localStorage ว่าง');
-    let _data;
-    try { _data = JSON.parse(_raw); } catch(e) { throw new Error('localStorage parse err'); }
-    if (!_data || !Array.isArray(_data.attempts)) throw new Error('local data ไม่ถูกต้อง');
-    _data._savedAt = Date.now();
-    localStorage.setItem(this.key, JSON.stringify(_data));
-    const _ok = await FirebaseSync.saveDoc('mainStore', _data);
+    if (!this._cache || !Array.isArray(this._cache.attempts)) throw new Error('ไม่มีข้อมูลใน memory');
+    this._cache._savedAt = Date.now();
+    const _ok = await FirebaseSync.saveDoc('mainStore', this._cache);
     if (!_ok) throw new Error('saveDoc returned false');
     const _verified = await FirebaseSync.loadDoc('mainStore');
     if (!_verified) throw new Error('read-back ได้ null — server อาจไม่ได้รับ');
     return {
-      written: _data._savedAt,
+      written: this._cache._savedAt,
       serverTs: _verified._savedAt || 0,
-      match: (_verified._savedAt || 0) === _data._savedAt,
-      localAttempts: _data.attempts.length,
+      match: (_verified._savedAt || 0) === this._cache._savedAt,
+      localAttempts: this._cache.attempts.length,
       serverAttempts: Array.isArray(_verified.attempts) ? _verified.attempts.length : 0
     };
   },
   // Retry-pending pushes that failed earlier because Firebase wasn't ready
   async flushPendingSync(){
     if (!FirebaseSync.ready()) return;
-    // Flush weakness pending (per-user flags) — independent of mainStore
     if (typeof WeaknessTracker !== 'undefined' && WeaknessTracker.flushPendingWeaknesses) {
       WeaknessTracker.flushPendingWeaknesses();
     }
-    // Flush mainStore pending
     if (localStorage.getItem('nanont:syncPending') !== '1') return;
-    const _raw = localStorage.getItem(this.key);
-    if (!_raw) { localStorage.removeItem('nanont:syncPending'); return; }
+    if (!this._cache || !Array.isArray(this._cache.attempts)) {
+      localStorage.removeItem('nanont:syncPending');
+      return;
+    }
+    // Merge cloud gamification + assignments before pushing to avoid overwriting newer cloud data
     try {
-      const _data = JSON.parse(_raw);
-      if (!_data || !Array.isArray(_data.attempts)) return;
-      // ป้องกันการ push stale data ทับของใหม่ใน cloud
-      // — fetch cloud, merge gamification (per-user _updatedAt) + assignments (union by id)
-      try {
-        const cloudSnapshot = await FirebaseSync.loadDoc('mainStore');
-        if (cloudSnapshot) {
-          // gamification: per-user _updatedAt
-          if (cloudSnapshot.gamification) {
-            _data.gamification = _mergeGamificationByTs(
-              _data.gamification, cloudSnapshot.gamification
-            );
-          }
-          // assignments: union by id (local ทับ cloud สำหรับ id เดียวกัน
-          // เพื่อรักษา status change ของ local เช่น student mark done)
-          if (Array.isArray(cloudSnapshot.assignments)) {
-            const _aMap = new Map();
-            cloudSnapshot.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-            (Array.isArray(_data.assignments) ? _data.assignments : [])
-              .forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-            _data.assignments = Array.from(_aMap.values());
-          }
-          // อัพเดต local ด้วยเพื่อไม่ให้ stale อยู่
-          const _localCopy = JSON.parse(localStorage.getItem(this.key) || '{}');
-          _localCopy.gamification = _data.gamification;
-          _localCopy.assignments = _data.assignments;
-          localStorage.setItem(this.key, JSON.stringify(_localCopy));
+      const cloudSnapshot = await FirebaseSync.loadDoc('mainStore');
+      if (cloudSnapshot) {
+        if (cloudSnapshot.gamification) {
+          this._cache.gamification = _mergeGamificationByTs(
+            this._cache.gamification, cloudSnapshot.gamification
+          );
         }
-      } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
-      FirebaseSync.saveDoc('mainStore', _data).then(() => {
-        localStorage.removeItem('nanont:syncPending');
-        console.log('[flushPendingSync] flushed pending data to cloud');
-        if (typeof toast === 'function') toast('✅ ข้อมูลที่ค้างไว้ sync ขึ้น cloud แล้ว');
-      }).catch(e => {
-        console.error('[flushPendingSync] failed, will retry next interval', e);
-      });
-    } catch(e) { console.warn('[flushPendingSync] parse err', e); }
+        if (Array.isArray(cloudSnapshot.assignments)) {
+          const _aMap = new Map();
+          cloudSnapshot.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+          (Array.isArray(this._cache.assignments) ? this._cache.assignments : [])
+            .forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+          this._cache.assignments = Array.from(_aMap.values());
+        }
+      }
+    } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
+    FirebaseSync.saveDoc('mainStore', this._cache).then(() => {
+      localStorage.removeItem('nanont:syncPending');
+      console.log('[flushPendingSync] flushed pending data to cloud');
+      if (typeof toast === 'function') toast('✅ ข้อมูลที่ค้างไว้ sync ขึ้น cloud แล้ว');
+    }).catch(e => {
+      console.error('[flushPendingSync] failed, will retry next interval', e);
+    });
   },
   init(){
     // Boot Firebase, migrate old localStorage data to cloud
@@ -3014,15 +2932,12 @@ const Store = {
       this.syncFromCloud();
       this.flushPendingSync();
     });
-    // Real-time listener: if another device saves, update localStorage only
-    // Do NOT call navigate() here — it resets scroll and re-inits page disruptively
-    // Instead just update the cache; next Store.load() will get fresh data
+    // Real-time listener: update in-memory cache when cloud data changes
     let _listenDocRefreshTimeout = null;
     let _lastCloudHash = '';
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{
-        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (ตัด _savedAt และ gamification._updatedAt ออก
-        // เพราะ _updatedAt เปลี่ยนทุกครั้งที่ save gamification แม้ค่าจริงจะเหมือนเดิม)
+        // Skip if cloud data hasn't actually changed (strip volatile fields)
         const _hashObj = { ...cloudData };
         delete _hashObj._savedAt;
         if (_hashObj.gamification && typeof _hashObj.gamification === 'object') {
@@ -3037,152 +2952,47 @@ const Store = {
         const _hash = JSON.stringify(_hashObj);
         if (_hash === _lastCloudHash) return;
         _lastCloudHash = _hash;
-        // Only accept cloud data if it's strictly newer
-        // AND local data exists and has been saved recently
-        const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
-        let _localTs = _local._savedAt || 0;
-        const _cloudTs = cloudData._savedAt || 0;
-        const _now = Date.now();
-        if (_localTs > _now + 300000) {
-          console.warn('[listenDoc] stuck timestamp detected, resetting');
-          _local._savedAt = 0;
-          _localTs = 0;
-          localStorage.setItem(this.key, JSON.stringify(_local));
-        }
-        const _localHasData = _localTs > 0;
-        if (!_localHasData || _cloudTs > _localTs) {
-          const _isPending = localStorage.getItem('nanont:syncPending') === '1';
-          if (_isPending && _localHasData && Array.isArray(_local.attempts)
-              && Array.isArray(cloudData.attempts)) {
-            try {
-              const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
-              const _localIds = new Set(_local.attempts.map(a => a.id));
-              const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
-              const _cloudOnly = cloudData.attempts.filter(a => !_localIds.has(a.id));
-              if (_localOnly.length > 0 || _cloudOnly.length > 0) {
-                const _allAttempts = [..._local.attempts, ..._cloudOnly];
-                _allAttempts.sort((a,b) =>
-                  new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
-                );
-                const _seen = new Set();
-                const _deduped = _allAttempts.filter(a => {
-                  if (_seen.has(a.id)) return false;
-                  _seen.add(a.id);
-                  return true;
-                });
-                cloudData.attempts = _deduped;
-                console.log('[listenDoc] bidirectional merge (pending):',
-                  'localOnly:', _localOnly.length,
-                  'cloudOnly:', _cloudOnly.length);
-              }
-            } catch(e) {}
+        // Preserve in-memory attempts not yet in cloud
+        if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloudData.attempts)) {
+          const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
+          const _memOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+          if (_memOnly.length > 0) {
+            const _all = [..._memOnly, ...cloudData.attempts];
+            _all.sort((a,b) => new Date(b.submittedAt||0) - new Date(a.submittedAt||0));
+            const _seen = new Set();
+            cloudData.attempts = _all.filter(a => {
+              if (_seen.has(a.id)) return false;
+              _seen.add(a.id);
+              return true;
+            });
           }
-          // else: pendingSync='' → trust cloud as-is; deletions propagate
-          // แต่ต้องเก็บ gamification ที่ local ใหม่กว่าไว้ — ป้องกัน rollback
-          // (เช่น iPad push stale gamification หลัง admin set points)
-          try {
-            const _mergedGam = _mergeGamificationByTs(
-              _local.gamification, cloudData.gamification
-            );
-            if (_mergedGam) cloudData.gamification = _mergedGam;
-          } catch(e) {}
-          // ป้องกัน assignment ของ local หาย เมื่อ pending — union by id, local ทับ cloud
-          // (เช่น student เพิ่ง mark done แต่ยัง push ไม่ทัน, cloud ยัง pending)
-          try {
-            if (_isPending && _localHasData && Array.isArray(_local.assignments)
-                && Array.isArray(cloudData.assignments)) {
-              const _aMap = new Map();
-              cloudData.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-              _local.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-              cloudData.assignments = Array.from(_aMap.values());
-            }
-          } catch(e) {}
-          localStorage.setItem(this.key, JSON.stringify(cloudData));
-          _updateBellBadge();
-        } else {
-          // Local is newer — merge attempts + assignments + gamification
-          let _changed = false;
-          try {
-            // Merge attempts bidirectionally
-            if (Array.isArray(cloudData.attempts) &&
-                Array.isArray(_local.attempts)) {
-              const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
-              const _localIds = new Set(_local.attempts.map(a => a.id));
-              const _cloudOnly = cloudData.attempts.filter(a => !_localIds.has(a.id));
-              const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
-              if (_cloudOnly.length > 0 || _localOnly.length > 0) {
-                const _merged = [..._local.attempts, ..._cloudOnly];
-                _merged.sort((a,b) =>
-                  new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
-                );
-                const _seen = new Set();
-                const _deduped = _merged.filter(a => {
-                  if (_seen.has(a.id)) return false;
-                  _seen.add(a.id);
-                  return true;
-                });
-                _local.attempts = _deduped;
-                _changed = true;
-                console.log('[listenDoc] local-wins: merged attempts',
-                  'cloudOnly:', _cloudOnly.length,
-                  'localOnly:', _localOnly.length);
-              }
-            }
-          } catch(e) {}
-          try {
-            // Merge assignments — union by id
-            if (Array.isArray(cloudData.assignments) &&
-                Array.isArray(_local.assignments)) {
-              const _localAssignIds = new Set(
-                _local.assignments.map(a => a.id)
-              );
-              const _newAssigns = cloudData.assignments
-                .filter(a => !_localAssignIds.has(a.id));
-              if (_newAssigns.length > 0) {
-                _local.assignments = [..._local.assignments, ..._newAssigns];
-                _changed = true;
-                console.log('[listenDoc] merged',
-                  _newAssigns.length, 'new assignments');
-              }
-              // Also sync status changes (pending→done/cancelled)
-              cloudData.assignments.forEach(ca => {
-                const li = _local.assignments.findIndex(a => a.id === ca.id);
-                if (li !== -1 && _local.assignments[li].status !== ca.status) {
-                  _local.assignments[li].status = ca.status;
-                  _changed = true;
-                }
-              });
-            }
-
-            // Merge gamification — ใช้ helper per-user _updatedAt comparison
-            if (cloudData.gamification || _local.gamification) {
-              const _mergedGam = _mergeGamificationByTs(
-                _local.gamification, cloudData.gamification
-              );
-              if (JSON.stringify(_mergedGam) !== JSON.stringify(_local.gamification || {})) {
-                _local.gamification = _mergedGam;
-                _changed = true;
-              }
-            }
-
-            if (_changed) {
-              localStorage.setItem(this.key, JSON.stringify(_local));
-              _updateBellBadge();
-              console.log('[listenDoc] local-wins: merged assignments/gamification');
-            }
-          } catch(e) {}
         }
+        // Merge gamification — per-user _updatedAt wins
+        try {
+          const _mergedGam = _mergeGamificationByTs(
+            this._cache && this._cache.gamification, cloudData.gamification
+          );
+          if (_mergedGam) cloudData.gamification = _mergedGam;
+        } catch(e) {}
+        // Merge assignments — union by id (in-memory overrides cloud for same id)
+        try {
+          if (this._cache && Array.isArray(this._cache.assignments) && Array.isArray(cloudData.assignments)) {
+            const _aMap = new Map();
+            cloudData.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            this._cache.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            cloudData.assignments = Array.from(_aMap.values());
+          }
+        } catch(e) {}
+        this._cache = cloudData;
+        _updateBellBadge();
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
-      // Re-enable auto-refresh — WHOOP ถูกซ่อนแล้วจึงไม่มี render loop
-      // (updateCoachStreak ไม่ถูกเรียกตอน render home อีกต่อไป)
       const safeSoftRefresh = ['home','stats','rewards'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
         navigate(pg, window._currentParams||{});
       } else if(pg && pg === 'admin'){
-        // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
         if(!sessionStorage.getItem('_conflictBannerDismissed')){
           let banner = document.getElementById('_syncConflictBanner');
           if(!banner){
@@ -3221,29 +3031,15 @@ const Store = {
           }
         }
       }
-      // ไม่เรียก navigate('home') อัตโนมัติ — ป้องกัน flickering และ render loop
-      // (renderHome → getDailyQuest → _saveGamificationUser → cloud write → listenDoc → loop)
-      // listenDoc update localStorage แล้ว user เห็นข้อมูลใหม่เมื่อเปลี่ยนหน้าเอง
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
-    const s=this.load();
-    if(!s.exams){
-      // init fields จำเป็น — ไม่มี Demo exam
-      // syncFromCloud() จะ overwrite ด้วยข้อมูลจริงจาก Firebase ทันที
-      s.exams=[];
-      s.questions={};
-      s.attempts=[];
-      s.benchmarks=[];
-      s.members=s.members||[];
-      s.assignments=s.assignments||[];
-      s.adminLoggedIn=false;
-      // บันทึกเฉพาะ localStorage — ไม่ sync ขึ้น Firebase
-      try{ localStorage.setItem(this.key, JSON.stringify(s)); }catch(e){}
+    // Initialize empty cache if not yet set; syncFromCloud() will populate it
+    if (!this._cache) {
+      this._cache = {exams:[],questions:{},attempts:[],benchmarks:[],members:[],assignments:[],adminLoggedIn:false};
     }
-    // Ensure no field is missing from the seed data
-    (s.questions||{});
-    if(!s.questions) s.questions={};
-    return this.migrate(s);
+    // One-time cleanup of old localStorage store key
+    try { localStorage.removeItem(this.key); } catch(e) {}
+    return this.migrate(this.load());
   }
 };
 
@@ -13094,7 +12890,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.85';
+  const CURRENT_VERSION = 'v47.86';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
