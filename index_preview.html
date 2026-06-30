@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.88p -->
+  <!-- APP_VERSION: v47.90p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -109,13 +109,19 @@
       .lifted-sb{position:fixed !important;top:0;z-index:60;}
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
-      /* PDF Annotate — ปุ่มเดียวใน header (toggle) + palette ลอย */
-      .pdfAnnotateToggleBtn{padding:5px 9px;border-radius:8px;border:1px solid #4b5563;background:#374151;color:#fff;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;font-family:inherit;}
-      .pdfAnnotateToggleBtn.active{background:#fbbf24;color:#111;border-color:#fbbf24;}
-      #pdfAnnotatePalette{position:fixed;z-index:9200;background:#1f2937;border-radius:12px;padding:8px 10px;display:flex;gap:6px;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,.3);transform:translateY(-6px) scale(.95);opacity:0;transition:transform .18s ease,opacity .15s ease;pointer-events:none;}
-      #pdfAnnotatePalette.open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto;}
-      .pdfAnnotatePenBtn{border-radius:50%;width:26px;height:26px;padding:0;border:2px solid rgba(255,255,255,.25);cursor:pointer;flex-shrink:0;}
-      .pdfAnnotatePenBtn.active{box-shadow:0 0 0 2.5px #fbbf24;}
+      /* PDF Annotate — floating toggle button + iOS Notes-style pill toolbar */
+      #pdfAnnotateToggleBtn{position:fixed;top:12px;right:calc(20vw + 195px);width:40px;height:40px;border-radius:50%;background:#1f2937;color:#e5e7eb;border:none;font-size:18px;cursor:pointer;z-index:8500;display:none;transition:background .15s,color .15s,box-shadow .15s;line-height:1;font-family:inherit;}
+      #pdfAnnotateToggleBtn.toolbar-open{background:#fbbf24;color:#111;}
+      #pdfAnnotateToggleBtn.draw-on{background:#374151;color:#fbbf24;box-shadow:0 0 0 2px #fbbf24;}
+      #pdfAnnotateToolbar{position:fixed;bottom:20px;left:16px;display:none;align-items:center;gap:4px;background:rgba(31,41,55,0.96);backdrop-filter:blur(12px);border-radius:20px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:9200;}
+      #pdfAnnotateToolbar.open{display:flex;}
+      .pa-tool{width:38px;height:38px;border-radius:10px;border:none;background:transparent;color:#d1d5db;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+      .pa-tool.active{background:#374151;color:#fbbf24;}
+      .pa-sep{width:1px;height:28px;background:#4b5563;margin:0 4px;flex-shrink:0;}
+      .pa-color{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;}
+      .pa-color.active{box-shadow:0 0 0 2.5px #fbbf24;}
+      .pa-size{padding:3px 9px;border-radius:8px;border:1px solid #4b5563;background:#374151;color:#d1d5db;font-size:12px;cursor:pointer;font-family:inherit;}
+      .pa-size.active{background:#fbbf24;color:#111;border-color:#fbbf24;}
       .pdfAnnotateStage{position:relative;display:block;width:100%;}
       .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
@@ -1062,7 +1068,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.88p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.90p</div>
     </div>
   </div>
 </div>
@@ -13370,33 +13376,34 @@ function initEntranceCompare(params) {
 (function initPdfAnnotate(){
   const MQ = window.matchMedia('(min-width:901px)');
   const PEN = { size: 3, alpha: 1 };
-  const HI  = { size: 18, color: '#fbbf24' };
-  const ERASER_SIZE = 28;
-  let tool = 'pen';
-  let penColor = '#111111'; // สีปากกาปัจจุบัน
-  const instances = {}; // containerId -> {toolbar, overlays:[{pdfCanvas,overlay,ctx,hlCanvas,hlCtx,ro}]}
-  let activeContainerId = null;
+  const HI  = { size: 18 };
 
-  // ── Palette singleton ──
-  let palette = null;
-  let currentToggleBtn = null;
+  // Module state
+  let tool       = 'pen';
+  let penColor   = '#111111';
+  let hlColor    = '#fbbf24';
+  let eraserSize = 28;
+  let drawMode   = false;
+  let toolbarOpen = false;
+
+  // DOM singletons
+  let toggleBtn = null;
+  let toolbarEl = null;
+  let paSubEl   = null;
+
+  const instances = {}; // containerId -> { overlays:[{pdfCanvas,overlay,ctx,hlCanvas,hlCtx,ro}] }
+  let activeContainerId = null;
 
   let cursorEl = null;
   function ensureCursor() {
-    if (!cursorEl) {
-      cursorEl = document.createElement('div');
-      cursorEl.id = 'pdfAnnotateCursor';
-      document.body.appendChild(cursorEl);
-    }
+    if (!cursorEl) { cursorEl = document.createElement('div'); cursorEl.id = 'pdfAnnotateCursor'; document.body.appendChild(cursorEl); }
     return cursorEl;
   }
   function updateCursor(clientX, clientY) {
     if (tool !== 'eraser') { hideCursor(); return; }
     const c = ensureCursor();
-    c.style.left = clientX + 'px';
-    c.style.top = clientY + 'px';
-    c.style.width = ERASER_SIZE + 'px';
-    c.style.height = ERASER_SIZE + 'px';
+    c.style.left = clientX + 'px'; c.style.top = clientY + 'px';
+    c.style.width = eraserSize + 'px'; c.style.height = eraserSize + 'px';
     c.classList.add('show');
   }
   function hideCursor() { if (cursorEl) cursorEl.classList.remove('show'); }
@@ -13404,13 +13411,15 @@ function initEntranceCompare(params) {
   function applyStrokeStyle(ctx) {
     if (tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = ERASER_SIZE;
+      ctx.globalAlpha = 1; ctx.lineWidth = eraserSize;
       ctx.strokeStyle = '#000'; ctx.fillStyle = '#000';
+    } else if (tool === 'highlighter') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1; ctx.lineWidth = HI.size;
+      ctx.strokeStyle = hlColor; ctx.fillStyle = hlColor;
     } else {
       ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = PEN.alpha;
-      ctx.lineWidth = PEN.size;
+      ctx.globalAlpha = PEN.alpha; ctx.lineWidth = PEN.size;
       ctx.strokeStyle = penColor; ctx.fillStyle = penColor;
     }
   }
@@ -13427,7 +13436,7 @@ function initEntranceCompare(params) {
     function drawDot(x, y) {
       applyStrokeStyle(ctx);
       ctx.beginPath();
-      ctx.arc(x, y, (tool === 'eraser' ? ERASER_SIZE : PEN.size) / 2, 0, Math.PI * 2);
+      ctx.arc(x, y, (tool === 'eraser' ? eraserSize : PEN.size) / 2, 0, Math.PI * 2);
       ctx.fill();
     }
     function drawSegment(x, y) {
@@ -13448,7 +13457,7 @@ function initEntranceCompare(params) {
       hlCtx.beginPath();
       hlCtx.moveTo(hlPoints[0].x, hlPoints[0].y);
       for (let i = 1; i < hlPoints.length; i++) hlCtx.lineTo(hlPoints[i].x, hlPoints[i].y);
-      hlCtx.strokeStyle = HI.color;
+      hlCtx.strokeStyle = hlColor;
       hlCtx.lineWidth = HI.size;
       hlCtx.lineCap = 'round'; hlCtx.lineJoin = 'round';
       hlCtx.stroke();
@@ -13570,101 +13579,118 @@ function initEntranceCompare(params) {
     }
   }
 
-  // ── Palette (floating tool picker) — สร้างครั้งเดียว append ไป body ──
-  function buildPalette() {
-    const p = document.createElement('div');
-    p.id = 'pdfAnnotatePalette';
-    p.innerHTML =
-      '<button class="pdfAnnotatePenBtn active" data-tool="pen" data-color="#111111" title="ปากกาดำ" style="background:#111111;"></button>' +
-      '<button class="pdfAnnotatePenBtn" data-tool="pen" data-color="#dc2626" title="ปากกาแดง" style="background:#dc2626;"></button>' +
-      '<button class="pdfAnnotatePenBtn" data-tool="pen" data-color="#2563eb" title="ปากกาน้ำเงิน" style="background:#2563eb;"></button>' +
-      '<button class="scratch-tool" data-tool="highlighter" title="Highlight">🖍️</button>' +
-      '<button class="scratch-tool" data-tool="eraser" title="ยางลบ">🩹</button>' +
-      '<button class="scratch-tool danger" data-action="clearAll" title="ล้างทั้งหมด" style="margin-left:4px;">🗑</button>';
-    p.querySelectorAll('[data-tool]').forEach(b => {
-      b.addEventListener('click', () => {
-        tool = b.dataset.tool;
-        if (b.dataset.color) penColor = b.dataset.color;
-        p.querySelectorAll('[data-tool]').forEach(x => {
-          if (x.classList.contains('pdfAnnotatePenBtn'))
-            x.classList.toggle('active', x.dataset.tool === tool && x.dataset.color === penColor);
-          else
-            x.classList.toggle('active', x.dataset.tool === tool);
-        });
-        if (tool !== 'eraser') hideCursor();
-      });
-    });
-    p.querySelector('[data-action="clearAll"]').addEventListener('click', () => {
-      if (confirm('ล้างทั้งหมดที่เขียน/highlight ไว้บน PDF นี้?')) {
-        Object.keys(instances).forEach(cid =>
-          instances[cid].overlays.forEach(clearOverlayFull));
-      }
-    });
-    document.body.appendChild(p);
-    return p;
-  }
-
   function setOverlayPointerEvents(containerId, enabled) {
     if (!containerId || !instances[containerId]) return;
-    instances[containerId].overlays.forEach(o =>
-      o.overlay.style.pointerEvents = enabled ? 'auto' : 'none');
+    instances[containerId].overlays.forEach(o => o.overlay.style.pointerEvents = enabled ? 'auto' : 'none');
   }
 
-  function openPalette(toggleBtn) {
-    if (!palette) palette = buildPalette();
-    const rect = toggleBtn.getBoundingClientRect();
-    palette.style.top = (rect.bottom + 6) + 'px';
-    palette.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
-    palette.classList.add('open');
-    toggleBtn.classList.add('active');
-    currentToggleBtn = toggleBtn;
-    setOverlayPointerEvents(activeContainerId, true);
+  // ── Sub-options area: สีปากกา / สี highlight / ขนาดยางลบ ──
+  function updateSubArea() {
+    if (!paSubEl) return;
+    paSubEl.innerHTML = '';
+    if (tool === 'pen') {
+      [['#111111'],['#dc2626'],['#2563eb']].forEach(([c]) => {
+        const b = document.createElement('button');
+        b.className = 'pa-color' + (penColor === c ? ' active' : '');
+        b.style.background = c; b.title = c;
+        b.addEventListener('click', () => { penColor = c; updateSubArea(); });
+        paSubEl.appendChild(b);
+      });
+    } else if (tool === 'highlighter') {
+      [['#fbbf24'],['#ec4899'],['#f97316']].forEach(([c]) => {
+        const b = document.createElement('button');
+        b.className = 'pa-color' + (hlColor === c ? ' active' : '');
+        b.style.background = c; b.title = c;
+        b.addEventListener('click', () => { hlColor = c; updateSubArea(); });
+        paSubEl.appendChild(b);
+      });
+    } else if (tool === 'eraser') {
+      [[12,'S'],[28,'M'],[60,'L']].forEach(([sz, label]) => {
+        const b = document.createElement('button');
+        b.className = 'pa-size' + (eraserSize === sz ? ' active' : '');
+        b.textContent = label;
+        b.addEventListener('click', () => { eraserSize = sz; updateSubArea(); });
+        paSubEl.appendChild(b);
+      });
+    }
   }
 
-  function closePalette() {
-    if (palette) palette.classList.remove('open');
-    if (currentToggleBtn) { currentToggleBtn.classList.remove('active'); currentToggleBtn = null; }
-    setOverlayPointerEvents(activeContainerId, false);
-    hideCursor();
+  function selectTool(t) {
+    tool = t;
+    if (toolbarEl) toolbarEl.querySelectorAll('.pa-tool').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+    if (tool !== 'eraser') hideCursor();
+    updateSubArea();
   }
 
-  // Click-outside ปิด palette
-  document.addEventListener('click', e => {
-    if (!palette || !palette.classList.contains('open')) return;
-    if (!palette.contains(e.target) && !e.target.closest('.pdfAnnotateToggleBtn') && !e.target.closest('.pdfAnnotateCanvas')) closePalette();
-  }, true);
-
+  // ── iOS Notes-style pill toolbar (singleton) ──
   function buildToolbar() {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'pdfAnnotateToggleBtn';
-    btn.title = 'ขีดเขียนบน PDF';
-    btn.textContent = '✏️';
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      if (palette && palette.classList.contains('open')) closePalette();
-      else openPalette(btn);
+    const el = document.createElement('div');
+    el.id = 'pdfAnnotateToolbar';
+    [['pen','✏️','ปากกา'],['highlighter','🖍️','Highlight'],['eraser','🩹','ยางลบ']].forEach(([t, emoji, title]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pa-tool' + (t === tool ? ' active' : '');
+      b.dataset.tool = t; b.title = title; b.textContent = emoji;
+      b.addEventListener('click', () => selectTool(t));
+      el.appendChild(b);
     });
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button'; clearBtn.className = 'pa-tool'; clearBtn.dataset.action = 'clearAll'; clearBtn.title = 'ล้างทั้งหมด'; clearBtn.textContent = '🗑';
+    clearBtn.addEventListener('click', () => {
+      if (confirm('ล้างทั้งหมดที่เขียน/highlight ไว้บน PDF นี้?'))
+        Object.keys(instances).forEach(cid => instances[cid].overlays.forEach(clearOverlayFull));
+    });
+    el.appendChild(clearBtn);
+    const sep = document.createElement('div'); sep.className = 'pa-sep'; el.appendChild(sep);
+    paSubEl = document.createElement('div');
+    paSubEl.style.cssText = 'display:flex;align-items:center;gap:4px;';
+    el.appendChild(paSubEl);
+    document.body.appendChild(el);
+    updateSubArea();
+    return el;
+  }
+
+  // ── Toggle button (singleton, ลอยข้างกระดาษทด) ──
+  function buildToggleBtn() {
+    const btn = document.createElement('button');
+    btn.id = 'pdfAnnotateToggleBtn'; btn.type = 'button'; btn.title = 'ขีดเขียนบน PDF'; btn.textContent = '✏️';
+    btn.addEventListener('click', e => { e.stopPropagation(); handleToggleClick(); });
+    document.body.appendChild(btn);
     return btn;
   }
 
-  // หา .stickyBar ด้วย anchor element (รองรับ _liftTakeStickyBars ที่ย้าย DOM ก่อน)
-  const HEADER_ANCHOR_ID = { takePdfViewer: 'takeExamTitle', pracPdfViewer: 'pracExamTitle' };
-  function findHeaderBar(containerId) {
-    const anchor = document.getElementById(HEADER_ANCHOR_ID[containerId] || '');
-    return anchor ? anchor.closest('.stickyBar') : null;
+  // ── 3-state toggle: Off → On+Toolbar → On(hidden) → Off ──
+  function handleToggleClick() {
+    if (!drawMode) {
+      drawMode = true; toolbarOpen = true;
+      if (toolbarEl) toolbarEl.classList.add('open');
+      setOverlayPointerEvents(activeContainerId, true);
+    } else if (toolbarOpen) {
+      toolbarOpen = false;
+      if (toolbarEl) toolbarEl.classList.remove('open');
+    } else {
+      drawMode = false;
+      setOverlayPointerEvents(activeContainerId, false); hideCursor();
+    }
+    updateToggleBtnClass();
   }
+  function updateToggleBtnClass() {
+    if (!toggleBtn) return;
+    toggleBtn.classList.toggle('toolbar-open', drawMode && toolbarOpen);
+    toggleBtn.classList.toggle('draw-on',      drawMode && !toolbarOpen);
+  }
+
+  // Click-outside ซ่อน toolbar (ไม่ปิด draw mode)
+  document.addEventListener('click', e => {
+    if (!toolbarOpen || !toolbarEl) return;
+    if (toolbarEl.contains(e.target) || e.target === toggleBtn || e.target.closest('.pdfAnnotateCanvas')) return;
+    toolbarOpen = false; toolbarEl.classList.remove('open'); updateToggleBtnClass();
+  }, true);
 
   function buildOverlaysFor(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return null;
     const pageWrappers = Array.from(container.querySelectorAll('[id^="' + containerId + '-page-"]'));
-    if (!pageWrappers.length) return null; // GDrive iframe embed — ไม่ต้องมี toolbar
-
-    const toolbar = buildToolbar();
-    const headerBar = findHeaderBar(containerId);
-    if (headerBar) headerBar.insertBefore(toolbar, headerBar.children[1] || null);
-    else container.insertBefore(toolbar, container.firstChild);
+    if (!pageWrappers.length) return null; // GDrive iframe embed
 
     const overlays = pageWrappers.map(wrapper => {
       const pdfCanvas = wrapper.querySelector('canvas');
@@ -13726,23 +13752,25 @@ function initEntranceCompare(params) {
       return { pdfCanvas, overlay, ctx, hlCanvas, hlCtx, ro };
     }).filter(Boolean);
 
-    return { toolbar, overlays };
+    return { overlays };
   }
 
   function teardown(containerId) {
-    const inst = instances[containerId];
-    if (!inst) return;
-    if (activeContainerId === containerId) closePalette();
+    const inst = instances[containerId]; if (!inst) return;
     inst.overlays.forEach(o => {
       try { o.ro.disconnect(); } catch (e) {}
       const stage = o.overlay.parentNode;
-      if (stage && stage.parentNode) {
-        stage.parentNode.insertBefore(o.pdfCanvas, stage);
-        stage.parentNode.removeChild(stage);
-      }
+      if (stage && stage.parentNode) { stage.parentNode.insertBefore(o.pdfCanvas, stage); stage.parentNode.removeChild(stage); }
     });
-    if (inst.toolbar && inst.toolbar.parentNode) inst.toolbar.parentNode.removeChild(inst.toolbar);
     delete instances[containerId];
+  }
+
+  function resetDrawState() {
+    drawMode = false; toolbarOpen = false;
+    setOverlayPointerEvents(activeContainerId, false);
+    hideCursor();
+    if (toolbarEl) toolbarEl.classList.remove('open');
+    updateToggleBtnClass();
   }
 
   function pdfAnnotateInit(containerId) {
@@ -13750,18 +13778,35 @@ function initEntranceCompare(params) {
     teardown(containerId);
     const built = buildOverlaysFor(containerId);
     if (built) instances[containerId] = built;
+    if (containerId === activeContainerId) {
+      if (instances[containerId]) {
+        if (!toggleBtn) { toggleBtn = buildToggleBtn(); toolbarEl = buildToolbar(); }
+        toggleBtn.style.display = 'block'; updateToggleBtnClass();
+      } else if (toggleBtn) {
+        resetDrawState(); toggleBtn.style.display = 'none';
+      }
+    }
   }
 
   window.pdfAnnotateInit = pdfAnnotateInit;
   window.pdfAnnotateShow = function(containerId) {
-    if (activeContainerId !== containerId) closePalette();
+    if (activeContainerId !== containerId) resetDrawState();
     activeContainerId = containerId;
-    if (MQ.matches && !instances[containerId]) pdfAnnotateInit(containerId);
+    if (MQ.matches) {
+      if (!instances[containerId]) pdfAnnotateInit(containerId);
+      if (instances[containerId]) {
+        if (!toggleBtn) { toggleBtn = buildToggleBtn(); toolbarEl = buildToolbar(); }
+        toggleBtn.style.display = 'block';
+        updateToggleBtnClass();
+      } else if (toggleBtn) {
+        resetDrawState(); toggleBtn.style.display = 'none';
+      }
+    }
   };
   window.pdfAnnotateHide = function() {
-    closePalette();
-    Object.keys(instances).forEach(cid =>
-      instances[cid].overlays.forEach(clearOverlayFull));
+    resetDrawState();
+    if (toggleBtn) toggleBtn.style.display = 'none';
+    Object.keys(instances).forEach(cid => instances[cid].overlays.forEach(clearOverlayFull));
     hideCursor();
   };
 
@@ -13770,8 +13815,10 @@ function initEntranceCompare(params) {
     if (MQ.matches) {
       if (!instances[activeContainerId]) pdfAnnotateInit(activeContainerId);
     } else if (instances[activeContainerId]) {
+      resetDrawState();
       instances[activeContainerId].overlays.forEach(clearOverlayFull);
       teardown(activeContainerId);
+      if (toggleBtn) toggleBtn.style.display = 'none';
     }
   });
 })();
