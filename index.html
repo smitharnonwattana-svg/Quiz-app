@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.89 -->
+  <!-- APP_VERSION: v47.90 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.89</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.90</div>
     </div>
   </div>
 </div>
@@ -2787,14 +2787,6 @@ const Store = {
   },
   load(){
     if (this._cache) return this._cache;
-    // Warm start: read localStorage as render cache while Firebase loads
-    try {
-      const _lsRaw = localStorage.getItem(this.key);
-      if (_lsRaw) {
-        const _ls = JSON.parse(_lsRaw);
-        if (_ls && Array.isArray(_ls.exams)) { this._cache = _ls; return this._cache; }
-      }
-    } catch(e) {}
     return {exams:[],questions:{},attempts:[],members:[],assignments:[],benchmarks:[]};
   },
   // อัปเดต in-memory cache เท่านั้น (ไม่ write Firebase — ใช้ใน migrate())
@@ -2812,8 +2804,6 @@ const Store = {
       }
       data._savedAt = Date.now();
       this._cache = data;
-      // Write to localStorage as fast render cache for next page load
-      try { localStorage.setItem(this.key, JSON.stringify(data)); } catch(e) {}
       if(FirebaseSync.ready()) {
         localStorage.removeItem('nanont:syncPending');
         FirebaseSync.saveDoc('mainStore', data).catch(e => {
@@ -2869,8 +2859,9 @@ const Store = {
       }
     }catch(e){ console.warn('[Store] localStorage recovery err',e); }
     this._cache = cloud;
-    // Update localStorage render cache to match Firebase
-    try { localStorage.setItem(this.key, JSON.stringify(cloud)); } catch(e) {}
+    Store._cloudLoaded = true;
+    const _lb = document.getElementById('_storeLoadingBar');
+    if(_lb) _lb.remove();
     console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
     // Always refresh current page so stale empty-state render is replaced with real data
     if(typeof navigate==='function' && window._currentPage){
@@ -3023,6 +3014,9 @@ const Store = {
         } catch(e) {}
         this._cache = cloudData;
         _updateBellBadge();
+        Store._cloudLoaded = true;
+        const _lb2 = document.getElementById('_storeLoadingBar');
+        if(_lb2) _lb2.remove();
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
@@ -3071,7 +3065,19 @@ const Store = {
       }
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
-    // Note: localStorage is kept as render cache; syncFromCloud() updates it after Firebase sync
+    Store._cloudLoaded = false;
+    // Inject loading bar while waiting for Firebase
+    (function(){
+      const _lbExist = document.getElementById('_storeLoadingBar');
+      if(_lbExist) return;
+      const _s = document.createElement('style');
+      _s.textContent = '@keyframes _fbLoad{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}';
+      document.head.appendChild(_s);
+      const _lb = document.createElement('div');
+      _lb.id = '_storeLoadingBar';
+      _lb.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;height:3px;background:linear-gradient(270deg,#3b82f6,#8b5cf6,#3b82f6);background-size:200% 200%;animation:_fbLoad 1.5s ease-in-out infinite;';
+      if(document.body) document.body.prepend(_lb);
+    })();
     return this.migrate(this.load());
   }
 };
@@ -12923,7 +12929,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.89';
+  const CURRENT_VERSION = 'v47.90';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
