@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.93p -->
+  <!-- APP_VERSION: v47.94p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -125,13 +125,9 @@
       .pa-size.active span{background:#111 !important;}
       .pdfAnnotateStage{position:relative;display:block;width:100%;}
       .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
-      /* Answer Sheet Mode */
-      #answerSheetToggleBtn{position:fixed;top:12px;right:calc(20vw + 245px);width:40px;height:40px;border-radius:50%;background:#1f2937;color:#e5e7eb;border:none;font-size:18px;cursor:pointer;z-index:8500;display:none;transition:background .15s,color .15s;line-height:1;font-family:inherit;}
-      #answerSheetToggleBtn.open{background:#10b981;color:#fff;}
-      #answerSheetPanel{position:fixed;top:60px;right:20vw;width:min(340px,58vw);max-height:calc(100dvh - 80px);background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.28);overflow:hidden;display:none;flex-direction:column;z-index:8400;}
-      #answerSheetPanel.open{display:flex;}
-      #answerSheetPanel canvas{display:block;touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;}
-      .asPanel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #e5e7eb;flex-shrink:0;background:#f9fafb;}
+      /* Answer Sheet Mode — embedded in right panel */
+      #answerSheetEmbed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;}
+      #answerSheetEmbed canvas{display:block;touch-action:pan-y;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
          พอ Safari ย่อ address bar ลง (มักเกิดอัตโนมัติ ~1s หลังเปิดหน้า) viewport
          จริงโตขึ้นแต่ 100vh ไม่รีคำนวณตามทันที ทำให้ .takeRoot/.takeRight ที่ใช้
@@ -1076,7 +1072,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.93p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.94p</div>
     </div>
   </div>
 </div>
@@ -5184,8 +5180,21 @@ function initTake(id){
   }
   window._refreshTakeChoices = render;
 
-  if (_answerSheetMode && typeof window.answerSheetShow === 'function') {
-    window.answerSheetShow(total);
+  if (_answerSheetMode && typeof window.answerSheetMount === 'function') {
+    const choicesBlock = document.querySelector('#page-take .takeChoicesBlock');
+    if (choicesBlock) {
+      choicesBlock.querySelector('.muted').style.display = 'none';
+      document.getElementById('takeChoices').style.display = 'none';
+      const numsWrap = document.querySelector('#page-take .takeNumsWrap');
+      if (numsWrap) numsWrap.style.display = 'none';
+      choicesBlock.style.cssText = 'display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0;min-height:0;';
+      const navRow = choicesBlock.querySelector('.takeMobileNav');
+      const embedDiv = document.createElement('div');
+      embedDiv.id = 'answerSheetEmbed';
+      choicesBlock.insertBefore(embedDiv, navRow);
+      if (navRow) navRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;flex-shrink:0;border-top:1px solid #e5e7eb;';
+      window.answerSheetMount(embedDiv, total);
+    }
   }
 
   document.getElementById('takePrevBtn').onclick=()=>{gotoQuestion(Math.max(0,st.currentIndex-1));};
@@ -13852,24 +13861,23 @@ function initEntranceCompare(params) {
   });
 })();
 
-// ── ANSWER SHEET MODE — กระดาษคำตอบ canvas-based ──
+// ── ANSWER SHEET MODE — กระดาษคำตอบ canvas-based (embedded in right panel) ──
 (function initAnswerSheet() {
-  const MQ = window.matchMedia('(min-width:901px)');
 
   // Layout constants (logical px)
-  const HEADER_H = 38;
-  const ROW_H    = 36;
-  const BUBBLE_R = 13;
-  const NUM_W    = 40;
-  const COL_W    = 40;
-  const PAD_L    = 14;
-  const PAD_R    = 14;
+  const HEADER_H = 36;
+  const ROW_H    = 34;
+  const BUBBLE_R = 12;
+  const NUM_W    = 36;
+  const COL_W    = 36;
+  const PAD_L    = 10;
+  const PAD_R    = 10;
   const CHOICE_LABELS = ['ก','ข','ค','ง'];
   const SEL_COLOR = '#111827';
-  const CUR_BG   = 'rgba(251,191,36,0.18)';
+  const CUR_BG   = 'rgba(251,191,36,0.22)';
 
-  let panelEl = null, canvasEl = null, ctx = null, scrollerEl = null, toggleBtnEl = null;
-  let totalQ = 0, currentRow = 0, panelOpen = false;
+  let canvasEl = null, ctx = null, embedEl = null;
+  let totalQ = 0, currentRow = 0;
 
   function getAnswers() {
     const st = window._takeState;
@@ -13886,19 +13894,25 @@ function initEntranceCompare(params) {
     if (!q) return;
     if (val) st.answers[q.id] = val;
     else delete st.answers[q.id];
-    // sync ย้อนกลับไปที่ panel ก/ข/ค/ง ถ้าอยู่ข้อนั้น
     if (st.currentIndex === qi && typeof window._refreshTakeChoices === 'function') {
       window._refreshTakeChoices();
     }
   }
 
-  function sheetW() { return PAD_L + NUM_W + CHOICE_LABELS.length * COL_W + PAD_R; }
-  function sheetH() { return HEADER_H + totalQ * ROW_H + 8; }
+  function sheetW() {
+    return embedEl ? embedEl.clientWidth || (PAD_L + NUM_W + CHOICE_LABELS.length * COL_W + PAD_R) : 200;
+  }
+  function sheetH() { return HEADER_H + totalQ * ROW_H + 4; }
 
   function renderSheet() {
     if (!canvasEl || !ctx || !totalQ) return;
     const W = sheetW(), H = sheetH();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // column widths proportional to available width
+    const availW = W - PAD_L - PAD_R;
+    const numW = Math.round(availW * 0.22);
+    const colW = Math.round((availW - numW) / CHOICE_LABELS.length);
+
     canvasEl.style.width = W + 'px';
     canvasEl.style.height = H + 'px';
     canvasEl.width  = Math.round(W * dpr);
@@ -13908,20 +13922,21 @@ function initEntranceCompare(params) {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, W, H);
 
-    // Header
+    // Header row
     ctx.fillStyle = '#f3f4f6';
     ctx.fillRect(0, 0, W, HEADER_H);
     ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, HEADER_H); ctx.lineTo(W, HEADER_H); ctx.stroke();
     ctx.fillStyle = '#6b7280'; ctx.font = 'bold 11px system-ui,sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('ข้อ', PAD_L + NUM_W / 2, HEADER_H / 2);
+    ctx.fillText('ข้อ', PAD_L + numW / 2, HEADER_H / 2);
     CHOICE_LABELS.forEach((l, ci) => {
-      ctx.fillText(l, PAD_L + NUM_W + ci * COL_W + COL_W / 2, HEADER_H / 2);
+      ctx.fillText(l, PAD_L + numW + ci * colW + colW / 2, HEADER_H / 2);
     });
 
     const answers = getAnswers();
     const ciMap = { A:0, B:1, C:2, D:3 };
+    const br = Math.min(BUBBLE_R, colW / 2 - 3);
 
     for (let qi = 0; qi < totalQ; qi++) {
       const rowTop = HEADER_H + qi * ROW_H;
@@ -13931,32 +13946,31 @@ function initEntranceCompare(params) {
         ctx.fillStyle = CUR_BG;
         ctx.fillRect(0, rowTop, W, ROW_H);
       } else if (qi % 2 === 1) {
-        ctx.fillStyle = 'rgba(0,0,0,0.018)';
+        ctx.fillStyle = 'rgba(0,0,0,0.02)';
         ctx.fillRect(0, rowTop, W, ROW_H);
       }
-
       if (qi > 0) {
         ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 0.5;
         ctx.beginPath(); ctx.moveTo(PAD_L, rowTop); ctx.lineTo(W - PAD_R, rowTop); ctx.stroke();
       }
 
-      ctx.font = qi === currentRow ? 'bold 12px system-ui,sans-serif' : '12px system-ui,sans-serif';
-      ctx.fillStyle = qi === currentRow ? '#111827' : '#374151';
+      ctx.font = qi === currentRow ? 'bold 11px system-ui,sans-serif' : '11px system-ui,sans-serif';
+      ctx.fillStyle = qi === currentRow ? '#111827' : '#6b7280';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(qi + 1, PAD_L + NUM_W / 2, rowCy);
+      ctx.fillText(qi + 1, PAD_L + numW / 2, rowCy);
 
       const selCI = answers[qi] != null ? ciMap[answers[qi]] : -1;
       CHOICE_LABELS.forEach((l, ci) => {
-        const bx = PAD_L + NUM_W + ci * COL_W + COL_W / 2;
+        const bx = PAD_L + numW + ci * colW + colW / 2;
         const sel = ci === selCI;
-        ctx.beginPath(); ctx.arc(bx, rowCy, BUBBLE_R, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.arc(bx, rowCy, br, 0, Math.PI * 2);
         if (sel) {
           ctx.fillStyle = SEL_COLOR; ctx.fill();
         } else {
           ctx.fillStyle = '#fff'; ctx.fill();
-          ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1.5; ctx.stroke();
         }
-        ctx.font = '11px system-ui,sans-serif';
+        ctx.font = '10px system-ui,sans-serif';
         ctx.fillStyle = sel ? '#fff' : '#9ca3af';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(l, bx, rowCy);
@@ -13965,124 +13979,96 @@ function initEntranceCompare(params) {
   }
 
   function hitTest(x, y) {
+    // คำนวณ column widths ตาม sheetW ปัจจุบัน
+    const W = sheetW();
+    const availW = W - PAD_L - PAD_R;
+    const numW = Math.round(availW * 0.22);
+    const colW = Math.round((availW - numW) / CHOICE_LABELS.length);
+    const br = Math.min(BUBBLE_R, colW / 2 - 3);
+
     for (let qi = 0; qi < totalQ; qi++) {
       const rowCy = HEADER_H + qi * ROW_H + ROW_H / 2;
       for (let ci = 0; ci < CHOICE_LABELS.length; ci++) {
-        const bx = PAD_L + NUM_W + ci * COL_W + COL_W / 2;
-        if (Math.hypot(x - bx, y - rowCy) <= BUBBLE_R + 8) return { qi, ci };
+        const bx = PAD_L + numW + ci * colW + colW / 2;
+        if (Math.hypot(x - bx, y - rowCy) <= br + 10) return { qi, ci };
       }
     }
     return null;
   }
 
-  function applyHit(clientX, clientY, canvasRect) {
-    const x = clientX - canvasRect.left;
-    const y = clientY - canvasRect.top + scrollerEl.scrollTop;
+  function applyHit(clientX, clientY) {
+    if (!canvasEl) return;
+    const r = canvasEl.getBoundingClientRect();
+    // getBoundingClientRect() ปรับตาม scroll อัตโนมัติ — ไม่ต้อง + scrollTop
+    const x = clientX - r.left;
+    const y = clientY - r.top;
     const hit = hitTest(x, y);
-    if (!hit) return;
+    if (!hit) return false;
     const { qi, ci } = hit;
     const choiceMap = ['A','B','C','D'];
     const newVal = choiceMap[ci];
     const st = window._takeState;
-    if (!st || !st.qsList) return;
+    if (!st || !st.qsList) return false;
     const q = st.qsList[qi];
-    if (!q) return;
+    if (!q) return false;
     const cur = st.answers[q.id];
     syncAnswer(qi, cur === newVal ? null : newVal);
     renderSheet();
+    return true; // hit found
   }
 
-  function buildPanel() {
-    const panel = document.createElement('div');
-    panel.id = 'answerSheetPanel';
+  function scrollToRow(qi) {
+    if (!embedEl) return;
+    const targetY = HEADER_H + qi * ROW_H - embedEl.clientHeight / 3;
+    embedEl.scrollTop = Math.max(0, targetY);
+  }
 
-    const header = document.createElement('div');
-    header.className = 'asPanel-header';
-    const title = document.createElement('span');
-    title.style.cssText = 'font-weight:700;font-size:14px;color:#111827;';
-    title.textContent = 'กระดาษคำตอบ';
-    header.appendChild(title);
-    const clearBtn = document.createElement('button');
-    clearBtn.type = 'button';
-    clearBtn.title = 'ล้างคำตอบทั้งหมด';
-    clearBtn.style.cssText = 'border:none;background:transparent;color:#ef4444;font-size:13px;cursor:pointer;padding:4px 8px;border-radius:6px;';
-    clearBtn.textContent = '🗑 ล้าง';
-    clearBtn.addEventListener('click', () => {
-      if (!confirm('ล้างคำตอบบนกระดาษคำตอบทั้งหมด?')) return;
-      const st = window._takeState;
-      if (st && st.qsList) st.qsList.forEach(q => { delete st.answers[q.id]; });
-      if (typeof window._refreshTakeChoices === 'function') window._refreshTakeChoices();
-      renderSheet();
-    });
-    header.appendChild(clearBtn);
-    panel.appendChild(header);
-
-    const scroller = document.createElement('div');
-    scroller.style.cssText = 'overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;';
-    scrollerEl = scroller;
+  window.answerSheetMount = function(container, total) {
+    embedEl = container;
+    totalQ = total; currentRow = 0;
 
     const canvas = document.createElement('canvas');
-    canvasEl = canvas;
-    ctx = canvas.getContext('2d');
-    scroller.appendChild(canvas);
-    panel.appendChild(scroller);
+    canvasEl = canvas; ctx = canvas.getContext('2d');
+    container.appendChild(canvas);
 
+    // pointerdown: Apple Pencil (pen) + mouse — ถ้าชน bubble ให้ preventDefault เพื่อป้องกัน scroll
     canvas.addEventListener('pointerdown', e => {
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
-      e.preventDefault();
-      applyHit(e.clientX, e.clientY, canvas.getBoundingClientRect());
-    });
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      if (hitTest(x, y)) {
+        e.preventDefault();
+        applyHit(e.clientX, e.clientY);
+      }
+    }, { passive: false });
+
+    // touchstart: Apple Pencil stylus (touchType==='stylus') หรือนิ้ว
     canvas.addEventListener('touchstart', e => {
       const stylus = Array.from(e.touches).find(t => t.touchType === 'stylus');
       const touch = stylus || (e.touches.length === 1 ? e.touches[0] : null);
       if (!touch) return;
-      e.preventDefault();
-      applyHit(touch.clientX, touch.clientY, canvas.getBoundingClientRect());
+      const r = canvas.getBoundingClientRect();
+      const x = touch.clientX - r.left;
+      const y = touch.clientY - r.top;
+      if (hitTest(x, y)) {
+        e.preventDefault();
+        applyHit(touch.clientX, touch.clientY);
+      }
     }, { passive: false });
 
-    document.body.appendChild(panel);
-    return panel;
-  }
-
-  function buildToggleBtn() {
-    const btn = document.createElement('button');
-    btn.id = 'answerSheetToggleBtn';
-    btn.type = 'button'; btn.title = 'กระดาษคำตอบ'; btn.textContent = '📋';
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      panelOpen = !panelOpen;
-      panelEl.classList.toggle('open', panelOpen);
-      btn.classList.toggle('open', panelOpen);
-      if (panelOpen) { renderSheet(); scrollToRow(currentRow); }
-    });
-    document.body.appendChild(btn);
-    return btn;
-  }
-
-  function scrollToRow(qi) {
-    if (!scrollerEl) return;
-    const targetY = HEADER_H + qi * ROW_H - 60;
-    scrollerEl.scrollTop = Math.max(0, targetY);
-  }
-
-  window.answerSheetShow = function(total) {
-    if (!MQ.matches) return;
-    totalQ = total; currentRow = 0; panelOpen = false;
-    if (!panelEl) { panelEl = buildPanel(); toggleBtnEl = buildToggleBtn(); }
-    toggleBtnEl.style.display = 'block';
-    toggleBtnEl.classList.remove('open');
-    panelEl.classList.remove('open');
+    renderSheet();
+    // รอให้ container มี width จริงก่อน render อีกรอบ
+    requestAnimationFrame(() => { renderSheet(); });
   };
 
   window.answerSheetHide = function() {
-    panelOpen = false;
-    if (panelEl) panelEl.classList.remove('open');
-    if (toggleBtnEl) { toggleBtnEl.classList.remove('open'); toggleBtnEl.style.display = 'none'; }
+    canvasEl = null; ctx = null; embedEl = null; totalQ = 0; currentRow = 0;
   };
 
   window.answerSheetSetRow = function(qi) {
     currentRow = qi;
-    if (panelOpen) { renderSheet(); scrollToRow(qi); }
+    renderSheet();
+    scrollToRow(qi);
   };
 
   window.answerSheetRenderSheet = renderSheet;
