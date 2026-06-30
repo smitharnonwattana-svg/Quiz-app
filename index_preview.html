@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.87p -->
+  <!-- APP_VERSION: v47.88p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1062,7 +1062,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.87p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.88p</div>
     </div>
   </div>
 </div>
@@ -13532,6 +13532,7 @@ function initEntranceCompare(params) {
       updateCursor(e.clientX, e.clientY);
     }
     function onPointerMove(e) {
+      if (e.pointerType === 'pen') { updateCursor(e.clientX, e.clientY); return; }
       if (e.pointerType !== 'mouse') return;
       updateCursor(e.clientX, e.clientY);
       if (!drawing || e.pointerId !== activePointerId) return;
@@ -13544,6 +13545,7 @@ function initEntranceCompare(params) {
       drawing = false; activePointerId = null;
     }
     function onPointerLeave(e) {
+      if (e.pointerType === 'pen') { hideCursor(); return; }
       if (e.pointerType !== 'mouse') return;
       if (drawing) { endStroke(); drawing = false; activePointerId = null; }
       hideCursor();
