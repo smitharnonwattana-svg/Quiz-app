@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.86 -->
+  <!-- APP_VERSION: v47.87 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.86</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.87</div>
     </div>
   </div>
 </div>
@@ -2834,8 +2834,8 @@ const Store = {
     }catch(e){}
     this._cache = cloud;
     console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
-    const safeSyncPages = ['stats', 'exams', 'home'];
-    if(typeof navigate==='function' && window._currentPage && safeSyncPages.includes(window._currentPage)){
+    // Always refresh current page so stale empty-state render is replaced with real data
+    if(typeof navigate==='function' && window._currentPage){
       navigate(window._currentPage, window._currentParams||{});
     }
   },
@@ -2988,7 +2988,7 @@ const Store = {
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
-      const safeSoftRefresh = ['home','stats','rewards'];
+      const safeSoftRefresh = ['home','stats','rewards','exams'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
         navigate(pg, window._currentParams||{});
@@ -12890,7 +12890,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.86';
+  const CURRENT_VERSION = 'v47.87';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
