@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.87 -->
+  <!-- APP_VERSION: v47.88 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.87</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.88</div>
     </div>
   </div>
 </div>
@@ -2832,6 +2832,31 @@ const Store = {
         }
       }
     }catch(e){}
+    // Recovery: if localStorage has MORE exams than Firestore, merge them up
+    // (handles the case where exams were added locally but never synced to cloud)
+    try{
+      const _lsRaw = localStorage.getItem(this.key);
+      if(_lsRaw){
+        const _ls = JSON.parse(_lsRaw);
+        const _lsExams = Array.isArray(_ls && _ls.exams) ? _ls.exams : [];
+        const _cloudExamIds = new Set((cloud.exams||[]).map(e=>e&&e.id));
+        const _lsOnly = _lsExams.filter(e=>e&&e.id&&!_cloudExamIds.has(e.id));
+        if(_lsOnly.length>0){
+          cloud.exams = [...(cloud.exams||[]), ..._lsOnly];
+          // Merge questions for the recovered exams
+          if(_ls.questions && typeof _ls.questions==='object'){
+            cloud.questions = Object.assign({}, _ls.questions, cloud.questions||{});
+          }
+          console.log('[Store] RECOVERY: merged', _lsOnly.length, 'exams from localStorage → pushing to Firestore');
+          FirebaseSync.saveDoc('mainStore', cloud).then(()=>{
+            localStorage.removeItem(this.key); // safe to remove after successful push
+            console.log('[Store] RECOVERY complete — localStorage cleared');
+          }).catch(e=>console.warn('[Store] RECOVERY push err',e));
+        } else {
+          localStorage.removeItem(this.key); // no unsynced exams → safe to clear
+        }
+      }
+    }catch(e){ console.warn('[Store] localStorage recovery err',e); }
     this._cache = cloud;
     console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
     // Always refresh current page so stale empty-state render is replaced with real data
@@ -3037,8 +3062,8 @@ const Store = {
     if (!this._cache) {
       this._cache = {exams:[],questions:{},attempts:[],benchmarks:[],members:[],assignments:[],adminLoggedIn:false};
     }
-    // One-time cleanup of old localStorage store key
-    try { localStorage.removeItem(this.key); } catch(e) {}
+    // Note: localStorage cleanup is handled by syncFromCloud() AFTER verifying
+    // all exams are in Firestore — never delete here to avoid data loss
     return this.migrate(this.load());
   }
 };
@@ -12890,7 +12915,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.87';
+  const CURRENT_VERSION = 'v47.88';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
