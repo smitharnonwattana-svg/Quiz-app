@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.84 -->
+  <!-- APP_VERSION: v47.85 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -109,6 +109,22 @@
       .lifted-sb{position:fixed !important;top:0;z-index:60;}
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
+      /* PDF Annotate — floating toggle button + iOS Notes-style pill toolbar */
+      #pdfAnnotateToggleBtn{position:fixed;top:12px;right:calc(20vw + 195px);width:40px;height:40px;border-radius:50%;background:#1f2937;color:#e5e7eb;border:none;font-size:18px;cursor:pointer;z-index:8500;display:none;transition:background .15s,color .15s,box-shadow .15s;line-height:1;font-family:inherit;}
+      #pdfAnnotateToggleBtn.toolbar-open{background:#fbbf24;color:#111;}
+      #pdfAnnotateToggleBtn.draw-on{background:#374151;color:#fbbf24;box-shadow:0 0 0 2px #fbbf24;}
+      #pdfAnnotateToolbar{position:fixed;top:60px;left:calc(80vw - 215px);transform:translateX(-50%);display:none;align-items:center;gap:4px;background:rgba(31,41,55,0.96);backdrop-filter:blur(12px);border-radius:20px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:9200;}
+      #pdfAnnotateToolbar.open{display:flex;}
+      .pa-tool{width:38px;height:38px;border-radius:10px;border:none;background:transparent;color:#d1d5db;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+      .pa-tool.active{background:#374151;color:#fbbf24;}
+      .pa-sep{width:1px;height:28px;background:#4b5563;margin:0 4px;flex-shrink:0;}
+      .pa-color{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;}
+      .pa-color.active{box-shadow:0 0 0 2.5px #fbbf24;}
+      .pa-size{width:32px;height:32px;border-radius:50%;border:1px solid #4b5563;background:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;}
+      .pa-size.active{border-color:#fbbf24;background:#fbbf24;}
+      .pa-size.active span{background:#111 !important;}
+      .pdfAnnotateStage{position:relative;display:block;width:100%;}
+      .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
          พอ Safari ย่อ address bar ลง (มักเกิดอัตโนมัติ ~1s หลังเปิดหน้า) viewport
          จริงโตขึ้นแต่ 100vh ไม่รีคำนวณตามทันที ทำให้ .takeRoot/.takeRight ที่ใช้
@@ -978,6 +994,14 @@
       display: none; z-index: 10;
     }
     #scratchCursor.show { display: block; }
+    #pdfAnnotateCursor {
+      position: fixed; pointer-events: none;
+      border: 1.5px solid #ef4444; border-radius: 50%;
+      background: rgba(239,68,68,0.12);
+      transform: translate(-50%, -50%);
+      display: none; z-index: 9500;
+    }
+    #pdfAnnotateCursor.show { display: block; }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1045,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.84</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.85</div>
     </div>
   </div>
 </div>
@@ -4278,6 +4302,13 @@ function navigate(page, params={}){
     else window.scratchHide();
   }
 
+  // PDF Annotate lifecycle (desktop/iPad ≥901px เท่านั้น, no-op on mobile)
+  if (typeof window.pdfAnnotateShow === 'function') {
+    if (page === 'take') window.pdfAnnotateShow('takePdfViewer');
+    else if (page === 'practice') window.pdfAnnotateShow('pracPdfViewer');
+    else window.pdfAnnotateHide();
+  }
+
   // กัน Safari iPad header หาย (.stickyBar) ตอนข้อ/หน้า PDF เยอะ บน desktop/
   // landscape breakpoint — ดู _liftTakeStickyBars
   // เรียก sync ตรงนี้ (ไม่รอ requestAnimationFrame) — ถ้ารอ rAF จะถูก pdf.js
@@ -4948,6 +4979,7 @@ function initTake(id){
       }
       const url = pdfUrl.startsWith('localpdf:') ? await getPdfBlobUrl(pdfUrl) : pdfUrl;
       await _takePdfViewer.loadUrl(url, 1);
+      if (typeof window.pdfAnnotateInit === 'function') window.pdfAnnotateInit('takePdfViewer');
     } catch(err){ toast(err?.message||String(err)); }
   }
 
@@ -7566,6 +7598,7 @@ function initPractice(params){
         pdfUrl=URL.createObjectURL(blob);
       }
       await _pracPdfViewer.loadUrl(pdfUrl,1);
+      if (typeof window.pdfAnnotateInit === 'function') window.pdfAnnotateInit('pracPdfViewer');
     }catch(err){toast(err?.message||String(err));}
   }
 
@@ -13061,7 +13094,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.84';
+  const CURRENT_VERSION = 'v47.85';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -13357,6 +13390,459 @@ function initEntranceCompare(params) {
     pad.classList.remove('open');
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
   };
+})();
+
+// ── PDF ANNOTATE — เขียน/Highlight ทับ PDF ข้อสอบ (desktop/iPad ≥901px เท่านั้น) ──
+(function initPdfAnnotate(){
+  const MQ = window.matchMedia('(min-width:901px)');
+  const PEN = { size: 3, alpha: 1 };
+  const HI  = { size: 18 };
+
+  // Module state
+  let tool       = 'pen';
+  let penColor   = '#111111';
+  let hlColor    = '#fbbf24';
+  let eraserSize = 28;
+  let drawMode   = false;
+  let toolbarOpen = false;
+
+  // DOM singletons
+  let toggleBtn = null;
+  let toolbarEl = null;
+  let paSubEl   = null;
+
+  const instances = {}; // containerId -> { overlays:[{pdfCanvas,overlay,ctx,hlCanvas,hlCtx,ro}] }
+  let activeContainerId = null;
+
+  let cursorEl = null;
+  function ensureCursor() {
+    if (!cursorEl) { cursorEl = document.createElement('div'); cursorEl.id = 'pdfAnnotateCursor'; document.body.appendChild(cursorEl); }
+    return cursorEl;
+  }
+  function updateCursor(clientX, clientY) {
+    if (tool !== 'eraser') { hideCursor(); return; }
+    const c = ensureCursor();
+    c.style.left = clientX + 'px'; c.style.top = clientY + 'px';
+    c.style.width = eraserSize + 'px'; c.style.height = eraserSize + 'px';
+    c.classList.add('show');
+  }
+  function hideCursor() { if (cursorEl) cursorEl.classList.remove('show'); }
+
+  function applyStrokeStyle(ctx) {
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalAlpha = 1; ctx.lineWidth = eraserSize;
+      ctx.strokeStyle = '#000'; ctx.fillStyle = '#000';
+    } else if (tool === 'highlighter') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1; ctx.lineWidth = HI.size;
+      ctx.strokeStyle = hlColor; ctx.fillStyle = hlColor;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = PEN.alpha; ctx.lineWidth = PEN.size;
+      ctx.strokeStyle = penColor; ctx.fillStyle = penColor;
+    }
+  }
+
+  // ── overlay canvas: stylus touch + mouse + hlCanvas buffer สำหรับ highlighter ──
+  function wireDrawing(overlay, ctx, hlCanvas, hlCtx) {
+    let drawing = false, lastX = 0, lastY = 0, activeStylusId = null, activePointerId = null;
+    let hlPoints = null; // buffer สำหรับ highlighter stroke ที่กำลังลากอยู่
+
+    function getPosFromClient(clientX, clientY) {
+      const r = overlay.getBoundingClientRect();
+      return { x: clientX - r.left, y: clientY - r.top };
+    }
+    function drawDot(x, y) {
+      applyStrokeStyle(ctx);
+      ctx.beginPath();
+      ctx.arc(x, y, (tool === 'eraser' ? eraserSize : PEN.size) / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    function drawSegment(x, y) {
+      applyStrokeStyle(ctx);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x; lastY = y;
+    }
+    // Highlighter: redraw ทั้ง path ใน hlCanvas ทุกครั้ง — กัน alpha accumulation ดวงๆ
+    function hlMove(x, y) {
+      hlPoints.push({x, y});
+      hlCtx.save();
+      hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+      hlCtx.clearRect(0, 0, hlCanvas.width, hlCanvas.height);
+      hlCtx.restore();
+      hlCtx.beginPath();
+      hlCtx.moveTo(hlPoints[0].x, hlPoints[0].y);
+      for (let i = 1; i < hlPoints.length; i++) hlCtx.lineTo(hlPoints[i].x, hlPoints[i].y);
+      hlCtx.strokeStyle = hlColor;
+      hlCtx.lineWidth = HI.size;
+      hlCtx.lineCap = 'round'; hlCtx.lineJoin = 'round';
+      hlCtx.stroke();
+    }
+    function hlEnd() {
+      if (!hlPoints || !hlPoints.length) return;
+      hlPoints = null;
+      // Composite hlCanvas → main canvas ด้วย alpha 0.35
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 0.35;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(hlCanvas, 0, 0);
+      ctx.restore();
+      hlCtx.save();
+      hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+      hlCtx.clearRect(0, 0, hlCanvas.width, hlCanvas.height);
+      hlCtx.restore();
+    }
+
+    function startStroke(x, y) {
+      if (tool === 'highlighter') { hlPoints = [{x, y}]; hlMove(x, y); }
+      else { lastX = x; lastY = y; drawDot(x, y); }
+    }
+    function continueStroke(x, y) {
+      if (tool === 'highlighter') hlMove(x, y);
+      else drawSegment(x, y);
+    }
+    function endStroke() { if (tool === 'highlighter') hlEnd(); }
+
+    function findStylus(touchList) {
+      for (let i = 0; i < touchList.length; i++) {
+        if (touchList[i].touchType === 'stylus') return touchList[i];
+      }
+      return null;
+    }
+    function findTouchById(touchList, id) {
+      for (let i = 0; i < touchList.length; i++) {
+        if (touchList[i].identifier === id) return touchList[i];
+      }
+      return null;
+    }
+    function onTouchStart(e) {
+      const t = findStylus(e.touches);
+      if (!t) return;
+      e.preventDefault();
+      drawing = true; activeStylusId = t.identifier;
+      const p = getPosFromClient(t.clientX, t.clientY);
+      startStroke(p.x, p.y);
+      updateCursor(t.clientX, t.clientY);
+    }
+    function onTouchMove(e) {
+      const stylus = findStylus(e.touches);
+      if (stylus) updateCursor(stylus.clientX, stylus.clientY);
+      if (!drawing || activeStylusId === null) return;
+      const t = findTouchById(e.touches, activeStylusId);
+      if (!t || t.touchType !== 'stylus') return;
+      e.preventDefault();
+      const p = getPosFromClient(t.clientX, t.clientY);
+      continueStroke(p.x, p.y);
+    }
+    function onTouchEnd(e) {
+      if (activeStylusId === null) return;
+      const t = findTouchById(e.changedTouches, activeStylusId);
+      if (!t) return;
+      endStroke();
+      drawing = false; activeStylusId = null;
+      hideCursor();
+    }
+    overlay.addEventListener('touchstart', onTouchStart, { passive: false });
+    overlay.addEventListener('touchmove', onTouchMove, { passive: false });
+    overlay.addEventListener('touchend', onTouchEnd, { passive: false });
+    overlay.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    function onPointerDown(e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      e.preventDefault();
+      drawing = true; activePointerId = e.pointerId;
+      const p = getPosFromClient(e.clientX, e.clientY);
+      startStroke(p.x, p.y);
+      updateCursor(e.clientX, e.clientY);
+    }
+    function onPointerMove(e) {
+      if (e.pointerType === 'pen') { updateCursor(e.clientX, e.clientY); return; }
+      if (e.pointerType !== 'mouse') return;
+      updateCursor(e.clientX, e.clientY);
+      if (!drawing || e.pointerId !== activePointerId) return;
+      const p = getPosFromClient(e.clientX, e.clientY);
+      continueStroke(p.x, p.y);
+    }
+    function onPointerUp(e) {
+      if (e.pointerType !== 'mouse' || e.pointerId !== activePointerId) return;
+      endStroke();
+      drawing = false; activePointerId = null;
+    }
+    function onPointerLeave(e) {
+      if (e.pointerType === 'pen') { hideCursor(); return; }
+      if (e.pointerType !== 'mouse') return;
+      if (drawing) { endStroke(); drawing = false; activePointerId = null; }
+      hideCursor();
+    }
+    overlay.addEventListener('pointerdown', onPointerDown);
+    overlay.addEventListener('pointermove', onPointerMove);
+    overlay.addEventListener('pointerup', onPointerUp);
+    overlay.addEventListener('pointerleave', onPointerLeave);
+    overlay.addEventListener('pointercancel', onPointerUp);
+  }
+
+  function clearOverlayFull(o) {
+    o.ctx.save();
+    o.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    o.ctx.clearRect(0, 0, o.overlay.width, o.overlay.height);
+    o.ctx.restore();
+    if (o.hlCtx) {
+      o.hlCtx.save();
+      o.hlCtx.setTransform(1, 0, 0, 1, 0, 0);
+      o.hlCtx.clearRect(0, 0, o.hlCanvas.width, o.hlCanvas.height);
+      o.hlCtx.restore();
+    }
+  }
+
+  function setOverlayPointerEvents(containerId, enabled) {
+    if (!containerId || !instances[containerId]) return;
+    instances[containerId].overlays.forEach(o => o.overlay.style.pointerEvents = enabled ? 'auto' : 'none');
+  }
+
+  // ── Sub-options area: สีปากกา / สี highlight / ขนาดยางลบ ──
+  function updateSubArea() {
+    if (!paSubEl) return;
+    paSubEl.innerHTML = '';
+    if (tool === 'pen') {
+      [['#111111'],['#dc2626'],['#2563eb']].forEach(([c]) => {
+        const b = document.createElement('button');
+        b.className = 'pa-color' + (penColor === c ? ' active' : '');
+        b.style.background = c; b.title = c;
+        b.addEventListener('click', () => { penColor = c; updateSubArea(); });
+        paSubEl.appendChild(b);
+      });
+    } else if (tool === 'highlighter') {
+      [['#fbbf24'],['#ec4899'],['#f97316']].forEach(([c]) => {
+        const b = document.createElement('button');
+        b.className = 'pa-color' + (hlColor === c ? ' active' : '');
+        b.style.background = c; b.title = c;
+        b.addEventListener('click', () => { hlColor = c; updateSubArea(); });
+        paSubEl.appendChild(b);
+      });
+    } else if (tool === 'eraser') {
+      [[12,6],[28,12],[60,20]].forEach(([sz, dotPx]) => {
+        const b = document.createElement('button');
+        b.className = 'pa-size' + (eraserSize === sz ? ' active' : '');
+        b.title = sz + 'px'; b.dataset.size = sz;
+        const dot = document.createElement('span');
+        dot.style.cssText = 'display:block;border-radius:50%;background:#fff;width:' + dotPx + 'px;height:' + dotPx + 'px;';
+        b.appendChild(dot);
+        b.addEventListener('click', () => { eraserSize = sz; updateSubArea(); });
+        paSubEl.appendChild(b);
+      });
+    }
+  }
+
+  function selectTool(t) {
+    tool = t;
+    if (toolbarEl) toolbarEl.querySelectorAll('.pa-tool').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+    if (tool !== 'eraser') hideCursor();
+    updateSubArea();
+  }
+
+  // ── iOS Notes-style pill toolbar (singleton) ──
+  function buildToolbar() {
+    const el = document.createElement('div');
+    el.id = 'pdfAnnotateToolbar';
+    [['pen','✏️','ปากกา'],['highlighter','🖍️','Highlight'],['eraser','🩹','ยางลบ']].forEach(([t, emoji, title]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pa-tool' + (t === tool ? ' active' : '');
+      b.dataset.tool = t; b.title = title; b.textContent = emoji;
+      b.addEventListener('click', () => selectTool(t));
+      el.appendChild(b);
+    });
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button'; clearBtn.className = 'pa-tool'; clearBtn.dataset.action = 'clearAll'; clearBtn.title = 'ล้างทั้งหมด'; clearBtn.textContent = '🗑';
+    clearBtn.addEventListener('click', () => {
+      if (confirm('ล้างทั้งหมดที่เขียน/highlight ไว้บน PDF นี้?'))
+        Object.keys(instances).forEach(cid => instances[cid].overlays.forEach(clearOverlayFull));
+    });
+    el.appendChild(clearBtn);
+    const sep = document.createElement('div'); sep.className = 'pa-sep'; el.appendChild(sep);
+    paSubEl = document.createElement('div');
+    paSubEl.style.cssText = 'display:flex;align-items:center;gap:4px;';
+    el.appendChild(paSubEl);
+    document.body.appendChild(el);
+    updateSubArea();
+    return el;
+  }
+
+  // ── Toggle button (singleton, ลอยข้างกระดาษทด) ──
+  function buildToggleBtn() {
+    const btn = document.createElement('button');
+    btn.id = 'pdfAnnotateToggleBtn'; btn.type = 'button'; btn.title = 'ขีดเขียนบน PDF'; btn.textContent = '✏️';
+    btn.addEventListener('click', e => { e.stopPropagation(); handleToggleClick(); });
+    document.body.appendChild(btn);
+    return btn;
+  }
+
+  // ── 3-state toggle: Off → On+Toolbar → On(hidden) → Off ──
+  function handleToggleClick() {
+    if (!drawMode) {
+      drawMode = true; toolbarOpen = true;
+      if (toolbarEl) toolbarEl.classList.add('open');
+      setOverlayPointerEvents(activeContainerId, true);
+    } else if (toolbarOpen) {
+      toolbarOpen = false;
+      if (toolbarEl) toolbarEl.classList.remove('open');
+    } else {
+      drawMode = false;
+      setOverlayPointerEvents(activeContainerId, false); hideCursor();
+    }
+    updateToggleBtnClass();
+  }
+  function updateToggleBtnClass() {
+    if (!toggleBtn) return;
+    toggleBtn.classList.toggle('toolbar-open', drawMode && toolbarOpen);
+    toggleBtn.classList.toggle('draw-on',      drawMode && !toolbarOpen);
+  }
+
+  // Click-outside ซ่อน toolbar (ไม่ปิด draw mode)
+  document.addEventListener('click', e => {
+    if (!toolbarOpen || !toolbarEl) return;
+    if (toolbarEl.contains(e.target) || e.target === toggleBtn || e.target.closest('.pdfAnnotateCanvas')) return;
+    toolbarOpen = false; toolbarEl.classList.remove('open'); updateToggleBtnClass();
+  }, true);
+
+  function buildOverlaysFor(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return null;
+    const pageWrappers = Array.from(container.querySelectorAll('[id^="' + containerId + '-page-"]'));
+    if (!pageWrappers.length) return null; // GDrive iframe embed
+
+    const overlays = pageWrappers.map(wrapper => {
+      const pdfCanvas = wrapper.querySelector('canvas');
+      if (!pdfCanvas) return null;
+      const stage = document.createElement('div');
+      stage.className = 'pdfAnnotateStage';
+      pdfCanvas.parentNode.insertBefore(stage, pdfCanvas);
+      stage.appendChild(pdfCanvas);
+      pdfCanvas.style.margin = '0 auto';
+
+      const overlay = document.createElement('canvas');
+      overlay.className = 'pdfAnnotateCanvas';
+      overlay.style.pointerEvents = 'none';
+      stage.appendChild(overlay);
+      const ctx = overlay.getContext('2d');
+
+      // hlCanvas: buffer สำหรับ highlighter stroke ปัจจุบัน
+      const hlCanvas = document.createElement('canvas');
+      hlCanvas.style.cssText = 'display:block;position:absolute;top:0;left:0;pointer-events:none;opacity:0.35;';
+      stage.appendChild(hlCanvas);
+      const hlCtx = hlCanvas.getContext('2d');
+
+      function syncGeometry() {
+        const w = pdfCanvas.offsetWidth, h = pdfCanvas.offsetHeight;
+        if (!w || !h) return;
+        const left = pdfCanvas.offsetLeft + 'px', top = pdfCanvas.offsetTop + 'px';
+        overlay.style.left = left; overlay.style.top = top;
+        overlay.style.width = w + 'px'; overlay.style.height = h + 'px';
+        hlCanvas.style.left = left; hlCanvas.style.top = top;
+        hlCanvas.style.width = w + 'px'; hlCanvas.style.height = h + 'px';
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+        if (overlay.width !== bw || overlay.height !== bh) {
+          let img = null;
+          if (overlay.width > 0 && overlay.height > 0) {
+            try { img = overlay.toDataURL(); } catch (e) {}
+          }
+          overlay.width = bw; overlay.height = bh;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          if (img && img.length > 100) {
+            const i = new Image();
+            i.onload = () => ctx.drawImage(i, 0, 0, w, h);
+            i.src = img;
+          }
+        }
+        if (hlCanvas.width !== bw || hlCanvas.height !== bh) {
+          hlCanvas.width = bw; hlCanvas.height = bh;
+          hlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          hlCtx.lineCap = 'round'; hlCtx.lineJoin = 'round';
+        }
+      }
+      syncGeometry();
+      const ro = new ResizeObserver(syncGeometry);
+      ro.observe(pdfCanvas);
+
+      wireDrawing(overlay, ctx, hlCanvas, hlCtx);
+      return { pdfCanvas, overlay, ctx, hlCanvas, hlCtx, ro };
+    }).filter(Boolean);
+
+    return { overlays };
+  }
+
+  function teardown(containerId) {
+    const inst = instances[containerId]; if (!inst) return;
+    inst.overlays.forEach(o => {
+      try { o.ro.disconnect(); } catch (e) {}
+      const stage = o.overlay.parentNode;
+      if (stage && stage.parentNode) { stage.parentNode.insertBefore(o.pdfCanvas, stage); stage.parentNode.removeChild(stage); }
+    });
+    delete instances[containerId];
+  }
+
+  function resetDrawState() {
+    drawMode = false; toolbarOpen = false;
+    setOverlayPointerEvents(activeContainerId, false);
+    hideCursor();
+    if (toolbarEl) toolbarEl.classList.remove('open');
+    updateToggleBtnClass();
+  }
+
+  function pdfAnnotateInit(containerId) {
+    if (!MQ.matches) return;
+    teardown(containerId);
+    const built = buildOverlaysFor(containerId);
+    if (built) instances[containerId] = built;
+    if (containerId === activeContainerId) {
+      if (instances[containerId]) {
+        if (!toggleBtn) { toggleBtn = buildToggleBtn(); toolbarEl = buildToolbar(); }
+        toggleBtn.style.display = 'block'; updateToggleBtnClass();
+      } else if (toggleBtn) {
+        resetDrawState(); toggleBtn.style.display = 'none';
+      }
+    }
+  }
+
+  window.pdfAnnotateInit = pdfAnnotateInit;
+  window.pdfAnnotateShow = function(containerId) {
+    if (activeContainerId !== containerId) resetDrawState();
+    activeContainerId = containerId;
+    if (MQ.matches) {
+      if (!instances[containerId]) pdfAnnotateInit(containerId);
+      if (instances[containerId]) {
+        if (!toggleBtn) { toggleBtn = buildToggleBtn(); toolbarEl = buildToolbar(); }
+        toggleBtn.style.display = 'block';
+        updateToggleBtnClass();
+      } else if (toggleBtn) {
+        resetDrawState(); toggleBtn.style.display = 'none';
+      }
+    }
+  };
+  window.pdfAnnotateHide = function() {
+    resetDrawState();
+    if (toggleBtn) toggleBtn.style.display = 'none';
+    Object.keys(instances).forEach(cid => instances[cid].overlays.forEach(clearOverlayFull));
+    hideCursor();
+  };
+
+  window.addEventListener('resize', () => {
+    if (!activeContainerId) return;
+    if (MQ.matches) {
+      if (!instances[activeContainerId]) pdfAnnotateInit(activeContainerId);
+    } else if (instances[activeContainerId]) {
+      resetDrawState();
+      instances[activeContainerId].overlays.forEach(clearOverlayFull);
+      teardown(activeContainerId);
+      if (toggleBtn) toggleBtn.style.display = 'none';
+    }
+  });
 })();
 </script>
 </body>
