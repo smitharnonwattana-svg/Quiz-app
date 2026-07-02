@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.93 -->
+  <!-- APP_VERSION: v47.94 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.93</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.94</div>
     </div>
   </div>
 </div>
@@ -5149,12 +5149,12 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       const savedS=Store.load();
       const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
       savedS.attempts.unshift(_newAttempt);
-      if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       const ok=Store.save(savedS);
       if (!ok) {
-        toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง — คำตอบยังกู้คืนได้จากหน้าเดิม');
         return;
       }
+      if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
       if (st.takerName && !Auth.isTeacher()) {
         updateCoachStreak(takerName);
@@ -5272,7 +5272,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
         saveTakeResume(st);
         _lastSaveTs = now;
       }
-      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;clearTakeResume(st.takerName);submit();}
+      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;submit();}
     },250);
   }
 
@@ -5322,7 +5322,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       _resumeOverlay.remove();
       st.answers = _resume.answers || {};
       st.unsure = _resume.unsure || {};
-      st.currentIndex = _resume.currentIndex || 0;
+      st.currentIndex = Math.min(_resume.currentIndex || 0, Math.max(0, total - 1));
       st.qElapsedMs = _resume.qElapsedMs || {};
       st.answerChanges = _resume.answerChanges || {};
       st.visitOrder = Array.isArray(_resume.visitOrder) ? _resume.visitOrder.slice() : [];
@@ -5341,6 +5341,16 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     };
 
   } else {
+    // มี resume ของข้อสอบชุดอื่นค้างอยู่ (คนละ id) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
+    if (_rawResume && _rawResume.examId && _rawResume.examId !== id && _rawResume.startedAt) {
+      const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
+      const _oldTitle = _oldExam ? _oldExam.title : 'ชุดก่อนหน้า';
+      if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
+        navigate('exams');
+        return;
+      }
+      clearTakeResume(_takerName);
+    }
     // No resume — auto-start normally
     if(Auth.isTeacher()){setTimeout(doStart,300);}
     else{setTimeout(()=>showMoodCheckIn(mood=>{st.mood=mood;doStart();}),300);}
@@ -7999,10 +8009,11 @@ function initAdminExams(){
       btn.addEventListener('click',()=>{
         const id=btn.getAttribute('data-id'),dir=btn.getAttribute('data-move');
         s.exams.forEach((ex,idx)=>{if(typeof ex.order!=='number') ex.order=idx+1;});
-        const sorted=s.exams.slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
-        const i=sorted.findIndex(x=>x.id===id);if(i<0) return;
-        const j=dir==='up'?i-1:i+1;if(j<0||j>=sorted.length) return;
-        const tmp=sorted[i].order;sorted[i].order=sorted[j].order;sorted[j].order=tmp;
+        // สลับกับเพื่อนบ้านใน "list" (รายการที่กรองวิชาแล้ว) ไม่ใช่ทุกวิชา — กันสลับข้ามวิชาที่มองไม่เห็น
+        // (list เป็น reference เดียวกับ object ใน s.exams — แก้ .order ตรงๆ มีผลจริง)
+        const i=list.findIndex(x=>x.id===id);if(i<0) return;
+        const j=dir==='up'?i-1:i+1;if(j<0||j>=list.length) return;
+        const tmp=list[i].order;list[i].order=list[j].order;list[j].order=tmp;
         Store.save(s);renderAdmin();
       });
     });
@@ -8143,13 +8154,22 @@ function initRewards() {
       <div id="rewardsContent"></div>
     `;
     bodyEl.innerHTML = tabsHtml;
-    if (initialUserId) renderRewardsFor(initialUserId);
+    // ดึง weakness ของนักเรียนจาก cloud ก่อน render — เครื่องครูไม่มี listener ฟัง weakness
+    // ของตัวเอง (ตั้งใจ) ถ้า render ก่อนโหลด quest progress จะคำนวณจาก local ว่างแล้วเขียนทับ
+    // ค่าจริงใน store ที่ share กับ Firebase กลับเป็น 0
+    if (initialUserId) {
+      const _c0 = document.getElementById('rewardsContent');
+      if (_c0) _c0.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กำลังโหลด...</div>';
+      fetchWeaknessFromCloud(initialUserId).then(() => renderRewardsFor(initialUserId)).catch(() => renderRewardsFor(initialUserId));
+    }
     const tabs = bodyEl.querySelectorAll('.rewardsTab');
     tabs.forEach(btn => {
       btn.addEventListener('click', () => {
         const name = btn.getAttribute('data-name');
         tabs.forEach(b => { b.style.cssText = _rTabStyle(b === btn); });
-        renderRewardsFor(name);
+        const _c = document.getElementById('rewardsContent');
+        if (_c) _c.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กำลังโหลด...</div>';
+        fetchWeaknessFromCloud(name).then(() => renderRewardsFor(name)).catch(() => renderRewardsFor(name));
       });
     });
   } else {
@@ -8972,7 +8992,7 @@ function initAdminMembers(){
         const dup = ms.find((x,j) => x.pin===newPin && j!==i);
         if (dup) { errEl.textContent='รหัสนี้ใช้โดย "'+dup.name+'" อยู่แล้ว'; return; }
         errEl.textContent='';
-        ms[i] = {pin:newPin, name:newName};
+        ms[i] = {...ms[i], pin:newPin, name:newName};
         s2.members = ms;
         Store.save(s2);
         toast('✅ บันทึกแล้ว');
@@ -9645,6 +9665,7 @@ function initEditor(examId){
           }
         });
         if(_quickTagSelected===t) _quickTagSelected=null;
+        s.questions[examId]=list;
         Store.save(s);
         _qtRenderChips();
         _qtUpdateInputUI();
@@ -9695,6 +9716,7 @@ function initEditor(examId){
         }
       }
     });
+    s.questions[examId]=list;
     Store.save(s);
     renderTable();
     if(_qtMsgEl){
@@ -9753,6 +9775,7 @@ function initEditor(examId){
       }
     }
     exam.questionCount = newCount;
+    s.questions[examId]=list;
     Store.save(s);
     renderTable();
     qCountStatus.textContent = newCount > oldCount
@@ -9768,7 +9791,7 @@ function initEditor(examId){
   };
 
   // bind excel import สำหรับ editor
-  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted);
+  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted, exam.subject);
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
@@ -9937,6 +9960,7 @@ function parseExcelFile(file, examType, weighted) {
         }
 
         const result = [];
+        const skipped = [];
         for (let i = startRow; i < rows.length; i++) {
           const row = rows[i];
           const no = parseInt(row[0]);
@@ -9957,9 +9981,12 @@ function parseExcelFile(file, examType, weighted) {
             const entry={ no, page, correct: (correct==null?_defaultCorrect:correct), topic: topic||'', isFree };
             if(_isWeighted) entry.points=points;
             result.push(entry);
+          } else if (!isNaN(no) && no > 0) {
+            // เลขข้อถูกต้องแต่เฉลยอ่านไม่ออก — แจ้งเตือนแทนตัดทิ้งเงียบๆ (กันเลขข้อเลื่อน)
+            skipped.push(no);
           }
         }
-        resolve(result);
+        resolve({ rows: result, skipped });
       } catch(err) {
         reject(err);
       }
@@ -9987,15 +10014,17 @@ function parseExcelFile(file, examType, weighted) {
     try {
       const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
       const _examType=_activeType?_activeType.dataset.val:'mc';
-      const data = await parseExcelFile(file, _examType);
+      const { rows: data, skipped } = await parseExcelFile(file, _examType);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
       window._newExcelData = data;
-      // อัปเดต qCount ให้ตรงกับ excel
+      // อัปเดต qCount จากเลขข้อสูงสุด ไม่ใช่จำนวนแถวที่รอด — กันแถวที่ถูกข้ามทำให้เลขข้อเลื่อน
+      const maxNo = data.reduce((m,r)=>Math.max(m,r.no),0);
       const qCountEl = document.getElementById('newQCount');
-      if (qCountEl) qCountEl.value = data.length;
+      if (qCountEl) qCountEl.value = maxNo;
       status.textContent = '';
       preview.style.display = 'block';
-      preview.textContent = `✅ อ่านสำเร็จ ${data.length} ข้อ — ตัวอย่าง: ข้อ${data[0].no} หน้า${data[0].page} เฉลย${data[0].correct}`;
+      const _skipMsg = skipped.length ? ` ⚠️ ข้ามข้อ ${skipped.join(',')} (เฉลยอ่านไม่ออก — กรุณาแก้เอง)` : '';
+      preview.textContent = `✅ อ่านสำเร็จ ${data.length} ข้อ (สูงสุดข้อที่ ${maxNo}) — ตัวอย่าง: ข้อ${data[0].no} หน้า${data[0].page} เฉลย${data[0].correct}${_skipMsg}`;
     } catch(err) {
       window._newExcelData = null;
       status.textContent = '❌ ' + err.message;
@@ -10005,15 +10034,15 @@ function parseExcelFile(file, examType, weighted) {
 })();
 
 // ── admin_editor: bind excel input ──
-function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
+function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject) {
   // bind template download
   const dlBtn = document.getElementById('editorDownloadTemplate');
   if (dlBtn) {
     const newDlBtn = dlBtn.cloneNode(true);
     dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
     newDlBtn.addEventListener('click', () => {
-      const _s2=Store.load(); const _topics=(_s2.subjectTopics&&exam.subject&&_s2.subjectTopics[exam.subject])||[];
-      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, exam.examType, !!exam.weighted);
+      const _s2=Store.load(); const _topics=(_s2.subjectTopics&&subject&&_s2.subjectTopics[subject])||[];
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, examType, !!(typeof getWeighted==='function'&&getWeighted()));
     });
   }
 
@@ -10031,7 +10060,7 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
     status.textContent = '⏳ กำลังอ่าน...';
     try {
       const _w=typeof getWeighted==='function'?getWeighted():false;
-      const data = await parseExcelFile(file, examType, _w);
+      const { rows: data, skipped } = await parseExcelFile(file, examType, _w);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
 
       // merge เข้า list
@@ -10049,7 +10078,8 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
       });
       // re-render table
       if (renderFn) renderFn();
-      status.textContent = `✅ อัปเดต ${updated} ข้อ`;
+      const _skipMsg = skipped.length ? ` ⚠️ ข้ามข้อ ${skipped.join(',')} (เฉลยอ่านไม่ออก)` : '';
+      status.textContent = `✅ อัปเดต ${updated} ข้อ${_skipMsg}`;
       toast(`นำเข้าเฉลยสำเร็จ ${updated} ข้อ`);
     } catch(err) {
       status.textContent = '❌ ' + err.message;
@@ -11173,6 +11203,7 @@ const _GAMIFICATION_DEFAULT = () => ({
   claimedTiers: [],
   pendingTiers: [],
   lastPointDate: '',
+  pointsAwardedToday: 0,
   lastStampDate: '',
   dailyQuest: null,
   bonusQuests: [],
@@ -11194,6 +11225,7 @@ function _getGamificationUser(userId) {
       claimedTiers: Array.isArray(rec.claimedTiers) ? rec.claimedTiers.slice() : def.claimedTiers,
       pendingTiers: Array.isArray(rec.pendingTiers) ? rec.pendingTiers.slice() : def.pendingTiers,
       lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate,
+      pointsAwardedToday: Number(rec.pointsAwardedToday) || def.pointsAwardedToday,
       lastStampDate: typeof rec.lastStampDate === 'string' ? rec.lastStampDate : def.lastStampDate,
       dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest,
       bonusQuests: Array.isArray(rec.bonusQuests) ? rec.bonusQuests.slice() : def.bonusQuests,
@@ -11221,6 +11253,7 @@ function _saveGamificationUser(userId, data) {
     claimedTiers: Array.isArray(data.claimedTiers) ? data.claimedTiers.slice() : [],
     pendingTiers: Array.isArray(data.pendingTiers) ? data.pendingTiers.slice() : [],
     lastPointDate: typeof data.lastPointDate === 'string' ? data.lastPointDate : '',
+    pointsAwardedToday: Math.max(0, Number(data.pointsAwardedToday) || 0),
     lastStampDate: typeof data.lastStampDate === 'string' ? data.lastStampDate : '',
     dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null,
     bonusQuests: Array.isArray(data.bonusQuests) ? data.bonusQuests.slice() : [],
@@ -11331,32 +11364,33 @@ function processGamificationAfterSubmit(userId /*, attemptData */) {
 
   const rec = _getGamificationUser(userId);
   const todayKey = getDateKey(new Date());
-  const alreadyAwardedToday = (rec.lastPointDate === todayKey);
+  if (rec.lastPointDate !== todayKey) {
+    rec.pointsAwardedToday = 0; // ขึ้นวันใหม่ — เริ่มนับคะแนนวันนี้ใหม่
+  }
 
-  let pointsAwarded = 0;
-  if (!alreadyAwardedToday) {
-    let activity = null, score = null;
-    try { activity = calculateActivity(userId); } catch { activity = null; }
-    try { score    = calculateScore(userId); }    catch { score    = null; }
+  let activity = null, score = null;
+  try { activity = calculateActivity(userId); } catch { activity = null; }
+  try { score    = calculateScore(userId); }    catch { score    = null; }
 
-    const focusSets    = (activity && Number(activity.focusSetCount))    || 0;
-    const nonFocusSets = (activity && Number(activity.nonFocusSetCount)) || 0;
-    const resolved     = (activity && Number(activity.resolvedToday))    || 0;
+  const focusSets    = (activity && Number(activity.focusSetCount))    || 0;
+  const nonFocusSets = (activity && Number(activity.nonFocusSetCount)) || 0;
+  const resolved     = (activity && Number(activity.resolvedToday))    || 0;
 
-    pointsAwarded += focusSets    * 10;
-    pointsAwarded += nonFocusSets * 5;
-    const weaknessPoints = Math.min(resolved * 1, 10);
-    pointsAwarded += weaknessPoints;
+  let totalToday = focusSets * 10 + nonFocusSets * 5 + Math.min(resolved * 1, 10);
+  if (score && score.hasScoreToday && typeof score.score === 'number' && score.score >= 85) {
+    totalToday += 5;
+  }
 
-    if (score && score.hasScoreToday && typeof score.score === 'number' && score.score >= 85) {
-      pointsAwarded += 5;
-    }
+  // ให้แต้มเฉพาะส่วนที่เพิ่มจากยอดสะสมวันนี้ — กันซ้ำโดยไม่ล็อกทั้งวันหลัง submit แรก
+  // (เดิม: submit แรกของวันล็อกแต้มทั้งวัน ทำให้กิจกรรมเล็กตอนเช้าปิดกั้นชุดใหญ่ตอนบ่าย)
+  const alreadyToday = Number(rec.pointsAwardedToday) || 0;
+  const pointsAwarded = Math.max(0, totalToday - alreadyToday);
 
-    if (pointsAwarded > 0) {
-      rec.points = (Number(rec.points) || 0) + pointsAwarded;
-      rec.lastPointDate = todayKey;
-      _saveGamificationUser(userId, rec);
-    }
+  if (pointsAwarded > 0) {
+    rec.points = (Number(rec.points) || 0) + pointsAwarded;
+    rec.pointsAwardedToday = totalToday;
+    rec.lastPointDate = todayKey;
+    _saveGamificationUser(userId, rec);
   }
 
   const stampResult = checkAndAwardStampMilestones(userId);
@@ -12933,7 +12967,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.93';
+  const CURRENT_VERSION = 'v47.94';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -12952,7 +12986,8 @@ function initEntranceCompare(params) {
           '🆕 มีเวอร์ชันใหม่ (' + data.version + ')\n' +
           'อัพเดทเพื่อใช้ฟีเจอร์ล่าสุดไหม?'
         )) {
-          window.location.reload(true);
+          // reload(true) ใช้ไม่ได้แล้วในเบราว์เซอร์สมัยใหม่ — เปลี่ยน URL แทนเพื่อบังคับ bypass cache
+          window.location.href = window.location.pathname + '?_v=' + Date.now();
         }
       }
     } catch(e) {
