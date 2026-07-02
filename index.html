@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.90 -->
+  <!-- APP_VERSION: v47.91 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.90</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.91</div>
     </div>
   </div>
 </div>
@@ -3024,44 +3024,6 @@ const Store = {
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
         navigate(pg, window._currentParams||{});
-      } else if(pg && pg === 'admin'){
-        if(!sessionStorage.getItem('_conflictBannerDismissed')){
-          let banner = document.getElementById('_syncConflictBanner');
-          if(!banner){
-            banner = document.createElement('div');
-            banner.id = '_syncConflictBanner';
-            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#1c1917;padding:7px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.15);pointer-events:auto;';
-            const dismiss = () => {
-              banner.remove();
-              sessionStorage.setItem('_conflictBannerDismissed', '1');
-            };
-            const b1 = document.createElement('button');
-            b1.textContent = '🔄 โหลดใหม่';
-            b1.style.cssText = 'background:#1c1917;color:#fef3c7;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
-            b1.onclick = () => location.reload();
-            const b2 = document.createElement('button');
-            b2.textContent = '✕ ปิด';
-            b2.style.cssText = 'background:transparent;color:#1c1917;border:1.5px solid #1c1917;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
-            b2.onclick = dismiss;
-            const b3 = document.createElement('button');
-            b3.textContent = '🔒 logout เครื่องอื่น';
-            b3.style.cssText = 'background:#dc2626;color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
-            b3.onclick = async () => {
-              const _adminPin = typeof Auth !== 'undefined' ? Auth.ADMIN_PIN : null;
-              await FirebaseSync.claimSession(_adminPin);
-              dismiss();
-              toast('✅ เครื่องนี้เป็น session ล่าสุดแล้ว — เครื่องอื่นถูก logout แล้ว');
-            };
-            const msg = document.createElement('span');
-            msg.textContent = '⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น';
-            msg.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-            const btnWrap = document.createElement('span');
-            btnWrap.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
-            btnWrap.append(b1, b3, b2);
-            banner.append(msg, btnWrap);
-            document.body.prepend(banner);
-          }
-        }
       }
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
@@ -3940,7 +3902,6 @@ const Auth = (() => {
   function isTeacher()  { return getRole() === 'teacher'; }
   function logout() {
     sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem('_conflictBannerDismissed');
     if(typeof numpadClear === 'function') numpadClear();
     navigate('login');
     setTimeout(()=>{
@@ -4075,8 +4036,6 @@ function navigate(page, params={}){
   if(_currentPage==='take') cleanupTake();
   if(_currentPage==='practice') cleanupPractice();
 
-  const _orphanBanner = document.getElementById('_syncConflictBanner');
-  if (_orphanBanner) _orphanBanner.remove();
   const _orphanNotif = document.getElementById('notifDropdown');
   if (_orphanNotif) _orphanNotif.remove();
   const _orphanAssignModal = document.getElementById('assignModal');
@@ -12929,7 +12888,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.90';
+  const CURRENT_VERSION = 'v47.91';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
