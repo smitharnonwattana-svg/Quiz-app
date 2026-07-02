@@ -40,17 +40,56 @@ function pushLine(message) {
   });
 }
 
+// ── lineNotify hardening ──
+const ALLOWED_ORIGIN = 'https://smitharnonwattana-svg.github.io';
+
+// Rate limit ต่อ instance: กัน spam ยิงถล่ม quota LINE
+let _rlWindowStart = 0;
+let _rlCount = 0;
+function rateLimited() {
+  const now = Date.now();
+  if (now - _rlWindowStart > 60000) { _rlWindowStart = now; _rlCount = 0; }
+  _rlCount += 1;
+  return _rlCount > 30;
+}
+
+// แปลงเป็นตัวเลขปลอดภัย — กัน NaN/ค่าประหลาดโผล่ในข้อความ LINE
+function num(v, max = 10000) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(n, max)) : 0;
+}
+function txt(v, max = 100) { return String(v == null ? '' : v).slice(0, max); }
+
 exports.lineNotify = onRequest(
-  { cors: true, secrets: ['LINE_TOKEN', 'LINE_USER_ID'] },
+  { cors: [ALLOWED_ORIGIN], secrets: ['LINE_TOKEN', 'LINE_USER_ID'] },
   async (req, res) => {
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'Method not allowed' });
       return;
     }
+    // browser fetch ข้าม origin ส่ง Origin header เสมอ — ต้องตรงกับแอปเท่านั้น
+    if (req.get('origin') !== ALLOWED_ORIGIN) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    if (rateLimited()) {
+      res.status(429).json({ error: 'Too many requests' });
+      return;
+    }
 
-    const { type, name, examTitle, score, total, usedSeconds,
-            subject, count, correct, answered, remaining, finished,
-            rewardName } = req.body || {};
+    const body = req.body || {};
+    const { type, finished } = body;
+    const name = txt(body.name);
+    const examTitle = txt(body.examTitle);
+    const subject = txt(body.subject);
+    const rewardName = txt(body.rewardName);
+    const score = num(body.score);
+    const total = num(body.total);
+    const usedSeconds = num(body.usedSeconds, 86400);
+    const count = num(body.count);
+    const correct = num(body.correct);
+    const answered = num(body.answered);
+    const remaining = body.remaining == null ? null : num(body.remaining);
     if (!type || !name || !examTitle) {
       res.status(400).json({ error: 'Missing fields' });
       return;
@@ -85,7 +124,12 @@ exports.lineNotify = onRequest(
 
     try {
       const result = await pushLine(message);
-      res.json({ ok: result.status === 200 });
+      if (result.status !== 200) {
+        console.warn('lineNotify: LINE API rejected', result.status, result.body);
+        res.status(502).json({ ok: false, lineStatus: result.status });
+        return;
+      }
+      res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.92 -->
+  <!-- APP_VERSION: v47.93 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.92</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.93</div>
     </div>
   </div>
 </div>
@@ -2429,6 +2429,12 @@ const FirebaseSync = (() => {
     }
   }
 
+  // เช็คว่า doc มีอยู่บน server จริงไหม — true/false = รู้แน่, null = เน็ตพัง (ห้ามถือว่า missing)
+  async function docExists(id) {
+    try { const s = await _doc(id).get({ source: 'server' }); return s.exists; }
+    catch(e) { return null; }
+  }
+
   // Real-time listener — calls cb(data) whenever doc changes from any device
   function listenDoc(id, cb) {
     if (!_ready) return () => {};
@@ -2521,7 +2527,7 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
+  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
 })();
 
 function _updateBellBadge() {
@@ -2802,13 +2808,41 @@ const Store = {
         console.warn('Store.save: missing required arrays', Object.keys(data));
         return false;
       }
+      if (!Store._cloudLoaded) {
+        // ห้าม push ก่อนข้อมูล cloud โหลดเสร็จ — กันการทับ Firestore ด้วย store เปล่า
+        this._cache = data;
+        this.lastError = 'cloud-not-loaded';
+        console.warn('[Store.save] blocked — cloud data not loaded yet');
+        return false;
+      }
+      // Stale-snapshot protection: หน้าที่ถือ object เก่า (listener แทน _cache ด้วย object ใหม่ไปแล้ว)
+      // handler ที่ Store.load() สดตอนกดปุ่ม ได้ object เดียวกับ _cache → ไม่เข้า branch นี้ → การลบถูกเคารพ
+      if (this._cache && data !== this._cache) {
+        try{
+          if (Array.isArray(this._cache.attempts) && Array.isArray(data.attempts)) {
+            const _ids = new Set(data.attempts.map(a => a && a.id));
+            const _missing = this._cache.attempts.filter(a => a && a.id && !_ids.has(a.id));
+            if (_missing.length > 0) data.attempts = [..._missing, ...data.attempts];
+          }
+          const _mg = _mergeGamificationByTs(data.gamification, this._cache.gamification);
+          if (_mg) data.gamification = _mg;
+          if (Array.isArray(this._cache.assignments) && Array.isArray(data.assignments)) {
+            const _aMap = new Map();
+            this._cache.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            data.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            data.assignments = Array.from(_aMap.values());
+          }
+        }catch(e){ console.warn('[Store.save] stale-merge err', e); }
+      }
       data._savedAt = Date.now();
       this._cache = data;
       if(FirebaseSync.ready()) {
-        localStorage.removeItem('nanont:syncPending');
-        FirebaseSync.saveDoc('mainStore', data).catch(e => {
-          console.error('[Store.save] cloud sync FAILED', e);
-          if (typeof toast === 'function') toast('⚠️ ไม่ได้ sync ขึ้น cloud — ตรวจ network');
+        FirebaseSync.saveDoc('mainStore', data).then(ok => {
+          if (ok) { localStorage.removeItem('nanont:syncPending'); }
+          else {
+            localStorage.setItem('nanont:syncPending', '1');
+            if (typeof toast === 'function') toast('⚠️ sync ขึ้น cloud ไม่สำเร็จ — จะลองใหม่อัตโนมัติ');
+          }
         });
       } else {
         localStorage.setItem('nanont:syncPending', '1');
@@ -2821,7 +2855,18 @@ const Store = {
   // Pull from Firestore and populate in-memory cache — Firebase is always source of truth
   async syncFromCloud(){
     const cloud = await FirebaseSync.loadDoc('mainStore');
-    if(!cloud) return;
+    if(!cloud){
+      // แยก "doc ยังไม่มีจริง" (ติดตั้งครั้งแรก/namespace ใหม่) ออกจาก "โหลดไม่สำเร็จ"
+      try{
+        if (await FirebaseSync.docExists('mainStore') === false) {
+          Store._cloudLoaded = true; // cloud ว่างจริงคือความจริง — อนุญาตเซฟแรก
+          const _lb0 = document.getElementById('_storeLoadingBar');
+          if(_lb0) _lb0.remove();
+          console.log('[Store] cloud doc missing — fresh namespace, first save allowed');
+        }
+      }catch(e){}
+      return;
+    }
     try{
       // Merge any in-memory attempts not yet in cloud (submitted before Firebase loaded)
       if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
@@ -2897,6 +2942,7 @@ const Store = {
   // Returns {written, serverTs, match, localAttempts, serverAttempts}.
   async forcePushToCloud(){
     if (!FirebaseSync.ready()) throw new Error('Firebase ไม่พร้อม');
+    if (!Store._cloudLoaded) throw new Error('ข้อมูล cloud ยังโหลดไม่เสร็จ — ห้าม force push ทับ');
     if (!this._cache || !Array.isArray(this._cache.attempts)) throw new Error('ไม่มีข้อมูลใน memory');
     this._cache._savedAt = Date.now();
     const _ok = await FirebaseSync.saveDoc('mainStore', this._cache);
@@ -2914,6 +2960,7 @@ const Store = {
   // Retry-pending pushes that failed earlier because Firebase wasn't ready
   async flushPendingSync(){
     if (!FirebaseSync.ready()) return;
+    if (!Store._cloudLoaded) return; // กัน race ตอน boot — ห้าม push store ที่ยังไม่ได้ sync กับ cloud
     if (typeof WeaknessTracker !== 'undefined' && WeaknessTracker.flushPendingWeaknesses) {
       WeaknessTracker.flushPendingWeaknesses();
     }
@@ -2940,12 +2987,11 @@ const Store = {
         }
       }
     } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
-    FirebaseSync.saveDoc('mainStore', this._cache).then(() => {
+    FirebaseSync.saveDoc('mainStore', this._cache).then((ok) => {
+      if (!ok) { console.warn('[flushPendingSync] push failed — retry next interval'); return; }
       localStorage.removeItem('nanont:syncPending');
       console.log('[flushPendingSync] flushed pending data to cloud');
       if (typeof toast === 'function') toast('✅ ข้อมูลที่ค้างไว้ sync ขึ้น cloud แล้ว');
-    }).catch(e => {
-      console.error('[flushPendingSync] failed, will retry next interval', e);
     });
   },
   init(){
@@ -4726,7 +4772,7 @@ function initTake(id){
   const attemptId='att_'+Math.random().toString(16).slice(2);
   const LAST_TAKER_KEY='nanont:lastTakerName';
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
-  const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||'').trim();
+  const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||(Auth.isTeacher()?'':Auth.getName())||'').trim();
   const _practiceMode = !!_pageParams.practice;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
   // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
@@ -5097,29 +5143,26 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     });
     const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
-    const takerName = st.takerName || '';
-    if (!takerName) {
-      toast('⚠️ ไม่พบชื่อผู้สอบ กรุณาออกแล้วเริ่มใหม่');
-      return;
-    }
+    // ไม่กรอกชื่อ = บันทึกเป็น 'ไม่ระบุชื่อ' (ห้าม block — คำตอบต้องไม่หาย)
+    const takerName = st.takerName || 'ไม่ระบุชื่อ';
     function _doSave(feeling, prediction){
       const savedS=Store.load();
       const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
       savedS.attempts.unshift(_newAttempt);
-      if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
+      if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       const ok=Store.save(savedS);
       if (!ok) {
         toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
         return;
       }
       WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         updateCoachStreak(takerName);
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         processGamificationAfterSubmit(takerName);
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         const _completedTiers = updateBonusQuestProgress(takerName);
         if (_completedTiers && _completedTiers.length > 0) {
           const _tierNames = {easy:'🟢 Easy',medium:'🟡 Medium',challenge:'🔴 Challenge'};
@@ -5130,10 +5173,10 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           }, 3000);
         }
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         syncDailySummary(takerName);
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         const _s3 = Store.load();
         const _ai = (_s3.assignments||[]).findIndex(a =>
           a.assignedTo === takerName &&
@@ -12890,7 +12933,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.92';
+  const CURRENT_VERSION = 'v47.93';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
