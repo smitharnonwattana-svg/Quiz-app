@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.91 -->
+  <!-- APP_VERSION: v47.92 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.91</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.92</div>
     </div>
   </div>
 </div>
@@ -2949,14 +2949,14 @@ const Store = {
     });
   },
   init(){
-    // Boot Firebase, migrate old localStorage data to cloud
+    // Boot Firebase once — Store.init() ถูกเรียกซ้ำจากหลายหน้า ห้าม re-init
+    // (FirebaseSync.init() ซ้ำจะ throw จาก enablePersistence → ป้าย offline หลอก)
+    if (Store._fbBooted) return this.migrate(this.load());
+    Store._fbBooted = true;
     FirebaseSync.init();
-    if (!Store._syncTimersBooted) {
-      _updateOfflineBanner();
-      setInterval(_updateOfflineBanner, 5000);
-      setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
-      Store._syncTimersBooted = true;
-    }
+    _updateOfflineBanner();
+    setInterval(_updateOfflineBanner, 5000);
+    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
       this.flushPendingSync();
@@ -3039,6 +3039,8 @@ const Store = {
       _lb.id = '_storeLoadingBar';
       _lb.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;height:3px;background:linear-gradient(270deg,#3b82f6,#8b5cf6,#3b82f6);background-size:200% 200%;animation:_fbLoad 1.5s ease-in-out infinite;';
       if(document.body) document.body.prepend(_lb);
+      // Fallback: อย่าให้แถบค้างถ้า server ช้า/ไม่ตอบ — listener ยังอัพเดตข้อมูลให้ทีหลังได้
+      setTimeout(()=>{ const b = document.getElementById('_storeLoadingBar'); if(b) b.remove(); }, 15000);
     })();
     return this.migrate(this.load());
   }
@@ -12888,7 +12890,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.91';
+  const CURRENT_VERSION = 'v47.92';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
