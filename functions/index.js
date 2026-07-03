@@ -153,6 +153,22 @@ exports.dailySummaryNotify = onSchedule(
 
     // Fetch all app docs and filter by ID pattern
     const snapshot = await db.collection('app').get();
+
+    // อ่านค่า lineNotify ต่อสมาชิกจาก mainStore doc (อยู่ใน snapshot เดียวกัน ไม่เพิ่ม read)
+    // กัน daily summary ส่งทับ toggle "ปิด LINE" ที่ตั้งไว้ในแอป
+    let disabledNames = new Set();
+    try {
+      const mainStoreDoc = snapshot.docs.find((doc) => doc.id.endsWith('_mainStore'));
+      const raw = mainStoreDoc && mainStoreDoc.data()._d;
+      const mainStore = raw ? JSON.parse(raw) : null;
+      const members = (mainStore && Array.isArray(mainStore.members)) ? mainStore.members : [];
+      disabledNames = new Set(
+        members.filter((m) => m && m.lineNotify === false).map((m) => m.name)
+      );
+    } catch (e) {
+      console.warn('dailySummaryNotify: failed to read mainStore for lineNotify prefs', e.message);
+    }
+
     const todayDocs = snapshot.docs.filter(
       (doc) => doc.id.includes('_dailySummary_') && doc.id.endsWith('_' + todayKey)
     );
@@ -163,6 +179,7 @@ exports.dailySummaryNotify = onSchedule(
         if (!raw) continue;
         const d = JSON.parse(raw);
         if (!d || !d.userId) continue;
+        if (disabledNames.has(d.userId)) continue; // สมาชิกปิด LINE notify ไว้
 
         const qDone = Array.isArray(d.questsCompleted) ? d.questsCompleted.length : 0;
         const message =
