@@ -236,3 +236,74 @@ exports.cleanupExpiredSummaries = onSchedule(
     console.log('cleanupExpiredSummaries: deleted', expired.length, 'expired docs');
   }
 );
+
+// Auto Backup — snapshot mainStore doc daily at 01:00 Bangkok
+// เก็บไว้ในคอลเลกชัน 'app' เดิม (ตาม pattern ของ dailySummary) doc id: <origin>_backup_auto_<YYYY-MM-DD>
+exports.autoBackupMainStore = onSchedule(
+  {
+    schedule: '0 1 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'asia-southeast1',
+  },
+  async (event) => {
+    const db = admin.firestore();
+    const snapshot = await db.collection('app').get();
+    const mainStoreDoc = snapshot.docs.find((doc) => doc.id.endsWith('_mainStore'));
+    if (!mainStoreDoc) {
+      console.warn('autoBackupMainStore: mainStore doc not found');
+      return;
+    }
+    const raw = mainStoreDoc.data()._d;
+    if (!raw) {
+      console.warn('autoBackupMainStore: mainStore doc has no data');
+      return;
+    }
+
+    const origin = mainStoreDoc.id.slice(0, -'_mainStore'.length);
+    const bangkokNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const todayKey = bangkokNow.toISOString().slice(0, 10);
+    const backupId = `${origin}_backup_auto_${todayKey}`;
+
+    await db.collection('app').doc(backupId).set({
+      _d: raw,
+      _ts: Date.now(),
+      type: 'auto',
+      date: todayKey,
+      createdAt: new Date().toISOString(),
+    });
+
+    console.log('autoBackupMainStore: saved', backupId);
+  }
+);
+
+// TTL Cleanup — ลบ auto backup ที่เก่ากว่า 14 วัน ที่ 02:30 Bangkok (backup manual ไม่ถูกแตะ)
+exports.cleanupOldAutoBackups = onSchedule(
+  {
+    schedule: '30 2 * * *',
+    timeZone: 'Asia/Bangkok',
+    region: 'asia-southeast1',
+  },
+  async (event) => {
+    const db = admin.firestore();
+    const RETENTION_DAYS = 14;
+    const cutoffKey = new Date(Date.now() + 7 * 60 * 60 * 1000 - RETENTION_DAYS * 86400000)
+      .toISOString()
+      .slice(0, 10);
+
+    const snapshot = await db.collection('app').get();
+    const expired = snapshot.docs.filter((doc) => {
+      if (!doc.id.includes('_backup_auto_')) return false;
+      const d = doc.data();
+      return d && d.date && d.date < cutoffKey;
+    });
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < expired.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      expired.slice(i, i + BATCH_SIZE).forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    console.log('cleanupOldAutoBackups: deleted', expired.length, 'auto backups older than', cutoffKey);
+  }
+);

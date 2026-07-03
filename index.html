@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.95 -->
+  <!-- APP_VERSION: v47.96 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.95</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.96</div>
     </div>
   </div>
 </div>
@@ -1589,6 +1589,9 @@
         <div class="linkCard" onclick="navigate('admin_memes')">
           <div style="font-weight:900;">🎭 จัดการมีม</div>
         </div>
+        <div class="linkCard" onclick="navigate('admin_backup')">
+          <div style="font-weight:900;">💾 สำรอง &amp; กู้คืนข้อมูล</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1663,6 +1666,52 @@
       </div>
       <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
       <div id="memberTbody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ADMIN BACKUP & RESTORE ===================== -->
+<div id="page-admin_backup" class="page">
+  <div class="container" style="max-width:800px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1">💾 สำรอง &amp; กู้คืนข้อมูล</h1>
+        <div class="muted" style="margin-top:4px;font-size:13px;">อัตโนมัติทุกวัน 01:00 น. + สำรองเองได้ทุกเมื่อ</div>
+      </div>
+      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+    </div>
+
+    <div class="card" style="margin-top:16px;padding:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="muted" style="font-size:13px;">สำรองสถานะข้อมูลปัจจุบันไว้ทันที (ตั้งชื่อได้)</div>
+      <button class="btn btnPrimary" id="backupNowBtn" type="button">📦 สำรองข้อมูลตอนนี้</button>
+    </div>
+
+    <div class="card" style="margin-top:14px;padding:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <button class="btn btnPrimary" id="backupTabAuto" type="button" style="flex:1;">🕐 อัตโนมัติ</button>
+        <button class="btn" id="backupTabManual" type="button" style="flex:1;">✍️ บันทึกเอง (<span id="backupManualCount">0</span>)</button>
+      </div>
+      <div id="backupManualWarn" class="muted" style="font-size:12px;color:#d97706;min-height:16px;margin-bottom:6px;"></div>
+      <div id="backupListError" style="color:#dc2626;font-size:13px;min-height:18px;"></div>
+      <div id="backupList"></div>
+    </div>
+  </div>
+
+  <!-- Restore confirm modal (type-to-confirm) -->
+  <div id="backupRestoreModal" class="modal-overlay" role="dialog">
+    <div class="modal">
+      <h3>⚠️ ยืนยันการกู้คืนข้อมูล</h3>
+      <p id="backupRestoreLabel" style="font-weight:700;"></p>
+      <div id="backupRestoreCompare" style="font-size:13px;line-height:1.9;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:10px;"></div>
+      <p style="font-size:13px;color:#b91c1c;">การกู้คืนจะ<b>ทับข้อมูลปัจจุบันทั้งหมด</b> (ชุดข้อสอบ, คะแนน, PIN, พ้อยท์/สตรีค ฯลฯ) — ย้อนกลับไม่ได้</p>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:4px;">พิมพ์ "กู้คืน" เพื่อยืนยัน</div>
+        <input id="backupRestoreConfirmInput" class="titleInput" type="text" placeholder="กู้คืน" style="width:100%;" autocomplete="off" />
+      </div>
+      <div class="mrow">
+        <button id="backupRestoreCancel" class="btn-ghost">ยกเลิก</button>
+        <button id="backupRestoreOk" class="btn-danger" disabled>♻️ กู้คืนข้อมูล</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2435,6 +2484,55 @@ const FirebaseSync = (() => {
     catch(e) { return null; }
   }
 
+  // ── Backup (save-game style: auto รายวันจาก Cloud Function + manual กดเองจากหน้าเว็บ) ──
+  // ใช้ collection 'app' เดิม doc id: <origin>_backup_auto_<date> / <origin>_backup_manual_<ts>
+  async function saveManualBackup(data, label) {
+    if (!_ready) return false;
+    try {
+      const ts = Date.now();
+      await _doc('backup_manual_' + ts).set({
+        _d: JSON.stringify(data),
+        _ts: ts,
+        type: 'manual',
+        label: String(label || '').slice(0, 60),
+        createdAt: new Date(ts).toISOString(),
+      });
+      return true;
+    } catch(e) { console.warn('[FB] saveManualBackup err', e); return false; }
+  }
+
+  // ลิสต์ backup ทั้ง auto+manual ของ origin นี้ — คืนแค่ metadata (ตัด _d ทิ้งก่อน return)
+  async function listBackups() {
+    if (!_ready) return [];
+    try {
+      const prefix = _ns('backup_');
+      const snap = await db.collection('app')
+        .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
+        .where(firebase.firestore.FieldPath.documentId(), '<', prefix + '')
+        .get({ source: 'server' });
+      // ไม่มี select()/field-mask ให้ใช้บน client SDK (มีแค่ Admin SDK ฝั่งเซิร์ฟเวอร์) — ดึงมาทั้ง doc
+      // แล้วหยิบเฉพาะ metadata ที่ต้องใช้ ทิ้ง _d (payload ก้อนใหญ่) ไป ไม่ผูกไว้ใน object ที่ return
+      return snap.docs.map(d => {
+        const v = d.data();
+        return { id: d.id, type: v.type || '', label: v.label || '', date: v.date || '', ts: v._ts || 0, createdAt: v.createdAt || '' };
+      }).sort((a, b) => b.ts - a.ts);
+    } catch(e) { console.warn('[FB] listBackups err', e); return []; }
+  }
+
+  // โหลดข้อมูลเต็มของ backup ตัวใดตัวหนึ่ง (ใช้ตอนจะ preview/restore เท่านั้น)
+  async function loadBackupData(id) {
+    try {
+      const s = await db.collection('app').doc(id).get({ source: 'server' });
+      if (!s.exists) return null;
+      return JSON.parse(s.data()._d || 'null');
+    } catch(e) { console.warn('[FB] loadBackupData err', e); return null; }
+  }
+
+  async function deleteBackup(id) {
+    try { await db.collection('app').doc(id).delete(); return true; }
+    catch(e) { console.warn('[FB] deleteBackup err', e); return false; }
+  }
+
   // Real-time listener — calls cb(data) whenever doc changes from any device
   function listenDoc(id, cb) {
     if (!_ready) return () => {};
@@ -2527,7 +2625,7 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
+  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, ready: () => _ready, ns: _ns };
 })();
 
 function _updateBellBadge() {
@@ -4132,6 +4230,7 @@ function navigate(page, params={}){
   else if(page==='admin_memes'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMemes(); }
   else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
   else if(page==='admin_rewards'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminRewards(); }
+  else if(page==='admin_backup'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBackup(); }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
@@ -9063,6 +9162,190 @@ function initAdminMembers(){
   renderMembers();
 }
 
+// ===================== ADMIN BACKUP & RESTORE =====================
+function initAdminBackup(){
+  if(!Auth.isTeacher()){navigate('home');return;}
+
+  let _allBackups = [];
+  let _activeTab = 'auto';
+  let _pendingRestoreData = null;
+
+  function fmtDateTime(ts){
+    if(!ts) return '-';
+    try { return new Date(ts).toLocaleString('th-TH', {dateStyle:'medium', timeStyle:'short'}); }
+    catch(e){ return '-'; }
+  }
+
+  function renderList(){
+    const listEl = document.getElementById('backupList');
+    if(!listEl) return;
+    const filtered = _allBackups.filter(b => b.type === _activeTab);
+    const manualCount = _allBackups.filter(b => b.type === 'manual').length;
+    const manualCountEl = document.getElementById('backupManualCount');
+    if (manualCountEl) manualCountEl.textContent = manualCount;
+    const warnEl = document.getElementById('backupManualWarn');
+    if (warnEl) warnEl.textContent = manualCount > 20 ? '⚠️ มีสำรองเองสะสมมาก ลองลบรายการเก่าที่ไม่ใช้แล้ว' : '';
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="muted" style="text-align:center;padding:24px;font-size:13px;">'
+        + (_activeTab === 'auto' ? 'ยังไม่มีสำรองอัตโนมัติ (จะเริ่มสร้างอัตโนมัติทุกวัน 01:00 น.)' : 'ยังไม่มีสำรองที่บันทึกเอง')
+        + '</div>';
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(b => {
+      const title = _activeTab === 'auto'
+        ? ('🕐 สำรองอัตโนมัติ ' + esc(b.date || ''))
+        : ('✍️ ' + esc(b.label || '(ไม่มีชื่อ)'));
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #e5e7eb;">'
+        + '<div><div style="font-weight:700;font-size:14px;">' + title + '</div>'
+        + '<div class="muted" style="font-size:12px;">' + esc(fmtDateTime(b.ts)) + '</div></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button class="btn" data-restore="' + esc(b.id) + '" type="button">♻️ กู้คืน</button>'
+        + (_activeTab === 'manual' ? '<button class="btn" style="color:#b91c1c;border-color:#fca5a5;" data-del="' + esc(b.id) + '" type="button">ลบ</button>' : '')
+        + '</div></div>';
+    }).join('');
+
+    listEl.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.onclick = () => openRestoreModal(btn.getAttribute('data-restore'));
+    });
+    listEl.querySelectorAll('[data-del]').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.getAttribute('data-del');
+        const meta = _allBackups.find(b => b.id === id);
+        if (!meta) return;
+        if (!confirm('ลบสำรอง "' + (meta.label || '(ไม่มีชื่อ)') + '" ถาวรใช่ไหม?')) return;
+        const ok = await FirebaseSync.deleteBackup(id);
+        toast(ok ? '🗑️ ลบสำรองแล้ว' : '❌ ลบไม่สำเร็จ');
+        if (ok) loadList();
+      };
+    });
+  }
+
+  async function loadList(){
+    const errEl = document.getElementById('backupListError');
+    if (errEl) errEl.textContent = '';
+    _allBackups = await FirebaseSync.listBackups();
+    renderList();
+  }
+
+  function updateOkState(){
+    const inputEl = document.getElementById('backupRestoreConfirmInput');
+    const okBtn = document.getElementById('backupRestoreOk');
+    if (!inputEl || !okBtn) return;
+    okBtn.disabled = !(_pendingRestoreData && inputEl.value.trim() === 'กู้คืน');
+  }
+
+  async function openRestoreModal(id){
+    const meta = _allBackups.find(b => b.id === id);
+    if (!meta) return;
+    _pendingRestoreData = null;
+
+    const modal = document.getElementById('backupRestoreModal');
+    const labelEl = document.getElementById('backupRestoreLabel');
+    const compareEl = document.getElementById('backupRestoreCompare');
+    const inputEl = document.getElementById('backupRestoreConfirmInput');
+    const okBtn = document.getElementById('backupRestoreOk');
+    if (!modal) return;
+
+    labelEl.textContent = meta.type === 'auto'
+      ? ('สำรองอัตโนมัติวันที่ ' + (meta.date || fmtDateTime(meta.ts)))
+      : ('สำรองเอง: ' + (meta.label || '(ไม่มีชื่อ)') + ' — ' + fmtDateTime(meta.ts));
+    compareEl.textContent = '⏳ กำลังโหลดข้อมูล...';
+    inputEl.value = '';
+    okBtn.disabled = true;
+    okBtn.textContent = '♻️ กู้คืนข้อมูล';
+    modal.classList.add('show');
+
+    const data = await FirebaseSync.loadBackupData(id);
+    if (!data) {
+      compareEl.textContent = '❌ โหลดข้อมูล backup ไม่สำเร็จ';
+      return;
+    }
+    _pendingRestoreData = data;
+
+    const cur = Store.load();
+    const curExams = (cur.exams || []).length;
+    const curAttempts = (cur.attempts || []).length;
+    const curMembers = (cur.members || []).length;
+    const bkExams = (data.exams || []).length;
+    const bkAttempts = (data.attempts || []).length;
+    const bkMembers = (data.members || []).length;
+    compareEl.innerHTML =
+      '<div>📌 ปัจจุบัน: ' + curExams + ' ชุดข้อสอบ, ' + curAttempts + ' attempts, ' + curMembers + ' สมาชิก</div>' +
+      '<div>📦 backup: ' + bkExams + ' ชุดข้อสอบ, ' + bkAttempts + ' attempts, ' + bkMembers + ' สมาชิก</div>';
+
+    updateOkState();
+  }
+
+  const confirmInput = document.getElementById('backupRestoreConfirmInput');
+  if (confirmInput) confirmInput.oninput = updateOkState;
+
+  const cancelBtn = document.getElementById('backupRestoreCancel');
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      document.getElementById('backupRestoreModal').classList.remove('show');
+      _pendingRestoreData = null;
+    };
+  }
+
+  // Ok button: clone-node rebind — modal is reused across every row, must not accumulate stale closures
+  const okBtnOrig = document.getElementById('backupRestoreOk');
+  if (okBtnOrig) {
+    const newOk = okBtnOrig.cloneNode(true);
+    okBtnOrig.parentNode.replaceChild(newOk, okBtnOrig);
+    newOk.onclick = async () => {
+      if (!_pendingRestoreData) return;
+      if (!Store._cloudLoaded) { toast('⚠️ ยังไม่พร้อม sync กับ cloud ลองใหม่อีกครั้ง'); return; }
+      const okBtn = document.getElementById('backupRestoreOk');
+      okBtn.disabled = true;
+      okBtn.textContent = 'กำลังกู้คืน...';
+      // bypass Store.save()'s stale-snapshot merge (นี่คือ full overwrite ตั้งใจ ไม่ใช่การ save ปกติ)
+      // — ทำให้ _cache ตรงกับ data ที่จะ save ก่อน (data===this._cache) branch merge จะไม่ทำงาน
+      _pendingRestoreData._savedAt = Date.now();
+      Store._cache = _pendingRestoreData;
+      const ok = await FirebaseSync.saveDoc('mainStore', Store._cache);
+      if (ok) {
+        localStorage.removeItem('nanont:syncPending');
+        toast('✅ กู้คืนสำเร็จ กำลังโหลดหน้าใหม่... (แนะนำให้แจ้งนักเรียนรีเฟรชหน้าเว็บด้วย)');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        okBtn.disabled = false;
+        okBtn.textContent = '♻️ กู้คืนข้อมูล';
+        toast('❌ กู้คืนไม่สำเร็จ กรุณาลองใหม่');
+      }
+    };
+  }
+
+  const tabAutoBtn = document.getElementById('backupTabAuto');
+  const tabManualBtn = document.getElementById('backupTabManual');
+  function setActiveTab(tab){
+    _activeTab = tab;
+    if (tabAutoBtn) tabAutoBtn.classList.toggle('btnPrimary', tab === 'auto');
+    if (tabManualBtn) tabManualBtn.classList.toggle('btnPrimary', tab === 'manual');
+    renderList();
+  }
+  if (tabAutoBtn) tabAutoBtn.onclick = () => setActiveTab('auto');
+  if (tabManualBtn) tabManualBtn.onclick = () => setActiveTab('manual');
+
+  const backupNowBtn = document.getElementById('backupNowBtn');
+  if (backupNowBtn) {
+    backupNowBtn.onclick = async () => {
+      const label = (prompt('ตั้งชื่อสำรอง (ไม่บังคับ):', '') || '').trim();
+      backupNowBtn.disabled = true;
+      const prevText = backupNowBtn.textContent;
+      backupNowBtn.textContent = 'กำลังสำรอง...';
+      const ok = await FirebaseSync.saveManualBackup(Store.load(), label);
+      backupNowBtn.disabled = false;
+      backupNowBtn.textContent = prevText;
+      toast(ok ? '✅ สำรองข้อมูลแล้ว' : '❌ สำรองไม่สำเร็จ');
+      if (ok) loadList();
+    };
+  }
+
+  loadList();
+}
+
 // ===================== ADMIN NEW PAGE =====================
 function initAdminNew(){
   const s=Store.init();
@@ -12976,7 +13259,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.95';
+  const CURRENT_VERSION = 'v47.96';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
