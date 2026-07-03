@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.94 -->
+  <!-- APP_VERSION: v47.95 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.94</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.95</div>
     </div>
   </div>
 </div>
@@ -5341,10 +5341,11 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     };
 
   } else {
-    // มี resume ของข้อสอบชุดอื่นค้างอยู่ (คนละ id) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
-    if (_rawResume && _rawResume.examId && _rawResume.examId !== id && _rawResume.startedAt) {
+    // มี resume ค้างอยู่ที่ไม่ตรงกับรอบนี้ (คนละชุด หรือชุดเดิมแต่คนละโหมด) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
+    if (_rawResume && _rawResume.examId && _rawResume.startedAt &&
+        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode)) {
       const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
-      const _oldTitle = _oldExam ? _oldExam.title : 'ชุดก่อนหน้า';
+      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : ' (จับเวลา)');
       if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
         navigate('exams');
         return;
@@ -8097,6 +8098,9 @@ function showTierReward(emoji, label, ptsText, rewardName) {
   m.style.display = 'flex';
 }
 
+// state นอก initRewards — ต้องอยู่รอดข้ามการเรียกซ้ำ (soft refresh เรียก initRewards ใหม่ทุกครั้ง)
+let _rewardsReqId = 0;
+const _rewardsWeaknessFetched = new Set();
 function initRewards() {
   const isTeacher = Auth.isTeacher();
   const bodyEl = document.getElementById('rewardsBody');
@@ -8157,19 +8161,24 @@ function initRewards() {
     // ดึง weakness ของนักเรียนจาก cloud ก่อน render — เครื่องครูไม่มี listener ฟัง weakness
     // ของตัวเอง (ตั้งใจ) ถ้า render ก่อนโหลด quest progress จะคำนวณจาก local ว่างแล้วเขียนทับ
     // ค่าจริงใน store ที่ share กับ Firebase กลับเป็น 0
-    if (initialUserId) {
-      const _c0 = document.getElementById('rewardsContent');
-      if (_c0) _c0.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กำลังโหลด...</div>';
-      fetchWeaknessFromCloud(initialUserId).then(() => renderRewardsFor(initialUserId)).catch(() => renderRewardsFor(initialUserId));
-    }
+    // fetch ครั้งเดียวต่อคนต่อ session (กันหน้ากระพริบตอน soft refresh) + req id กันสลับ tab เร็วแล้ววาดผิดคน
+    const _loadRewardsTab = (name) => {
+      const _req = ++_rewardsReqId;
+      if (_rewardsWeaknessFetched.has(name)) { renderRewardsFor(name); return; }
+      const _c = document.getElementById('rewardsContent');
+      if (_c) _c.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กำลังโหลด...</div>';
+      fetchWeaknessFromCloud(name)
+        .then(() => { _rewardsWeaknessFetched.add(name); })
+        .catch(() => {})
+        .then(() => { if (_req === _rewardsReqId) renderRewardsFor(name); });
+    };
+    if (initialUserId) _loadRewardsTab(initialUserId);
     const tabs = bodyEl.querySelectorAll('.rewardsTab');
     tabs.forEach(btn => {
       btn.addEventListener('click', () => {
         const name = btn.getAttribute('data-name');
         tabs.forEach(b => { b.style.cssText = _rTabStyle(b === btn); });
-        const _c = document.getElementById('rewardsContent');
-        if (_c) _c.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กำลังโหลด...</div>';
-        fetchWeaknessFromCloud(name).then(() => renderRewardsFor(name)).catch(() => renderRewardsFor(name));
+        _loadRewardsTab(name);
       });
     });
   } else {
@@ -12967,7 +12976,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.94';
+  const CURRENT_VERSION = 'v47.95';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
