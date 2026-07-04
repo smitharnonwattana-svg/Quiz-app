@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.96 -->
+  <!-- APP_VERSION: v47.97 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.96</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.97</div>
     </div>
   </div>
 </div>
@@ -8081,20 +8081,13 @@ function initAdminExams(){
         const modalCancel=document.getElementById('adminDeleteModalCancel');
         if(!modal) return;
         modalText.textContent=`ต้องการลบ "${exam.title}" ใช่ไหม?`;
-        const isStorage=(url)=>url&&!url.startsWith('localpdf:')&&!url.startsWith('./')&&!url.includes('drive.google.com')&&url.startsWith('https://firebasestorage');
-        const filesToDelete=[];
-        if(isStorage(exam.pdfUrl)) filesToDelete.push('📄 PDF โจทย์ (Firebase Storage)');
-        if(isStorage(exam.answerPdfUrl)) filesToDelete.push('✅ PDF เฉลย (Firebase Storage)');
-        modalFiles.innerHTML=filesToDelete.length
-          ?'<div style="padding:6px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#c2410c;">⚠️ ไฟล์ต่อไปนี้จะถูกลบถาวรจาก Firebase Storage:<br>'+filesToDelete.map(f=>`• ${f}`).join('<br>')+'</div>'
-          :'';
+        // ไฟล์ PDF ใน Firebase Storage จะไม่ถูกลบตามอีกต่อไป (เผื่อกู้คืนภายหลัง) — ดู CLAUDE.md
+        modalFiles.innerHTML='';
         modal.classList.add('show');
         const newOk=modalOk.cloneNode(true);
         modalOk.parentNode.replaceChild(newOk,modalOk);
         newOk.onclick=async()=>{
           modal.classList.remove('show');
-          if(exam.pdfUrl) FirebaseSync.deleteStoragePdf(exam.pdfUrl);
-          if(exam.answerPdfUrl) FirebaseSync.deleteStoragePdf(exam.answerPdfUrl);
           s.exams=s.exams.filter(x=>x.id!==id);
           if(s.questions&&s.questions[id]) delete s.questions[id];
           Store.save(s);toast('ลบชุดข้อสอบแล้ว');renderAdmin();
@@ -9702,12 +9695,10 @@ function initEditor(examId){
   if(editorPdfUrlEl) editorPdfUrlEl.value = (exam.pdfUrl && !exam.pdfUrl.startsWith('localpdf:')) ? exam.pdfUrl : '';
 
   function updateExamPdf(newUrl) {
-    const oldUrl = exam.pdfUrl;
     exam.pdfUrl = newUrl;
     Store.save(s);
     document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
-    // Delete old Storage PDF if it was a Firebase Storage URL
-    FirebaseSync.deleteStoragePdf(oldUrl);
+    // ไฟล์ PDF เดิมใน Storage จะไม่ถูกลบตามอีกต่อไป (เผื่อกู้คืนภายหลัง) — ดู CLAUDE.md
     toast('✅ อัปเดต PDF แล้ว');
   }
 
@@ -13259,7 +13250,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.96';
+  const CURRENT_VERSION = 'v47.97';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
