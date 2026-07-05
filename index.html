@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.99 -->
+  <!-- APP_VERSION: v48.0 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.99</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.0</div>
     </div>
   </div>
 </div>
@@ -3171,7 +3171,11 @@ const Store = {
       const safeSoftRefresh = ['home','stats','rewards','exams'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
-        navigate(pg, window._currentParams||{});
+        // flag ให้ initExams รู้ว่านี่คือ soft refresh (listener re-nav) ไม่ใช่ผู้ใช้กดเอง
+        // → คงวิชาที่เลือกไว้ ไม่เด้งกลับหน้าเลือกวิชา (navigate→initExams รันแบบ sync อ่าน flag ทัน)
+        window._softRefreshing = true;
+        try { navigate(pg, window._currentParams||{}); }
+        finally { window._softRefreshing = false; }
       }
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
@@ -4376,7 +4380,9 @@ function initExams(){
   const s=Store.load();
   const published=(s.exams||[]).filter(e=>e.published);
   const subjFilterEl=document.getElementById('examsSubjFilter');
-  let subjectFilter='';
+  // คงวิชาที่เลือกไว้เฉพาะตอน soft refresh (Firebase listener re-nav) — เข้าหน้าเองยังเริ่มที่หน้าเลือกวิชา
+  let subjectFilter = window._softRefreshing ? (window._examsSubjectFilter||'') : '';
+  if(!window._softRefreshing) window._examsSubjectFilter = '';
   const _myName = Auth.getName ? Auth.getName() : '';
   const isTeacher = Auth.isTeacher();
   let _editMode = false;
@@ -4418,6 +4424,7 @@ function initExams(){
   const backBtn = document.getElementById('examsBackToSubjBtn');
   if(backBtn) backBtn.onclick = () => {
     subjectFilter = '';
+    window._examsSubjectFilter = '';
     if(backRow){ backRow.style.display='none'; }
     renderSubjectGrid();
   };
@@ -4480,6 +4487,7 @@ function initExams(){
           if(ev.target.closest('.subj-drag-handle')) return;
           if(_editMode) return;
           subjectFilter = card.dataset.subj;
+          window._examsSubjectFilter = subjectFilter;
           if(subjLabel) subjLabel.textContent = subjectFilter;
           if(backRow){ backRow.style.display='flex'; }
           subjectGrid.innerHTML = '';
@@ -4829,8 +4837,17 @@ function initExams(){
     if(_myResume && _myResume.startedAt) _startResumeBadgeTick();
   }
 
-  subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderExams();};
-  renderSubjectGrid();
+  subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._examsSubjectFilter=subjectFilter;renderExams();};
+  if(subjectFilter){
+    // soft refresh คืนวิชาที่เลือกไว้ — เข้าหน้ารายการข้อสอบเลย (จำลอง state ตอนกด card)
+    if(subjLabel) subjLabel.textContent = subjectFilter;
+    if(backRow) backRow.style.display='flex';
+    if(subjectGrid) subjectGrid.innerHTML='';
+    renderExams();
+  } else {
+    if(backRow) backRow.style.display='none'; // กัน back row ค้างจาก state ก่อนหน้า (DOM ค้างข้ามการ navigate)
+    renderSubjectGrid();
+  }
 }
 
 // ===================== EXAM DETAIL PAGE =====================
@@ -13296,7 +13313,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.99';
+  const CURRENT_VERSION = 'v48.0';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
