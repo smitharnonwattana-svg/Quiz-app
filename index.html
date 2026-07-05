@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.98 -->
+  <!-- APP_VERSION: v47.99 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.98</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.99</div>
     </div>
   </div>
 </div>
@@ -3617,6 +3617,35 @@ async function fetchWeaknessFromCloud(userId) {
   } catch (e) { console.warn('fetchWeaknessFromCloud fallback error', e); }
 }
 
+// ── Cloud loading state (v47.99) ──
+// หน้า home/exams รู้ตัวเองว่าข้อมูล cloud ยังโหลดไม่เสร็จ — แสดงสถานะโหลดแทนรายการว่าง
+// กัน "หน้าว่างชั่วคราวตอนเน็ตหลุด" ถูกเข้าใจผิดว่าข้อมูลหาย
+// listener soft refresh (safeSoftRefresh มี home/exams อยู่แล้ว) จะ re-render ให้เองเมื่อโหลดเสร็จ
+function renderCloudLoading(el, page){
+  if(!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:60px 20px;">'
+    + '<div style="font-size:40px;">⏳</div>'
+    + '<div class="muted" style="margin-top:10px;font-weight:700;">กำลังโหลดข้อมูล...</div>'
+    + '</div>';
+  setTimeout(() => {
+    if (Store._cloudLoaded) return;
+    if (window._currentPage !== page) return;
+    el.innerHTML = '<div style="text-align:center;padding:60px 20px;">'
+      + '<div style="font-size:40px;">📶</div>'
+      + '<div style="margin-top:10px;font-weight:700;color:#b91c1c;">โหลดข้อมูลไม่สำเร็จ</div>'
+      + '<div class="muted" style="font-size:13px;margin-top:4px;">เช็คอินเทอร์เน็ตแล้วลองใหม่ — ข้อมูลไม่ได้หายไปไหน</div>'
+      + '<button class="btn btnPrimary" style="margin-top:14px;" onclick="retryCloudLoad()">🔄 ลองใหม่</button>'
+      + '</div>';
+  }, 10000);
+}
+function retryCloudLoad(){
+  const pg = window._currentPage;
+  Store.syncFromCloud().then(() => {
+    if (window._currentPage === pg) navigate(pg, window._currentParams || {});
+  });
+  navigate(pg, window._currentParams || {}); // กลับไปสถานะ "กำลังโหลด..." ระหว่างรอ
+}
+
 // WHOOP UI — Stage 4
 let _whoopReqId = 0;
 let _whoopFetching = false;
@@ -3625,6 +3654,7 @@ function renderHome(){
   const role = Auth.getRole();
   const homeEl = document.getElementById('page-home');
   if(!homeEl) return;
+  if(!Store._cloudLoaded){ renderCloudLoading(homeEl, 'home'); return; }
 
   // ── local helpers (renderHome scope only) ─────────────
   function _getHomeGreeting(name){
@@ -4337,6 +4367,12 @@ window.addEventListener('orientationchange', _syncTakeStickyBarLift);
 
 // ===================== EXAMS PAGE =====================
 function initExams(){
+  if(!Store._cloudLoaded){
+    const _sg=document.getElementById('examsSubjGrid');
+    if(_sg) _sg.innerHTML='';
+    renderCloudLoading(document.getElementById('examsList'), 'exams');
+    return;
+  }
   const s=Store.load();
   const published=(s.exams||[]).filter(e=>e.published);
   const subjFilterEl=document.getElementById('examsSubjFilter');
@@ -13260,7 +13296,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v47.98';
+  const CURRENT_VERSION = 'v47.99';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
