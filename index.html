@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.0 -->
+  <!-- APP_VERSION: v48.1 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.0</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.1</div>
     </div>
   </div>
 </div>
@@ -3672,13 +3672,7 @@ function renderHome(){
       : 'ดึกแลวนะ 🌙';
     return name ? timeGreet + ' ' + name : timeGreet;
   }
-  function esc(s){
-    return String(s||'')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
-  }
+  // ใช้ esc() global (escape ครบกว่า local เดิม — superset, ผล render เท่ากัน)
   function ringColor(v){
     if (v == null || isNaN(v)) return '#d1d5db';
     if (v >= 85) return '#16a34a';
@@ -4260,15 +4254,23 @@ function navigate(page, params={}){
   else if(page==='review') initReview(params.attemptId);
   else if(page==='stats') initStats();
   else if(page==='practice'){ if(Auth.isTeacher()){navigate('exams');return;} initPractice(params); }
-  else if(page==='admin'){ if(!Auth.isTeacher()){navigate('home');return;} initAdmin(); }
-  else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
-  else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
-  else if(page==='admin_benchmark'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBenchmark(); }
-  else if(page==='admin_exams'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminExams(); }
-  else if(page==='admin_memes'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMemes(); }
-  else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
-  else if(page==='admin_rewards'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminRewards(); }
-  else if(page==='admin_backup'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBackup(); }
+  else if(page==='admin'||page.startsWith('admin_')){
+    // ทุกหน้า admin ผ่าน guard ครูจุดเดียว (init function แต่ละตัวยังมี guard ของตัวเองด้วย — defense in depth)
+    if(!Auth.isTeacher()){navigate('home');return;}
+    const ADMIN_INITS = {
+      admin: () => initAdmin(),
+      admin_new: () => initAdminNew(),
+      admin_editor: () => initEditor(params.id),
+      admin_benchmark: () => initAdminBenchmark(),
+      admin_exams: () => initAdminExams(),
+      admin_memes: () => initAdminMemes(),
+      admin_members: () => initAdminMembers(),
+      admin_rewards: () => initAdminRewards(),
+      admin_backup: () => initAdminBackup(),
+    };
+    if(ADMIN_INITS[page]) ADMIN_INITS[page]();
+    else console.warn('unknown admin page:', page);
+  }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
@@ -4370,6 +4372,10 @@ window.addEventListener('resize', _syncTakeStickyBarLift);
 window.addEventListener('orientationchange', _syncTakeStickyBarLift);
 
 // ===================== EXAMS PAGE =====================
+// รายชื่อวิชามาตรฐาน — จุดเดียวในไฟล์ (เพิ่มวิชาใหม่ที่นี่ที่เดียว)
+const KNOWN_SUBJS = ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
+const SUBJ_EMOJI = {'คณิตศาสตร์':'🔢','วิทยาศาสตร์':'🔬','ภาษาไทย':'📖','ภาษาอังกฤษ':'🌐','สังคมศึกษา':'🌍','สอบเข้า ม.1':'🎓'};
+const SUBJ_BG = {'คณิตศาสตร์':'#eff6ff','วิทยาศาสตร์':'#f0fdf4','ภาษาไทย':'#fff7ed','ภาษาอังกฤษ':'#f0f9ff','สังคมศึกษา':'#fefce8','สอบเข้า ม.1':'#faf5ff'};
 function initExams(){
   if(!Store._cloudLoaded){
     const _sg=document.getElementById('examsSubjGrid');
@@ -4414,9 +4420,7 @@ function initExams(){
   if(editBtn) editBtn.onclick = ()=>{ if(!isTeacher) return; _editMode=true; window._examsEditMode=true; editBar?.classList.add('show'); editBtn.style.display='none'; renderExams(); };
   if(editDoneBtn) editDoneBtn.onclick = ()=>{ _editMode=false; window._examsEditMode=false; _dragSrcId=null; editBar?.classList.remove('show'); if(editBtn && isTeacher) editBtn.style.display=''; renderExams(); };
 
-  const KNOWN_SUBJS = ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
-  const SUBJ_EMOJI = {'คณิตศาสตร์':'🔢','วิทยาศาสตร์':'🔬','ภาษาไทย':'📖','ภาษาอังกฤษ':'🌐','สังคมศึกษา':'🌍','สอบเข้า ม.1':'🎓'};
-  const SUBJ_BG = {'คณิตศาสตร์':'#eff6ff','วิทยาศาสตร์':'#f0fdf4','ภาษาไทย':'#fff7ed','ภาษาอังกฤษ':'#f0f9ff','สังคมศึกษา':'#fefce8','สอบเข้า ม.1':'#faf5ff'};
+  // KNOWN_SUBJS/SUBJ_EMOJI/SUBJ_BG ประกาศ module-level เหนือฟังก์ชันนี้
 
   const subjectGrid = document.getElementById('examsSubjGrid');
   const backRow = document.getElementById('examsBackToSubj');
@@ -4594,7 +4598,7 @@ function initExams(){
     if(!subjectFilter){ renderSubjectGrid(); return; }
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
-    const KNOWN=['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
+    const KNOWN=KNOWN_SUBJS; // ใช้รายชื่อวิชากลางตัวเดียว (module-level)
     // sort by displayOrder (exams page) — แยกจาก order (admin page)
     // ถ้ายังไม่มี displayOrder ให้ fallback ไป order เดิม
     const allPublished = (s2.exams||[]).filter(e=>e.published).sort((a,b)=>{
@@ -8369,7 +8373,7 @@ function renderRewardsFor(userId, opts) {
     return;
   }
 
-  const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // ใช้ esc() global (escape ครบกว่า local เดิม — superset, ผล render เท่ากัน)
 
   // Trophy Road UI — G6 (Section 1) + Reward Claim Flow — G7
   const state = getGamificationState(userId);
@@ -8806,7 +8810,7 @@ function initAdminRewards(){
     const host = document.getElementById('adminRewardsStudyRoad');
     if(!host) return;
     const rewards = getStudyRoadRewards();
-    const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const escAttr = esc; // ใช้ esc() global (escape ครบกว่า — superset, ผล render เท่ากัน)
     host.innerHTML = REWARD_TIERS.map(t => {
       const v = escAttr(rewards[t.key] || '');
       const head = /^\d+$/.test(t.key) ? (t.key + ' pt → ' + t.label) : t.label;
@@ -8895,7 +8899,7 @@ function initAdminRewards(){
       ? 'background:#111;color:#fff;border:1px solid #111;'
       : 'background:#fff;color:#111;border:1px solid #d1d5db;')
       + 'padding:6px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;';
-    const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    // ใช้ esc() global (escape ครบกว่า local เดิม)
     function show(name){
       Array.from(tabsHost.children).forEach(b => { b.style.cssText = tabStyle(b.getAttribute('data-name') === name); });
       renderRewardsFor(name, { host: viewHost, adminTools: true, afterRender: _renderPendingClaims });
@@ -8914,7 +8918,7 @@ function initAdminRewards(){
     const host = document.getElementById('adminRewardsQuestConfig');
     if(!host) return;
     const cfg = getQuestConfig();
-    const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const escAttr = esc; // ใช้ esc() global
     const tierColor = { easy:'#16a34a', medium:'#b45309', challenge:'#dc2626' };
 
     // Main quest rows — target + reward only (description is auto-generated from the student's weakness)
@@ -9025,7 +9029,7 @@ function initAdminMembers(){
       const currentFocus = (typeof getFocusSubjects === 'function') ? getFocusSubjects(m.name) : [];
       const focusBox = document.createElement('div');
       focusBox.style.cssText = 'background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-top:4px;margin-bottom:8px;';
-      const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      const escAttr = esc; // ใช้ esc() global
       const badgesHtml = currentFocus.length
         ? currentFocus.map(sub => '<span class="badge ok" style="margin-left:6px;">' + escAttr(sub) + '</span>').join('')
         : '<span class="muted" style="margin-left:6px;font-size:12px;">— ยังไม่ได้ตั้ง</span>';
@@ -13313,7 +13317,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.0';
+  const CURRENT_VERSION = 'v48.1';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
