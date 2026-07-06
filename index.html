@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.1 -->
+  <!-- APP_VERSION: v48.2 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1069,7 +1069,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.1</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.2</div>
     </div>
   </div>
 </div>
@@ -2126,6 +2126,30 @@
 
 
 <script>
+/* ═══════════════════════════════════════════════════════════════════
+   TABLE OF CONTENTS — script block หลัก (grep "=====" เพื่อกระโดดไป section)
+   ───────────────────────────────────────────────────────────────────
+   PDF VIEWER          — render PDF ด้วย pdf.js (canvas ต่อหน้า)
+   FIREBASE SYNC       — FirebaseSync IIFE: saveDoc/loadDoc/listenDoc/backup/upload
+   STORE               — ⚠️ HIGH-RISK: in-memory cache + merge + cloud push (อ่านป้ายเตือนในโค้ด)
+   LINE NOTIFICATION   — client เรียก Cloud Function lineNotify (เช็ค flag ต่อสมาชิก)
+   ROUTER              — navigate() + dispatch ต่อหน้า (ADMIN_INITS สำหรับหน้า admin)
+   MEME SCORE POPUP    — overlay แสดงคะแนน+มีมหลังส่งข้อสอบ
+   AUTH / NUMPAD LOGIN — PIN-based role (teacher/student) + หน้า login
+   EXAMS PAGE          — เลือกวิชา→รายการชุด (subjectFilter รอด soft-refresh ผ่าน window._examsSubjectFilter)
+   EXAM DETAIL / TAKE  — ⚠️ HIGH-RISK: ทำข้อสอบ/submit/_doSave/resume (ลำดับ clearTakeResume สำคัญ)
+   REVIEW / TAG MODAL  — ดูเฉลย+ติด tag ข้อผิด
+   DASHBOARD / STATS   — สถิติ + กราฟ
+   PRACTICE PAGE       — โหมดแก้จุดอ่อน (weakness practice)
+   ADMIN* PAGES        — จัดการข้อสอบ/สมาชิก/backup/รางวัล/มีม/benchmark/editor
+   EXCEL TEMPLATE/IMPORT — template เฉลย + parse excel (คืน {rows, skipped})
+   BENCHMARK           — ตารางเทียบคะแนน
+   INIT                — bootstrap ลำดับ: Store.init → restore session → navigate
+   WEAKNESS TRACKING   — ⚠️ เขียน weakness doc แยกต่อ user (nanont:weaknesses_*)
+   STAGE 1-6 / COACH   — เมตริกรายวัน (activity/score/fixes/streak) + คำแนะนำ
+   GAMIFICATION G1-G8  — ⚠️ HIGH-RISK: แต้ม/stamps/quest (_saveGamificationUser เป็น whitelist!)
+   ENTRANCE STATS      — สถิติสอบเข้า (eplus/gate)
+   ═══════════════════════════════════════════════════════════════════ */
 // ===================== PDF VIEWER (PDF.js) =====================
 // Single-page viewer พร้อมปุ่มเปลี่ยนหน้า ทำงานได้ทุก browser/OS
 const PdfViewer = (() => {
@@ -2899,6 +2923,12 @@ const Store = {
   },
   // อัปเดต in-memory cache เท่านั้น (ไม่ write Firebase — ใช้ใน migrate())
   saveLocalOnly(data){ this._cache = data; },
+  // ⚠️⚠️ HIGH-RISK — invariants ที่ห้ามละเมิด (ทุกข้อเคยเป็นบั๊กข้อมูลหายจริง):
+  // 1. ห้าม push ก่อน _cloudLoaded=true (v47.93 — กัน store เปล่าทับ cloud)
+  // 2. stale-snapshot merge (data !== _cache) ต้องคงอยู่ — กัน handler ที่ถือ object เก่า
+  //    ทับ attempts/gamification/assignments ใหม่ (v47.93)
+  // 3. restore จากหน้า backup จงใจ BYPASS ฟังก์ชันนี้ (เซ็ต _cache ตรง + saveDoc ตรง)
+  //    เพราะ restore ต้องการ overwrite เต็ม ไม่ใช่ merge (v47.96) — อย่า "แก้ให้มันเรียก save()"
   save(data){
     try{
       this.lastError=null;
@@ -3590,7 +3620,7 @@ function _downloadCanvas(canvas) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
-// ── Home page render (role-aware) ──
+// ===================== HOME PAGE + CLOUD-LOADING HELPERS =====================
 // Weakness Cloud Sync — Stage 6
 // Weakness Sync Fallback — Bug #2
 async function fetchWeaknessFromCloud(userId) {
@@ -5305,6 +5335,8 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
     // ไม่กรอกชื่อ = บันทึกเป็น 'ไม่ระบุชื่อ' (ห้าม block — คำตอบต้องไม่หาย)
     const takerName = st.takerName || 'ไม่ระบุชื่อ';
+    // ⚠️ HIGH-RISK: ลำดับใน _doSave ห้ามสลับ — Store.save ต้องสำเร็จก่อนค่อย clearTakeResume
+    // (v47.94: เคลียร์ก่อนเซฟ = ปิดแอประหว่าง check-in modal แล้วคำตอบหายทั้ง attempt)
     function _doSave(feeling, prediction){
       const savedS=Store.load();
       const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
@@ -11584,6 +11616,9 @@ function _getGamificationUser(userId) {
   } catch { return _GAMIFICATION_DEFAULT(); }
 }
 
+// ⚠️ HIGH-RISK: ฟังก์ชันนี้เป็น WHITELIST — เขียนเฉพาะ field ที่ระบุชื่อไว้ข้างในเท่านั้น
+// เพิ่ม field ใหม่ใน gamification เมื่อไหร่ ต้องเพิ่มทั้ง 3 ที่: _GAMIFICATION_DEFAULT,
+// _getGamificationUser, และที่นี่ — ลืมที่นี่ = field หายเงียบทุกครั้งที่เซฟ (เคยพลาดจริง v47.94)
 function _saveGamificationUser(userId, data) {
   if (!userId || !data || typeof data !== 'object') return;
   const s = Store.load();
@@ -13317,7 +13352,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.1';
+  const CURRENT_VERSION = 'v48.2';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
