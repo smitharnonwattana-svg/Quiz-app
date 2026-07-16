@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.95p -->
+  <!-- APP_VERSION: v47.96p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -948,6 +948,13 @@
     }
     #scratchPad.open { transform: translateX(0); }
     #scratchPad.full { width: 100vw; }
+    /* Split-view: เปิดกระดาษทดโหมดปกติ (ไม่เต็มจอ) แล้วให้โจทย์ (.takeLeft) หด
+       พอดีกับพื้นที่ที่เหลือจริง แทนที่จะให้ scratch pad overlay ทับซ้อนเข้าไปในโจทย์
+       (เดิม width:min(50vw,720px) ของ scratch pad กว้างกว่าคอลัมน์ .takeRight 20%
+       จึงเบียดทับโจทย์ด้วย) — เต็มจอ (.full) ไม่ใช้ rule นี้ พฤติกรรมเหมือนเดิมทุกอย่าง */
+    @media (min-width: 901px) {
+      .takeGrid.scratchSplit { grid-template-columns: calc(100% - min(50vw, 720px)) 0; }
+    }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1072,7 +1079,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.95p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.96p</div>
     </div>
   </div>
 </div>
@@ -13353,13 +13360,22 @@ function initEntranceCompare(params) {
   document.getElementById('scratchClearBtn').addEventListener('click', () => {
     if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
   });
+  // ให้ .takeGrid หด/คืนพื้นที่ตามสถานะ open/full ปัจจุบันของกระดาษทด — เปิดปกติ
+  // (ไม่เต็มจอ) เท่านั้นที่ split (ดูโจทย์ไม่ถูกบัง), เต็มจอ/ปิด ไม่ split (พฤติกรรมเดิม)
+  function _syncScratchSplit() {
+    const split = pad.classList.contains('open') && !pad.classList.contains('full');
+    document.querySelectorAll('.takeGrid').forEach(g => g.classList.toggle('scratchSplit', split));
+  }
+
   document.getElementById('scratchExpandBtn').addEventListener('click', () => {
     // canvas ขนาดเท่าเต็มจอเสมอแล้ว (ดู resizeCanvas) แค่ toggle class ให้ wrap
     // เปลี่ยนความกว้างที่ "เผย" ออกมา ไม่ต้อง resize canvas เลย
     pad.classList.toggle('full');
+    _syncScratchSplit();
   });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
+    _syncScratchSplit();
   });
 
   // 2-finger tap บนกระดาษทด → สลับ pen ↔ eraser
@@ -13392,6 +13408,7 @@ function initEntranceCompare(params) {
   btn.addEventListener('click', () => {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
+    _syncScratchSplit();
     if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
   });
   window.addEventListener('resize', () => {
@@ -13403,6 +13420,7 @@ function initEntranceCompare(params) {
   window.scratchHide = function() {
     btn.classList.remove('visible');
     pad.classList.remove('open');
+    _syncScratchSplit();
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
   };
 })();
