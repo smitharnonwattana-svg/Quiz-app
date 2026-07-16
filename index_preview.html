@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.96p -->
+  <!-- APP_VERSION: v47.97p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1079,7 +1079,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.96p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.97p</div>
     </div>
   </div>
 </div>
@@ -13141,7 +13141,7 @@ function initEntranceCompare(params) {
   window.checkVersion = function(){};
 })();
 
-// ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil ทดเขียนระหว่างสอบ) ──
+// ── SCRATCH PAD — Phase 1 (iPad/Apple Pencil + desktop/เมาส์) ──
 (function initScratchPad(){
   // iPad detection: real iPad UA, or iPadOS 13+ reporting Macintosh w/ touch, or large touch screen
   const isIPad = (
@@ -13149,13 +13149,15 @@ function initEntranceCompare(params) {
     (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) ||
     (navigator.maxTouchPoints > 1 && Math.min(window.screen.width, window.screen.height) >= 768)
   );
-  if (!isIPad) return; // hide forever on non-iPad
+  // Desktop PC: มีเมาส์ (fine pointer) แต่ไม่ใช่ iPad — กันมือถือจอเล็ก (touch-only, coarse pointer)
+  const isDesktop = !isIPad && window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+  if (!isIPad && !isDesktop) return; // hide forever on phones/touch-only
 
   // Inject UI once
   const btn = document.createElement('button');
   btn.id = 'scratchToggleBtn';
   btn.type = 'button';
-  btn.title = 'กระดาษทด (ใช้ Apple Pencil)';
+  btn.title = 'กระดาษทด (Apple Pencil / เมาส์)';
   btn.textContent = '📝';
   document.body.appendChild(btn);
 
@@ -13328,15 +13330,37 @@ function initEntranceCompare(params) {
   canvas.addEventListener('touchend', onTouchEnd, {passive:false});
   canvas.addEventListener('touchcancel', onTouchEnd, {passive:false});
 
-  // Pointer Events เก็บไว้เฉพาะ hover cursor (Apple Pencil 2/Pro hover preview
-  // บน iPad Pro รุ่นรองรับ) — ไม่ใช้สำหรับวาด
+  // Pointer Events: hover cursor (Apple Pencil 2/Pro hover preview บน iPad Pro
+  // รุ่นรองรับ) + วาดจริงด้วยเมาส์บน desktop (pointerType==='mouse') — ใช้ getPos/
+  // drawDot/drawSegment/updateCursor ชุดเดียวกับที่มีอยู่แล้ว ไม่แตะ path ของ
+  // touch/stylus (iPad) เลย
   function onPointerHover(e) {
-    if (e.pointerType !== 'pen') return;
-    const r = canvas.getBoundingClientRect();
-    updateCursor(e.clientX - r.left, e.clientY - r.top);
+    if (e.pointerType === 'pen') {
+      const r = canvas.getBoundingClientRect();
+      updateCursor(e.clientX - r.left, e.clientY - r.top);
+      return;
+    }
+    if (e.pointerType === 'mouse') {
+      const p = getPos(e);
+      updateCursor(p.x, p.y);
+      if (drawing) drawSegment(p.x, p.y);
+    }
   }
+  function onMouseDown(e) {
+    if (e.pointerType !== 'mouse') return;
+    e.preventDefault();
+    drawing = true;
+    const p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    drawDot(p.x, p.y);
+  }
+  function onMouseUp(e) {
+    if (e.pointerType === 'mouse') drawing = false;
+  }
+  canvas.addEventListener('pointerdown', onMouseDown);
+  canvas.addEventListener('pointerup', onMouseUp);
   canvas.addEventListener('pointermove', onPointerHover);
-  canvas.addEventListener('pointerleave', hideCursor);
+  canvas.addEventListener('pointerleave', (e) => { hideCursor(); onMouseUp(e); });
 
   const eraserSizesEl = document.getElementById('scratchEraserSizes');
   pad.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
