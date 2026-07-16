@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.2 -->
+  <!-- APP_VERSION: v48.3 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -945,6 +945,13 @@
     }
     #scratchPad.open { transform: translateX(0); }
     #scratchPad.full { width: 100vw; }
+    /* Split-view: เปิดกระดาษทดโหมดปกติ (ไม่เต็มจอ) แล้วให้โจทย์ (.takeLeft) หด
+       พอดีกับพื้นที่ที่เหลือจริง แทนที่จะให้ scratch pad overlay ทับซ้อนเข้าไปในโจทย์
+       (เดิม width:min(50vw,720px) ของ scratch pad กว้างกว่าคอลัมน์ .takeRight 20%
+       จึงเบียดทับโจทย์ด้วย) — เต็มจอ (.full) ไม่ใช้ rule นี้ พฤติกรรมเหมือนเดิมทุกอย่าง */
+    @media (min-width: 901px) {
+      .takeGrid.scratchSplit { grid-template-columns: calc(100% - min(50vw, 720px)) 0; }
+    }
     #scratchPadHeader {
       padding: 10px 14px; background: #1f2937; color: #fff;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1069,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.2</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.3</div>
     </div>
   </div>
 </div>
@@ -13352,7 +13359,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.2';
+  const CURRENT_VERSION = 'v48.3';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -13398,19 +13405,21 @@ function initEntranceCompare(params) {
 })();
 </script>
 <script>
-// ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil ทดเขียนระหว่างสอบ) ──
+// ── SCRATCH PAD — Phase 1 (iPad/Apple Pencil + desktop/เมาส์) ──
 (function initScratchPad(){
   const isIPad = (
     /iPad/.test(navigator.userAgent) ||
     (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) ||
     (navigator.maxTouchPoints > 1 && Math.min(window.screen.width, window.screen.height) >= 768)
   );
-  if (!isIPad) return;
+  // Desktop PC: มีเมาส์ (fine pointer) แต่ไม่ใช่ iPad — กันมือถือจอเล็ก (touch-only, coarse pointer)
+  const isDesktop = !isIPad && window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+  if (!isIPad && !isDesktop) return;
 
   const btn = document.createElement('button');
   btn.id = 'scratchToggleBtn';
   btn.type = 'button';
-  btn.title = 'กระดาษทด (ใช้ Apple Pencil)';
+  btn.title = 'กระดาษทด (Apple Pencil / เมาส์)';
   btn.textContent = '📝';
   document.body.appendChild(btn);
 
@@ -13572,13 +13581,37 @@ function initEntranceCompare(params) {
   canvas.addEventListener('touchend', onTouchEnd, {passive:false});
   canvas.addEventListener('touchcancel', onTouchEnd, {passive:false});
 
+  // Pointer Events: hover cursor (Apple Pencil 2/Pro hover preview บน iPad Pro
+  // รุ่นรองรับ) + วาดจริงด้วยเมาส์บน desktop (pointerType==='mouse') — ใช้ getPos/
+  // drawDot/drawSegment/updateCursor ชุดเดียวกับที่มีอยู่แล้ว ไม่แตะ path ของ
+  // touch/stylus (iPad) เลย
   function onPointerHover(e) {
-    if (e.pointerType !== 'pen') return;
-    const r = canvas.getBoundingClientRect();
-    updateCursor(e.clientX - r.left, e.clientY - r.top);
+    if (e.pointerType === 'pen') {
+      const r = canvas.getBoundingClientRect();
+      updateCursor(e.clientX - r.left, e.clientY - r.top);
+      return;
+    }
+    if (e.pointerType === 'mouse') {
+      const p = getPos(e);
+      updateCursor(p.x, p.y);
+      if (drawing) drawSegment(p.x, p.y);
+    }
   }
+  function onMouseDown(e) {
+    if (e.pointerType !== 'mouse') return;
+    e.preventDefault();
+    drawing = true;
+    const p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    drawDot(p.x, p.y);
+  }
+  function onMouseUp(e) {
+    if (e.pointerType === 'mouse') drawing = false;
+  }
+  canvas.addEventListener('pointerdown', onMouseDown);
+  canvas.addEventListener('pointerup', onMouseUp);
   canvas.addEventListener('pointermove', onPointerHover);
-  canvas.addEventListener('pointerleave', hideCursor);
+  canvas.addEventListener('pointerleave', (e) => { hideCursor(); onMouseUp(e); });
 
   const eraserSizesEl = document.getElementById('scratchEraserSizes');
   pad.querySelectorAll('.scratch-tool[data-tool]').forEach(b => {
@@ -13602,11 +13635,20 @@ function initEntranceCompare(params) {
   document.getElementById('scratchClearBtn').addEventListener('click', () => {
     if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
   });
+  // ให้ .takeGrid หด/คืนพื้นที่ตามสถานะ open/full ปัจจุบันของกระดาษทด — เปิดปกติ
+  // (ไม่เต็มจอ) เท่านั้นที่ split (ดูโจทย์ไม่ถูกบัง), เต็มจอ/ปิด ไม่ split (พฤติกรรมเดิม)
+  function _syncScratchSplit() {
+    const split = pad.classList.contains('open') && !pad.classList.contains('full');
+    document.querySelectorAll('.takeGrid').forEach(g => g.classList.toggle('scratchSplit', split));
+  }
+
   document.getElementById('scratchExpandBtn').addEventListener('click', () => {
     pad.classList.toggle('full');
+    _syncScratchSplit();
   });
   document.getElementById('scratchCloseBtn').addEventListener('click', () => {
     pad.classList.remove('open');
+    _syncScratchSplit();
   });
 
   let _twoFingerStartTime = 0;
@@ -13636,6 +13678,7 @@ function initEntranceCompare(params) {
   btn.addEventListener('click', () => {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
+    _syncScratchSplit();
     if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
   });
   window.addEventListener('resize', () => {
@@ -13647,6 +13690,7 @@ function initEntranceCompare(params) {
   window.scratchHide = function() {
     btn.classList.remove('visible');
     pad.classList.remove('open');
+    _syncScratchSplit();
     clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
   };
 })();

@@ -1,8 +1,9 @@
 # Regression tests
 
-ชุดตรวจสอบอัตโนมัติ รวม checks จากการแก้บั๊กช่วง v47.93 → v48.0
+ชุดตรวจสอบอัตโนมัติ รวม checks จากการแก้บั๊กช่วง v47.93 → v48.3
 (editor persistence, admin reorder/member, gamification delta, resume warnings,
-backup/restore merge-bypass, purge checkbox, loading state, subject-filter soft-refresh)
+backup/restore merge-bypass, purge checkbox, loading state, subject-filter soft-refresh,
+scratch pad: desktop mouse drawing + split-view ไม่บังโจทย์)
 
 ## วิธีรัน
 

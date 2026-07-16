@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Quiz-app regression suite — รวม checks จากการแก้บั๊ก v47.93 → v48.0
+// Quiz-app regression suite — รวม checks จากการแก้บั๊ก v47.93 → v48.3
 // รันผ่าน tests/run.sh (start static server → รันไฟล์นี้ → kill server)
 // ทุก section เปิด browser context ใหม่ + seed ข้อมูลเอง — ไม่แตะ Firebase จริง
 // (FirebaseSync ถูก stub ต่อ section, Store._cache seed ตรงๆ, _cloudLoaded บังคับ)
@@ -447,6 +447,68 @@ currentSection = 'subjectFilter';
     stored: window._examsSubjectFilter,
   }));
   check('genuine re-entry resets to subject grid + clears stored filter', genuine.grid && genuine.backRowHidden && genuine.stored === '', JSON.stringify(genuine));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section I: Scratch pad (v48.3) — desktop mouse drawing + split-view ไม่บังโจทย์
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'scratchpad';
+{
+  // Desktop (มีเมาส์ ไม่มี touch) — ปุ่มต้องโผล่ + วาดด้วยเมาส์ค้างลากได้จริง
+  const { ctx, page } = await newSeededPage({ cache: baseCache() });
+  await page.evaluate(() => window.scratchShow());
+  await page.waitForTimeout(100);
+  const btnVisible = await page.evaluate(() => document.getElementById('scratchToggleBtn')?.classList.contains('visible'));
+  check('desktop (mouse, no touch): scratch toggle button appears', btnVisible === true);
+
+  await page.evaluate(() => document.getElementById('scratchToggleBtn').click());
+  await page.waitForTimeout(200);
+  const box = await page.locator('#scratchCanvas').boundingBox();
+  const blankBefore = await page.locator('#scratchCanvas').evaluate(c => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    return d.every(v => v === 0);
+  });
+  await page.mouse.move(box.x + 50, box.y + 50);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 150, box.y + 100, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  const hasInk = await page.locator('#scratchCanvas').evaluate(c => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] !== 0) return true;
+    return false;
+  });
+  check('desktop: mouse drag draws ink on scratch canvas', blankBefore && hasInk, JSON.stringify({ blankBefore, hasInk }));
+  await ctx.close();
+}
+{
+  // iPad (touch + Apple Pencil) — เปิดปกติ (ไม่เต็มจอ) ต้อง split ไม่บังโจทย์,
+  // เต็มจอ (.full) ต้องพฤติกรรมเดิม (ไม่ split)
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    hasTouch: true,
+  });
+  const page = await ctx.newPage();
+  page.on('dialog', d => d.accept());
+  await page.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1800);
+  await page.evaluate(() => window.scratchShow());
+  await page.waitForTimeout(100);
+  const gridBefore = await page.locator('.takeGrid').first().evaluate(el => getComputedStyle(el).gridTemplateColumns);
+
+  await page.evaluate(() => document.getElementById('scratchToggleBtn').click());
+  await page.waitForTimeout(200);
+  const splitOn = await page.locator('.takeGrid').first().evaluate(el => el.classList.contains('scratchSplit'));
+  const gridOpen = await page.locator('.takeGrid').first().evaluate(el => getComputedStyle(el).gridTemplateColumns);
+  check('iPad: opening scratch pad ปกติ (ไม่เต็มจอ) หด .takeGrid (PDF ไม่ถูกบัง)', splitOn && gridOpen !== gridBefore, JSON.stringify({ gridBefore, gridOpen }));
+
+  await page.evaluate(() => document.getElementById('scratchExpandBtn').click());
+  await page.waitForTimeout(200);
+  const splitOffFull = await page.locator('.takeGrid').first().evaluate(el => el.classList.contains('scratchSplit'));
+  const gridFull = await page.locator('.takeGrid').first().evaluate(el => getComputedStyle(el).gridTemplateColumns);
+  check('iPad: โหมดเต็มจอปิด split (พฤติกรรมเดิม, .takeGrid กลับความกว้างเดิม)', splitOffFull === false && gridFull === gridBefore, JSON.stringify({ gridFull, gridBefore }));
   await ctx.close();
 }
 
