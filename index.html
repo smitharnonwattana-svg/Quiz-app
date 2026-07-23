@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.5 -->
+  <!-- APP_VERSION: v48.6 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1076,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.5</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.6</div>
     </div>
   </div>
 </div>
@@ -1120,6 +1120,7 @@
     </div>
     <div id="examEditBar" class="examEditBar">
       <span>🖱️ ลากเพื่อเรียงลำดับ</span>
+      <button id="examCreateFolderBtn" class="btn" style="padding:6px 14px;font-size:12px;display:none;">📁 สร้างโฟลเดอร์</button>
       <button id="examsEditDoneBtn" class="btn btnPrimary" style="padding:6px 14px;font-size:12px;">✅ เสร็จแล้ว</button>
     </div>
     <div id="examsSubjGrid"></div>
@@ -1619,6 +1620,8 @@
     <div class="card" style="padding:12px;margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <span class="muted">วิชา</span>
       <select id="adminSubjFilter" class="btn" style="padding:10px 12px;min-width:240px;"></select>
+      <span class="muted">โฟลเดอร์</span>
+      <select id="adminFolderFilter" class="btn" style="padding:10px 12px;min-width:200px;"></select>
     </div>
     <div class="tableWrap">
       <table>
@@ -1626,6 +1629,7 @@
           <tr>
             <th>ชื่อชุด</th>
             <th style="width:160px;">วิชา</th>
+            <th style="width:150px;">โฟลเดอร์</th>
             <th style="width:120px;">จัดลำดับ</th>
             <th style="width:160px;">สถานะ</th>
             <th style="width:70px;">ข้อ</th>
@@ -1858,6 +1862,12 @@
             <option value="อื่นๆ">อื่นๆ</option>
         </select>
         <input id="newSubject" type="hidden" value="" />
+      </label>
+      <label style="display:grid;gap:6px;">
+        <span style="font-weight:900;">โฟลเดอร์ (ถ้ามี)</span>
+        <select id="newFolderSelect" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+          <option value="">ไม่มีโฟลเดอร์</option>
+        </select>
       </label>
       <!-- เนื้อหาวิชา — แสดงเมื่อเลือกวิชาแล้ว -->
       <div id="newTopicsWrap" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;display:grid;gap:8px;">
@@ -4429,6 +4439,10 @@ function initExams(){
   // คงวิชาที่เลือกไว้เฉพาะตอน soft refresh (Firebase listener re-nav) — เข้าหน้าเองยังเริ่มที่หน้าเลือกวิชา
   let subjectFilter = window._softRefreshing ? (window._examsSubjectFilter||'') : '';
   if(!window._softRefreshing) window._examsSubjectFilter = '';
+  // folderFilter: null = ยังไม่เลือกโฟลเดอร์ (โชว์ folder grid ถ้าวิชานี้มีโฟลเดอร์), 'none' = "ทั่วไป", หรือ folderId
+  // คงไว้เฉพาะตอน soft refresh เหมือน subjectFilter ข้างบน
+  let folderFilter = window._softRefreshing ? (window._examsFolderFilter ?? null) : null;
+  if(!window._softRefreshing) window._examsFolderFilter = null;
   const _myName = Auth.getName ? Auth.getName() : '';
   const isTeacher = Auth.isTeacher();
   let _editMode = false;
@@ -4451,6 +4465,7 @@ function initExams(){
   const editBtn = document.getElementById('examsEditBtn');
   const editBar = document.getElementById('examEditBar');
   const editDoneBtn = document.getElementById('examsEditDoneBtn');
+  const createFolderBtn = document.getElementById('examCreateFolderBtn');
   // restore _editMode จาก global flag (ป้องกัน Firebase listener reset)
   if(!isTeacher) window._examsEditMode = false; // student ไม่มี edit mode
   _editMode = isTeacher ? (window._examsEditMode || false) : false;
@@ -4460,6 +4475,22 @@ function initExams(){
   if(editBtn) editBtn.onclick = ()=>{ if(!isTeacher) return; _editMode=true; window._examsEditMode=true; editBar?.classList.add('show'); editBtn.style.display='none'; renderExams(); };
   if(editDoneBtn) editDoneBtn.onclick = ()=>{ _editMode=false; window._examsEditMode=false; _dragSrcId=null; editBar?.classList.remove('show'); if(editBtn && isTeacher) editBtn.style.display=''; renderExams(); };
 
+  // สร้างโฟลเดอร์สำหรับวิชาที่กำลังดูอยู่ — ใช้ทั้งจากปุ่มใน edit bar (ตอนวิชานี้ยังไม่มี
+  // โฟลเดอร์เลย จึงยังไม่เห็น folder grid ที่มี tile "+ สร้างโฟลเดอร์") และจาก tile ใน folder grid เอง
+  function createFolderForCurrentSubject(){
+    if(!subjectFilter || subjectFilter==='อื่นๆ') return;
+    const name = prompt('ชื่อโฟลเดอร์:');
+    if(!name || !name.trim()) return;
+    const s3 = Store.load();
+    if(!s3.examFolders) s3.examFolders=[];
+    const maxOrder = Math.max(0, ...s3.examFolders.filter(f=>f.subject===subjectFilter).map(f=>f.order||0));
+    s3.examFolders.push({id:'folder_'+Math.random().toString(16).slice(2), subject:subjectFilter, name:name.trim(), order:maxOrder+1});
+    Store.save(s3);
+    folderFilter=null; window._examsFolderFilter=null; // แสดง folder grid ทันทีหลังสร้าง
+    renderExams();
+  }
+  if(createFolderBtn) createFolderBtn.onclick = createFolderForCurrentSubject;
+
   // KNOWN_SUBJS/SUBJ_EMOJI/SUBJ_BG ประกาศ module-level เหนือฟังก์ชันนี้
 
   const subjectGrid = document.getElementById('examsSubjGrid');
@@ -4467,6 +4498,13 @@ function initExams(){
   const subjLabel = document.getElementById('examsSelectedSubjLabel');
   const backBtn = document.getElementById('examsBackToSubjBtn');
   if(backBtn) backBtn.onclick = () => {
+    if(folderFilter!==null){
+      // ถอยจากมุมมองในโฟลเดอร์ → กลับไป folder grid ของวิชาเดิม
+      folderFilter=null; window._examsFolderFilter=null;
+      if(subjLabel) subjLabel.textContent = subjectFilter;
+      renderExams();
+      return;
+    }
     subjectFilter = '';
     window._examsSubjectFilter = '';
     if(backRow){ backRow.style.display='none'; }
@@ -4474,6 +4512,7 @@ function initExams(){
   };
 
   function renderSubjectGrid() {
+    if(createFolderBtn) createFolderBtn.style.display='none'; // ยังไม่เลือกวิชา ไม่มี context ให้สร้างโฟลเดอร์
     const s2 = Store.load();
     const allPub = (s2.exams||[]).filter(e=>e.published);
     const subjCounts = {};
@@ -4532,6 +4571,7 @@ function initExams(){
           if(_editMode) return;
           subjectFilter = card.dataset.subj;
           window._examsSubjectFilter = subjectFilter;
+          folderFilter = null; window._examsFolderFilter = null; // เข้าวิชาใหม่ทุกครั้ง เริ่มจากยังไม่เลือกโฟลเดอร์เสมอ
           if(subjLabel) subjLabel.textContent = subjectFilter;
           if(backRow){ backRow.style.display='flex'; }
           subjectGrid.innerHTML = '';
@@ -4591,6 +4631,99 @@ function initExams(){
     if(listEl) listEl.innerHTML = '';
   }
 
+  // ── โฟลเดอร์ (จัดกลุ่มการ์ดข้อสอบภายในวิชาเดียว, opt-in ต่อวิชา) ──
+  // folders: รายการโฟลเดอร์ของ subjectFilter ปัจจุบัน, examsInSubj: ข้อสอบที่เผยแพร่แล้วในวิชานี้ (ก่อนกรองโฟลเดอร์)
+  function renderFolderGrid(folders, examsInSubj) {
+    const listEl = document.getElementById('examsList');
+    if(!listEl) return;
+    listEl.className = '';
+    listEl.innerHTML = '';
+    const gridEl = document.createElement('div');
+    gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:16px;';
+
+    const sortedFolders = [...folders].sort((a,b)=>(a.order??0)-(b.order??0));
+    const validIds = new Set(sortedFolders.map(f=>f.id));
+
+    sortedFolders.forEach(f=>{
+      const cnt = examsInSubj.filter(e=>e.folderId===f.id).length;
+      const card = document.createElement('div');
+      card.className = 'linkCard subjCard';
+      card.dataset.folder = f.id;
+      card.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
+      const editIconsHtml = _editMode
+        ? `<div style="position:absolute;top:6px;right:6px;display:flex;gap:4px;">
+             <span data-editfolder="${f.id}" title="แก้ชื่อ" style="cursor:pointer;font-size:13px;background:#f3f4f6;border-radius:6px;padding:2px 5px;">✏️</span>
+             <span data-delfolder="${f.id}" title="ลบโฟลเดอร์" style="cursor:pointer;font-size:13px;background:#fee2e2;border-radius:6px;padding:2px 5px;">🗑</span>
+           </div>`
+        : '';
+      card.innerHTML = `${editIconsHtml}
+        <div style="width:54px;height:54px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">📁</div>
+        <div style="font-weight:900;font-size:14px;line-height:1.3;">${esc(f.name)}</div>
+        <div class="muted" style="font-size:12px;margin-top:5px;">${cnt} ชุด</div>`;
+      gridEl.appendChild(card);
+    });
+
+    // "ทั่วไป" — ข้อสอบที่ไม่มีโฟลเดอร์ หรือ folderId ชี้ไปโฟลเดอร์ที่ถูกลบไปแล้ว
+    const ungroupedCount = examsInSubj.filter(e=>!e.folderId||!validIds.has(e.folderId)).length;
+    const ungroupedCard = document.createElement('div');
+    ungroupedCard.className = 'linkCard subjCard';
+    ungroupedCard.dataset.folder = 'none';
+    ungroupedCard.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
+    ungroupedCard.innerHTML = `
+      <div style="width:54px;height:54px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">📂</div>
+      <div style="font-weight:900;font-size:14px;line-height:1.3;">ทั่วไป</div>
+      <div class="muted" style="font-size:12px;margin-top:5px;">${ungroupedCount} ชุด</div>`;
+    gridEl.appendChild(ungroupedCard);
+
+    if(_editMode){
+      const addCard = document.createElement('div');
+      addCard.className = 'linkCard subjCard';
+      addCard.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;border:2px dashed #c7d2fe;background:#eef2ff;';
+      addCard.innerHTML = `<div style="font-size:26px;margin-bottom:10px;">➕</div><div style="font-weight:900;font-size:13px;color:#4338ca;">สร้างโฟลเดอร์</div>`;
+      addCard.addEventListener('click', createFolderForCurrentSubject);
+      gridEl.appendChild(addCard);
+    }
+
+    listEl.appendChild(gridEl);
+
+    gridEl.querySelectorAll('[data-editfolder]').forEach(el=>{
+      el.addEventListener('click', ev=>{
+        ev.stopPropagation();
+        const fid = el.getAttribute('data-editfolder');
+        const s3 = Store.load();
+        const f = (s3.examFolders||[]).find(x=>x.id===fid);
+        if(!f) return;
+        const name = prompt('ชื่อโฟลเดอร์ใหม่:', f.name);
+        if(!name || !name.trim()) return;
+        f.name = name.trim();
+        Store.save(s3);
+        renderExams();
+      });
+    });
+    gridEl.querySelectorAll('[data-delfolder]').forEach(el=>{
+      el.addEventListener('click', ev=>{
+        ev.stopPropagation();
+        const fid = el.getAttribute('data-delfolder');
+        if(!confirm('ลบโฟลเดอร์นี้? (ข้อสอบข้างในจะย้ายกลับไป "ทั่วไป" ไม่ถูกลบ)')) return;
+        const s3 = Store.load();
+        s3.examFolders = (s3.examFolders||[]).filter(x=>x.id!==fid);
+        (s3.exams||[]).forEach(e=>{ if(e.folderId===fid) e.folderId=null; });
+        Store.save(s3);
+        renderExams();
+      });
+    });
+    gridEl.querySelectorAll('[data-folder]').forEach(card=>{
+      card.addEventListener('click', ev=>{
+        if(ev.target.closest('[data-editfolder],[data-delfolder]')) return;
+        const fid = card.dataset.folder;
+        folderFilter = fid; window._examsFolderFilter = fid;
+        const chosen = fid==='none' ? 'ทั่วไป' : (sortedFolders.find(f=>f.id===fid)?.name || fid);
+        if(subjLabel) subjLabel.textContent = subjectFilter + ' › ' + chosen;
+        renderExams();
+      });
+    });
+  }
+
   // Only show KNOWN subjects + "อื่นๆ" bucket in the filter dropdown — no custom subject names
   const _knownInUse=KNOWN_SUBJS.filter(subj=>published.some(e=>e.subject===subj));
   const _hasOtherSubj=published.some(e=>!KNOWN_SUBJS.includes(e.subject||''));
@@ -4646,7 +4779,22 @@ function initExams(){
       const db = b.displayOrder??b.order??0;
       return (da-db)||((a.uploadedAt??0)-(b.uploadedAt??0));
     });
-    const exams=!subjectFilter?allPublished:subjectFilter==='อื่นๆ'?allPublished.filter(e=>!KNOWN.includes(e.subject||'')):allPublished.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
+    let exams=!subjectFilter?allPublished:subjectFilter==='อื่นๆ'?allPublished.filter(e=>!KNOWN.includes(e.subject||'')):allPublished.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
+
+    // ── โฟลเดอร์: เฉพาะวิชาจริง (ไม่ใช่ "อื่นๆ" ซึ่งรวมหลายวิชา), opt-in ต่อวิชา ──
+    if(createFolderBtn) createFolderBtn.style.display = subjectFilter==='อื่นๆ' ? 'none' : '';
+    const folders = subjectFilter!=='อื่นๆ' ? (s2.examFolders||[]).filter(f=>f.subject===subjectFilter) : [];
+    if(folders.length && folderFilter===null){
+      renderFolderGrid(folders, exams);
+      return;
+    }
+    if(folders.length && folderFilter!==null){
+      const validIds=new Set(folders.map(f=>f.id));
+      exams = folderFilter==='none'
+        ? exams.filter(e=>!e.folderId||!validIds.has(e.folderId))
+        : exams.filter(e=>e.folderId===folderFilter);
+    }
+
     const list=document.getElementById('examsList');
     list.className='examGrid';
     list.innerHTML='';
@@ -4732,6 +4880,10 @@ function initExams(){
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <span class="subj">${esc(e.subject||'ไม่ระบุ')}</span>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            ${_editMode&&folders.length?`<select class="examFolderMoveSel" data-examfolder="${e.id}" title="ย้ายไปโฟลเดอร์" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #e5e7eb;max-width:100px;">
+              <option value="">ไม่มีโฟลเดอร์</option>
+              ${folders.map(f=>`<option value="${f.id}" ${e.folderId===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}
+            </select>`:''}
             ${_editMode?'<span class="drag-handle" style="font-size:20px;color:#6b7280;cursor:grab;padding:4px 8px;touch-action:none;user-select:none;-webkit-user-select:none;background:#f3f4f6;border-radius:8px;line-height:1;">☰</span>':''}
             ${Auth.isTeacher()?`<button title="คัดลอกลิ้งแชร์ข้อสอบนี้" data-examid="${e.id}" data-title="${esc(e.title)}" onclick="copyExamLink(this,event)"
               style="border:none;background:none;cursor:pointer;padding:2px 4px;font-size:16px;line-height:1;color:#9ca3af;border-radius:6px;"
@@ -4762,6 +4914,17 @@ function initExams(){
           _showAssignModal(e.id, e.title, e.subject);
         };
         card.appendChild(assignBtn);
+      }
+
+      // ย้ายโฟลเดอร์ (edit mode only) — select แยกจาก drag handle เลย ไม่ชนกัน
+      const folderMoveSel=card.querySelector('.examFolderMoveSel');
+      if(folderMoveSel){
+        folderMoveSel.addEventListener('change', ()=>{
+          const s3=Store.load();
+          const ex=s3.exams.find(x=>x.id===e.id);
+          if(ex){ ex.folderId=folderMoveSel.value||null; Store.save(s3); }
+          renderExams();
+        });
       }
 
       // drag (edit mode only) — events อยู่บน drag handle เท่านั้น ไม่ขัดกับ card onclick
@@ -8104,8 +8267,11 @@ function initAdminExams(){
   if(!Auth.isTeacher()){navigate('home');return;}
   const s=Store.init();
   let subjectFilter=window._adminExamsFilter||'';
+  let folderFilter='';
   const subjFilterEl=document.getElementById('adminSubjFilter');
-  if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._adminExamsFilter=subjectFilter;renderAdmin();};
+  const folderFilterEl=document.getElementById('adminFolderFilter');
+  if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._adminExamsFilter=subjectFilter;folderFilter='';renderAdmin();};
+  if(folderFilterEl) folderFilterEl.onchange=(e)=>{folderFilter=e.target.value;renderAdmin();};
   const dlAllBtn=document.getElementById('adminDownloadAllAnswerKeys');
   if(dlAllBtn) dlAllBtn.onclick=downloadAllAnswerKeyTemplates;
 
@@ -8115,8 +8281,16 @@ function initAdminExams(){
     if(subjFilterEl){
       subjFilterEl.innerHTML=`<option value="">ทุกวิชา</option>${subjects.map(sub=>`<option value="${esc(sub)}" ${sub===subjectFilter?'selected':''}>${esc(sub)}</option>`).join('')}`;
     }
+    // โฟลเดอร์ผูกกับวิชาเดียว — เลือก "ทุกวิชา" แล้วไม่มีวิชาที่ชัดเจนให้กรองโฟลเดอร์ต่อ
+    if(folderFilterEl){
+      const foldersForSubj=subjectFilter?(s.examFolders||[]).filter(f=>f.subject===subjectFilter):[];
+      folderFilterEl.innerHTML=`<option value="">ทุกโฟลเดอร์</option>`+
+        foldersForSubj.map(f=>`<option value="${f.id}" ${f.id===folderFilter?'selected':''}>${esc(f.name)}</option>`).join('');
+      if(!foldersForSubj.some(f=>f.id===folderFilter)) folderFilter='';
+    }
 
-    const list=subjectFilter?all.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter):all;
+    let list=subjectFilter?all.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter):all;
+    if(subjectFilter&&folderFilter) list=list.filter(e=>e.folderId===folderFilter);
     const fmtDate=(ts)=>{if(!ts) return '-';try{return new Date(ts).toLocaleString('th-TH');}catch{return '-';}};
     const tb=document.getElementById('adminTbody');tb.innerHTML='';
     // Mobile card layout — renderAdmin()
@@ -8138,6 +8312,9 @@ function initAdminExams(){
                 <option value="hidden" ${!e.published?'selected':''}>ซ่อน</option>
               </select>
             </div>
+            ${(()=>{const rf=(s.examFolders||[]).filter(f=>f.subject===(e.subject||'ไม่ระบุ'));
+              return rf.length?`<div style="margin-bottom:8px;"><select class="folderSel" data-folder="${e.id}" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;font-size:13px;"><option value="">ไม่มีโฟลเดอร์</option>${rf.map(f=>`<option value="${f.id}" ${e.folderId===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>`:'';
+            })()}
             <div style="display:flex;gap:8px;">
               <button class="btn" data-edit="${e.id}" style="flex:1;text-align:center;">เปิด Editor</button>
               <button class="btn" data-del="${e.id}" style="border-color:#ef4444;color:#b91c1c;padding:8px 16px;">ลบ</button>
@@ -8150,9 +8327,12 @@ function initAdminExams(){
     list.forEach((e,idx)=>{
       const tr=document.createElement('tr');
       const hasPdf=!!(e.pdfUrl);
+      const _rowFolders=(s.examFolders||[]).filter(f=>f.subject===(e.subject||'ไม่ระบุ'));
+      const _folderOptsHtml=`<option value="">ไม่มีโฟลเดอร์</option>`+_rowFolders.map(f=>`<option value="${f.id}" ${e.folderId===f.id?'selected':''}>${esc(f.name)}</option>`).join('');
       tr.innerHTML=`
         <td style="font-weight:900;">${esc(e.title)}</td>
         <td>${esc(e.subject||'ไม่ระบุ')}</td>
+        <td>${_rowFolders.length?`<select class="folderSel" data-folder="${e.id}" style="padding:6px 8px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:12px;max-width:130px;">${_folderOptsHtml}</select>`:'<span class="muted">-</span>'}</td>
         <td><div style="display:flex;flex-direction:column;gap:6px;"><button class="btn" style="padding:6px 10px;" data-move="up" data-id="${e.id}" ${idx===0?'disabled':''}>▲</button><button class="btn" style="padding:6px 10px;" data-move="down" data-id="${e.id}" ${idx===list.length-1?'disabled':''}>▼</button></div></td>
         <td><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span class="badge ${e.published?'ok':'warn'}">${e.published?'เผยแพร่':'ซ่อน'}</span><select class="statusSel" data-status="${e.id}" style="padding:6px 10px;border:1px solid var(--border);border-radius:12px;background:#fff;"><option value="published" ${e.published?'selected':''}>เผยแพร่</option><option value="hidden" ${!e.published?'selected':''}>ซ่อน</option></select></div></td>
         <td>${e.questionCount}</td>
@@ -8174,6 +8354,12 @@ function initAdminExams(){
       sel.addEventListener('change',()=>{
         const id=sel.getAttribute('data-status');const exam=s.exams.find(x=>x.id===id);if(!exam) return;
         exam.published=(sel.value==='published');Store.save(s);toast(exam.published?'ตั้งค่าเป็นเผยแพร่แล้ว':'ตั้งค่าเป็นซ่อนแล้ว');renderAdmin();
+      });
+    });
+    tb.querySelectorAll('[data-folder]').forEach(sel=>{
+      sel.addEventListener('change',()=>{
+        const id=sel.getAttribute('data-folder');const exam=s.exams.find(x=>x.id===id);if(!exam) return;
+        exam.folderId=sel.value||null;Store.save(s);toast('ย้ายโฟลเดอร์แล้ว');renderAdmin();
       });
     });
     tb.querySelectorAll('[data-del]').forEach(btn=>{
@@ -9545,6 +9731,13 @@ function initAdminNew(){
       if(subjHidden) subjHidden.value='';
       if(wrap) wrap.style.display='none';
     }
+    // โฟลเดอร์: cascading ตามวิชาที่เลือก (มีเฉพาะวิชาจริง ไม่รวม "อื่นๆ")
+    const folderSel=document.getElementById('newFolderSelect');
+    if(folderSel){
+      const folders=(val&&val!=='อื่นๆ')?((s.examFolders||[]).filter(f=>f.subject===val)):[];
+      folderSel.innerHTML='<option value="">ไม่มีโฟลเดอร์</option>'+
+        folders.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
+    }
   };
 
   const _ntAddBtn=document.getElementById('newTopicAddBtn');
@@ -9617,7 +9810,8 @@ function initAdminNew(){
     const difficulty=_activeDiff?_activeDiff.dataset.val:'develop';
     const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
     const examType=_activeType?_activeType.dataset.val:'mc';
-    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType});
+    const folderId=document.getElementById('newFolderSelect')?.value||null;
+    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType,folderId});
     const _emptyCorrect=examType==='fillblank-num'?'':'A';
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>{
       const _q={id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),correct:_emptyCorrect};
@@ -13407,7 +13601,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.5';
+  const CURRENT_VERSION = 'v48.6';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

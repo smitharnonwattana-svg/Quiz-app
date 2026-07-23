@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Quiz-app regression suite — รวม checks จากการแก้บั๊ก v47.93 → v48.3
+// Quiz-app regression suite — รวม checks จากการแก้บั๊ก v47.93 → v48.6
 // รันผ่าน tests/run.sh (start static server → รันไฟล์นี้ → kill server)
 // ทุก section เปิด browser context ใหม่ + seed ข้อมูลเอง — ไม่แตะ Firebase จริง
 // (FirebaseSync ถูก stub ต่อ section, Store._cache seed ตรงๆ, _cloudLoaded บังคับ)
@@ -50,7 +50,7 @@ const mkExam = (id, title, subject, extra = {}) => ({
 const mkQ = () => [{ id: 'q1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } }];
 const baseCache = (over = {}) => ({
   exams: [], questions: {}, attempts: [], members: [], assignments: [],
-  benchmarks: [], subjectTopics: {}, subjectSubTopics: {}, gamification: {}, ...over,
+  benchmarks: [], subjectTopics: {}, subjectSubTopics: {}, gamification: {}, examFolders: [], ...over,
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -561,6 +561,185 @@ currentSection = 'answerKeyExport';
   check('grid numbering is column-major, truncated at questionCount, ข้อ+เฉลยจริงจากระบบ',
     result && JSON.stringify(result.m1Row1) === JSON.stringify([1, 'A', 3, 'C', 5, 'A', 7, 'C', '', '']) && JSON.stringify(result.m2Row1) === JSON.stringify([1, 'B', 2, 'D', 3, '', '', '', '', '']),
     JSON.stringify(result));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section K: หน้าเลือกข้อสอบ — โฟลเดอร์จัดกลุ่มการ์ดต่อวิชา (v48.6, ported จาก preview)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'examFolders';
+{
+  // วิชาไม่มีโฟลเดอร์เลย -> flat list เหมือนเดิม 100%
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('m1', 'เลข ชุด 1', 'คณิตศาสตร์'), mkExam('m2', 'เลข ชุด 2', 'คณิตศาสตร์')],
+      questions: { m1: mkQ(), m2: mkQ() },
+    }),
+  });
+  await page.evaluate(() => navigate('exams', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('#examsSubjGrid [data-subj="คณิตศาสตร์"]').click());
+  await page.waitForTimeout(400);
+  const flatState = await page.evaluate(() => ({
+    hasFolderTiles: !!document.querySelector('#examsList [data-folder]'),
+    examCards: document.querySelectorAll('#examsList .examCard').length,
+  }));
+  check('subject with NO folders shows flat exam list (no folder grid)', !flatState.hasFolderTiles && flatState.examCards === 2, JSON.stringify(flatState));
+  await ctx.close();
+}
+{
+  // วิชามีโฟลเดอร์ -> folder grid, drill-down, ปุ่มย้อนกลับ 2 ชั้น
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [
+        mkExam('s1', 'วิทย์ ชุด 1', 'วิทยาศาสตร์', { folderId: 'fA' }),
+        mkExam('s2', 'วิทย์ ชุด 2', 'วิทยาศาสตร์', { folderId: 'fA' }),
+        mkExam('s3', 'วิทย์ ชุด 3', 'วิทยาศาสตร์'), // ไม่มี folderId -> ทั่วไป
+      ],
+      questions: { s1: mkQ(), s2: mkQ(), s3: mkQ() },
+      examFolders: [{ id: 'fA', subject: 'วิทยาศาสตร์', name: 'บทที่ 1', order: 1 }],
+    }),
+  });
+  await page.evaluate(() => navigate('exams', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('#examsSubjGrid [data-subj="วิทยาศาสตร์"]').click());
+  await page.waitForTimeout(400);
+  const gridTiles = await page.evaluate(() => document.querySelectorAll('#examsList [data-folder]').length);
+  check('subject WITH folders shows folder grid (fA + ทั่วไป = 2 tiles)', gridTiles === 2, 'tiles=' + gridTiles);
+
+  await page.evaluate(() => document.querySelector('#examsList [data-folder="fA"]').click());
+  await page.waitForTimeout(300);
+  const insideFolder = await page.evaluate(() => [...document.querySelectorAll('#examsList .examCard .title')].map(t => t.textContent));
+  check('inside folder fA shows only its 2 exams', insideFolder.length === 2 && insideFolder.includes('วิทย์ ชุด 1') && insideFolder.includes('วิทย์ ชุด 2'), JSON.stringify(insideFolder));
+
+  await page.evaluate(() => document.getElementById('examsBackToSubjBtn').click());
+  await page.waitForTimeout(300);
+  const backOnce = await page.evaluate(() => document.querySelectorAll('#examsList [data-folder]').length);
+  check('back button from inside folder returns to folder grid (not all the way out)', backOnce === 2, 'tiles=' + backOnce);
+
+  await page.evaluate(() => document.getElementById('examsBackToSubjBtn').click());
+  await page.waitForTimeout(300);
+  const backTwice = await page.evaluate(() => document.querySelectorAll('#examsSubjGrid [data-subj]').length);
+  check('back button again from folder grid returns to subject grid', backTwice > 0, 'subjTiles=' + backTwice);
+  await ctx.close();
+}
+{
+  // Admin edit mode: สร้างโฟลเดอร์แรกจากปุ่มใน edit bar (bug ที่เจอจริง — ไม่ใช่แค่ tile ใน grid),
+  // ย้ายการ์ดผ่าน select, ลบโฟลเดอร์ -> การ์ด fallback กลับ "ทั่วไป"
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('t1', 'ไทย ชุด 1', 'ภาษาไทย')],
+      questions: { t1: mkQ() },
+    }),
+  });
+  await page.evaluate(() => navigate('exams', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('#examsSubjGrid [data-subj="ภาษาไทย"]').click());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => document.getElementById('examsEditBtn').click());
+  await page.waitForTimeout(300);
+  const createBtnVisible = await page.evaluate(() => {
+    const btn = document.getElementById('examCreateFolderBtn');
+    return !!btn && btn.style.display !== 'none';
+  });
+  check('create-folder button in edit bar visible even when subject has ZERO folders', createBtnVisible === true);
+
+  await page.evaluate(() => { window.prompt = () => 'หน่วยที่ 1'; });
+  await page.evaluate(() => document.getElementById('examCreateFolderBtn').click());
+  await page.waitForTimeout(300);
+  const afterCreate = await page.evaluate(() => ({
+    folderCount: (Store._cache.examFolders || []).filter(f => f.subject === 'ภาษาไทย').length,
+    nowShowsGrid: !!document.querySelector('#examsList [data-folder]'),
+  }));
+  check('clicking create-folder button creates the FIRST folder + shows folder grid immediately', afterCreate.folderCount === 1 && afterCreate.nowShowsGrid, JSON.stringify(afterCreate));
+
+  const folderId = await page.evaluate(() => Store._cache.examFolders.find(f => f.subject === 'ภาษาไทย').id);
+  await page.evaluate(() => document.querySelector('#examsList [data-folder="none"]').click());
+  await page.waitForTimeout(300);
+  const moveOk = await page.evaluate((fid) => {
+    const sel = document.querySelector('.examFolderMoveSel');
+    if (!sel) return false;
+    sel.value = fid; sel.dispatchEvent(new Event('change'));
+    return true;
+  }, folderId);
+  await page.waitForTimeout(300);
+  const afterMove = await page.evaluate(() => ({
+    folderId: (Store._cache.exams || []).find(e => e.id === 't1')?.folderId,
+    cardsLeftInUngrouped: document.querySelectorAll('#examsList .examCard').length,
+  }));
+  check('moving exam via select updates folderId + disappears from current view', moveOk && afterMove.folderId === folderId && afterMove.cardsLeftInUngrouped === 0, JSON.stringify(afterMove));
+
+  await page.evaluate(() => document.getElementById('examsBackToSubjBtn').click());
+  await page.waitForTimeout(300);
+  await page.evaluate((fid) => {
+    window.confirm = () => true;
+    document.querySelector(`#examsList [data-delfolder="${fid}"]`).click();
+  }, folderId);
+  await page.waitForTimeout(300);
+  const afterDelete = await page.evaluate((fid) => ({
+    folderExists: (Store._cache.examFolders || []).some(f => f.id === fid),
+    examFolderId: (Store._cache.exams || []).find(e => e.id === 't1')?.folderId,
+  }), folderId);
+  check('deleting a folder removes it AND exam falls back to ungrouped (not deleted)', !afterDelete.folderExists && (afterDelete.examFolderId === null || afterDelete.examFolderId === undefined), JSON.stringify(afterDelete));
+  await ctx.close();
+}
+{
+  // admin_exams table: คอลัมน์โฟลเดอร์ต่อแถว + filter cascading ตามวิชา
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('m1', 'เลข ชุด 1', 'คณิตศาสตร์', { folderId: 'fM' }), mkExam('m2', 'เลข ชุด 2', 'คณิตศาสตร์')],
+      questions: { m1: mkQ(), m2: mkQ() },
+      examFolders: [{ id: 'fM', subject: 'คณิตศาสตร์', name: 'บทที่ A', order: 1 }],
+    }),
+  });
+  await page.evaluate(() => navigate('admin_exams', {}));
+  await page.waitForTimeout(500);
+  const rowSel = await page.evaluate(() => {
+    const sel = document.querySelector('[data-folder="m1"]');
+    return { exists: !!sel, value: sel?.value };
+  });
+  check('admin_exams table shows folder select per row, pre-selected correctly', rowSel.exists && rowSel.value === 'fM', JSON.stringify(rowSel));
+
+  await page.evaluate(() => {
+    const sel = document.getElementById('adminSubjFilter');
+    sel.value = 'คณิตศาสตร์'; sel.dispatchEvent(new Event('change'));
+  });
+  await page.waitForTimeout(300);
+  const folderFilterOpts = await page.evaluate(() => [...document.getElementById('adminFolderFilter').options].map(o => o.textContent));
+  check('folder filter cascades to show folders of selected subject', folderFilterOpts.includes('บทที่ A'), JSON.stringify(folderFilterOpts));
+
+  await page.evaluate(() => {
+    const sel = document.querySelector('[data-folder="m2"]');
+    sel.value = 'fM'; sel.dispatchEvent(new Event('change'));
+  });
+  await page.waitForTimeout(300);
+  const afterAdminMove = await page.evaluate(() => (Store._cache.exams || []).find(e => e.id === 'm2')?.folderId);
+  check('admin_exams: changing folder select updates exam.folderId', afterAdminMove === 'fM', 'folderId=' + afterAdminMove);
+  await ctx.close();
+}
+{
+  // admin_new: folder select cascading ตามวิชา + folderId ติดไปกับข้อสอบที่สร้างใหม่
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({ examFolders: [{ id: 'fSci', subject: 'วิทยาศาสตร์', name: 'บทที่ 1', order: 1 }] }),
+  });
+  await page.evaluate(() => navigate('admin_new', {}));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    document.getElementById('newSubjectSelect').value = 'วิทยาศาสตร์';
+    window._onNewSubjectChange('วิทยาศาสตร์');
+  });
+  await page.waitForTimeout(200);
+  const folderOpts = await page.evaluate(() => [...document.getElementById('newFolderSelect').options].map(o => o.textContent));
+  check('admin_new: folder select populates with folders for chosen subject', folderOpts.includes('บทที่ 1'), JSON.stringify(folderOpts));
+
+  await page.evaluate(() => {
+    document.getElementById('newTitle').value = 'วิทย์ ชุดใหม่';
+    document.getElementById('newFolderSelect').value = 'fSci';
+  });
+  await page.evaluate(() => document.getElementById('newCreateBtn').click());
+  await page.waitForTimeout(300);
+  const created = await page.evaluate(() => (Store._cache.exams || []).find(e => e.title === 'วิทย์ ชุดใหม่'));
+  check('creating an exam with a folder selected sets exam.folderId', created && created.folderId === 'fSci', JSON.stringify(created));
   await ctx.close();
 }
 
