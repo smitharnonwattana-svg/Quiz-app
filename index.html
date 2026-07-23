@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.3 -->
+  <!-- APP_VERSION: v48.4 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1076,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.3</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.4</div>
     </div>
   </div>
 </div>
@@ -1611,7 +1611,10 @@
       <div>
         <h1 class="h1">📋 รายการข้อสอบ</h1>
       </div>
-      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="adminDownloadAllAnswerKeys" title="ดาวน์โหลด Template เฉลยทุกวิชา (กรอกเองออฟไลน์)">⬇️ ดาวน์โหลดเฉลย</button>
+        <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+      </div>
     </div>
     <div class="card" style="padding:12px;margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <span class="muted">วิชา</span>
@@ -8103,6 +8106,8 @@ function initAdminExams(){
   let subjectFilter=window._adminExamsFilter||'';
   const subjFilterEl=document.getElementById('adminSubjFilter');
   if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._adminExamsFilter=subjectFilter;renderAdmin();};
+  const dlAllBtn=document.getElementById('adminDownloadAllAnswerKeys');
+  if(dlAllBtn) dlAllBtn.onclick=downloadAllAnswerKeyTemplates;
 
   function renderAdmin(){
     const all=(s.exams||[]).slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
@@ -10181,6 +10186,43 @@ function initEditor(examId){
 
   // bind excel import สำหรับ editor
   bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted, exam.subject);
+}
+
+// ===================== ADMIN EXAM LIST — ดาวน์โหลด Template เฉลยทุกวิชา =====================
+// ฟอร์มพิมพ์ให้กรอกเองออฟไลน์ (ไม่ใช่ import กลับเข้าระบบ — คนละแบบกับ downloadExcelTemplate
+// ด้านล่าง) — 1 sheet ต่อวิชา แต่ละชุดข้อสอบมีแถวหัวเรื่อง (ชื่อชุด + สถานะอัพโหลด PDF)
+// ตามด้วยตาราง ข้อ/เฉลย 5 คอลัมน์คู่ จำนวนแถวปรับตาม questionCount ของชุดนั้นๆ
+function downloadAllAnswerKeyTemplates(){
+  if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
+  const s=Store.load();
+  const all=(s.exams||[]).slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
+  if(!all.length){ toast('ยังไม่มีชุดข้อสอบ'); return; }
+  const subjects=Array.from(new Set(all.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
+  const wb=XLSX.utils.book_new();
+  const PAIRS=5;
+  subjects.forEach(subject=>{
+    const rows=[];
+    all.filter(e=>(e.subject||'ไม่ระบุ')===subject).forEach(e=>{
+      const n=e.questionCount||0;
+      const R=Math.max(1, Math.ceil(n/PAIRS));
+      rows.push([e.title, '', '', '', '', '', '', '', e.pdfUrl?'✓ อยู่ในระบบแล้ว':'ยังไม่อัพโหลด', '']);
+      rows.push(['ข้อ','เฉลย','ข้อ','เฉลย','ข้อ','เฉลย','ข้อ','เฉลย','ข้อ','เฉลย']);
+      for(let r=1;r<=R;r++){
+        const row=[];
+        for(let k=0;k<PAIRS;k++){
+          const qNum=k*R+r;
+          row.push(qNum<=n?qNum:'', '');
+        }
+        rows.push(row);
+      }
+      rows.push([]); // แถวว่างคั่นระหว่างชุดข้อสอบ
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=Array.from({length:10},()=>({wch:8}));
+    const safeName=subject.replace(/[\\/?*[\]:]/g,'').slice(0,31)||'ไม่ระบุ';
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  });
+  XLSX.writeFile(wb, `เฉลย_ทุกวิชา_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
@@ -13359,7 +13401,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.3';
+  const CURRENT_VERSION = 'v48.4';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

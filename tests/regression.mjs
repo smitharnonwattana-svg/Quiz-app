@@ -513,6 +513,53 @@ currentSection = 'scratchpad';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section J: Admin exam list — ดาวน์โหลด Template เฉลยทุกวิชา (v48.4)
+// 1 sheet ต่อวิชา, แถวหัวเรื่อง (ชื่อชุด+สถานะอัพโหลด) + grid ข้อ/เฉลย 5 คอลัมน์คู่
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'answerKeyExport';
+{
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [
+        mkExam('m1', 'เลข ชุด 1', 'คณิตศาสตร์', { questionCount: 7, pdfUrl: 'https://x/m1.pdf' }),
+        mkExam('m2', 'เลข ชุด 2', 'คณิตศาสตร์', { questionCount: 3 }),
+        mkExam('t1', 'ไทย ชุด 1', 'ภาษาไทย', { questionCount: 12, pdfUrl: 'https://x/t1.pdf' }),
+      ],
+    }),
+  });
+  await page.evaluate(() => navigate('admin_exams', {}));
+  await page.waitForTimeout(400);
+  // SheetJS โหลดจาก CDN ไม่ได้ในแซนด์บ็อกซ์ (proxy บล็อก, เหมือน Firebase) — stub
+  // เฉพาะ API 4 ตัวที่ downloadAllAnswerKeyTemplates() เรียกจริง เพื่อจับ raw AOA rows
+  const result = await page.evaluate(() => {
+    let captured = null;
+    window.XLSX = {
+      utils: {
+        book_new: () => ({ SheetNames: [], Sheets: {} }),
+        aoa_to_sheet: (rows) => ({ __aoa: rows }),
+        book_append_sheet: (wb, ws, name) => { wb.SheetNames.push(name); wb.Sheets[name] = ws; },
+      },
+      writeFile: (wb) => { captured = wb; },
+    };
+    document.getElementById('adminDownloadAllAnswerKeys').click();
+    if (!captured) return null;
+    const aoa = captured.Sheets['คณิตศาสตร์'].__aoa;
+    return {
+      sheetNames: captured.SheetNames.slice().sort(),
+      m1: aoa[0], m1Row1: aoa[2], // m1: n=7,R=2 → title row, header row, grid row1
+      m2: aoa[5], m2Row1: aoa[7], // m2: n=3,R=1 → title row, header row, grid row1
+    };
+  });
+  check('exports one sheet per subject', result && JSON.stringify(result.sheetNames) === JSON.stringify(['คณิตศาสตร์', 'ภาษาไทย'].sort()), JSON.stringify(result));
+  check('exam with pdfUrl shows "อยู่ในระบบแล้ว", title correct', result && result.m1[0] === 'เลข ชุด 1' && result.m1[8] === '✓ อยู่ในระบบแล้ว', JSON.stringify(result));
+  check('exam WITHOUT pdfUrl shows "ยังไม่อัพโหลด"', result && result.m2[0] === 'เลข ชุด 2' && result.m2[8] === 'ยังไม่อัพโหลด', JSON.stringify(result));
+  check('grid numbering is column-major, truncated at questionCount',
+    result && JSON.stringify(result.m1Row1) === JSON.stringify([1, '', 3, '', 5, '', 7, '', '', '']) && JSON.stringify(result.m2Row1) === JSON.stringify([1, '', 2, '', 3, '', '', '', '', '']),
+    JSON.stringify(result));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
