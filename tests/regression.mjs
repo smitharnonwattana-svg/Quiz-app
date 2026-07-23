@@ -525,6 +525,11 @@ currentSection = 'answerKeyExport';
         mkExam('m2', 'เลข ชุด 2', 'คณิตศาสตร์', { questionCount: 3 }),
         mkExam('t1', 'ไทย ชุด 1', 'ภาษาไทย', { questionCount: 12, pdfUrl: 'https://x/t1.pdf' }),
       ],
+      questions: {
+        // เฉลยจริงในระบบ — m2 ข้อ 3 ยังไม่มีเฉลย (correct undefined) ทดสอบ fallback ช่องว่าง
+        m1: [1, 2, 3, 4, 5, 6, 7].map(no => ({ id: 'm1q' + no, no, correct: ['A', 'B', 'C', 'D'][(no - 1) % 4] })),
+        m2: [{ id: 'm2q1', no: 1, correct: 'B' }, { id: 'm2q2', no: 2, correct: 'D' }, { id: 'm2q3', no: 3 }],
+      },
     }),
   });
   await page.evaluate(() => navigate('admin_exams', {}));
@@ -553,8 +558,8 @@ currentSection = 'answerKeyExport';
   check('exports one sheet per subject', result && JSON.stringify(result.sheetNames) === JSON.stringify(['คณิตศาสตร์', 'ภาษาไทย'].sort()), JSON.stringify(result));
   check('exam with pdfUrl shows "อยู่ในระบบแล้ว", title correct', result && result.m1[0] === 'เลข ชุด 1' && result.m1[8] === '✓ อยู่ในระบบแล้ว', JSON.stringify(result));
   check('exam WITHOUT pdfUrl shows "ยังไม่อัพโหลด"', result && result.m2[0] === 'เลข ชุด 2' && result.m2[8] === 'ยังไม่อัพโหลด', JSON.stringify(result));
-  check('grid numbering is column-major, truncated at questionCount',
-    result && JSON.stringify(result.m1Row1) === JSON.stringify([1, '', 3, '', 5, '', 7, '', '', '']) && JSON.stringify(result.m2Row1) === JSON.stringify([1, '', 2, '', 3, '', '', '', '', '']),
+  check('grid numbering is column-major, truncated at questionCount, ข้อ+เฉลยจริงจากระบบ',
+    result && JSON.stringify(result.m1Row1) === JSON.stringify([1, 'A', 3, 'C', 5, 'A', 7, 'C', '', '']) && JSON.stringify(result.m2Row1) === JSON.stringify([1, 'B', 2, 'D', 3, '', '', '', '', '']),
     JSON.stringify(result));
   await ctx.close();
 }
