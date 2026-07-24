@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.6 -->
+  <!-- APP_VERSION: v48.7 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1076,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.6</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.7</div>
     </div>
   </div>
 </div>
@@ -2059,6 +2059,16 @@
               <button type="button" class="btn diffBtn" data-val="develop" style="flex:1;border:2px solid #fde68a;background:#fffbeb;color:#d97706;font-weight:700;font-size:13px;">🟡 พัฒนา</button>
               <button type="button" class="btn diffBtn" data-val="hard" style="flex:1;border:2px solid #fecaca;background:#fff1f2;color:#dc2626;font-weight:700;font-size:13px;">🔴 ยาก</button>
             </div>
+          </div>
+
+          <!-- Row 1.6: ประเภทข้อสอบ -->
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">ประเภทข้อสอบ</div>
+            <div style="display:flex;gap:8px;" id="editorExamTypeBtns">
+              <button type="button" class="btn examTypeBtn" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
+              <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
+            </div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:4px;">⚠️ เปลี่ยนประเภทจะล้างเฉลยที่กรอกไว้ทั้งหมด (รูปแบบคำตอบข้ามประเภทกันไม่ได้)</div>
           </div>
 
           <!-- Row 2: PDF โจทย์ + PDF เฉลย -->
@@ -9978,6 +9988,39 @@ function initEditor(examId){
     };
   });
 
+  // ── ประเภทข้อสอบ (mc / fillblank-num) ──
+  // _isFillNum ถูกคำนวณครั้งเดียวตอนเข้าฟังก์ชัน (บรรทัด ~9846) แล้วฝังอยู่ใน closure
+  // ของ renderTable/import อีกหลายจุด — เปลี่ยนแล้ว re-init ทั้งหน้าผ่าน navigate()
+  // ง่ายและปลอดภัยกว่าไล่แก้ทุก closure ที่อ้าง _isFillNum เดิม
+  const _examTypeBtns=document.querySelectorAll('#editorExamTypeBtns .examTypeBtn');
+  function _syncExamTypeBtnStyle(btn, active){
+    btn.classList.toggle('active', active);
+    if(active){
+      btn.style.background = btn.dataset.val==='fillblank-num' ? '#fef3c7' : '#eef2ff';
+      btn.style.borderColor = btn.dataset.val==='fillblank-num' ? '#fcd34d' : '#c7d2fe';
+      btn.style.color = btn.dataset.val==='fillblank-num' ? '#b45309' : '#4338ca';
+    } else {
+      btn.style.background='#fff'; btn.style.borderColor='#e5e7eb'; btn.style.color='#6b7280';
+    }
+  }
+  _examTypeBtns.forEach(btn=>{
+    _syncExamTypeBtnStyle(btn, btn.dataset.val===exam.examType);
+    btn.onclick=()=>{
+      const newType=btn.dataset.val;
+      if(newType===exam.examType) return;
+      const hasAnyAnswers=list.some(q=>q.correct);
+      if(!confirm(hasAnyAnswers
+        ? 'เปลี่ยนประเภทข้อสอบ? เฉลยที่กรอกไว้ทั้งหมดจะถูกล้าง (รูปแบบคำตอบข้ามประเภทกันไม่ได้)'
+        : 'เปลี่ยนประเภทข้อสอบ?')) return;
+      exam.examType=newType;
+      list.forEach(q=>{ q.correct=''; });
+      s.questions[examId]=list;
+      Store.save(s);
+      toast('เปลี่ยนประเภทข้อสอบแล้ว');
+      navigate('admin_editor', {id: examId});
+    };
+  });
+
   // ── Duration ──
   const durationInput=document.getElementById('editorDurationMin');
   const durationBtn=document.getElementById('editorDurationBtn');
@@ -13601,7 +13644,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.6';
+  const CURRENT_VERSION = 'v48.7';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

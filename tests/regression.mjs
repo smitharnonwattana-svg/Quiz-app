@@ -101,6 +101,24 @@ currentSection = 'editor';
     return err;
   });
   check('template download button does not throw (v47.94 exam-undefined fix)', tmplErr === null, String(tmplErr));
+
+  // v48.7: เปลี่ยนประเภทข้อสอบ (mc -> fillblank-num) จากหน้า editor ได้ — เดิมแก้ไม่ได้เลย
+  // หลังสร้าง ต้องไปแก้ที่ admin_new เท่านั้น
+  const beforeType = await page.evaluate(() => document.querySelector('#editorExamTypeBtns [data-val="fillblank-num"]')?.classList.contains('active'));
+  await page.evaluate(() => document.querySelector('#editorExamTypeBtns [data-val="fillblank-num"]').click());
+  await page.waitForTimeout(600); // navigate() re-init หน้าทั้งหมด
+  const afterType = await page.evaluate(() => {
+    const s = Store.load();
+    return {
+      examType: s.exams.find(e => e.id === 'eA1')?.examType,
+      q1Correct: (s.questions.eA1 || []).find(q => q.no === 1)?.correct,
+      hasNumericInput: !!document.querySelector('input[data-field="correctNum"]'),
+      activeBtn: document.querySelector('#editorExamTypeBtns .examTypeBtn.active')?.dataset.val,
+    };
+  });
+  check('editor: toggling exam type to fillblank-num updates exam.examType + clears old correct answers + re-renders numeric input',
+    beforeType === false && afterType.examType === 'fillblank-num' && (afterType.q1Correct === '' || afterType.q1Correct == null) && afterType.hasNumericInput && afterType.activeBtn === 'fillblank-num',
+    JSON.stringify({ beforeType, afterType }));
   await ctx.close();
 }
 
