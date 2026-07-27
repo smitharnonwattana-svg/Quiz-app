@@ -924,6 +924,11 @@
         top: 12px; bottom: auto; right: auto; left: calc(40vw + 26px); transform: translateX(-50%);
         width: 40px; height: 40px; font-size: 18px;
       }
+      /* #scratchToggleBtn:active ด้านบน (บรรทัด 910) ตั้ง transform:scale(0.95) เฉยๆ —
+         transform ไม่รวมกันข้าม rule เวลากดปุ่มค้างจะทับ translateX(-50%) ด้านบนจนปุ่ม
+         หลุดจากตำแหน่งกึ่งกลางไปทางขวาชั่วขณะ (เห็นเป็นปุ่ม "ขยับ" ตอนกด) ต้องรวม
+         translateX ไว้ในนี้ด้วยเฉพาะ desktop (มือถือไม่ใช้ translateX เลยไม่ต้องแตะ) */
+      #scratchToggleBtn:active { transform: translateX(-50%) scale(0.95); }
     }
     #scratchPad {
       /* width ใช้ min() แทน max-width แยก property — max-width เดิมค่าเป็น
