@@ -236,6 +236,31 @@ currentSection = 'resume';
     return document.getElementById('takeQNo')?.textContent || null;
   });
   check('resume with out-of-range currentIndex clamps (page renders a question)', !!clamp, 'takeQNo=' + clamp);
+
+  // v48.8: submit() ต้องหัก pauseOffset (เวลาที่ออกจากแอปไป) ออกจาก usedSeconds ด้วย —
+  // เดิมคำนวณจากนาฬิกาโลกจริงตรงๆ ทำให้ฝึกซ้อมที่ทำค้างข้ามวันแล้วกลับมาทำต่อ ได้ usedSeconds
+  // รวมเวลาที่ปิดแอปไปด้วย (บั๊กจริงที่เจอ: "เวลาที่ใช้ 1440:00 นาที" ทั้งที่ทำจริงไม่กี่นาที)
+  const pauseTiming = await page.evaluate(async () => {
+    const now = Date.now();
+    const startedAt = now - 7200 * 1000; // เริ่มทำเมื่อ 2 ชม.ที่แล้ว
+    const pausedAt = now - 7000 * 1000;  // active จริง 200 วิ ก่อน save ครั้งสุดท้ายแล้วปิดแอปไป
+    localStorage.setItem('nanont:takeResume:ครู', JSON.stringify({
+      examId: 'eX', takerName: 'ครู', startedAt, pausedAt, pauseOffset: 0, currentIndex: 0,
+      answers: {}, unsure: {}, qElapsedMs: {}, answerChanges: {}, visitOrder: [],
+      practiceMode: true, attemptId: 'att_pausetest',
+    }));
+    navigate('take', { id: 'eX', takerName: 'ครู', practice: true });
+    await new Promise(r => setTimeout(r, 500));
+    document.querySelectorAll('button').forEach(b => { if (b.textContent.includes('ทำต่อ')) b.click(); });
+    await new Promise(r => setTimeout(r, 300));
+    document.getElementById('takeSubmitBtn')?.click();
+    await new Promise(r => setTimeout(r, 500));
+    const att = (Store.load().attempts || []).find(a => a.id === 'att_pausetest');
+    return { usedSeconds: att ? att.usedSeconds : null };
+  });
+  check('practice-mode submit excludes away-time (pauseOffset) from usedSeconds, not raw wall-clock since start',
+    pauseTiming.usedSeconds !== null && pauseTiming.usedSeconds >= 150 && pauseTiming.usedSeconds < 400,
+    JSON.stringify(pauseTiming));
   await ctx.close();
 }
 

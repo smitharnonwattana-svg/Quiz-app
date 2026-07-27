@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.7 -->
+  <!-- APP_VERSION: v48.8 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1076,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.7</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.8</div>
     </div>
   </div>
 </div>
@@ -5514,7 +5514,10 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       if(_isWeighted) _pq.points=getQPoints(q);
       return _pq;
     });
-    const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
+    // หัก _pauseOffset ออกด้วย (เวลาที่ออกจากแอปไประหว่างทำค้าง) — เหมือนสูตรเดียวกับ
+    // นาฬิกาที่เดินสดใน doStart()/_calcRemaining() ไม่งั้นฝึกซ้อมที่ทำค้างข้ามวันจะได้
+    // usedSeconds รวมเวลาที่ปิดแอปไปด้วย (บั๊กที่ทำให้เห็น "เวลาที่ใช้ 1440:00 นาที")
+    const _rawElapsed = st.startedAt ? Math.max(0, Math.floor((Date.now()-st.startedAt)/1000) - _pauseOffset) : 0;
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
     // ไม่กรอกชื่อ = บันทึกเป็น 'ไม่ระบุชื่อ' (ห้าม block — คำตอบต้องไม่หาย)
     const takerName = st.takerName || 'ไม่ระบุชื่อ';
@@ -13644,7 +13647,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.7';
+  const CURRENT_VERSION = 'v48.8';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
