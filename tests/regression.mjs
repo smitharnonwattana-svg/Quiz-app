@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Quiz-app regression suite — รวม checks จากการแก้บั๊ก v47.93 → v48.6
+// Quiz-app regression suite — รวม checks จากการแก้บั๊ก v47.93 → v48.10
 // รันผ่าน tests/run.sh (start static server → รันไฟล์นี้ → kill server)
 // ทุก section เปิด browser context ใหม่ + seed ข้อมูลเอง — ไม่แตะ Firebase จริง
 // (FirebaseSync ถูก stub ต่อ section, Store._cache seed ตรงๆ, _cloudLoaded บังคับ)
@@ -89,9 +89,25 @@ currentSection = 'editor';
     if (!el) return { ok: false };
     el.value = '5';
     document.getElementById('editorQCountBtn').click();
-    return { ok: true, len: (Store.load().questions.eA1 || []).length };
+    const qs = Store.load().questions.eA1 || [];
+    return { ok: true, len: qs.length, q4Correct: qs.find(q => q.no === 4)?.correct };
   });
   check('applyQCount persists new count to store', qcount.ok && qcount.len === 5, JSON.stringify(qcount));
+  check('applyQCount: newly-added question has NO default answer key selected (v48.10)', qcount.q4Correct === '', JSON.stringify(qcount));
+
+  // v48.10: สลับคอลัมน์ตาราง เฉลย เป็น หน้า > ข้อ > เฉลย + เฉลยข้อใหม่ต้องไม่มีปุ่มไหน active
+  const tableLayout = await page.evaluate(() => {
+    const headers = [...document.querySelectorAll('#page-admin_editor table thead th')].map(th => th.textContent.trim());
+    const firstRow = document.querySelector('#editorTbody tr');
+    const q4Row = [...document.querySelectorAll('#editorTbody tr')][3];
+    const anySelectedInQ4 = !!q4Row?.querySelector('.correctBtn.selected');
+    return { headers, hasPageInputFirst: !!firstRow?.children[0]?.querySelector('input[data-field="page"]'), anySelectedInQ4 };
+  });
+  check('editor table columns reordered to หน้า, ข้อ, เฉลย (v48.10)',
+    tableLayout.headers[0] === 'หน้า' && tableLayout.headers[1] === 'ข้อ' && tableLayout.headers[2] === 'เฉลย' && tableLayout.hasPageInputFirst,
+    JSON.stringify(tableLayout));
+  check('editor: newly-created question shows NO ก/ข/ค/ง button highlighted by default (v48.10)',
+    tableLayout.anySelectedInQ4 === false, JSON.stringify(tableLayout));
 
   const tmplErr = await page.evaluate(() => {
     let err = null;
