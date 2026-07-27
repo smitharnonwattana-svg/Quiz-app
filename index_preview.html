@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v47.99p -->
+  <!-- APP_VERSION: v48.8p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -125,9 +125,6 @@
       .pa-size.active span{background:#111 !important;}
       .pdfAnnotateStage{position:relative;display:block;width:100%;}
       .pdfAnnotateCanvas{display:block;position:absolute;top:0;left:0;touch-action:pan-y;cursor:crosshair;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
-      /* Answer Sheet Mode — embedded in right panel (canvas drawing) */
-      #answerSheetEmbed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;position:relative;}
-      #answerSheetEmbed canvas{display:block;touch-action:pan-y;-webkit-user-select:none;user-select:none;cursor:crosshair;}
       /* 100vh บน iPad Safari มักวัดจาก viewport ตอน address bar ยังโชว์เต็ม —
          พอ Safari ย่อ address bar ลง (มักเกิดอัตโนมัติ ~1s หลังเปิดหน้า) viewport
          จริงโตขึ้นแต่ 100vh ไม่รีคำนวณตามทันที ทำให้ .takeRoot/.takeRight ที่ใช้
@@ -1079,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v47.99p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.8p</div>
     </div>
   </div>
 </div>
@@ -1600,6 +1597,9 @@
         <div class="linkCard" onclick="navigate('admin_memes')">
           <div style="font-weight:900;">🎭 จัดการมีม</div>
         </div>
+        <div class="linkCard" onclick="navigate('admin_backup')">
+          <div style="font-weight:900;">💾 สำรอง &amp; กู้คืนข้อมูล</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1612,7 +1612,10 @@
       <div>
         <h1 class="h1">📋 รายการข้อสอบ</h1>
       </div>
-      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="adminDownloadAllAnswerKeys" title="ดาวน์โหลดเฉลยทุกวิชา (ดึงเฉลยที่มีในระบบมาใส่ให้ ข้อไหนยังไม่มีเว้นว่างไว้กรอกเพิ่ม)">⬇️ ดาวน์โหลดเฉลย</button>
+        <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+      </div>
     </div>
     <div class="card" style="padding:12px;margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <span class="muted">วิชา</span>
@@ -1646,6 +1649,10 @@
       <h3>🗑️ ยืนยันการลบข้อสอบ</h3>
       <p id="adminDeleteModalText">ต้องการลบข้อสอบนี้ใช่ไหม?</p>
       <div id="adminDeleteModalFiles" style="margin:-6px 0 10px;font-size:12px;color:#6b7280;display:grid;gap:4px;"></div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#c2410c;margin:0 0 12px;cursor:pointer;">
+        <input id="adminDeleteModalPurge" type="checkbox" style="margin-top:3px;" />
+        <span>ลบไฟล์ PDF ออกจาก Firebase Storage ด้วย (ลบถาวร กู้คืนไม่ได้)</span>
+      </label>
       <div class="mrow">
         <button id="adminDeleteModalCancel" class="btn-ghost">ยกเลิก</button>
         <button id="adminDeleteModalOk" class="btn-danger">🗑️ ลบ</button>
@@ -1677,6 +1684,52 @@
       </div>
       <div id="memberError" style="color:#dc2626;font-size:13px;min-height:18px;margin-bottom:8px;"></div>
       <div id="memberTbody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ADMIN BACKUP & RESTORE ===================== -->
+<div id="page-admin_backup" class="page">
+  <div class="container" style="max-width:800px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1">💾 สำรอง &amp; กู้คืนข้อมูล</h1>
+        <div class="muted" style="margin-top:4px;font-size:13px;">อัตโนมัติทุกวัน 01:00 น. + สำรองเองได้ทุกเมื่อ</div>
+      </div>
+      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+    </div>
+
+    <div class="card" style="margin-top:16px;padding:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="muted" style="font-size:13px;">สำรองสถานะข้อมูลปัจจุบันไว้ทันที (ตั้งชื่อได้)</div>
+      <button class="btn btnPrimary" id="backupNowBtn" type="button">📦 สำรองข้อมูลตอนนี้</button>
+    </div>
+
+    <div class="card" style="margin-top:14px;padding:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <button class="btn btnPrimary" id="backupTabAuto" type="button" style="flex:1;">🕐 อัตโนมัติ</button>
+        <button class="btn" id="backupTabManual" type="button" style="flex:1;">✍️ บันทึกเอง (<span id="backupManualCount">0</span>)</button>
+      </div>
+      <div id="backupManualWarn" class="muted" style="font-size:12px;color:#d97706;min-height:16px;margin-bottom:6px;"></div>
+      <div id="backupListError" style="color:#dc2626;font-size:13px;min-height:18px;"></div>
+      <div id="backupList"></div>
+    </div>
+  </div>
+
+  <!-- Restore confirm modal (type-to-confirm) -->
+  <div id="backupRestoreModal" class="modal-overlay" role="dialog">
+    <div class="modal">
+      <h3>⚠️ ยืนยันการกู้คืนข้อมูล</h3>
+      <p id="backupRestoreLabel" style="font-weight:700;"></p>
+      <div id="backupRestoreCompare" style="font-size:13px;line-height:1.9;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:10px;"></div>
+      <p style="font-size:13px;color:#b91c1c;">การกู้คืนจะ<b>ทับข้อมูลปัจจุบันทั้งหมด</b> (ชุดข้อสอบ, คะแนน, PIN, พ้อยท์/สตรีค ฯลฯ) — ย้อนกลับไม่ได้</p>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:4px;">พิมพ์ "กู้คืน" เพื่อยืนยัน</div>
+        <input id="backupRestoreConfirmInput" class="titleInput" type="text" placeholder="กู้คืน" style="width:100%;" autocomplete="off" />
+      </div>
+      <div class="mrow">
+        <button id="backupRestoreCancel" class="btn-ghost">ยกเลิก</button>
+        <button id="backupRestoreOk" class="btn-danger" disabled>♻️ กู้คืนข้อมูล</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2008,6 +2061,16 @@
             </div>
           </div>
 
+          <!-- Row 1.6: ประเภทข้อสอบ -->
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">ประเภทข้อสอบ</div>
+            <div style="display:flex;gap:8px;" id="editorExamTypeBtns">
+              <button type="button" class="btn examTypeBtn" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
+              <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
+            </div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:4px;">⚠️ เปลี่ยนประเภทจะล้างเฉลยที่กรอกไว้ทั้งหมด (รูปแบบคำตอบข้ามประเภทกันไม่ได้)</div>
+          </div>
+
           <!-- Row 2: PDF โจทย์ + PDF เฉลย -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
             <div style="display:flex;flex-direction:column;gap:4px;">
@@ -2093,6 +2156,30 @@
 
 
 <script>
+/* ═══════════════════════════════════════════════════════════════════
+   TABLE OF CONTENTS — script block หลัก (grep "=====" เพื่อกระโดดไป section)
+   ───────────────────────────────────────────────────────────────────
+   PDF VIEWER          — render PDF ด้วย pdf.js (canvas ต่อหน้า)
+   FIREBASE SYNC       — FirebaseSync IIFE: saveDoc/loadDoc/listenDoc/backup/upload
+   STORE               — ⚠️ HIGH-RISK: in-memory cache + merge + cloud push (อ่านป้ายเตือนในโค้ด)
+   LINE NOTIFICATION   — client เรียก Cloud Function lineNotify (เช็ค flag ต่อสมาชิก)
+   ROUTER              — navigate() + dispatch ต่อหน้า (ADMIN_INITS สำหรับหน้า admin)
+   MEME SCORE POPUP    — overlay แสดงคะแนน+มีมหลังส่งข้อสอบ
+   AUTH / NUMPAD LOGIN — PIN-based role (teacher/student) + หน้า login
+   EXAMS PAGE          — เลือกวิชา→รายการชุด (subjectFilter รอด soft-refresh ผ่าน window._examsSubjectFilter)
+   EXAM DETAIL / TAKE  — ⚠️ HIGH-RISK: ทำข้อสอบ/submit/_doSave/resume (ลำดับ clearTakeResume สำคัญ)
+   REVIEW / TAG MODAL  — ดูเฉลย+ติด tag ข้อผิด
+   DASHBOARD / STATS   — สถิติ + กราฟ
+   PRACTICE PAGE       — โหมดแก้จุดอ่อน (weakness practice)
+   ADMIN* PAGES        — จัดการข้อสอบ/สมาชิก/backup/รางวัล/มีม/benchmark/editor
+   EXCEL TEMPLATE/IMPORT — template เฉลย + parse excel (คืน {rows, skipped})
+   BENCHMARK           — ตารางเทียบคะแนน
+   INIT                — bootstrap ลำดับ: Store.init → restore session → navigate
+   WEAKNESS TRACKING   — ⚠️ เขียน weakness doc แยกต่อ user (nanont:weaknesses_*)
+   STAGE 1-6 / COACH   — เมตริกรายวัน (activity/score/fixes/streak) + คำแนะนำ
+   GAMIFICATION G1-G8  — ⚠️ HIGH-RISK: แต้ม/stamps/quest (_saveGamificationUser เป็น whitelist!)
+   ENTRANCE STATS      — สถิติสอบเข้า (eplus/gate)
+   ═══════════════════════════════════════════════════════════════════ */
 // ===================== PDF VIEWER (PDF.js) =====================
 // Single-page viewer พร้อมปุ่มเปลี่ยนหน้า ทำงานได้ทุก browser/OS
 const PdfViewer = (() => {
@@ -2449,6 +2536,61 @@ const FirebaseSync = (() => {
     }
   }
 
+  // เช็คว่า doc มีอยู่บน server จริงไหม — true/false = รู้แน่, null = เน็ตพัง (ห้ามถือว่า missing)
+  async function docExists(id) {
+    try { const s = await _doc(id).get({ source: 'server' }); return s.exists; }
+    catch(e) { return null; }
+  }
+
+  // ── Backup (save-game style: auto รายวันจาก Cloud Function + manual กดเองจากหน้าเว็บ) ──
+  // ใช้ collection 'app' เดิม doc id: <origin>_backup_auto_<date> / <origin>_backup_manual_<ts>
+  async function saveManualBackup(data, label) {
+    if (!_ready) return false;
+    try {
+      const ts = Date.now();
+      await _doc('backup_manual_' + ts).set({
+        _d: JSON.stringify(data),
+        _ts: ts,
+        type: 'manual',
+        label: String(label || '').slice(0, 60),
+        createdAt: new Date(ts).toISOString(),
+      });
+      return true;
+    } catch(e) { console.warn('[FB] saveManualBackup err', e); return false; }
+  }
+
+  // ลิสต์ backup ทั้ง auto+manual ของ origin นี้ — คืนแค่ metadata (ตัด _d ทิ้งก่อน return)
+  async function listBackups() {
+    if (!_ready) return [];
+    try {
+      const prefix = _ns('backup_');
+      const snap = await db.collection('app')
+        .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
+        .where(firebase.firestore.FieldPath.documentId(), '<', prefix + '')
+        .get({ source: 'server' });
+      // ไม่มี select()/field-mask ให้ใช้บน client SDK (มีแค่ Admin SDK ฝั่งเซิร์ฟเวอร์) — ดึงมาทั้ง doc
+      // แล้วหยิบเฉพาะ metadata ที่ต้องใช้ ทิ้ง _d (payload ก้อนใหญ่) ไป ไม่ผูกไว้ใน object ที่ return
+      return snap.docs.map(d => {
+        const v = d.data();
+        return { id: d.id, type: v.type || '', label: v.label || '', date: v.date || '', ts: v._ts || 0, createdAt: v.createdAt || '' };
+      }).sort((a, b) => b.ts - a.ts);
+    } catch(e) { console.warn('[FB] listBackups err', e); return []; }
+  }
+
+  // โหลดข้อมูลเต็มของ backup ตัวใดตัวหนึ่ง (ใช้ตอนจะ preview/restore เท่านั้น)
+  async function loadBackupData(id) {
+    try {
+      const s = await db.collection('app').doc(id).get({ source: 'server' });
+      if (!s.exists) return null;
+      return JSON.parse(s.data()._d || 'null');
+    } catch(e) { console.warn('[FB] loadBackupData err', e); return null; }
+  }
+
+  async function deleteBackup(id) {
+    try { await db.collection('app').doc(id).delete(); return true; }
+    catch(e) { console.warn('[FB] deleteBackup err', e); return false; }
+  }
+
   // Real-time listener — calls cb(data) whenever doc changes from any device
   function listenDoc(id, cb) {
     if (!_ready) return () => {};
@@ -2541,7 +2683,7 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, ready: () => _ready, ns: _ns };
+  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, ready: () => _ready, ns: _ns };
 })();
 
 function _updateBellBadge() {
@@ -2749,7 +2891,8 @@ function _mergeGamificationByTs(localGam, cloudGam) {
 // ===================== STORE =====================
 const Store = {
   lastError:null,
-  key:"quizSciDemoStoreV1",
+  key:"quizSciDemoStoreV1",   // kept for migration cleanup only
+  _cache:null,                 // in-memory store — Firebase is source of truth
   migrate(s){
     if(!s||typeof s!=='object') return s;
     if(!Array.isArray(s.exams)) s.exams=[];
@@ -2804,15 +2947,21 @@ const Store = {
     }
     return s;
   },
-  load(){try{return JSON.parse(localStorage.getItem(this.key)||"{}");}catch{return {};}},
-  // บันทึกเฉพาะ localStorage ไม่ sync Firebase — ใช้ใน migrate() และ seed
-  saveLocalOnly(data){
-    try{ localStorage.setItem(this.key, JSON.stringify(data)); }catch(e){}
+  load(){
+    if (this._cache) return this._cache;
+    return {exams:[],questions:{},attempts:[],members:[],assignments:[],benchmarks:[]};
   },
+  // อัปเดต in-memory cache เท่านั้น (ไม่ write Firebase — ใช้ใน migrate())
+  saveLocalOnly(data){ this._cache = data; },
+  // ⚠️⚠️ HIGH-RISK — invariants ที่ห้ามละเมิด (ทุกข้อเคยเป็นบั๊กข้อมูลหายจริง):
+  // 1. ห้าม push ก่อน _cloudLoaded=true (v47.93 — กัน store เปล่าทับ cloud)
+  // 2. stale-snapshot merge (data !== _cache) ต้องคงอยู่ — กัน handler ที่ถือ object เก่า
+  //    ทับ attempts/gamification/assignments ใหม่ (v47.93)
+  // 3. restore จากหน้า backup จงใจ BYPASS ฟังก์ชันนี้ (เซ็ต _cache ตรง + saveDoc ตรง)
+  //    เพราะ restore ต้องการ overwrite เต็ม ไม่ใช่ merge (v47.96) — อย่า "แก้ให้มันเรียก save()"
   save(data){
     try{
       this.lastError=null;
-      // Guard: reject invalid data structures
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
         console.warn('Store.save: invalid data structure rejected', typeof data);
         return false;
@@ -2821,16 +2970,41 @@ const Store = {
         console.warn('Store.save: missing required arrays', Object.keys(data));
         return false;
       }
+      if (!Store._cloudLoaded) {
+        // ห้าม push ก่อนข้อมูล cloud โหลดเสร็จ — กันการทับ Firestore ด้วย store เปล่า
+        this._cache = data;
+        this.lastError = 'cloud-not-loaded';
+        console.warn('[Store.save] blocked — cloud data not loaded yet');
+        return false;
+      }
+      // Stale-snapshot protection: หน้าที่ถือ object เก่า (listener แทน _cache ด้วย object ใหม่ไปแล้ว)
+      // handler ที่ Store.load() สดตอนกดปุ่ม ได้ object เดียวกับ _cache → ไม่เข้า branch นี้ → การลบถูกเคารพ
+      if (this._cache && data !== this._cache) {
+        try{
+          if (Array.isArray(this._cache.attempts) && Array.isArray(data.attempts)) {
+            const _ids = new Set(data.attempts.map(a => a && a.id));
+            const _missing = this._cache.attempts.filter(a => a && a.id && !_ids.has(a.id));
+            if (_missing.length > 0) data.attempts = [..._missing, ...data.attempts];
+          }
+          const _mg = _mergeGamificationByTs(data.gamification, this._cache.gamification);
+          if (_mg) data.gamification = _mg;
+          if (Array.isArray(this._cache.assignments) && Array.isArray(data.assignments)) {
+            const _aMap = new Map();
+            this._cache.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            data.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            data.assignments = Array.from(_aMap.values());
+          }
+        }catch(e){ console.warn('[Store.save] stale-merge err', e); }
+      }
       data._savedAt = Date.now();
-      localStorage.setItem(this.key,JSON.stringify(data));
-      // async sync to Firestore (fire-and-forget, non-blocking)
+      this._cache = data;
       if(FirebaseSync.ready()) {
-        localStorage.setItem('nanont:syncPending', '1');
-        FirebaseSync.saveDoc('mainStore', data).then(() => {
-          localStorage.removeItem('nanont:syncPending');
-        }).catch(e => {
-          console.error('[Store.save] cloud sync FAILED', e);
-          if (typeof toast === 'function') toast('⚠️ ไม่ได้ sync ขึ้น cloud — ตรวจ network');
+        FirebaseSync.saveDoc('mainStore', data).then(ok => {
+          if (ok) { localStorage.removeItem('nanont:syncPending'); }
+          else {
+            localStorage.setItem('nanont:syncPending', '1');
+            if (typeof toast === 'function') toast('⚠️ sync ขึ้น cloud ไม่สำเร็จ — จะลองใหม่อัตโนมัติ');
+          }
         });
       } else {
         localStorage.setItem('nanont:syncPending', '1');
@@ -2840,96 +3014,77 @@ const Store = {
       return true;
     } catch(e){this.lastError=String(e&&e.message?e.message:e);console.warn('Store.save failed',e);return false;}
   },
-  // Load from Firestore and overwrite localStorage (called once on startup)
+  // Pull from Firestore and populate in-memory cache — Firebase is always source of truth
   async syncFromCloud(){
     const cloud = await FirebaseSync.loadDoc('mainStore');
-    if(!cloud) return;
+    if(!cloud){
+      // แยก "doc ยังไม่มีจริง" (ติดตั้งครั้งแรก/namespace ใหม่) ออกจาก "โหลดไม่สำเร็จ"
+      try{
+        if (await FirebaseSync.docExists('mainStore') === false) {
+          Store._cloudLoaded = true; // cloud ว่างจริงคือความจริง — อนุญาตเซฟแรก
+          const _lb0 = document.getElementById('_storeLoadingBar');
+          if(_lb0) _lb0.remove();
+          console.log('[Store] cloud doc missing — fresh namespace, first save allowed');
+        }
+      }catch(e){}
+      return;
+    }
     try{
-      // Only overwrite local if cloud is strictly newer
-      const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
-      let _localTs = _local._savedAt || 0;
-      const _cloudTs = cloud._savedAt || 0;
-      const _now = Date.now();
-      if (_localTs > _now + 300000) {
-        console.warn('[sync] stuck timestamp detected, resetting');
-        _local._savedAt = 0;
-        _localTs = 0;
-        localStorage.setItem(this.key, JSON.stringify(_local));
-      }
-      const _localHasData = _localTs > 0;
-      if (!_localHasData || _cloudTs > _localTs) {
-        // Cloud is newer — but merge attempts to prevent data loss
-        try {
-          const _localIds = new Set((_local.attempts||[]).map(a => a.id));
-          const _missingAttempts = (cloud.attempts||[])
-            .filter(a => !_localIds.has(a.id));
-          if (_missingAttempts.length > 0 && _localHasData) {
-            // Merge missing attempts from cloud into local
-            const _all = [
-              ...(_missingAttempts),
-              ...(cloud.attempts||[]).filter(a => _localIds.has(a.id))
-            ];
-            const _seen = new Set();
-            cloud.attempts = _all.filter(a => {
-              if (_seen.has(a.id)) return false;
-              _seen.add(a.id);
-              return true;
-            });
-            console.log('[Store] merged', _missingAttempts.length,
-              'local attempts into cloud');
-          }
-        } catch(e) {}
-        localStorage.setItem(this.key, JSON.stringify(cloud));
-      } else {
-        console.log('[Store] syncFromCloud: local is newer, keeping local');
-        // Merge any attempts from cloud not in local
-        try {
-          const _cloudIds = new Set((cloud.attempts||[]).map(a => a.id));
-          const _missingFromCloud = (_local.attempts||[])
-            .filter(a => !_cloudIds.has(a.id));
-          if (_missingFromCloud.length > 0) {
-            const _all = [
-              ...(_missingFromCloud),
-              ...(_local.attempts||[])
-            ];
-            const _seen = new Set();
-            _local.attempts = _all.filter(a => {
-              if (_seen.has(a.id)) return false;
-              _seen.add(a.id);
-              return true;
-            });
-            console.log('[Store] merged', _missingFromCloud.length,
-              'cloud attempts into local');
-          }
-        } catch(e) {}
-        // Push merged local back to cloud
-        _local._savedAt = Date.now();
-        localStorage.setItem(this.key, JSON.stringify(_local));
-        if(FirebaseSync.ready())
-          FirebaseSync.saveDoc('mainStore', _local).catch(e => console.error('[syncFromCloud] cloud push FAILED', e));
+      // Merge any in-memory attempts not yet in cloud (submitted before Firebase loaded)
+      if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
+        const _cloudIds = new Set(cloud.attempts.map(a => a.id));
+        const _localOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+        if (_localOnly.length > 0) {
+          cloud.attempts = [..._localOnly, ...cloud.attempts];
+          console.log('[Store] merged', _localOnly.length, 'in-memory attempts into cloud');
+        }
       }
     }catch(e){}
-    console.log('[Store] synced from cloud');
-    // Only refresh safe pages after initial sync
-    const safeSyncPages = ['stats'];
-    if(typeof navigate==='function' && window._currentPage && safeSyncPages.includes(window._currentPage)){
+    // Recovery: if localStorage has MORE exams than Firestore, merge them up
+    // (handles the case where exams were added locally but never synced to cloud)
+    try{
+      const _lsRaw = localStorage.getItem(this.key);
+      if(_lsRaw){
+        const _ls = JSON.parse(_lsRaw);
+        const _lsExams = Array.isArray(_ls && _ls.exams) ? _ls.exams : [];
+        const _cloudExamIds = new Set((cloud.exams||[]).map(e=>e&&e.id));
+        const _lsOnly = _lsExams.filter(e=>e&&e.id&&!_cloudExamIds.has(e.id));
+        if(_lsOnly.length>0){
+          cloud.exams = [...(cloud.exams||[]), ..._lsOnly];
+          // Merge questions for the recovered exams
+          if(_ls.questions && typeof _ls.questions==='object'){
+            cloud.questions = Object.assign({}, _ls.questions, cloud.questions||{});
+          }
+          console.log('[Store] RECOVERY: merged', _lsOnly.length, 'exams from localStorage → pushing to Firestore');
+          FirebaseSync.saveDoc('mainStore', cloud).then(()=>{
+            localStorage.removeItem(this.key); // safe to remove after successful push
+            console.log('[Store] RECOVERY complete — localStorage cleared');
+          }).catch(e=>console.warn('[Store] RECOVERY push err',e));
+        } else {
+          localStorage.removeItem(this.key); // no unsynced exams → safe to clear
+        }
+      }
+    }catch(e){ console.warn('[Store] localStorage recovery err',e); }
+    this._cache = cloud;
+    Store._cloudLoaded = true;
+    const _lb = document.getElementById('_storeLoadingBar');
+    if(_lb) _lb.remove();
+    console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
+    // Always refresh current page so stale empty-state render is replaced with real data
+    if(typeof navigate==='function' && window._currentPage){
       navigate(window._currentPage, window._currentParams||{});
     }
   },
   // Force pull cloud data — bypass timestamp guard. Union-merges any
-  // local-only attempts so nothing the user already submitted is lost.
+  // in-memory attempts so nothing the user already submitted is lost.
   async forcePullFromCloud(){
     const cloud = await FirebaseSync.loadDoc('mainStore');
     if(!cloud) throw new Error('cloud empty or unreachable');
-    const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
     const _cloudCount = Array.isArray(cloud.attempts) ? cloud.attempts.length : 0;
-    const _localCountBefore = Array.isArray(_local.attempts) ? _local.attempts.length : 0;
-    let _preserved = 0;
-    const _isPending = localStorage.getItem('nanont:syncPending') === '1';
-    if (_isPending && Array.isArray(cloud.attempts) && Array.isArray(_local.attempts)) {
+    const _memCount = this._cache ? (Array.isArray(this._cache.attempts) ? this._cache.attempts.length : 0) : 0;
+    if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
       const _cloudIds = new Set(cloud.attempts.map(a => a.id));
-      const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
-      _preserved = _localOnly.length;
+      const _localOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
       if (_localOnly.length > 0) {
         const _all = [..._localOnly, ...cloud.attempts];
         const _seen = new Set();
@@ -2938,111 +3093,88 @@ const Store = {
           _seen.add(a.id);
           return true;
         });
-        console.log('[forcePull] preserved', _localOnly.length, 'unpushed local-only attempts');
+        console.log('[forcePull] preserved', _localOnly.length, 'in-memory attempts');
       }
     }
-    // else: pendingSync='' → trust cloud as-is; deletions propagate
-    cloud._savedAt = Date.now();
-    localStorage.setItem(this.key, JSON.stringify(cloud));
-    console.log('[forcePull] complete — cloud:', _cloudCount, 'localBefore:', _localCountBefore, 'preserved:', _preserved);
-    return { cloudAttempts: _cloudCount, localAttemptsBefore: _localCountBefore, preserved: _preserved };
+    this._cache = cloud;
+    console.log('[forcePull] complete — cloud:', _cloudCount, 'memBefore:', _memCount);
+    return { cloudAttempts: _cloudCount, localAttemptsBefore: _memCount, preserved: 0 };
   },
-  // Force push local mainStore + verify server actually received it
-  // by reading back from {source:'server'} and comparing _savedAt.
+  // Force push in-memory store to Firebase + verify server received it.
   // Returns {written, serverTs, match, localAttempts, serverAttempts}.
   async forcePushToCloud(){
     if (!FirebaseSync.ready()) throw new Error('Firebase ไม่พร้อม');
-    const _raw = localStorage.getItem(this.key);
-    if (!_raw) throw new Error('localStorage ว่าง');
-    let _data;
-    try { _data = JSON.parse(_raw); } catch(e) { throw new Error('localStorage parse err'); }
-    if (!_data || !Array.isArray(_data.attempts)) throw new Error('local data ไม่ถูกต้อง');
-    _data._savedAt = Date.now();
-    localStorage.setItem(this.key, JSON.stringify(_data));
-    const _ok = await FirebaseSync.saveDoc('mainStore', _data);
+    if (!Store._cloudLoaded) throw new Error('ข้อมูล cloud ยังโหลดไม่เสร็จ — ห้าม force push ทับ');
+    if (!this._cache || !Array.isArray(this._cache.attempts)) throw new Error('ไม่มีข้อมูลใน memory');
+    this._cache._savedAt = Date.now();
+    const _ok = await FirebaseSync.saveDoc('mainStore', this._cache);
     if (!_ok) throw new Error('saveDoc returned false');
     const _verified = await FirebaseSync.loadDoc('mainStore');
     if (!_verified) throw new Error('read-back ได้ null — server อาจไม่ได้รับ');
     return {
-      written: _data._savedAt,
+      written: this._cache._savedAt,
       serverTs: _verified._savedAt || 0,
-      match: (_verified._savedAt || 0) === _data._savedAt,
-      localAttempts: _data.attempts.length,
+      match: (_verified._savedAt || 0) === this._cache._savedAt,
+      localAttempts: this._cache.attempts.length,
       serverAttempts: Array.isArray(_verified.attempts) ? _verified.attempts.length : 0
     };
   },
   // Retry-pending pushes that failed earlier because Firebase wasn't ready
   async flushPendingSync(){
     if (!FirebaseSync.ready()) return;
-    // Flush weakness pending (per-user flags) — independent of mainStore
+    if (!Store._cloudLoaded) return; // กัน race ตอน boot — ห้าม push store ที่ยังไม่ได้ sync กับ cloud
     if (typeof WeaknessTracker !== 'undefined' && WeaknessTracker.flushPendingWeaknesses) {
       WeaknessTracker.flushPendingWeaknesses();
     }
-    // Flush mainStore pending
     if (localStorage.getItem('nanont:syncPending') !== '1') return;
-    const _raw = localStorage.getItem(this.key);
-    if (!_raw) { localStorage.removeItem('nanont:syncPending'); return; }
+    if (!this._cache || !Array.isArray(this._cache.attempts)) {
+      localStorage.removeItem('nanont:syncPending');
+      return;
+    }
+    // Merge cloud gamification + assignments before pushing to avoid overwriting newer cloud data
     try {
-      const _data = JSON.parse(_raw);
-      if (!_data || !Array.isArray(_data.attempts)) return;
-      // ป้องกันการ push stale data ทับของใหม่ใน cloud
-      // — fetch cloud, merge gamification (per-user _updatedAt) + assignments (union by id)
-      try {
-        const cloudSnapshot = await FirebaseSync.loadDoc('mainStore');
-        if (cloudSnapshot) {
-          // gamification: per-user _updatedAt
-          if (cloudSnapshot.gamification) {
-            _data.gamification = _mergeGamificationByTs(
-              _data.gamification, cloudSnapshot.gamification
-            );
-          }
-          // assignments: union by id (local ทับ cloud สำหรับ id เดียวกัน
-          // เพื่อรักษา status change ของ local เช่น student mark done)
-          if (Array.isArray(cloudSnapshot.assignments)) {
-            const _aMap = new Map();
-            cloudSnapshot.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-            (Array.isArray(_data.assignments) ? _data.assignments : [])
-              .forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-            _data.assignments = Array.from(_aMap.values());
-          }
-          // อัพเดต local ด้วยเพื่อไม่ให้ stale อยู่
-          const _localCopy = JSON.parse(localStorage.getItem(this.key) || '{}');
-          _localCopy.gamification = _data.gamification;
-          _localCopy.assignments = _data.assignments;
-          localStorage.setItem(this.key, JSON.stringify(_localCopy));
+      const cloudSnapshot = await FirebaseSync.loadDoc('mainStore');
+      if (cloudSnapshot) {
+        if (cloudSnapshot.gamification) {
+          this._cache.gamification = _mergeGamificationByTs(
+            this._cache.gamification, cloudSnapshot.gamification
+          );
         }
-      } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
-      FirebaseSync.saveDoc('mainStore', _data).then(() => {
-        localStorage.removeItem('nanont:syncPending');
-        console.log('[flushPendingSync] flushed pending data to cloud');
-        if (typeof toast === 'function') toast('✅ ข้อมูลที่ค้างไว้ sync ขึ้น cloud แล้ว');
-      }).catch(e => {
-        console.error('[flushPendingSync] failed, will retry next interval', e);
-      });
-    } catch(e) { console.warn('[flushPendingSync] parse err', e); }
+        if (Array.isArray(cloudSnapshot.assignments)) {
+          const _aMap = new Map();
+          cloudSnapshot.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+          (Array.isArray(this._cache.assignments) ? this._cache.assignments : [])
+            .forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+          this._cache.assignments = Array.from(_aMap.values());
+        }
+      }
+    } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
+    FirebaseSync.saveDoc('mainStore', this._cache).then((ok) => {
+      if (!ok) { console.warn('[flushPendingSync] push failed — retry next interval'); return; }
+      localStorage.removeItem('nanont:syncPending');
+      console.log('[flushPendingSync] flushed pending data to cloud');
+      if (typeof toast === 'function') toast('✅ ข้อมูลที่ค้างไว้ sync ขึ้น cloud แล้ว');
+    });
   },
   init(){
-    // Boot Firebase, migrate old localStorage data to cloud
+    // Boot Firebase once — Store.init() ถูกเรียกซ้ำจากหลายหน้า ห้าม re-init
+    // (FirebaseSync.init() ซ้ำจะ throw จาก enablePersistence → ป้าย offline หลอก)
+    if (Store._fbBooted) return this.migrate(this.load());
+    Store._fbBooted = true;
     FirebaseSync.init();
-    if (!Store._syncTimersBooted) {
-      _updateOfflineBanner();
-      setInterval(_updateOfflineBanner, 5000);
-      setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
-      Store._syncTimersBooted = true;
-    }
+    _updateOfflineBanner();
+    setInterval(_updateOfflineBanner, 5000);
+    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
       this.flushPendingSync();
     });
-    // Real-time listener: if another device saves, update localStorage only
-    // Do NOT call navigate() here — it resets scroll and re-inits page disruptively
-    // Instead just update the cache; next Store.load() will get fresh data
+    // Real-time listener: update in-memory cache when cloud data changes
     let _listenDocRefreshTimeout = null;
     let _lastCloudHash = '';
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{
-        // Skip ถ้า cloud data ไม่ได้เปลี่ยนจริง (ตัด _savedAt และ gamification._updatedAt ออก
-        // เพราะ _updatedAt เปลี่ยนทุกครั้งที่ save gamification แม้ค่าจริงจะเหมือนเดิม)
+        // Skip if cloud data hasn't actually changed (strip volatile fields)
         const _hashObj = { ...cloudData };
         delete _hashObj._savedAt;
         if (_hashObj.gamification && typeof _hashObj.gamification === 'object') {
@@ -3057,213 +3189,72 @@ const Store = {
         const _hash = JSON.stringify(_hashObj);
         if (_hash === _lastCloudHash) return;
         _lastCloudHash = _hash;
-        // Only accept cloud data if it's strictly newer
-        // AND local data exists and has been saved recently
-        const _local = JSON.parse(localStorage.getItem(this.key)||'{}');
-        let _localTs = _local._savedAt || 0;
-        const _cloudTs = cloudData._savedAt || 0;
-        const _now = Date.now();
-        if (_localTs > _now + 300000) {
-          console.warn('[listenDoc] stuck timestamp detected, resetting');
-          _local._savedAt = 0;
-          _localTs = 0;
-          localStorage.setItem(this.key, JSON.stringify(_local));
-        }
-        const _localHasData = _localTs > 0;
-        if (!_localHasData || _cloudTs > _localTs) {
-          const _isPending = localStorage.getItem('nanont:syncPending') === '1';
-          if (_isPending && _localHasData && Array.isArray(_local.attempts)
-              && Array.isArray(cloudData.attempts)) {
-            try {
-              const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
-              const _localIds = new Set(_local.attempts.map(a => a.id));
-              const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
-              const _cloudOnly = cloudData.attempts.filter(a => !_localIds.has(a.id));
-              if (_localOnly.length > 0 || _cloudOnly.length > 0) {
-                const _allAttempts = [..._local.attempts, ..._cloudOnly];
-                _allAttempts.sort((a,b) =>
-                  new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
-                );
-                const _seen = new Set();
-                const _deduped = _allAttempts.filter(a => {
-                  if (_seen.has(a.id)) return false;
-                  _seen.add(a.id);
-                  return true;
-                });
-                cloudData.attempts = _deduped;
-                console.log('[listenDoc] bidirectional merge (pending):',
-                  'localOnly:', _localOnly.length,
-                  'cloudOnly:', _cloudOnly.length);
-              }
-            } catch(e) {}
+        // Preserve in-memory attempts not yet in cloud
+        if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloudData.attempts)) {
+          const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
+          const _memOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+          if (_memOnly.length > 0) {
+            const _all = [..._memOnly, ...cloudData.attempts];
+            _all.sort((a,b) => new Date(b.submittedAt||0) - new Date(a.submittedAt||0));
+            const _seen = new Set();
+            cloudData.attempts = _all.filter(a => {
+              if (_seen.has(a.id)) return false;
+              _seen.add(a.id);
+              return true;
+            });
           }
-          // else: pendingSync='' → trust cloud as-is; deletions propagate
-          // แต่ต้องเก็บ gamification ที่ local ใหม่กว่าไว้ — ป้องกัน rollback
-          // (เช่น iPad push stale gamification หลัง admin set points)
-          try {
-            const _mergedGam = _mergeGamificationByTs(
-              _local.gamification, cloudData.gamification
-            );
-            if (_mergedGam) cloudData.gamification = _mergedGam;
-          } catch(e) {}
-          // ป้องกัน assignment ของ local หาย เมื่อ pending — union by id, local ทับ cloud
-          // (เช่น student เพิ่ง mark done แต่ยัง push ไม่ทัน, cloud ยัง pending)
-          try {
-            if (_isPending && _localHasData && Array.isArray(_local.assignments)
-                && Array.isArray(cloudData.assignments)) {
-              const _aMap = new Map();
-              cloudData.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-              _local.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
-              cloudData.assignments = Array.from(_aMap.values());
-            }
-          } catch(e) {}
-          localStorage.setItem(this.key, JSON.stringify(cloudData));
-          _updateBellBadge();
-        } else {
-          // Local is newer — merge attempts + assignments + gamification
-          let _changed = false;
-          try {
-            // Merge attempts bidirectionally
-            if (Array.isArray(cloudData.attempts) &&
-                Array.isArray(_local.attempts)) {
-              const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
-              const _localIds = new Set(_local.attempts.map(a => a.id));
-              const _cloudOnly = cloudData.attempts.filter(a => !_localIds.has(a.id));
-              const _localOnly = _local.attempts.filter(a => !_cloudIds.has(a.id));
-              if (_cloudOnly.length > 0 || _localOnly.length > 0) {
-                const _merged = [..._local.attempts, ..._cloudOnly];
-                _merged.sort((a,b) =>
-                  new Date(b.submittedAt||0) - new Date(a.submittedAt||0)
-                );
-                const _seen = new Set();
-                const _deduped = _merged.filter(a => {
-                  if (_seen.has(a.id)) return false;
-                  _seen.add(a.id);
-                  return true;
-                });
-                _local.attempts = _deduped;
-                _changed = true;
-                console.log('[listenDoc] local-wins: merged attempts',
-                  'cloudOnly:', _cloudOnly.length,
-                  'localOnly:', _localOnly.length);
-              }
-            }
-          } catch(e) {}
-          try {
-            // Merge assignments — union by id
-            if (Array.isArray(cloudData.assignments) &&
-                Array.isArray(_local.assignments)) {
-              const _localAssignIds = new Set(
-                _local.assignments.map(a => a.id)
-              );
-              const _newAssigns = cloudData.assignments
-                .filter(a => !_localAssignIds.has(a.id));
-              if (_newAssigns.length > 0) {
-                _local.assignments = [..._local.assignments, ..._newAssigns];
-                _changed = true;
-                console.log('[listenDoc] merged',
-                  _newAssigns.length, 'new assignments');
-              }
-              // Also sync status changes (pending→done/cancelled)
-              cloudData.assignments.forEach(ca => {
-                const li = _local.assignments.findIndex(a => a.id === ca.id);
-                if (li !== -1 && _local.assignments[li].status !== ca.status) {
-                  _local.assignments[li].status = ca.status;
-                  _changed = true;
-                }
-              });
-            }
-
-            // Merge gamification — ใช้ helper per-user _updatedAt comparison
-            if (cloudData.gamification || _local.gamification) {
-              const _mergedGam = _mergeGamificationByTs(
-                _local.gamification, cloudData.gamification
-              );
-              if (JSON.stringify(_mergedGam) !== JSON.stringify(_local.gamification || {})) {
-                _local.gamification = _mergedGam;
-                _changed = true;
-              }
-            }
-
-            if (_changed) {
-              localStorage.setItem(this.key, JSON.stringify(_local));
-              _updateBellBadge();
-              console.log('[listenDoc] local-wins: merged assignments/gamification');
-            }
-          } catch(e) {}
         }
+        // Merge gamification — per-user _updatedAt wins
+        try {
+          const _mergedGam = _mergeGamificationByTs(
+            this._cache && this._cache.gamification, cloudData.gamification
+          );
+          if (_mergedGam) cloudData.gamification = _mergedGam;
+        } catch(e) {}
+        // Merge assignments — union by id (in-memory overrides cloud for same id)
+        try {
+          if (this._cache && Array.isArray(this._cache.assignments) && Array.isArray(cloudData.assignments)) {
+            const _aMap = new Map();
+            cloudData.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            this._cache.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
+            cloudData.assignments = Array.from(_aMap.values());
+          }
+        } catch(e) {}
+        this._cache = cloudData;
+        _updateBellBadge();
+        Store._cloudLoaded = true;
+        const _lb2 = document.getElementById('_storeLoadingBar');
+        if(_lb2) _lb2.remove();
       }catch(e){}
       if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
       _listenDocRefreshTimeout = setTimeout(() => {
-      // Re-enable auto-refresh — WHOOP ถูกซ่อนแล้วจึงไม่มี render loop
-      // (updateCoachStreak ไม่ถูกเรียกตอน render home อีกต่อไป)
-      const safeSoftRefresh = ['home','stats','rewards'];
+      const safeSoftRefresh = ['home','stats','rewards','exams'];
       const pg = window._currentPage;
       if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
-        navigate(pg, window._currentParams||{});
-      } else if(pg && pg === 'admin'){
-        // แสดงแค่ครั้งเดียวต่อ session — ถ้าเคย dismiss แล้วไม่ขึ้นอีก
-        if(!sessionStorage.getItem('_conflictBannerDismissed')){
-          let banner = document.getElementById('_syncConflictBanner');
-          if(!banner){
-            banner = document.createElement('div');
-            banner.id = '_syncConflictBanner';
-            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#1c1917;padding:7px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.15);pointer-events:auto;';
-            const dismiss = () => {
-              banner.remove();
-              sessionStorage.setItem('_conflictBannerDismissed', '1');
-            };
-            const b1 = document.createElement('button');
-            b1.textContent = '🔄 โหลดใหม่';
-            b1.style.cssText = 'background:#1c1917;color:#fef3c7;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
-            b1.onclick = () => location.reload();
-            const b2 = document.createElement('button');
-            b2.textContent = '✕ ปิด';
-            b2.style.cssText = 'background:transparent;color:#1c1917;border:1.5px solid #1c1917;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
-            b2.onclick = dismiss;
-            const b3 = document.createElement('button');
-            b3.textContent = '🔒 logout เครื่องอื่น';
-            b3.style.cssText = 'background:#dc2626;color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
-            b3.onclick = async () => {
-              const _adminPin = typeof Auth !== 'undefined' ? Auth.ADMIN_PIN : null;
-              await FirebaseSync.claimSession(_adminPin);
-              dismiss();
-              toast('✅ เครื่องนี้เป็น session ล่าสุดแล้ว — เครื่องอื่นถูก logout แล้ว');
-            };
-            const msg = document.createElement('span');
-            msg.textContent = '⚠️ มีการแก้ไขข้อมูลจากอุปกรณ์อื่น';
-            msg.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-            const btnWrap = document.createElement('span');
-            btnWrap.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
-            btnWrap.append(b1, b3, b2);
-            banner.append(msg, btnWrap);
-            document.body.prepend(banner);
-          }
-        }
+        // flag ให้ initExams รู้ว่านี่คือ soft refresh (listener re-nav) ไม่ใช่ผู้ใช้กดเอง
+        // → คงวิชาที่เลือกไว้ ไม่เด้งกลับหน้าเลือกวิชา (navigate→initExams รันแบบ sync อ่าน flag ทัน)
+        window._softRefreshing = true;
+        try { navigate(pg, window._currentParams||{}); }
+        finally { window._softRefreshing = false; }
       }
-      // ไม่เรียก navigate('home') อัตโนมัติ — ป้องกัน flickering และ render loop
-      // (renderHome → getDailyQuest → _saveGamificationUser → cloud write → listenDoc → loop)
-      // listenDoc update localStorage แล้ว user เห็นข้อมูลใหม่เมื่อเปลี่ยนหน้าเอง
       }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
     });
-    const s=this.load();
-    if(!s.exams){
-      // init fields จำเป็น — ไม่มี Demo exam
-      // syncFromCloud() จะ overwrite ด้วยข้อมูลจริงจาก Firebase ทันที
-      s.exams=[];
-      s.questions={};
-      s.attempts=[];
-      s.benchmarks=[];
-      s.members=s.members||[];
-      s.assignments=s.assignments||[];
-      s.adminLoggedIn=false;
-      // บันทึกเฉพาะ localStorage — ไม่ sync ขึ้น Firebase
-      try{ localStorage.setItem(this.key, JSON.stringify(s)); }catch(e){}
-    }
-    // Ensure no field is missing from the seed data
-    (s.questions||{});
-    if(!s.questions) s.questions={};
-    return this.migrate(s);
+    Store._cloudLoaded = false;
+    // Inject loading bar while waiting for Firebase
+    (function(){
+      const _lbExist = document.getElementById('_storeLoadingBar');
+      if(_lbExist) return;
+      const _s = document.createElement('style');
+      _s.textContent = '@keyframes _fbLoad{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}';
+      document.head.appendChild(_s);
+      const _lb = document.createElement('div');
+      _lb.id = '_storeLoadingBar';
+      _lb.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;height:3px;background:linear-gradient(270deg,#3b82f6,#8b5cf6,#3b82f6);background-size:200% 200%;animation:_fbLoad 1.5s ease-in-out infinite;';
+      if(document.body) document.body.prepend(_lb);
+      // Fallback: อย่าให้แถบค้างถ้า server ช้า/ไม่ตอบ — listener ยังอัพเดตข้อมูลให้ทีหลังได้
+      setTimeout(()=>{ const b = document.getElementById('_storeLoadingBar'); if(b) b.remove(); }, 15000);
+    })();
+    return this.migrate(this.load());
   }
 };
 
@@ -3659,7 +3650,7 @@ function _downloadCanvas(canvas) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
-// ── Home page render (role-aware) ──
+// ===================== HOME PAGE + CLOUD-LOADING HELPERS =====================
 // Weakness Cloud Sync — Stage 6
 // Weakness Sync Fallback — Bug #2
 async function fetchWeaknessFromCloud(userId) {
@@ -3690,6 +3681,35 @@ async function fetchWeaknessFromCloud(userId) {
   } catch (e) { console.warn('fetchWeaknessFromCloud fallback error', e); }
 }
 
+// ── Cloud loading state (v47.99) ──
+// หน้า home/exams รู้ตัวเองว่าข้อมูล cloud ยังโหลดไม่เสร็จ — แสดงสถานะโหลดแทนรายการว่าง
+// กัน "หน้าว่างชั่วคราวตอนเน็ตหลุด" ถูกเข้าใจผิดว่าข้อมูลหาย
+// listener soft refresh (safeSoftRefresh มี home/exams อยู่แล้ว) จะ re-render ให้เองเมื่อโหลดเสร็จ
+function renderCloudLoading(el, page){
+  if(!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:60px 20px;">'
+    + '<div style="font-size:40px;">⏳</div>'
+    + '<div class="muted" style="margin-top:10px;font-weight:700;">กำลังโหลดข้อมูล...</div>'
+    + '</div>';
+  setTimeout(() => {
+    if (Store._cloudLoaded) return;
+    if (window._currentPage !== page) return;
+    el.innerHTML = '<div style="text-align:center;padding:60px 20px;">'
+      + '<div style="font-size:40px;">📶</div>'
+      + '<div style="margin-top:10px;font-weight:700;color:#b91c1c;">โหลดข้อมูลไม่สำเร็จ</div>'
+      + '<div class="muted" style="font-size:13px;margin-top:4px;">เช็คอินเทอร์เน็ตแล้วลองใหม่ — ข้อมูลไม่ได้หายไปไหน</div>'
+      + '<button class="btn btnPrimary" style="margin-top:14px;" onclick="retryCloudLoad()">🔄 ลองใหม่</button>'
+      + '</div>';
+  }, 10000);
+}
+function retryCloudLoad(){
+  const pg = window._currentPage;
+  Store.syncFromCloud().then(() => {
+    if (window._currentPage === pg) navigate(pg, window._currentParams || {});
+  });
+  navigate(pg, window._currentParams || {}); // กลับไปสถานะ "กำลังโหลด..." ระหว่างรอ
+}
+
 // WHOOP UI — Stage 4
 let _whoopReqId = 0;
 let _whoopFetching = false;
@@ -3698,6 +3718,7 @@ function renderHome(){
   const role = Auth.getRole();
   const homeEl = document.getElementById('page-home');
   if(!homeEl) return;
+  if(!Store._cloudLoaded){ renderCloudLoading(homeEl, 'home'); return; }
 
   // ── local helpers (renderHome scope only) ─────────────
   function _getHomeGreeting(name){
@@ -3711,13 +3732,7 @@ function renderHome(){
       : 'ดึกแลวนะ 🌙';
     return name ? timeGreet + ' ' + name : timeGreet;
   }
-  function esc(s){
-    return String(s||'')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
-  }
+  // ใช้ esc() global (escape ครบกว่า local เดิม — superset, ผล render เท่ากัน)
   function ringColor(v){
     if (v == null || isNaN(v)) return '#d1d5db';
     if (v >= 85) return '#16a34a';
@@ -4125,7 +4140,6 @@ const Auth = (() => {
   function isTeacher()  { return getRole() === 'teacher'; }
   function logout() {
     sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem('_conflictBannerDismissed');
     if(typeof numpadClear === 'function') numpadClear();
     navigate('login');
     setTimeout(()=>{
@@ -4260,8 +4274,6 @@ function navigate(page, params={}){
   if(_currentPage==='take') cleanupTake();
   if(_currentPage==='practice') cleanupPractice();
 
-  const _orphanBanner = document.getElementById('_syncConflictBanner');
-  if (_orphanBanner) _orphanBanner.remove();
   const _orphanNotif = document.getElementById('notifDropdown');
   if (_orphanNotif) _orphanNotif.remove();
   const _orphanAssignModal = document.getElementById('assignModal');
@@ -4302,14 +4314,23 @@ function navigate(page, params={}){
   else if(page==='review') initReview(params.attemptId);
   else if(page==='stats') initStats();
   else if(page==='practice'){ if(Auth.isTeacher()){navigate('exams');return;} initPractice(params); }
-  else if(page==='admin'){ if(!Auth.isTeacher()){navigate('home');return;} initAdmin(); }
-  else if(page==='admin_new'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminNew(); }
-  else if(page==='admin_editor'){ if(!Auth.isTeacher()){navigate('home');return;} initEditor(params.id); }
-  else if(page==='admin_benchmark'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminBenchmark(); }
-  else if(page==='admin_exams'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminExams(); }
-  else if(page==='admin_memes'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMemes(); }
-  else if(page==='admin_members'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminMembers(); }
-  else if(page==='admin_rewards'){ if(!Auth.isTeacher()){navigate('home');return;} initAdminRewards(); }
+  else if(page==='admin'||page.startsWith('admin_')){
+    // ทุกหน้า admin ผ่าน guard ครูจุดเดียว (init function แต่ละตัวยังมี guard ของตัวเองด้วย — defense in depth)
+    if(!Auth.isTeacher()){navigate('home');return;}
+    const ADMIN_INITS = {
+      admin: () => initAdmin(),
+      admin_new: () => initAdminNew(),
+      admin_editor: () => initEditor(params.id),
+      admin_benchmark: () => initAdminBenchmark(),
+      admin_exams: () => initAdminExams(),
+      admin_memes: () => initAdminMemes(),
+      admin_members: () => initAdminMembers(),
+      admin_rewards: () => initAdminRewards(),
+      admin_backup: () => initAdminBackup(),
+    };
+    if(ADMIN_INITS[page]) ADMIN_INITS[page]();
+    else console.warn('unknown admin page:', page);
+  }
   else if(page==='entrance_stats') initEntranceStats();
   else if(page==='entrance_program') initEntranceProgram(params);
   else if(page==='entrance_year') initEntranceYear(params);
@@ -4327,11 +4348,6 @@ function navigate(page, params={}){
     if (page === 'take') window.pdfAnnotateShow('takePdfViewer');
     else if (page === 'practice') window.pdfAnnotateShow('pracPdfViewer');
     else window.pdfAnnotateHide();
-  }
-
-  // Answer Sheet lifecycle
-  if (typeof window.answerSheetHide === 'function') {
-    if (page !== 'take') window.answerSheetHide();
   }
 
   // กัน Safari iPad header หาย (.stickyBar) ตอนข้อ/หน้า PDF เยอะ บน desktop/
@@ -4416,12 +4432,27 @@ window.addEventListener('resize', _syncTakeStickyBarLift);
 window.addEventListener('orientationchange', _syncTakeStickyBarLift);
 
 // ===================== EXAMS PAGE =====================
+// รายชื่อวิชามาตรฐาน — จุดเดียวในไฟล์ (เพิ่มวิชาใหม่ที่นี่ที่เดียว)
+const KNOWN_SUBJS = ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
+const SUBJ_EMOJI = {'คณิตศาสตร์':'🔢','วิทยาศาสตร์':'🔬','ภาษาไทย':'📖','ภาษาอังกฤษ':'🌐','สังคมศึกษา':'🌍','สอบเข้า ม.1':'🎓'};
+const SUBJ_BG = {'คณิตศาสตร์':'#eff6ff','วิทยาศาสตร์':'#f0fdf4','ภาษาไทย':'#fff7ed','ภาษาอังกฤษ':'#f0f9ff','สังคมศึกษา':'#fefce8','สอบเข้า ม.1':'#faf5ff'};
 function initExams(){
+  if(!Store._cloudLoaded){
+    const _sg=document.getElementById('examsSubjGrid');
+    if(_sg) _sg.innerHTML='';
+    renderCloudLoading(document.getElementById('examsList'), 'exams');
+    return;
+  }
   const s=Store.load();
   const published=(s.exams||[]).filter(e=>e.published);
   const subjFilterEl=document.getElementById('examsSubjFilter');
-  let subjectFilter='';
-  let folderFilter=null; // null = ยังไม่เลือกโฟลเดอร์ (โชว์ folder grid ถ้าวิชานี้มีโฟลเดอร์), 'none' = เลือก "ทั่วไป", หรือ folderId
+  // คงวิชาที่เลือกไว้เฉพาะตอน soft refresh (Firebase listener re-nav) — เข้าหน้าเองยังเริ่มที่หน้าเลือกวิชา
+  let subjectFilter = window._softRefreshing ? (window._examsSubjectFilter||'') : '';
+  if(!window._softRefreshing) window._examsSubjectFilter = '';
+  // folderFilter: null = ยังไม่เลือกโฟลเดอร์ (โชว์ folder grid ถ้าวิชานี้มีโฟลเดอร์), 'none' = "ทั่วไป", หรือ folderId
+  // คงไว้เฉพาะตอน soft refresh เหมือน subjectFilter ข้างบน
+  let folderFilter = window._softRefreshing ? (window._examsFolderFilter ?? null) : null;
+  if(!window._softRefreshing) window._examsFolderFilter = null;
   const _myName = Auth.getName ? Auth.getName() : '';
   const isTeacher = Auth.isTeacher();
   let _editMode = false;
@@ -4465,14 +4496,12 @@ function initExams(){
     const maxOrder = Math.max(0, ...s3.examFolders.filter(f=>f.subject===subjectFilter).map(f=>f.order||0));
     s3.examFolders.push({id:'folder_'+Math.random().toString(16).slice(2), subject:subjectFilter, name:name.trim(), order:maxOrder+1});
     Store.save(s3);
-    folderFilter=null; // แสดง folder grid ทันทีหลังสร้าง (เผื่อกำลังอยู่ในมุมมองการ์ดแบน)
+    folderFilter=null; window._examsFolderFilter=null; // แสดง folder grid ทันทีหลังสร้าง
     renderExams();
   }
   if(createFolderBtn) createFolderBtn.onclick = createFolderForCurrentSubject;
 
-  const KNOWN_SUBJS = ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
-  const SUBJ_EMOJI = {'คณิตศาสตร์':'🔢','วิทยาศาสตร์':'🔬','ภาษาไทย':'📖','ภาษาอังกฤษ':'🌐','สังคมศึกษา':'🌍','สอบเข้า ม.1':'🎓'};
-  const SUBJ_BG = {'คณิตศาสตร์':'#eff6ff','วิทยาศาสตร์':'#f0fdf4','ภาษาไทย':'#fff7ed','ภาษาอังกฤษ':'#f0f9ff','สังคมศึกษา':'#fefce8','สอบเข้า ม.1':'#faf5ff'};
+  // KNOWN_SUBJS/SUBJ_EMOJI/SUBJ_BG ประกาศ module-level เหนือฟังก์ชันนี้
 
   const subjectGrid = document.getElementById('examsSubjGrid');
   const backRow = document.getElementById('examsBackToSubj');
@@ -4481,12 +4510,13 @@ function initExams(){
   if(backBtn) backBtn.onclick = () => {
     if(folderFilter!==null){
       // ถอยจากมุมมองในโฟลเดอร์ → กลับไป folder grid ของวิชาเดิม
-      folderFilter=null;
+      folderFilter=null; window._examsFolderFilter=null;
       if(subjLabel) subjLabel.textContent = subjectFilter;
       renderExams();
       return;
     }
     subjectFilter = '';
+    window._examsSubjectFilter = '';
     if(backRow){ backRow.style.display='none'; }
     renderSubjectGrid();
   };
@@ -4550,7 +4580,8 @@ function initExams(){
           if(ev.target.closest('.subj-drag-handle')) return;
           if(_editMode) return;
           subjectFilter = card.dataset.subj;
-          folderFilter = null; // เข้าวิชาใหม่ทุกครั้ง เริ่มจากยังไม่เลือกโฟลเดอร์เสมอ
+          window._examsSubjectFilter = subjectFilter;
+          folderFilter = null; window._examsFolderFilter = null; // เข้าวิชาใหม่ทุกครั้ง เริ่มจากยังไม่เลือกโฟลเดอร์เสมอ
           if(subjLabel) subjLabel.textContent = subjectFilter;
           if(backRow){ backRow.style.display='flex'; }
           subjectGrid.innerHTML = '';
@@ -4695,7 +4726,7 @@ function initExams(){
       card.addEventListener('click', ev=>{
         if(ev.target.closest('[data-editfolder],[data-delfolder]')) return;
         const fid = card.dataset.folder;
-        folderFilter = fid;
+        folderFilter = fid; window._examsFolderFilter = fid;
         const chosen = fid==='none' ? 'ทั่วไป' : (sortedFolders.find(f=>f.id===fid)?.name || fid);
         if(subjLabel) subjLabel.textContent = subjectFilter + ' › ' + chosen;
         renderExams();
@@ -4748,10 +4779,9 @@ function initExams(){
 
   function renderExams(){
     if(!subjectFilter){ renderSubjectGrid(); return; }
-    if(createFolderBtn) createFolderBtn.style.display = subjectFilter==='อื่นๆ' ? 'none' : '';
     const s2=Store.load();
     const allAttempts=s2.attempts||[];
-    const KNOWN=['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
+    const KNOWN=KNOWN_SUBJS; // ใช้รายชื่อวิชากลางตัวเดียว (module-level)
     // sort by displayOrder (exams page) — แยกจาก order (admin page)
     // ถ้ายังไม่มี displayOrder ให้ fallback ไป order เดิม
     const allPublished = (s2.exams||[]).filter(e=>e.published).sort((a,b)=>{
@@ -4762,6 +4792,7 @@ function initExams(){
     let exams=!subjectFilter?allPublished:subjectFilter==='อื่นๆ'?allPublished.filter(e=>!KNOWN.includes(e.subject||'')):allPublished.filter(e=>(e.subject||'ไม่ระบุ')===subjectFilter);
 
     // ── โฟลเดอร์: เฉพาะวิชาจริง (ไม่ใช่ "อื่นๆ" ซึ่งรวมหลายวิชา), opt-in ต่อวิชา ──
+    if(createFolderBtn) createFolderBtn.style.display = subjectFilter==='อื่นๆ' ? 'none' : '';
     const folders = subjectFilter!=='อื่นๆ' ? (s2.examFolders||[]).filter(f=>f.subject===subjectFilter) : [];
     if(folders.length && folderFilter===null){
       renderFolderGrid(folders, exams);
@@ -4786,7 +4817,7 @@ function initExams(){
       const myAttempts=isTeacher?_examAttempts:_examAttempts.filter(a=>(a.takerName||'')===_myName);
       const last=myAttempts[0];
       const bestScore=myAttempts.length?Math.max(...myAttempts.map(a=>a.score)):null;
-      // FIX: หา total ของ attempt ที่ได้ bestScore (กัน weighted exam)
+      // FIX (v47.74): หา total ของ attempt ที่ได้ bestScore (กัน weighted exam)
       const bestAtt=bestScore!=null?myAttempts.find(a=>a.score===bestScore):null;
       const bestTotal=(bestAtt&&bestAtt.total)||(last&&last.total)||e.questionCount;
       const card=document.createElement('div');
@@ -4794,9 +4825,10 @@ function initExams(){
 
       // ── Admin: per-student blocks (max 3, latest activity first) ──
       const _adminBlocksHtml=isTeacher?(()=>{
-        // FIX: ใช้ _examAttempts (ตัด weakness_practice แล้ว) ไม่ใช่ allAttempts
+        // FIX (v47.73): ใช้ _examAttempts (ตัด weakness_practice แล้ว) ไม่ใช่ allAttempts
         // เดิม pass allAttempts → ติด user ที่ทำแค่ weakness_practice → ภายใน
         // วน filter ด้วย _examAttempts กลับว่าง → uLast undefined → throw
+        // → forEach หยุด → cards หลังจากนั้นไม่ render → admin เห็นข้อสอบไม่ครบ
         const ru=getRecentAttemptUsersByExam(_examAttempts,e.id,3);
         if(!ru.length) return '<div style="font-size:12px;color:#9ca3af;margin-top:6px;">ยังไม่มีใครทำ</div>';
         return ru.map(latestAtt=>{
@@ -4805,8 +4837,7 @@ function initExams(){
           if(!uAtts.length) return ''; // defensive guard
           const uBest=Math.max(...uAtts.map(a=>a.score||0));
           const uLast=uAtts[0];
-          // FIX: หา total ของ attempt ที่ได้คะแนนสูงสุด (ไม่ใช่ e.questionCount)
-          // กัน weighted exam ที่คะแนนเต็มไม่เท่าจำนวนข้อ (เช่น 25 ข้อ = 100 คะแนน)
+          // FIX (v47.74): หา total ของ attempt ที่ได้คะแนนสูงสุด (กัน weighted exam)
           const uBestAtt=uAtts.find(a=>(a.score||0)===uBest)||uLast;
           const uBestTotal=(uBestAtt&&uBestAtt.total)||e.questionCount;
           const uPct=uLast&&uLast.total?Math.round((uLast.score||0)/uLast.total*100):0;
@@ -5023,8 +5054,17 @@ function initExams(){
     if(_myResume && _myResume.startedAt) _startResumeBadgeTick();
   }
 
-  subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;renderExams();};
-  renderSubjectGrid();
+  subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._examsSubjectFilter=subjectFilter;renderExams();};
+  if(subjectFilter){
+    // soft refresh คืนวิชาที่เลือกไว้ — เข้าหน้ารายการข้อสอบเลย (จำลอง state ตอนกด card)
+    if(subjLabel) subjLabel.textContent = subjectFilter;
+    if(backRow) backRow.style.display='flex';
+    if(subjectGrid) subjectGrid.innerHTML='';
+    renderExams();
+  } else {
+    if(backRow) backRow.style.display='none'; // กัน back row ค้างจาก state ก่อนหน้า (DOM ค้างข้ามการ navigate)
+    renderSubjectGrid();
+  }
 }
 
 // ===================== EXAM DETAIL PAGE =====================
@@ -5044,7 +5084,6 @@ function initExamDetail(id){
     <div class="hr"></div>
     <div class="card" style="padding:20px;display:grid;gap:10px;max-width:480px;">
       <input id="detailTakerName" class="btn" style="text-align:left;padding:12px 14px;font-size:15px;border-radius:14px;" placeholder="ชื่อผู้ทำ (ไม่บังคับ)" />
-      ${exam.examType !== 'fillblank-num' ? `<label id="detailAnswerSheetLabel" style="display:flex;align-items:center;gap:8px;font-size:14px;color:#374151;cursor:pointer;padding:4px 0;"><input type="checkbox" id="detailAnswerSheetMode" style="width:16px;height:16px;cursor:pointer;accent-color:#10b981;"> 📋 ใช้กระดาษคำตอบ (ฝนวง เหมือนสอบจริง)</label>` : ''}
       <button class="btn btnPrimary" id="examStartBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;">▶ เริ่มทำ (จับเวลา)</button>
       <button class="btn" id="examStartPracticeBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;color:#0891b2;border-color:#67e8f9;">📝 ฝึกซ้อม (ไม่จับเวลา)</button>
       <div class="muted" style="font-size:12px;">ไม่กรอกชื่อก็กดเริ่มได้เลย · ระบบจำชื่อล่าสุดให้อัตโนมัติ</div>
@@ -5065,14 +5104,12 @@ function initExamDetail(id){
   document.getElementById('examStartBtn').onclick=()=>{
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
-    const useAS = !!(document.getElementById('detailAnswerSheetMode')||{checked:false}).checked;
-    navigate('take', {id:exam.id, takerName:name, answerSheet:useAS||undefined});
+    navigate('take', {id:exam.id, takerName:name});
   };
   document.getElementById('examStartPracticeBtn').onclick=()=>{
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
-    const useAS = !!(document.getElementById('detailAnswerSheetMode')||{checked:false}).checked;
-    navigate('take', {id:exam.id, takerName:name, practice:true, answerSheet:useAS||undefined});
+    navigate('take', {id:exam.id, takerName:name, practice:true});
   };
   // กด Enter ก็เริ่มได้เลย
   takerEl.addEventListener('keydown', (e)=>{
@@ -5087,7 +5124,6 @@ let _takeState=null;
 function cleanupTake(){
   if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
   _takeState=null;
-  window._takeState=null;
 }
 
 let _pracState=null;
@@ -5109,9 +5145,8 @@ function initTake(id){
   const attemptId='att_'+Math.random().toString(16).slice(2);
   const LAST_TAKER_KEY='nanont:lastTakerName';
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
-  const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||'').trim();
+  const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||(Auth.isTeacher()?'':Auth.getName())||'').trim();
   const _practiceMode = !!_pageParams.practice;
-  const _answerSheetMode = !!_pageParams.answerSheet;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
   // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
   if(!_practiceMode) lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
@@ -5124,7 +5159,6 @@ function initTake(id){
     takerName:_takerName,
     practiceMode:_practiceMode
   };
-  window._takeState = _takeState;
   const st=_takeState;
 
   document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : '') + exam.title;
@@ -5194,7 +5228,6 @@ function initTake(id){
     st.currentIndex=idx;
     enterQuestion();
     render();
-    if (typeof window.answerSheetSetRow === 'function') window.answerSheetSetRow(idx);
   }
 
   // build num buttons
@@ -5343,25 +5376,6 @@ function initTake(id){
     document.getElementById('takePrevBtn').disabled=st.currentIndex===0;
     document.getElementById('takeNextBtn').disabled=st.currentIndex===total-1;
     setNumStyles();
-    if (typeof window.answerSheetRenderSheet === 'function') window.answerSheetRenderSheet();
-  }
-  window._refreshTakeChoices = render;
-
-  if (_answerSheetMode && typeof window.answerSheetMount === 'function') {
-    const choicesBlock = document.querySelector('#page-take .takeChoicesBlock');
-    if (choicesBlock) {
-      choicesBlock.querySelector('.muted').style.display = 'none';
-      document.getElementById('takeChoices').style.display = 'none';
-      const numsWrap = document.querySelector('#page-take .takeNumsWrap');
-      if (numsWrap) numsWrap.style.display = 'none';
-      choicesBlock.style.cssText = 'display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0;min-height:0;';
-      const navRow = choicesBlock.querySelector('.takeMobileNav');
-      const embedDiv = document.createElement('div');
-      embedDiv.id = 'answerSheetEmbed';
-      choicesBlock.insertBefore(embedDiv, navRow);
-      if (navRow) navRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;flex-shrink:0;border-top:1px solid #e5e7eb;';
-      window.answerSheetMount(embedDiv, total);
-    }
   }
 
   document.getElementById('takePrevBtn').onclick=()=>{gotoQuestion(Math.max(0,st.currentIndex-1));};
@@ -5500,31 +5514,33 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       if(_isWeighted) _pq.points=getQPoints(q);
       return _pq;
     });
-    const _rawElapsed = st.startedAt ? Math.floor((Date.now()-st.startedAt)/1000) : 0;
+    // หัก _pauseOffset ออกด้วย (เวลาที่ออกจากแอปไประหว่างทำค้าง) — เหมือนสูตรเดียวกับ
+    // นาฬิกาที่เดินสดใน doStart()/_calcRemaining() ไม่งั้นฝึกซ้อมที่ทำค้างข้ามวันจะได้
+    // usedSeconds รวมเวลาที่ปิดแอปไปด้วย (บั๊กที่ทำให้เห็น "เวลาที่ใช้ 1440:00 นาที")
+    const _rawElapsed = st.startedAt ? Math.max(0, Math.floor((Date.now()-st.startedAt)/1000) - _pauseOffset) : 0;
     const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
-    const takerName = st.takerName || '';
-    if (!takerName) {
-      toast('⚠️ ไม่พบชื่อผู้สอบ กรุณาออกแล้วเริ่มใหม่');
-      return;
-    }
+    // ไม่กรอกชื่อ = บันทึกเป็น 'ไม่ระบุชื่อ' (ห้าม block — คำตอบต้องไม่หาย)
+    const takerName = st.takerName || 'ไม่ระบุชื่อ';
+    // ⚠️ HIGH-RISK: ลำดับใน _doSave ห้ามสลับ — Store.save ต้องสำเร็จก่อนค่อย clearTakeResume
+    // (v47.94: เคลียร์ก่อนเซฟ = ปิดแอประหว่าง check-in modal แล้วคำตอบหายทั้ง attempt)
     function _doSave(feeling, prediction){
       const savedS=Store.load();
       const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
       savedS.attempts.unshift(_newAttempt);
-      if(typeof clearTakeResume === 'function') clearTakeResume(takerName);
       const ok=Store.save(savedS);
       if (!ok) {
-        toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง — คำตอบยังกู้คืนได้จากหน้าเดิม');
         return;
       }
+      if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         updateCoachStreak(takerName);
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         processGamificationAfterSubmit(takerName);
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         const _completedTiers = updateBonusQuestProgress(takerName);
         if (_completedTiers && _completedTiers.length > 0) {
           const _tierNames = {easy:'🟢 Easy',medium:'🟡 Medium',challenge:'🔴 Challenge'};
@@ -5535,10 +5551,10 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           }, 3000);
         }
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         syncDailySummary(takerName);
       }
-      if (takerName && !Auth.isTeacher()) {
+      if (st.takerName && !Auth.isTeacher()) {
         const _s3 = Store.load();
         const _ai = (_s3.assignments||[]).findIndex(a =>
           a.assignedTo === takerName &&
@@ -5634,7 +5650,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
         saveTakeResume(st);
         _lastSaveTs = now;
       }
-      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;clearTakeResume(st.takerName);submit();}
+      if(remaining===0){clearInterval(_takeInterval);_takeInterval=null;submit();}
     },250);
   }
 
@@ -5684,7 +5700,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       _resumeOverlay.remove();
       st.answers = _resume.answers || {};
       st.unsure = _resume.unsure || {};
-      st.currentIndex = _resume.currentIndex || 0;
+      st.currentIndex = Math.min(_resume.currentIndex || 0, Math.max(0, total - 1));
       st.qElapsedMs = _resume.qElapsedMs || {};
       st.answerChanges = _resume.answerChanges || {};
       st.visitOrder = Array.isArray(_resume.visitOrder) ? _resume.visitOrder.slice() : [];
@@ -5703,6 +5719,17 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     };
 
   } else {
+    // มี resume ค้างอยู่ที่ไม่ตรงกับรอบนี้ (คนละชุด หรือชุดเดิมแต่คนละโหมด) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
+    if (_rawResume && _rawResume.examId && _rawResume.startedAt &&
+        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode)) {
+      const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
+      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : ' (จับเวลา)');
+      if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
+        navigate('exams');
+        return;
+      }
+      clearTakeResume(_takerName);
+    }
     // No resume — auto-start normally
     if(Auth.isTeacher()){setTimeout(doStart,300);}
     else{setTimeout(()=>showMoodCheckIn(mood=>{st.mood=mood;doStart();}),300);}
@@ -8258,6 +8285,8 @@ function initAdminExams(){
   const folderFilterEl=document.getElementById('adminFolderFilter');
   if(subjFilterEl) subjFilterEl.onchange=(e)=>{subjectFilter=e.target.value;window._adminExamsFilter=subjectFilter;folderFilter='';renderAdmin();};
   if(folderFilterEl) folderFilterEl.onchange=(e)=>{folderFilter=e.target.value;renderAdmin();};
+  const dlAllBtn=document.getElementById('adminDownloadAllAnswerKeys');
+  if(dlAllBtn) dlAllBtn.onclick=downloadAllAnswerKeyTemplates;
 
   function renderAdmin(){
     const all=(s.exams||[]).slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
@@ -8354,22 +8383,21 @@ function initAdminExams(){
         const modalFiles=document.getElementById('adminDeleteModalFiles');
         const modalOk=document.getElementById('adminDeleteModalOk');
         const modalCancel=document.getElementById('adminDeleteModalCancel');
+        const modalPurge=document.getElementById('adminDeleteModalPurge');
         if(!modal) return;
         modalText.textContent=`ต้องการลบ "${exam.title}" ใช่ไหม?`;
-        const isStorage=(url)=>url&&!url.startsWith('localpdf:')&&!url.startsWith('./')&&!url.includes('drive.google.com')&&url.startsWith('https://firebasestorage');
-        const filesToDelete=[];
-        if(isStorage(exam.pdfUrl)) filesToDelete.push('📄 PDF โจทย์ (Firebase Storage)');
-        if(isStorage(exam.answerPdfUrl)) filesToDelete.push('✅ PDF เฉลย (Firebase Storage)');
-        modalFiles.innerHTML=filesToDelete.length
-          ?'<div style="padding:6px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#c2410c;">⚠️ ไฟล์ต่อไปนี้จะถูกลบถาวรจาก Firebase Storage:<br>'+filesToDelete.map(f=>`• ${f}`).join('<br>')+'</div>'
-          :'';
+        // ไฟล์ PDF ใน Firebase Storage จะไม่ถูกลบตามอีกต่อไป เว้นแต่ติ๊ก "ลบถาวร" — ดู CLAUDE.md
+        modalFiles.innerHTML='';
+        if(modalPurge) modalPurge.checked=false; // ปิดไว้ก่อนเสมอทุกครั้งที่เปิด modal — ปลอดภัยไว้ก่อน
         modal.classList.add('show');
         const newOk=modalOk.cloneNode(true);
         modalOk.parentNode.replaceChild(newOk,modalOk);
         newOk.onclick=async()=>{
           modal.classList.remove('show');
-          if(exam.pdfUrl) FirebaseSync.deleteStoragePdf(exam.pdfUrl);
-          if(exam.answerPdfUrl) FirebaseSync.deleteStoragePdf(exam.answerPdfUrl);
+          if(modalPurge && modalPurge.checked){
+            if(exam.pdfUrl) FirebaseSync.deleteStoragePdf(exam.pdfUrl);
+            if(exam.answerPdfUrl) FirebaseSync.deleteStoragePdf(exam.answerPdfUrl);
+          }
           s.exams=s.exams.filter(x=>x.id!==id);
           if(s.questions&&s.questions[id]) delete s.questions[id];
           Store.save(s);toast('ลบชุดข้อสอบแล้ว');renderAdmin();
@@ -8384,10 +8412,11 @@ function initAdminExams(){
       btn.addEventListener('click',()=>{
         const id=btn.getAttribute('data-id'),dir=btn.getAttribute('data-move');
         s.exams.forEach((ex,idx)=>{if(typeof ex.order!=='number') ex.order=idx+1;});
-        const sorted=s.exams.slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
-        const i=sorted.findIndex(x=>x.id===id);if(i<0) return;
-        const j=dir==='up'?i-1:i+1;if(j<0||j>=sorted.length) return;
-        const tmp=sorted[i].order;sorted[i].order=sorted[j].order;sorted[j].order=tmp;
+        // สลับกับเพื่อนบ้านใน "list" (รายการที่กรองวิชาแล้ว) ไม่ใช่ทุกวิชา — กันสลับข้ามวิชาที่มองไม่เห็น
+        // (list เป็น reference เดียวกับ object ใน s.exams — แก้ .order ตรงๆ มีผลจริง)
+        const i=list.findIndex(x=>x.id===id);if(i<0) return;
+        const j=dir==='up'?i-1:i+1;if(j<0||j>=list.length) return;
+        const tmp=list[i].order;list[i].order=list[j].order;list[j].order=tmp;
         Store.save(s);renderAdmin();
       });
     });
@@ -8471,6 +8500,9 @@ function showTierReward(emoji, label, ptsText, rewardName) {
   m.style.display = 'flex';
 }
 
+// state นอก initRewards — ต้องอยู่รอดข้ามการเรียกซ้ำ (soft refresh เรียก initRewards ใหม่ทุกครั้ง)
+let _rewardsReqId = 0;
+const _rewardsWeaknessFetched = new Set();
 function initRewards() {
   const isTeacher = Auth.isTeacher();
   const bodyEl = document.getElementById('rewardsBody');
@@ -8528,13 +8560,27 @@ function initRewards() {
       <div id="rewardsContent"></div>
     `;
     bodyEl.innerHTML = tabsHtml;
-    if (initialUserId) renderRewardsFor(initialUserId);
+    // ดึง weakness ของนักเรียนจาก cloud ก่อน render — เครื่องครูไม่มี listener ฟัง weakness
+    // ของตัวเอง (ตั้งใจ) ถ้า render ก่อนโหลด quest progress จะคำนวณจาก local ว่างแล้วเขียนทับ
+    // ค่าจริงใน store ที่ share กับ Firebase กลับเป็น 0
+    // fetch ครั้งเดียวต่อคนต่อ session (กันหน้ากระพริบตอน soft refresh) + req id กันสลับ tab เร็วแล้ววาดผิดคน
+    const _loadRewardsTab = (name) => {
+      const _req = ++_rewardsReqId;
+      if (_rewardsWeaknessFetched.has(name)) { renderRewardsFor(name); return; }
+      const _c = document.getElementById('rewardsContent');
+      if (_c) _c.innerHTML = '<div class="muted" style="text-align:center;padding:30px;">กำลังโหลด...</div>';
+      fetchWeaknessFromCloud(name)
+        .then(() => { _rewardsWeaknessFetched.add(name); })
+        .catch(() => {})
+        .then(() => { if (_req === _rewardsReqId) renderRewardsFor(name); });
+    };
+    if (initialUserId) _loadRewardsTab(initialUserId);
     const tabs = bodyEl.querySelectorAll('.rewardsTab');
     tabs.forEach(btn => {
       btn.addEventListener('click', () => {
         const name = btn.getAttribute('data-name');
         tabs.forEach(b => { b.style.cssText = _rTabStyle(b === btn); });
-        renderRewardsFor(name);
+        _loadRewardsTab(name);
       });
     });
   } else {
@@ -8570,7 +8616,7 @@ function renderRewardsFor(userId, opts) {
     return;
   }
 
-  const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // ใช้ esc() global (escape ครบกว่า local เดิม — superset, ผล render เท่ากัน)
 
   // Trophy Road UI — G6 (Section 1) + Reward Claim Flow — G7
   const state = getGamificationState(userId);
@@ -9007,7 +9053,7 @@ function initAdminRewards(){
     const host = document.getElementById('adminRewardsStudyRoad');
     if(!host) return;
     const rewards = getStudyRoadRewards();
-    const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const escAttr = esc; // ใช้ esc() global (escape ครบกว่า — superset, ผล render เท่ากัน)
     host.innerHTML = REWARD_TIERS.map(t => {
       const v = escAttr(rewards[t.key] || '');
       const head = /^\d+$/.test(t.key) ? (t.key + ' pt → ' + t.label) : t.label;
@@ -9096,7 +9142,7 @@ function initAdminRewards(){
       ? 'background:#111;color:#fff;border:1px solid #111;'
       : 'background:#fff;color:#111;border:1px solid #d1d5db;')
       + 'padding:6px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;';
-    const esc = (v) => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    // ใช้ esc() global (escape ครบกว่า local เดิม)
     function show(name){
       Array.from(tabsHost.children).forEach(b => { b.style.cssText = tabStyle(b.getAttribute('data-name') === name); });
       renderRewardsFor(name, { host: viewHost, adminTools: true, afterRender: _renderPendingClaims });
@@ -9115,7 +9161,7 @@ function initAdminRewards(){
     const host = document.getElementById('adminRewardsQuestConfig');
     if(!host) return;
     const cfg = getQuestConfig();
-    const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const escAttr = esc; // ใช้ esc() global
     const tierColor = { easy:'#16a34a', medium:'#b45309', challenge:'#dc2626' };
 
     // Main quest rows — target + reward only (description is auto-generated from the student's weakness)
@@ -9226,7 +9272,7 @@ function initAdminMembers(){
       const currentFocus = (typeof getFocusSubjects === 'function') ? getFocusSubjects(m.name) : [];
       const focusBox = document.createElement('div');
       focusBox.style.cssText = 'background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-top:4px;margin-bottom:8px;';
-      const escAttr = (v) => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      const escAttr = esc; // ใช้ esc() global
       const badgesHtml = currentFocus.length
         ? currentFocus.map(sub => '<span class="badge ok" style="margin-left:6px;">' + escAttr(sub) + '</span>').join('')
         : '<span class="muted" style="margin-left:6px;font-size:12px;">— ยังไม่ได้ตั้ง</span>';
@@ -9357,7 +9403,7 @@ function initAdminMembers(){
         const dup = ms.find((x,j) => x.pin===newPin && j!==i);
         if (dup) { errEl.textContent='รหัสนี้ใช้โดย "'+dup.name+'" อยู่แล้ว'; return; }
         errEl.textContent='';
-        ms[i] = {pin:newPin, name:newName};
+        ms[i] = {...ms[i], pin:newPin, name:newName};
         s2.members = ms;
         Store.save(s2);
         toast('✅ บันทึกแล้ว');
@@ -9417,6 +9463,190 @@ function initAdminMembers(){
   }
 
   renderMembers();
+}
+
+// ===================== ADMIN BACKUP & RESTORE =====================
+function initAdminBackup(){
+  if(!Auth.isTeacher()){navigate('home');return;}
+
+  let _allBackups = [];
+  let _activeTab = 'auto';
+  let _pendingRestoreData = null;
+
+  function fmtDateTime(ts){
+    if(!ts) return '-';
+    try { return new Date(ts).toLocaleString('th-TH', {dateStyle:'medium', timeStyle:'short'}); }
+    catch(e){ return '-'; }
+  }
+
+  function renderList(){
+    const listEl = document.getElementById('backupList');
+    if(!listEl) return;
+    const filtered = _allBackups.filter(b => b.type === _activeTab);
+    const manualCount = _allBackups.filter(b => b.type === 'manual').length;
+    const manualCountEl = document.getElementById('backupManualCount');
+    if (manualCountEl) manualCountEl.textContent = manualCount;
+    const warnEl = document.getElementById('backupManualWarn');
+    if (warnEl) warnEl.textContent = manualCount > 20 ? '⚠️ มีสำรองเองสะสมมาก ลองลบรายการเก่าที่ไม่ใช้แล้ว' : '';
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="muted" style="text-align:center;padding:24px;font-size:13px;">'
+        + (_activeTab === 'auto' ? 'ยังไม่มีสำรองอัตโนมัติ (จะเริ่มสร้างอัตโนมัติทุกวัน 01:00 น.)' : 'ยังไม่มีสำรองที่บันทึกเอง')
+        + '</div>';
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(b => {
+      const title = _activeTab === 'auto'
+        ? ('🕐 สำรองอัตโนมัติ ' + esc(b.date || ''))
+        : ('✍️ ' + esc(b.label || '(ไม่มีชื่อ)'));
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #e5e7eb;">'
+        + '<div><div style="font-weight:700;font-size:14px;">' + title + '</div>'
+        + '<div class="muted" style="font-size:12px;">' + esc(fmtDateTime(b.ts)) + '</div></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button class="btn" data-restore="' + esc(b.id) + '" type="button">♻️ กู้คืน</button>'
+        + (_activeTab === 'manual' ? '<button class="btn" style="color:#b91c1c;border-color:#fca5a5;" data-del="' + esc(b.id) + '" type="button">ลบ</button>' : '')
+        + '</div></div>';
+    }).join('');
+
+    listEl.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.onclick = () => openRestoreModal(btn.getAttribute('data-restore'));
+    });
+    listEl.querySelectorAll('[data-del]').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.getAttribute('data-del');
+        const meta = _allBackups.find(b => b.id === id);
+        if (!meta) return;
+        if (!confirm('ลบสำรอง "' + (meta.label || '(ไม่มีชื่อ)') + '" ถาวรใช่ไหม?')) return;
+        const ok = await FirebaseSync.deleteBackup(id);
+        toast(ok ? '🗑️ ลบสำรองแล้ว' : '❌ ลบไม่สำเร็จ');
+        if (ok) loadList();
+      };
+    });
+  }
+
+  async function loadList(){
+    const errEl = document.getElementById('backupListError');
+    if (errEl) errEl.textContent = '';
+    _allBackups = await FirebaseSync.listBackups();
+    renderList();
+  }
+
+  function updateOkState(){
+    const inputEl = document.getElementById('backupRestoreConfirmInput');
+    const okBtn = document.getElementById('backupRestoreOk');
+    if (!inputEl || !okBtn) return;
+    okBtn.disabled = !(_pendingRestoreData && inputEl.value.trim() === 'กู้คืน');
+  }
+
+  async function openRestoreModal(id){
+    const meta = _allBackups.find(b => b.id === id);
+    if (!meta) return;
+    _pendingRestoreData = null;
+
+    const modal = document.getElementById('backupRestoreModal');
+    const labelEl = document.getElementById('backupRestoreLabel');
+    const compareEl = document.getElementById('backupRestoreCompare');
+    const inputEl = document.getElementById('backupRestoreConfirmInput');
+    const okBtn = document.getElementById('backupRestoreOk');
+    if (!modal) return;
+
+    labelEl.textContent = meta.type === 'auto'
+      ? ('สำรองอัตโนมัติวันที่ ' + (meta.date || fmtDateTime(meta.ts)))
+      : ('สำรองเอง: ' + (meta.label || '(ไม่มีชื่อ)') + ' — ' + fmtDateTime(meta.ts));
+    compareEl.textContent = '⏳ กำลังโหลดข้อมูล...';
+    inputEl.value = '';
+    okBtn.disabled = true;
+    okBtn.textContent = '♻️ กู้คืนข้อมูล';
+    modal.classList.add('show');
+
+    const data = await FirebaseSync.loadBackupData(id);
+    if (!data) {
+      compareEl.textContent = '❌ โหลดข้อมูล backup ไม่สำเร็จ';
+      return;
+    }
+    _pendingRestoreData = data;
+
+    const cur = Store.load();
+    const curExams = (cur.exams || []).length;
+    const curAttempts = (cur.attempts || []).length;
+    const curMembers = (cur.members || []).length;
+    const bkExams = (data.exams || []).length;
+    const bkAttempts = (data.attempts || []).length;
+    const bkMembers = (data.members || []).length;
+    compareEl.innerHTML =
+      '<div>📌 ปัจจุบัน: ' + curExams + ' ชุดข้อสอบ, ' + curAttempts + ' attempts, ' + curMembers + ' สมาชิก</div>' +
+      '<div>📦 backup: ' + bkExams + ' ชุดข้อสอบ, ' + bkAttempts + ' attempts, ' + bkMembers + ' สมาชิก</div>';
+
+    updateOkState();
+  }
+
+  const confirmInput = document.getElementById('backupRestoreConfirmInput');
+  if (confirmInput) confirmInput.oninput = updateOkState;
+
+  const cancelBtn = document.getElementById('backupRestoreCancel');
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      document.getElementById('backupRestoreModal').classList.remove('show');
+      _pendingRestoreData = null;
+    };
+  }
+
+  // Ok button: clone-node rebind — modal is reused across every row, must not accumulate stale closures
+  const okBtnOrig = document.getElementById('backupRestoreOk');
+  if (okBtnOrig) {
+    const newOk = okBtnOrig.cloneNode(true);
+    okBtnOrig.parentNode.replaceChild(newOk, okBtnOrig);
+    newOk.onclick = async () => {
+      if (!_pendingRestoreData) return;
+      if (!Store._cloudLoaded) { toast('⚠️ ยังไม่พร้อม sync กับ cloud ลองใหม่อีกครั้ง'); return; }
+      const okBtn = document.getElementById('backupRestoreOk');
+      okBtn.disabled = true;
+      okBtn.textContent = 'กำลังกู้คืน...';
+      // bypass Store.save()'s stale-snapshot merge (นี่คือ full overwrite ตั้งใจ ไม่ใช่การ save ปกติ)
+      // — ทำให้ _cache ตรงกับ data ที่จะ save ก่อน (data===this._cache) branch merge จะไม่ทำงาน
+      _pendingRestoreData._savedAt = Date.now();
+      Store._cache = _pendingRestoreData;
+      const ok = await FirebaseSync.saveDoc('mainStore', Store._cache);
+      if (ok) {
+        localStorage.removeItem('nanont:syncPending');
+        toast('✅ กู้คืนสำเร็จ กำลังโหลดหน้าใหม่... (แนะนำให้แจ้งนักเรียนรีเฟรชหน้าเว็บด้วย)');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        okBtn.disabled = false;
+        okBtn.textContent = '♻️ กู้คืนข้อมูล';
+        toast('❌ กู้คืนไม่สำเร็จ กรุณาลองใหม่');
+      }
+    };
+  }
+
+  const tabAutoBtn = document.getElementById('backupTabAuto');
+  const tabManualBtn = document.getElementById('backupTabManual');
+  function setActiveTab(tab){
+    _activeTab = tab;
+    if (tabAutoBtn) tabAutoBtn.classList.toggle('btnPrimary', tab === 'auto');
+    if (tabManualBtn) tabManualBtn.classList.toggle('btnPrimary', tab === 'manual');
+    renderList();
+  }
+  if (tabAutoBtn) tabAutoBtn.onclick = () => setActiveTab('auto');
+  if (tabManualBtn) tabManualBtn.onclick = () => setActiveTab('manual');
+
+  const backupNowBtn = document.getElementById('backupNowBtn');
+  if (backupNowBtn) {
+    backupNowBtn.onclick = async () => {
+      const label = (prompt('ตั้งชื่อสำรอง (ไม่บังคับ):', '') || '').trim();
+      backupNowBtn.disabled = true;
+      const prevText = backupNowBtn.textContent;
+      backupNowBtn.textContent = 'กำลังสำรอง...';
+      const ok = await FirebaseSync.saveManualBackup(Store.load(), label);
+      backupNowBtn.disabled = false;
+      backupNowBtn.textContent = prevText;
+      toast(ok ? '✅ สำรองข้อมูลแล้ว' : '❌ สำรองไม่สำเร็จ');
+      if (ok) loadList();
+    };
+  }
+
+  loadList();
 }
 
 // ===================== ADMIN NEW PAGE =====================
@@ -9761,6 +9991,39 @@ function initEditor(examId){
     };
   });
 
+  // ── ประเภทข้อสอบ (mc / fillblank-num) ──
+  // _isFillNum ถูกคำนวณครั้งเดียวตอนเข้าฟังก์ชัน (บรรทัด ~9846) แล้วฝังอยู่ใน closure
+  // ของ renderTable/import อีกหลายจุด — เปลี่ยนแล้ว re-init ทั้งหน้าผ่าน navigate()
+  // ง่ายและปลอดภัยกว่าไล่แก้ทุก closure ที่อ้าง _isFillNum เดิม
+  const _examTypeBtns=document.querySelectorAll('#editorExamTypeBtns .examTypeBtn');
+  function _syncExamTypeBtnStyle(btn, active){
+    btn.classList.toggle('active', active);
+    if(active){
+      btn.style.background = btn.dataset.val==='fillblank-num' ? '#fef3c7' : '#eef2ff';
+      btn.style.borderColor = btn.dataset.val==='fillblank-num' ? '#fcd34d' : '#c7d2fe';
+      btn.style.color = btn.dataset.val==='fillblank-num' ? '#b45309' : '#4338ca';
+    } else {
+      btn.style.background='#fff'; btn.style.borderColor='#e5e7eb'; btn.style.color='#6b7280';
+    }
+  }
+  _examTypeBtns.forEach(btn=>{
+    _syncExamTypeBtnStyle(btn, btn.dataset.val===exam.examType);
+    btn.onclick=()=>{
+      const newType=btn.dataset.val;
+      if(newType===exam.examType) return;
+      const hasAnyAnswers=list.some(q=>q.correct);
+      if(!confirm(hasAnyAnswers
+        ? 'เปลี่ยนประเภทข้อสอบ? เฉลยที่กรอกไว้ทั้งหมดจะถูกล้าง (รูปแบบคำตอบข้ามประเภทกันไม่ได้)'
+        : 'เปลี่ยนประเภทข้อสอบ?')) return;
+      exam.examType=newType;
+      list.forEach(q=>{ q.correct=''; });
+      s.questions[examId]=list;
+      Store.save(s);
+      toast('เปลี่ยนประเภทข้อสอบแล้ว');
+      navigate('admin_editor', {id: examId});
+    };
+  });
+
   // ── Duration ──
   const durationInput=document.getElementById('editorDurationMin');
   const durationBtn=document.getElementById('editorDurationBtn');
@@ -9783,12 +10046,10 @@ function initEditor(examId){
   if(editorPdfUrlEl) editorPdfUrlEl.value = (exam.pdfUrl && !exam.pdfUrl.startsWith('localpdf:')) ? exam.pdfUrl : '';
 
   function updateExamPdf(newUrl) {
-    const oldUrl = exam.pdfUrl;
     exam.pdfUrl = newUrl;
     Store.save(s);
     document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
-    // Delete old Storage PDF if it was a Firebase Storage URL
-    FirebaseSync.deleteStoragePdf(oldUrl);
+    // ไฟล์ PDF เดิมใน Storage จะไม่ถูกลบตามอีกต่อไป (เผื่อกู้คืนภายหลัง) — ดู CLAUDE.md
     toast('✅ อัปเดต PDF แล้ว');
   }
 
@@ -10038,6 +10299,7 @@ function initEditor(examId){
           }
         });
         if(_quickTagSelected===t) _quickTagSelected=null;
+        s.questions[examId]=list;
         Store.save(s);
         _qtRenderChips();
         _qtUpdateInputUI();
@@ -10088,6 +10350,7 @@ function initEditor(examId){
         }
       }
     });
+    s.questions[examId]=list;
     Store.save(s);
     renderTable();
     if(_qtMsgEl){
@@ -10146,6 +10409,7 @@ function initEditor(examId){
       }
     }
     exam.questionCount = newCount;
+    s.questions[examId]=list;
     Store.save(s);
     renderTable();
     qCountStatus.textContent = newCount > oldCount
@@ -10161,7 +10425,50 @@ function initEditor(examId){
   };
 
   // bind excel import สำหรับ editor
-  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted);
+  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted, exam.subject);
+}
+
+// ===================== ADMIN EXAM LIST — ดาวน์โหลด Template เฉลยทุกวิชา =====================
+// ฟอร์มพิมพ์ให้กรอกเองออฟไลน์ (ไม่ใช่ import กลับเข้าระบบ — คนละแบบกับ downloadExcelTemplate
+// ด้านล่าง) — 1 sheet ต่อวิชา แต่ละชุดข้อสอบมีแถวหัวเรื่อง (ชื่อชุด + สถานะอัพโหลด PDF)
+// ตามด้วยตาราง ข้อ/เฉลย 5 คอลัมน์คู่ จำนวนแถวปรับตาม questionCount ของชุดนั้นๆ
+// ช่องเฉลยดึงจาก q.correct จริงในระบบ (ถ้าข้อไหนยังไม่มีเฉลย ปล่อยว่างไว้ให้กรอกเพิ่ม)
+function downloadAllAnswerKeyTemplates(){
+  if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
+  const s=Store.load();
+  const all=(s.exams||[]).slice().sort((a,b)=>((a.order??0)-(b.order??0))||((a.uploadedAt??0)-(b.uploadedAt??0)));
+  if(!all.length){ toast('ยังไม่มีชุดข้อสอบ'); return; }
+  const subjects=Array.from(new Set(all.map(e=>(e.subject||'ไม่ระบุ')))).sort((a,b)=>a.localeCompare(b,'th'));
+  const wb=XLSX.utils.book_new();
+  const PAIRS=5;
+  subjects.forEach(subject=>{
+    const rows=[];
+    all.filter(e=>(e.subject||'ไม่ระบุ')===subject).forEach(e=>{
+      const n=e.questionCount||0;
+      const R=Math.max(1, Math.ceil(n/PAIRS));
+      const answerByNo={};
+      (s.questions&&s.questions[e.id]||[]).forEach(q=>{
+        const no=q.no||q.number;
+        if(no) answerByNo[no]=q.correct||'';
+      });
+      rows.push([e.title, '', '', '', '', '', '', '', e.pdfUrl?'✓ อยู่ในระบบแล้ว':'ยังไม่อัพโหลด', '']);
+      rows.push(['ข้อ','เฉลย','ข้อ','เฉลย','ข้อ','เฉลย','ข้อ','เฉลย','ข้อ','เฉลย']);
+      for(let r=1;r<=R;r++){
+        const row=[];
+        for(let k=0;k<PAIRS;k++){
+          const qNum=k*R+r;
+          row.push(qNum<=n?qNum:'', qNum<=n?(answerByNo[qNum]||''):'');
+        }
+        rows.push(row);
+      }
+      rows.push([]); // แถวว่างคั่นระหว่างชุดข้อสอบ
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=Array.from({length:10},()=>({wch:8}));
+    const safeName=subject.replace(/[\\/?*[\]:]/g,'').slice(0,31)||'ไม่ระบุ';
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  });
+  XLSX.writeFile(wb, `เฉลย_ทุกวิชา_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
@@ -10330,6 +10637,7 @@ function parseExcelFile(file, examType, weighted) {
         }
 
         const result = [];
+        const skipped = [];
         for (let i = startRow; i < rows.length; i++) {
           const row = rows[i];
           const no = parseInt(row[0]);
@@ -10350,9 +10658,12 @@ function parseExcelFile(file, examType, weighted) {
             const entry={ no, page, correct: (correct==null?_defaultCorrect:correct), topic: topic||'', isFree };
             if(_isWeighted) entry.points=points;
             result.push(entry);
+          } else if (!isNaN(no) && no > 0) {
+            // เลขข้อถูกต้องแต่เฉลยอ่านไม่ออก — แจ้งเตือนแทนตัดทิ้งเงียบๆ (กันเลขข้อเลื่อน)
+            skipped.push(no);
           }
         }
-        resolve(result);
+        resolve({ rows: result, skipped });
       } catch(err) {
         reject(err);
       }
@@ -10380,15 +10691,17 @@ function parseExcelFile(file, examType, weighted) {
     try {
       const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
       const _examType=_activeType?_activeType.dataset.val:'mc';
-      const data = await parseExcelFile(file, _examType);
+      const { rows: data, skipped } = await parseExcelFile(file, _examType);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
       window._newExcelData = data;
-      // อัปเดต qCount ให้ตรงกับ excel
+      // อัปเดต qCount จากเลขข้อสูงสุด ไม่ใช่จำนวนแถวที่รอด — กันแถวที่ถูกข้ามทำให้เลขข้อเลื่อน
+      const maxNo = data.reduce((m,r)=>Math.max(m,r.no),0);
       const qCountEl = document.getElementById('newQCount');
-      if (qCountEl) qCountEl.value = data.length;
+      if (qCountEl) qCountEl.value = maxNo;
       status.textContent = '';
       preview.style.display = 'block';
-      preview.textContent = `✅ อ่านสำเร็จ ${data.length} ข้อ — ตัวอย่าง: ข้อ${data[0].no} หน้า${data[0].page} เฉลย${data[0].correct}`;
+      const _skipMsg = skipped.length ? ` ⚠️ ข้ามข้อ ${skipped.join(',')} (เฉลยอ่านไม่ออก — กรุณาแก้เอง)` : '';
+      preview.textContent = `✅ อ่านสำเร็จ ${data.length} ข้อ (สูงสุดข้อที่ ${maxNo}) — ตัวอย่าง: ข้อ${data[0].no} หน้า${data[0].page} เฉลย${data[0].correct}${_skipMsg}`;
     } catch(err) {
       window._newExcelData = null;
       status.textContent = '❌ ' + err.message;
@@ -10398,15 +10711,15 @@ function parseExcelFile(file, examType, weighted) {
 })();
 
 // ── admin_editor: bind excel input ──
-function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
+function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject) {
   // bind template download
   const dlBtn = document.getElementById('editorDownloadTemplate');
   if (dlBtn) {
     const newDlBtn = dlBtn.cloneNode(true);
     dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
     newDlBtn.addEventListener('click', () => {
-      const _s2=Store.load(); const _topics=(_s2.subjectTopics&&exam.subject&&_s2.subjectTopics[exam.subject])||[];
-      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, exam.examType, !!exam.weighted);
+      const _s2=Store.load(); const _topics=(_s2.subjectTopics&&subject&&_s2.subjectTopics[subject])||[];
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, examType, !!(typeof getWeighted==='function'&&getWeighted()));
     });
   }
 
@@ -10424,7 +10737,7 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
     status.textContent = '⏳ กำลังอ่าน...';
     try {
       const _w=typeof getWeighted==='function'?getWeighted():false;
-      const data = await parseExcelFile(file, examType, _w);
+      const { rows: data, skipped } = await parseExcelFile(file, examType, _w);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
 
       // merge เข้า list
@@ -10442,7 +10755,8 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted) {
       });
       // re-render table
       if (renderFn) renderFn();
-      status.textContent = `✅ อัปเดต ${updated} ข้อ`;
+      const _skipMsg = skipped.length ? ` ⚠️ ข้ามข้อ ${skipped.join(',')} (เฉลยอ่านไม่ออก)` : '';
+      status.textContent = `✅ อัปเดต ${updated} ข้อ${_skipMsg}`;
       toast(`นำเข้าเฉลยสำเร็จ ${updated} ข้อ`);
     } catch(err) {
       status.textContent = '❌ ' + err.message;
@@ -11566,6 +11880,7 @@ const _GAMIFICATION_DEFAULT = () => ({
   claimedTiers: [],
   pendingTiers: [],
   lastPointDate: '',
+  pointsAwardedToday: 0,
   lastStampDate: '',
   dailyQuest: null,
   bonusQuests: [],
@@ -11587,6 +11902,7 @@ function _getGamificationUser(userId) {
       claimedTiers: Array.isArray(rec.claimedTiers) ? rec.claimedTiers.slice() : def.claimedTiers,
       pendingTiers: Array.isArray(rec.pendingTiers) ? rec.pendingTiers.slice() : def.pendingTiers,
       lastPointDate: typeof rec.lastPointDate === 'string' ? rec.lastPointDate : def.lastPointDate,
+      pointsAwardedToday: Number(rec.pointsAwardedToday) || def.pointsAwardedToday,
       lastStampDate: typeof rec.lastStampDate === 'string' ? rec.lastStampDate : def.lastStampDate,
       dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest,
       bonusQuests: Array.isArray(rec.bonusQuests) ? rec.bonusQuests.slice() : def.bonusQuests,
@@ -11595,6 +11911,9 @@ function _getGamificationUser(userId) {
   } catch { return _GAMIFICATION_DEFAULT(); }
 }
 
+// ⚠️ HIGH-RISK: ฟังก์ชันนี้เป็น WHITELIST — เขียนเฉพาะ field ที่ระบุชื่อไว้ข้างในเท่านั้น
+// เพิ่ม field ใหม่ใน gamification เมื่อไหร่ ต้องเพิ่มทั้ง 3 ที่: _GAMIFICATION_DEFAULT,
+// _getGamificationUser, และที่นี่ — ลืมที่นี่ = field หายเงียบทุกครั้งที่เซฟ (เคยพลาดจริง v47.94)
 function _saveGamificationUser(userId, data) {
   if (!userId || !data || typeof data !== 'object') return;
   const s = Store.load();
@@ -11614,6 +11933,7 @@ function _saveGamificationUser(userId, data) {
     claimedTiers: Array.isArray(data.claimedTiers) ? data.claimedTiers.slice() : [],
     pendingTiers: Array.isArray(data.pendingTiers) ? data.pendingTiers.slice() : [],
     lastPointDate: typeof data.lastPointDate === 'string' ? data.lastPointDate : '',
+    pointsAwardedToday: Math.max(0, Number(data.pointsAwardedToday) || 0),
     lastStampDate: typeof data.lastStampDate === 'string' ? data.lastStampDate : '',
     dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null,
     bonusQuests: Array.isArray(data.bonusQuests) ? data.bonusQuests.slice() : [],
@@ -11724,32 +12044,33 @@ function processGamificationAfterSubmit(userId /*, attemptData */) {
 
   const rec = _getGamificationUser(userId);
   const todayKey = getDateKey(new Date());
-  const alreadyAwardedToday = (rec.lastPointDate === todayKey);
+  if (rec.lastPointDate !== todayKey) {
+    rec.pointsAwardedToday = 0; // ขึ้นวันใหม่ — เริ่มนับคะแนนวันนี้ใหม่
+  }
 
-  let pointsAwarded = 0;
-  if (!alreadyAwardedToday) {
-    let activity = null, score = null;
-    try { activity = calculateActivity(userId); } catch { activity = null; }
-    try { score    = calculateScore(userId); }    catch { score    = null; }
+  let activity = null, score = null;
+  try { activity = calculateActivity(userId); } catch { activity = null; }
+  try { score    = calculateScore(userId); }    catch { score    = null; }
 
-    const focusSets    = (activity && Number(activity.focusSetCount))    || 0;
-    const nonFocusSets = (activity && Number(activity.nonFocusSetCount)) || 0;
-    const resolved     = (activity && Number(activity.resolvedToday))    || 0;
+  const focusSets    = (activity && Number(activity.focusSetCount))    || 0;
+  const nonFocusSets = (activity && Number(activity.nonFocusSetCount)) || 0;
+  const resolved     = (activity && Number(activity.resolvedToday))    || 0;
 
-    pointsAwarded += focusSets    * 10;
-    pointsAwarded += nonFocusSets * 5;
-    const weaknessPoints = Math.min(resolved * 1, 10);
-    pointsAwarded += weaknessPoints;
+  let totalToday = focusSets * 10 + nonFocusSets * 5 + Math.min(resolved * 1, 10);
+  if (score && score.hasScoreToday && typeof score.score === 'number' && score.score >= 85) {
+    totalToday += 5;
+  }
 
-    if (score && score.hasScoreToday && typeof score.score === 'number' && score.score >= 85) {
-      pointsAwarded += 5;
-    }
+  // ให้แต้มเฉพาะส่วนที่เพิ่มจากยอดสะสมวันนี้ — กันซ้ำโดยไม่ล็อกทั้งวันหลัง submit แรก
+  // (เดิม: submit แรกของวันล็อกแต้มทั้งวัน ทำให้กิจกรรมเล็กตอนเช้าปิดกั้นชุดใหญ่ตอนบ่าย)
+  const alreadyToday = Number(rec.pointsAwardedToday) || 0;
+  const pointsAwarded = Math.max(0, totalToday - alreadyToday);
 
-    if (pointsAwarded > 0) {
-      rec.points = (Number(rec.points) || 0) + pointsAwarded;
-      rec.lastPointDate = todayKey;
-      _saveGamificationUser(userId, rec);
-    }
+  if (pointsAwarded > 0) {
+    rec.points = (Number(rec.points) || 0) + pointsAwarded;
+    rec.pointsAwardedToday = totalToday;
+    rec.lastPointDate = todayKey;
+    _saveGamificationUser(userId, rec);
   }
 
   const stampResult = checkAndAwardStampMilestones(userId);
@@ -13326,15 +13647,62 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  // index_preview.html — ไฟล์ทดสอบชั่วคราว (เริ่มใหม่จาก v47.72 production)
+  const CURRENT_VERSION = 'v48.8';
+  const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
+  let _prompted = false;
+
+  async function checkVersion(){
+    if (_prompted) return;
+    try {
+      const res = await fetch(
+        '/Quiz-app/version.json?t=' + Date.now(),
+        { cache: 'no-store' }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.version && data.version !== CURRENT_VERSION) {
+        _prompted = true;
+        if (confirm(
+          '🆕 มีเวอร์ชันใหม่ (' + data.version + ')\n' +
+          'อัพเดทเพื่อใช้ฟีเจอร์ล่าสุดไหม?'
+        )) {
+          // reload(true) ใช้ไม่ได้แล้วในเบราว์เซอร์สมัยใหม่ — เปลี่ยน URL แทนเพื่อบังคับ bypass cache
+          window.location.href = window.location.pathname + '?_v=' + Date.now();
+        }
+      }
+    } catch(e) {
+      // silent fail — offline or fetch error
+    }
+  }
+
+  // Check on app open
+  window.addEventListener('load', () => {
+    setTimeout(checkVersion, 3000);
+  });
+
+  // Check every 5 minutes while app is open
+  window.checkVersion = checkVersion;
+  window._versionCheckInterval = setInterval(checkVersion, CHECK_INTERVAL);
+
+  // Check when app comes back to foreground
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkVersion();
+    }
+  });
+})();
+</script>
+<script>
+(function(){
+  // index_preview.html — ไฟล์ทดสอบชั่วคราว (sync ล่าสุดจาก index.html v48.8)
   // ใช้ version.json ร่วมกับ index.html จริงที่ root ทำให้เทียบเวอร์ชัน
-  // ไม่ตรงกันเสมอ — ปิด version-check ในไฟล์นี้
+  // ไม่ตรงกันเสมอ — ปิด version-check ในไฟล์นี้ (ทับ window.checkVersion ของจริงด้านบน)
   window.checkVersion = function(){};
 })();
-
+</script>
+<script>
 // ── SCRATCH PAD — Phase 1 (iPad/Apple Pencil + desktop/เมาส์) ──
 (function initScratchPad(){
-  // iPad detection: real iPad UA, or iPadOS 13+ reporting Macintosh w/ touch, or large touch screen
   const isIPad = (
     /iPad/.test(navigator.userAgent) ||
     (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) ||
@@ -13342,9 +13710,8 @@ function initEntranceCompare(params) {
   );
   // Desktop PC: มีเมาส์ (fine pointer) แต่ไม่ใช่ iPad — กันมือถือจอเล็ก (touch-only, coarse pointer)
   const isDesktop = !isIPad && window.matchMedia && window.matchMedia('(pointer:fine)').matches;
-  if (!isIPad && !isDesktop) return; // hide forever on phones/touch-only
+  if (!isIPad && !isDesktop) return;
 
-  // Inject UI once
   const btn = document.createElement('button');
   btn.id = 'scratchToggleBtn';
   btn.type = 'button';
@@ -13383,10 +13750,6 @@ function initEntranceCompare(params) {
   let eraserSize = 28;
 
   function resizeCanvas(preserve) {
-    // canvas ตั้งขนาดเท่า "เต็มจอ" เสมอ (เท่ากับโหมดขยาย) ไม่ใช่ขนาด wrap ปัจจุบัน
-    // — ตอนพับครึ่งจอ wrap (overflow:hidden) จะบังฝั่งขวาไว้เฉยๆ ไม่ตัดเนื้อหา
-    // ทิ้งจริง ฟังก์ชันนี้จึงรันแค่ตอนเปิดครั้งแรก/หน้าจอเปลี่ยนขนาดจริง (ไม่ใช่
-    // ทุกครั้งที่กดปุ่มขยาย/ย่อ — ดู scratchExpandBtn handler ด้านล่าง)
     const w = Math.max(10, Math.floor(window.innerWidth));
     const r = wrap.getBoundingClientRect();
     const h = Math.max(10, Math.floor(r.height));
@@ -13408,8 +13771,6 @@ function initEntranceCompare(params) {
     ctx.lineJoin = 'round';
     if (img && img.length > 100) {
       const i = new Image();
-      // วาดที่ขนาดเดิม (ไม่ยืดตามพื้นที่ใหม่) — ขยาย/ย่อ = เพิ่ม/ลดพื้นที่เขียนว่างๆ
-      // ข้างๆ ของเดิม ไม่ใช่ซูมของที่เขียนไว้แล้วให้ใหญ่ขึ้น
       i.onload = () => ctx.drawImage(i, 0, 0, oldW, oldH);
       i.src = img;
     }
@@ -13463,10 +13824,6 @@ function initEntranceCompare(params) {
   }
   function hideCursor() { cursorEl.classList.remove('show'); }
 
-  // ── Drawing: Touch Events ตรงๆ + touchType==='stylus' (Safari API) ──
-  // เหตุผล: Safari สร้าง Pointer Events จาก Touch ใต้ฮูด — มี race condition
-  // เวลายกปากกาแล้วลงใหม่เร็วๆ pointerdown ตัวใหม่หาย แอพวาดรูปจริง
-  // (Procreate/GoodNotes) ใช้ touch.touchType === 'stylus' โดยตรง
   let activeStylusId = null;
   function findStylus(touchList) {
     for (let i = 0; i < touchList.length; i++) {
@@ -13486,7 +13843,7 @@ function initEntranceCompare(params) {
   }
   function onTouchStart(e) {
     const t = findStylus(e.touches);
-    if (!t) return; // ไม่มีปากกาแตะ — ปล่อยให้ touch อื่น (นิ้ว) ทำอะไรก็ได้
+    if (!t) return;
     e.preventDefault();
     drawing = true;
     activeStylusId = t.identifier;
@@ -13496,7 +13853,6 @@ function initEntranceCompare(params) {
     updateCursor(p.x, p.y);
   }
   function onTouchMove(e) {
-    // อัพเดท cursor ตามตำแหน่งปากกาก่อน
     const stylus = findStylus(e.touches);
     if (stylus) {
       const sp = getPosFromTouch(stylus);
@@ -13583,8 +13939,6 @@ function initEntranceCompare(params) {
   }
 
   document.getElementById('scratchExpandBtn').addEventListener('click', () => {
-    // canvas ขนาดเท่าเต็มจอเสมอแล้ว (ดู resizeCanvas) แค่ toggle class ให้ wrap
-    // เปลี่ยนความกว้างที่ "เผย" ออกมา ไม่ต้อง resize canvas เลย
     pad.classList.toggle('full');
     _syncScratchSplit();
   });
@@ -13593,12 +13947,9 @@ function initEntranceCompare(params) {
     _syncScratchSplit();
   });
 
-  // 2-finger tap บนกระดาษทด → สลับ pen ↔ eraser
-  // (ทดแทน squeeze ของ Apple Pencil Pro ที่ Safari ยังไม่เปิด API)
   let _twoFingerStartTime = 0;
   let _twoFingerStartFingers = 0;
   canvas.addEventListener('touchstart', (e) => {
-    // นับเฉพาะนิ้ว (ไม่ใช่ปากกา)
     let fingers = 0;
     for (let i = 0; i < e.touches.length; i++) {
       if (e.touches[i].touchType !== 'stylus') fingers++;
@@ -13793,7 +14144,7 @@ function initEntranceCompare(params) {
       if (!t) return;
       endStroke();
       drawing = false; activeStylusId = null;
-      hideCursor(); // แก้บัค: cursor ต้องหายตอน Apple Pencil ยก
+      hideCursor();
     }
     overlay.addEventListener('touchstart', onTouchStart, { passive: false });
     overlay.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -13974,12 +14325,11 @@ function initEntranceCompare(params) {
 
       const overlay = document.createElement('canvas');
       overlay.className = 'pdfAnnotateCanvas';
-      overlay.style.pointerEvents = 'none'; // เปิดเฉพาะตอน palette open
+      overlay.style.pointerEvents = 'none';
       stage.appendChild(overlay);
       const ctx = overlay.getContext('2d');
 
       // hlCanvas: buffer สำหรับ highlighter stroke ปัจจุบัน
-      // CSS opacity:0.35 กัน alpha accumulation (ดวงๆ) โดยไม่ต้อง drawImage ซ้ำซ้อน
       const hlCanvas = document.createElement('canvas');
       hlCanvas.style.cssText = 'display:block;position:absolute;top:0;left:0;pointer-events:none;opacity:0.35;';
       stage.appendChild(hlCanvas);
@@ -14092,228 +14442,6 @@ function initEntranceCompare(params) {
       if (toggleBtn) toggleBtn.style.display = 'none';
     }
   });
-})();
-
-// ── ANSWER SHEET MODE — กระดาษคำตอบ (canvas + pen drawing) ──
-(function initAnswerSheet() {
-
-  const HEADER_H = 36;
-  const ROW_H    = 34;
-  const BUBBLE_R = 12;
-  const PAD_L    = 10;
-  const PAD_R    = 10;
-  const LABELS   = ['ก','ข','ค','ง'];
-  const SEL_COL  = '#111827';
-  const CUR_BG   = 'rgba(251,191,36,0.22)';
-
-  let canvasEl = null, ctx = null, embedEl = null;
-  let totalQ = 0, currentRow = 0;
-  let isDrawing = false, drawPointerId = null;
-  let inkDots = []; // [{x,y,r}] — ink dots วาดใน session ปัจจุบัน
-
-  function layoutCols(W) {
-    const avail = W - PAD_L - PAD_R;
-    const numW  = Math.round(avail * 0.20);
-    const colW  = Math.round((avail - numW) / LABELS.length);
-    return { numW, colW };
-  }
-
-  function getAnswer(qi) {
-    const st = window._takeState;
-    if (!st || !st.qsList) return null;
-    const q = st.qsList[qi]; if (!q) return null;
-    return st.answers[q.id] || null;
-  }
-
-  function syncAnswer(qi, val) {
-    const st = window._takeState;
-    if (!st || !st.qsList) return;
-    const q = st.qsList[qi]; if (!q) return;
-    if (val) st.answers[q.id] = val; else delete st.answers[q.id];
-    if (st.currentIndex === qi && typeof window._refreshTakeChoices === 'function')
-      window._refreshTakeChoices();
-  }
-
-  function hitTest(x, y) {
-    if (!canvasEl) return null;
-    const W = canvasEl.offsetWidth || 200;
-    const { numW, colW } = layoutCols(W);
-    const br = Math.min(BUBBLE_R, colW / 2 - 2);
-    for (let qi = 0; qi < totalQ; qi++) {
-      const rowCy = HEADER_H + qi * ROW_H + ROW_H / 2;
-      for (let ci = 0; ci < LABELS.length; ci++) {
-        const bx = PAD_L + numW + ci * colW + colW / 2;
-        if (Math.hypot(x - bx, y - rowCy) <= br + 10) return { qi, ci };
-      }
-    }
-    return null;
-  }
-
-  function scrollToRow(qi) {
-    if (!embedEl) return;
-    const targetY = HEADER_H + qi * ROW_H - (embedEl.clientHeight || 200) / 3;
-    embedEl.scrollTop = Math.max(0, targetY);
-  }
-
-  // ── render ──
-
-  function renderBaseSheet() {
-    if (!canvasEl || !ctx || !totalQ) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const W = canvasEl.offsetWidth || 200;
-    const H = HEADER_H + totalQ * ROW_H + 4;
-    const { numW, colW } = layoutCols(W);
-
-    canvasEl.style.width  = W + 'px';
-    canvasEl.style.height = H + 'px';
-    canvasEl.width  = Math.round(W * dpr);
-    canvasEl.height = Math.round(H * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, W, H);
-
-    // Header
-    ctx.fillStyle = '#f3f4f6';
-    ctx.fillRect(0, 0, W, HEADER_H);
-    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, HEADER_H); ctx.lineTo(W, HEADER_H); ctx.stroke();
-    ctx.fillStyle = '#6b7280'; ctx.font = 'bold 11px system-ui,sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('ข้อ', PAD_L + numW / 2, HEADER_H / 2);
-    LABELS.forEach(function(l, ci) {
-      ctx.fillText(l, PAD_L + numW + ci * colW + colW / 2, HEADER_H / 2);
-    });
-
-    const ciMap = { A:0, B:1, C:2, D:3 };
-    const br = Math.min(BUBBLE_R, colW / 2 - 2);
-
-    for (var qi = 0; qi < totalQ; qi++) {
-      var rowTop = HEADER_H + qi * ROW_H;
-      var rowCy  = rowTop + ROW_H / 2;
-
-      if (qi === currentRow) {
-        ctx.fillStyle = CUR_BG; ctx.fillRect(0, rowTop, W, ROW_H);
-      } else if (qi % 2 === 1) {
-        ctx.fillStyle = 'rgba(0,0,0,0.018)'; ctx.fillRect(0, rowTop, W, ROW_H);
-      }
-      if (qi > 0) {
-        ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(PAD_L, rowTop); ctx.lineTo(W - PAD_R, rowTop); ctx.stroke();
-      }
-
-      ctx.font = qi === currentRow ? 'bold 11px system-ui,sans-serif' : '11px system-ui,sans-serif';
-      ctx.fillStyle = qi === currentRow ? '#111827' : '#6b7280';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(qi + 1, PAD_L + numW / 2, rowCy);
-
-      var ans = getAnswer(qi);
-      var selCI = ans != null ? (ciMap[ans] !== undefined ? ciMap[ans] : -1) : -1;
-      LABELS.forEach(function(l, ci) {
-        var bx = PAD_L + numW + ci * colW + colW / 2;
-        var sel = ci === selCI;
-        ctx.beginPath(); ctx.arc(bx, rowCy, br, 0, Math.PI * 2);
-        if (sel) { ctx.fillStyle = SEL_COL; ctx.fill(); }
-        else { ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1.5; ctx.stroke(); }
-        ctx.font = '10px system-ui,sans-serif';
-        ctx.fillStyle = sel ? '#fff' : '#9ca3af';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(l, bx, rowCy);
-      });
-    }
-  }
-
-  function renderInk() {
-    if (!ctx || !inkDots.length) return;
-    ctx.save();
-    inkDots.forEach(function(d) {
-      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(17,24,39,0.35)'; ctx.fill();
-    });
-    ctx.restore();
-  }
-
-  function renderSheet() { renderBaseSheet(); renderInk(); }
-
-  // ── pen drawing ──
-
-  function handlePenMove(clientX, clientY, pressure) {
-    if (!canvasEl) return;
-    var r = canvasEl.getBoundingClientRect();
-    var x = clientX - r.left;
-    var y = clientY - r.top;
-
-    // Add ink dot (visual shading)
-    var dotR = Math.max(2, (pressure || 0.5) * 5);
-    inkDots.push({ x: x, y: y, r: dotR });
-    if (inkDots.length > 2000) inkDots = inkDots.slice(-2000);
-
-    // Hit test → select bubble (only select, not deselect during drag)
-    var hit = hitTest(x, y);
-    if (hit) {
-      var newVal = ['A','B','C','D'][hit.ci];
-      var st = window._takeState;
-      if (st && st.qsList) {
-        var q = st.qsList[hit.qi];
-        if (q && st.answers[q.id] !== newVal) {
-          syncAnswer(hit.qi, newVal);
-        }
-      }
-    }
-    renderSheet();
-  }
-
-  function attachEvents(canvas) {
-    // Use ONLY pointer events — no touchstart (fixes Apple Pencil double-fire)
-    canvas.addEventListener('pointerdown', function(e) {
-      if (e.pointerType === 'touch') return; // finger → let pan-y scroll happen
-      e.preventDefault();
-      isDrawing = true;
-      drawPointerId = e.pointerId;
-      canvas.setPointerCapture(e.pointerId);
-      inkDots = []; // clear previous session ink
-      handlePenMove(e.clientX, e.clientY, e.pressure);
-    }, { passive: false });
-
-    canvas.addEventListener('pointermove', function(e) {
-      if (!isDrawing || e.pointerId !== drawPointerId) return;
-      handlePenMove(e.clientX, e.clientY, e.pressure);
-    });
-
-    canvas.addEventListener('pointerup', function(e) {
-      if (e.pointerId === drawPointerId) { isDrawing = false; drawPointerId = null; }
-    });
-
-    canvas.addEventListener('pointercancel', function() {
-      isDrawing = false; drawPointerId = null;
-    });
-  }
-
-  // ── Public API ──
-
-  window.answerSheetMount = function(container, total) {
-    embedEl = container; totalQ = total; currentRow = 0; inkDots = [];
-    var canvas = document.createElement('canvas');
-    canvasEl = canvas; ctx = canvas.getContext('2d');
-    container.appendChild(canvas);
-    attachEvents(canvas);
-    renderSheet();
-    requestAnimationFrame(renderSheet);
-  };
-
-  window.answerSheetHide = function() {
-    canvasEl = null; ctx = null; embedEl = null; totalQ = 0; currentRow = 0; inkDots = [];
-    isDrawing = false; drawPointerId = null;
-  };
-
-  window.answerSheetSetRow = function(qi) {
-    currentRow = qi;
-    renderSheet();
-    scrollToRow(qi);
-  };
-
-  window.answerSheetRenderSheet = renderSheet;
-
 })();
 </script>
 </body>
