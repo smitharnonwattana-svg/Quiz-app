@@ -787,6 +787,99 @@ currentSection = 'examFolders';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section L: หน้ารีวิว — ปุ่ม "คำนวณคะแนนใหม่" (v48.9) กรณีแก้เฉลยผิดหลังทำข้อสอบไปแล้ว
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'recalcScore';
+{
+  const cache = baseCache({
+    exams: [mkExam('eR1', 'เลข ทดสอบ Recalc', 'คณิตศาสตร์')],
+    questions: {
+      eR1: [
+        { id: 'q1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } }, // เฉลยเดิม (ผิด) — จะแก้เป็น C
+        { id: 'q2', no: 2, number: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      ],
+    },
+    attempts: [{
+      id: 'attR1', examId: 'eR1', examTitle: 'เลข ทดสอบ Recalc', examSubject: 'คณิตศาสตร์',
+      examType: 'mc', weighted: false, takerName: 'เด็กทดสอบ',
+      startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date().toISOString(),
+      usedSeconds: 60, score: 2, total: 2,
+      answers: { q1: 'A', q2: 'B' },
+      perQuestion: [
+        { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+        { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+      ],
+      practiceMode: false, visitOrder: ['q1', 'q2'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+    }],
+  });
+  const { ctx, page } = await newSeededPage({ cache });
+
+  // ก่อนแก้เฉลย: ปุ่มคำนวณใหม่ต้องโผล่ (admin/teacher เท่านั้น)
+  await page.evaluate(() => navigate('review', { attemptId: 'attR1' }));
+  await page.waitForTimeout(400);
+  const btnVisibleBefore = await page.evaluate(() => {
+    const btn = document.getElementById('reviewRecalcBtn');
+    return btn && btn.style.display !== 'none';
+  });
+  check('recalc button visible for teacher on review page', btnVisibleBefore === true);
+
+  // แก้เฉลย q1 จาก A -> C (จำลองว่า admin ไปแก้ในหน้า editor)
+  await page.evaluate(() => {
+    const s = Store.load();
+    const q1 = s.questions.eR1.find(q => q.id === 'q1');
+    q1.correct = 'C';
+    Store.save(s);
+  });
+
+  // กดคำนวณคะแนนใหม่ (confirm ถูก auto-accept โดย newSeededPage)
+  await page.evaluate(() => document.getElementById('reviewRecalcBtn').click());
+  await page.waitForTimeout(400);
+
+  const afterRecalc = await page.evaluate(() => {
+    const s = Store.load();
+    const att = s.attempts.find(a => a.id === 'attR1');
+    return {
+      score: att.score, total: att.total,
+      q1Correct: att.perQuestion.find(p => p.qid === 'q1')?.isCorrect,
+      q2Correct: att.perQuestion.find(p => p.qid === 'q2')?.isCorrect,
+      q1CorrectAnswer: att.perQuestion.find(p => p.qid === 'q1')?.correct,
+    };
+  });
+  check('recalc updates score (2/2 -> 1/2) after fixing wrong answer key',
+    afterRecalc.score === 1 && afterRecalc.total === 2 && afterRecalc.q1Correct === false && afterRecalc.q2Correct === true && afterRecalc.q1CorrectAnswer === 'C',
+    JSON.stringify(afterRecalc));
+
+  const weaknessAfter = await page.evaluate(() => WeaknessTracker.countWeaknessesByExam('เด็กทดสอบ', 'eR1'));
+  check('recalc rebuilds weakness data — q1 now shows as active weakness', weaknessAfter === 1, 'weaknessCount=' + weaknessAfter);
+
+  await ctx.close();
+}
+{
+  // นักเรียน (ไม่ใช่ครู) ต้องไม่เห็นปุ่มคำนวณคะแนนใหม่ — ดูของตัวเองได้ปกติ แต่แก้คะแนนไม่ได้
+  const cache = baseCache({
+    exams: [mkExam('eR2', 'เลข ทดสอบ Recalc 2', 'คณิตศาสตร์')],
+    questions: { eR2: mkQ() },
+    attempts: [{
+      id: 'attR2', examId: 'eR2', examTitle: 'เลข ทดสอบ Recalc 2', examSubject: 'คณิตศาสตร์',
+      examType: 'mc', weighted: false, takerName: 'เด็กทดสอบ',
+      startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date().toISOString(),
+      usedSeconds: 60, score: 1, total: 1, answers: { q1: 'A' },
+      perQuestion: [{ qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 500, changes: 0 }],
+      practiceMode: false, visitOrder: ['q1'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+    }],
+  });
+  const { ctx, page } = await newSeededPage({ cache, role: 'student', name: 'เด็กทดสอบ' });
+  await page.evaluate(() => navigate('review', { attemptId: 'attR2' }));
+  await page.waitForTimeout(400);
+  const btnHiddenForStudent = await page.evaluate(() => {
+    const btn = document.getElementById('reviewRecalcBtn');
+    return btn && btn.style.display === 'none';
+  });
+  check('recalc button hidden for student (own attempt, not a teacher)', btnHiddenForStudent === true);
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

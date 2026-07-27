@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.8 -->
+  <!-- APP_VERSION: v48.9 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1076,7 +1076,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.8</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.9</div>
     </div>
   </div>
 </div>
@@ -1268,6 +1268,7 @@
           <div style="margin-top:10px;">
             <div id="reviewWrongListText" class="wrongText"></div>
           </div>
+          <button class="btn" id="reviewRecalcBtn" style="display:none;margin-top:10px;width:100%;font-size:12px;" title="คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน — ใช้ตอนแก้เฉลยผิดในหน้า editor แล้วอยากให้คะแนนของครั้งนี้ตรงตาม">🔄 คำนวณคะแนนใหม่จากเฉลยปัจจุบัน</button>
         </div>
         <div class="reviewCard" style="margin-top:12px;">
           <div class="muted" style="margin-bottom:6px;">ไปที่ข้อ</div>
@@ -5780,6 +5781,69 @@ function initReview(attemptId){
 
   document.getElementById('reviewMeta').textContent=`ส่งคำตอบ: ${fmtDate(att.submittedAt)} • เวลา: ${fmtDur(att.usedSeconds)}`;
   document.getElementById('reviewPdfLabel').textContent=exam?esc(exam.title||'PDF'):'PDF';
+
+  // ── Admin: คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน (กรณีแก้เฉลยผิดหลังทำข้อสอบไปแล้ว) ──
+  // สูตรคำนวณคะแนนก็อปมาจาก submit() ตรงๆ (ไม่แก้ submit()/_doSave เดิม — จุดนั้น
+  // ทำเครื่องหมาย HIGH-RISK ไว้แล้ว) ต่างกันแค่ใช้ att.answers ที่บันทึกไว้แทน st.answers สด
+  // และ qs (เฉลยปัจจุบัน) แทน qsList ตอนทำจริง — ไม่แตะ gamification/point/streak/รางวัล
+  const recalcBtn = document.getElementById('reviewRecalcBtn');
+  if (recalcBtn) {
+    recalcBtn.style.display = Auth.isTeacher() ? '' : 'none';
+    recalcBtn.onclick = async () => {
+      if (!confirm(`คำนวณคะแนนใหม่จากเฉลยปัจจุบันของ "${att.examTitle||'ชุดนี้'}"?\n\nคะแนน/ถูกผิดของ "${taker}" ในครั้งนี้จะถูกเขียนทับ (กู้คืนได้จาก Backup) และจุดอ่อนของ "${taker}" จะถูกสร้างใหม่ทั้งหมดจากประวัติการทำข้อสอบทุกครั้ง — ไม่กระทบแต้มเกม/streak/รางวัลที่ได้ไปแล้ว`)) return;
+      const s2 = Store.load();
+      const att2 = (s2.attempts||[]).find(a => a.id === attemptId);
+      const exam2 = (s2.exams||[]).find(e => e.id === (att2&&att2.examId));
+      const qs2 = (att2 && s2.questions[att2.examId]) || [];
+      if (!att2 || !exam2 || !qs2.length) { toast('⚠️ ไม่พบข้อมูลชุดข้อสอบ/คำถามปัจจุบัน'); return; }
+      const _eType2 = exam2.examType || 'mc';
+      const _isWeighted2 = !!exam2.weighted;
+      const answers2 = att2.answers || {};
+      let score2 = 0, total2 = qs2.length;
+      if (_isWeighted2) {
+        let _sumAll = 0, _sumOk = 0;
+        qs2.forEach(q => {
+          const pts = getQPoints(q);
+          _sumAll += pts;
+          if (q.isFree || (answers2[q.id] && isAnswerCorrect(answers2[q.id], q.correct, _eType2))) _sumOk += pts;
+        });
+        total2 = Math.round(_sumAll * 100) / 100;
+        score2 = Math.round(_sumOk * 100) / 100;
+      } else {
+        qs2.forEach(q => { if (q.isFree || (answers2[q.id] && isAnswerCorrect(answers2[q.id], q.correct, _eType2))) score2++; });
+      }
+      const perQuestion2 = qs2.map(q => {
+        const chosen = answers2[q.id] || null;
+        const correct = q.correct || null;
+        const isFree = !!q.isFree;
+        const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, _eType2) : false);
+        const _finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
+        const _finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
+        const _old = Array.isArray(att2.perQuestion) ? att2.perQuestion.find(p => p && (p.qid === q.id || p.no === (q.no??q.number))) : null;
+        const _pq = {
+          qid: q.id, no: q.no??q.number, page: q.page, tags: _finalTags, subTags: _finalSubTags, topic: _finalTags[0]||'',
+          chosen, correct, isCorrect, isFree,
+          unsure: _old ? !!_old.unsure : false,
+          visited: _old ? !!_old.visited : true,
+          elapsedMs: _old ? (_old.elapsedMs||0) : 0,
+          changes: _old ? (_old.changes||0) : 0,
+        };
+        if (_isWeighted2) _pq.points = getQPoints(q);
+        return _pq;
+      });
+      att2.score = score2;
+      att2.total = total2;
+      att2.perQuestion = perQuestion2;
+      att2.weighted = _isWeighted2;
+      const ok = Store.save(s2);
+      if (!ok) { toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่'); return; }
+      if (att2.takerName && typeof WeaknessTracker !== 'undefined') {
+        await WeaknessTracker.rebuildWeaknessesForUser(att2.takerName);
+      }
+      toast('✅ คำนวณคะแนนใหม่แล้ว');
+      initReview(attemptId);
+    };
+  }
 
   const answers=att.answers||{};
   const _isWAtt=isWeightedAttempt(att);
@@ -11288,6 +11352,17 @@ const WeaknessTracker = (() => {
     localStorage.setItem(BACKFILL_FLAG + u, 'true');
   }
 
+  // เหมือน rebuildWeaknessesForCurrentUser แต่ให้ครู/แอดมินสั่งสร้างใหม่ให้ "คนอื่น" ได้
+  // (เช่น หลังแก้เฉลยแล้วคำนวณคะแนนย้อนหลังใหม่ — ต้องสร้างจุดอ่อนของนักเรียนคนนั้นใหม่ทั้งชุด
+  // จากประวัติทั้งหมด ไม่ใช่แค่ครั้งที่แก้ กันข้อมูลไม่ตรงกับ perQuestion ที่เพิ่งอัพเดต)
+  async function rebuildWeaknessesForUser(userId) {
+    if (!userId) return;
+    const s = Store.load();
+    const items = buildWeaknessItemsFromAttempts(s.attempts||[], userId);
+    _saveLocal(userId, items);
+    await _saveToCloud(userId, items);
+  }
+
   // Realtime listener สำหรับ weakness ของ user ปัจจุบัน
   let _weaknessUnsubscribe = null;
   function subscribeMyWeakness() {
@@ -11325,6 +11400,7 @@ const WeaknessTracker = (() => {
     resetWeaknessesForUser, resetWeaknessesForUserAndExam, cleanupOrphanWeaknesses,
     countWeaknessesByExam, countWeaknessesBySubject,
     buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser,
+    rebuildWeaknessesForUser,
     flushPendingWeaknesses, subscribeMyWeakness, unsubscribeMyWeakness };
 })();
 
@@ -13647,7 +13723,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.8';
+  const CURRENT_VERSION = 'v48.9';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
