@@ -13650,7 +13650,7 @@ function initEntranceCompare(params) {
   let _prompted = false;
 
   async function checkVersion(){
-    if (_prompted) return;
+    if (_prompted || window.__previewDisableVersionCheck) return;
     try {
       const res = await fetch(
         '/Quiz-app/version.json?t=' + Date.now(),
@@ -13692,10 +13692,15 @@ function initEntranceCompare(params) {
 </script>
 <script>
 (function(){
-  // index_preview.html — ไฟล์ทดสอบชั่วคราว (sync ล่าสุดจาก index.html v48.8)
-  // ใช้ version.json ร่วมกับ index.html จริงที่ root ทำให้เทียบเวอร์ชัน
-  // ไม่ตรงกันเสมอ — ปิด version-check ในไฟล์นี้ (ทับ window.checkVersion ของจริงด้านบน)
+  // index_preview.html — ไฟล์ทดสอบชั่วคราว ใช้ version.json ร่วมกับ index.html จริงที่ root
+  // ทำให้เทียบเวอร์ชันไม่ตรงกันเสมอ — ปิด version-check ในไฟล์นี้
+  // (เดิมทับแค่ window.checkVersion เฉยๆ ไม่พอ เพราะ setTimeout/setInterval ของสคริปต์
+  // จริงด้านบนอ้างถึงฟังก์ชัน checkVersion ภายใน closure ตรงๆ ไม่ผ่าน window.checkVersion
+  // เลยยังทำงาน/เด้ง confirm() วนซ้ำทุกครั้งที่โหลดหน้าหรือครบ 5 นาที ต้องตั้ง flag ที่
+  // checkVersion เช็คเองตั้งแต่ต้นฟังก์ชันแทน ถึงจะหยุดได้จริงทุก path)
+  window.__previewDisableVersionCheck = true;
   window.checkVersion = function(){};
+  if (window._versionCheckInterval) clearInterval(window._versionCheckInterval);
 })();
 </script>
 <script>
