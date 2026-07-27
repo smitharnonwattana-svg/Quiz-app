@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.10 -->
+  <!-- APP_VERSION: v48.11 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -110,10 +110,10 @@
       .lifted-sb-left{left:0;width:80vw;}
       .lifted-sb-right{right:0;width:20vw;}
       /* PDF Annotate — floating toggle button + iOS Notes-style pill toolbar */
-      #pdfAnnotateToggleBtn{position:fixed;top:12px;right:calc(20vw + 195px);width:40px;height:40px;border-radius:50%;background:#1f2937;color:#e5e7eb;border:none;font-size:18px;cursor:pointer;z-index:8500;display:none;transition:background .15s,color .15s,box-shadow .15s;line-height:1;font-family:inherit;}
+      #pdfAnnotateToggleBtn{position:fixed;top:12px;left:calc(40vw - 26px);transform:translateX(-50%);width:40px;height:40px;border-radius:50%;background:#1f2937;color:#e5e7eb;border:none;font-size:18px;cursor:pointer;z-index:8500;display:none;transition:background .15s,color .15s,box-shadow .15s;line-height:1;font-family:inherit;}
       #pdfAnnotateToggleBtn.toolbar-open{background:#fbbf24;color:#111;}
       #pdfAnnotateToggleBtn.draw-on{background:#374151;color:#fbbf24;box-shadow:0 0 0 2px #fbbf24;}
-      #pdfAnnotateToolbar{position:fixed;top:60px;left:calc(80vw - 215px);transform:translateX(-50%);display:none;align-items:center;gap:4px;background:rgba(31,41,55,0.96);backdrop-filter:blur(12px);border-radius:20px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:9200;}
+      #pdfAnnotateToolbar{position:fixed;top:60px;left:calc(40vw - 26px);transform:translateX(-50%);display:none;align-items:center;gap:4px;background:rgba(31,41,55,0.96);backdrop-filter:blur(12px);border-radius:20px;padding:8px 12px;box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:9200;}
       #pdfAnnotateToolbar.open{display:flex;}
       .pa-tool{width:38px;height:38px;border-radius:10px;border:none;background:transparent;color:#d1d5db;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
       .pa-tool.active{background:#374151;color:#fbbf24;}
@@ -914,18 +914,21 @@
     @media (max-width: 900px) {
       #scratchToggleBtn { bottom: calc(20vh + 12px); right: 14px; }
     }
-    /* Desktop/landscape: ตารางเลขข้ออยู่ฝั่งขวาเต็มความสูง ปุ่มลอย bottom-right (ค่า
-       default ด้านบน) จะมาทับเลขข้อแถวล่าง — ย้ายขึ้นไปแถบบนสุด วางซ้ายของ "เวลาเหลือ"
-       แทน ชิดกับคำว่า "เวลาเหลือ" (เอา "📝 " ออกจากหน้าตัวจับเวลาแล้ว — ทำให้ความกว้าง
-       เท่ากันทั้งโหมดปกติและฝึกซ้อม ระยะห่างนี้จึงคงที่ไม่ขึ้นกับ viewport). 20vw คือ
-       ความกว้างของ .lifted-sb-right, 147px ชดเชยความกว้างจริงของ "เวลาเหลือ"+ตัวเลข+
-       padding ให้เหลือช่องว่างกระชับ ~10px จากตัวจับเวลา (ฝั่งชื่อข้อสอบมีที่ว่างเหลือ
-       มากกว่าเยอะ แม้ตอนชื่อยาวสุด+ฝึกซ้อม) */
+    /* Desktop/landscape: ย้ายปุ่มขึ้นไปแถบบนสุด กึ่งกลางฝั่ง PDF (.takeLeft กว้าง 80vw
+       จุดกึ่งกลางคือ 40vw) แทนตำแหน่งเดิมใกล้ขอบขวา — เดิมเคยอยู่ใกล้ #pdfAnnotateToggleBtn
+       จนถูก #scratchPad (เลื่อนเข้าจากขอบขวา, กว้างสุด 50vw) มาทับเวลาเปิดกระดาษทด การย้าย
+       มาไว้กึ่งกลาง (+26px ทางขวาของจุดกึ่งกลาง, ปุ่มดินสออยู่ -26px ทางซ้าย) ทำให้ยังอยู่ใน
+       ฝั่ง 0–50vw เสมอแม้ตอน .takeGrid.scratchSplit บีบ .takeLeft เหลือ 50vw จึงไม่โดนบัง */
     @media (min-width: 901px) {
       #scratchToggleBtn {
-        top: 12px; bottom: auto; right: calc(20vw + 147px);
+        top: 12px; bottom: auto; right: auto; left: calc(40vw + 26px); transform: translateX(-50%);
         width: 40px; height: 40px; font-size: 18px;
       }
+      /* #scratchToggleBtn:active ด้านบน (บรรทัด 910) ตั้ง transform:scale(0.95) เฉยๆ —
+         transform ไม่รวมกันข้าม rule เวลากดปุ่มค้างจะทับ translateX(-50%) ด้านบนจนปุ่ม
+         หลุดจากตำแหน่งกึ่งกลางไปทางขวาชั่วขณะ (เห็นเป็นปุ่ม "ขยับ" ตอนกด) ต้องรวม
+         translateX ไว้ในนี้ด้วยเฉพาะ desktop (มือถือไม่ใช้ translateX เลยไม่ต้องแตะ) */
+      #scratchToggleBtn:active { transform: translateX(-50%) scale(0.95); }
     }
     #scratchPad {
       /* width ใช้ min() แทน max-width แยก property — max-width เดิมค่าเป็น
@@ -1076,7 +1079,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.10</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.11</div>
     </div>
   </div>
 </div>
@@ -13723,7 +13726,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.10';
+  const CURRENT_VERSION = 'v48.11';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

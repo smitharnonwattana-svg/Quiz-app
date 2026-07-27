@@ -570,6 +570,69 @@ currentSection = 'scratchpad';
   check('iPad: โหมดเต็มจอปิด split (พฤติกรรมเดิม, .takeGrid กลับความกว้างเดิม)', splitOffFull === false && gridFull === gridBefore, JSON.stringify({ gridFull, gridBefore }));
   await ctx.close();
 }
+{
+  // v48.10: ปุ่มดินสอ (PDF-annotate) + ปุ่มกระดาษทด ย้ายมากึ่งกลางฝั่ง PDF (.takeLeft
+  // 80vw, จุดกึ่งกลาง 40vw) แทนตำแหน่งเดิมใกล้ขอบขวาที่เคยโดน #scratchPad บังตอนเปิด
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('m1', 'เลข ชุด 1', 'คณิตศาสตร์', { questionCount: 2, pdfUrl: 'https://x/m1.pdf' })],
+      questions: { m1: mkQ() },
+    }),
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => navigate('take', { examId: 'm1' }));
+  await page.waitForTimeout(500);
+  // fabricate the PDF-page/canvas DOM pdfAnnotate's buildOverlaysFor() expects —
+  // real PDF.js rendering needs network access this sandbox doesn't have
+  await page.evaluate(() => {
+    const container = document.getElementById('takePdfViewer');
+    container.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.id = 'takePdfViewer-page-1';
+    const canvas = document.createElement('canvas');
+    canvas.width = 600; canvas.height = 800;
+    wrapper.appendChild(canvas);
+    container.appendChild(wrapper);
+    window.pdfAnnotateInit('takePdfViewer');
+  });
+  await page.waitForTimeout(300);
+  const box = (sel) => page.evaluate((s) => {
+    const el = document.querySelector(s);
+    const r = el.getBoundingClientRect();
+    return { cx: r.left + r.width / 2, right: r.right, left: r.left };
+  }, sel);
+  const pen = await box('#pdfAnnotateToggleBtn');
+  const scratch = await box('#scratchToggleBtn');
+  check('v48.10: pen + scratch buttons centered over PDF pane (40vw), not overlapping',
+    Math.abs(pen.cx - (1280 * 0.4 - 26)) < 5 && Math.abs(scratch.cx - (1280 * 0.4 + 26)) < 5 && pen.right < scratch.left,
+    JSON.stringify({ pen, scratch }));
+
+  await page.evaluate(() => document.getElementById('scratchToggleBtn').click());
+  await page.waitForTimeout(400);
+  const padOpen = await box('#scratchPad');
+  const penAfterSplit = await box('#pdfAnnotateToggleBtn');
+  check('v48.10: pen button NOT covered by #scratchPad when opened (split mode)',
+    penAfterSplit.right < padOpen.left, JSON.stringify({ penAfterSplit, padOpen }));
+
+  // v48.10: :active{transform:scale(0.95)} เดิมทับ translateX(-50%) ที่ใช้จัดกึ่งกลาง
+  // ทำให้ปุ่มหลุดตำแหน่งชั่วขณะตอนกดค้าง — ต้องรวม translateX ไว้ใน :active ด้วย
+  await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+  const idleCx = (await box('#scratchToggleBtn')).cx;
+  const handle = await page.$('#scratchToggleBtn');
+  const bb = await handle.boundingBox();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  const pressedState = await page.evaluate(() => {
+    const el = document.getElementById('scratchToggleBtn');
+    const r = el.getBoundingClientRect();
+    return { cx: r.left + r.width / 2, isActive: el.matches(':active') };
+  });
+  await page.mouse.up();
+  check('v48.10: scratch button does not shift while pressed (:active + translateX combined)',
+    pressedState.isActive && Math.abs(pressedState.cx - idleCx) < 2, JSON.stringify({ idleCx, pressedState }));
+  await ctx.close();
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Section J: Admin exam list — ดาวน์โหลด Template เฉลยทุกวิชา (v48.4)

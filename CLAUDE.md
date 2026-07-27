@@ -22,12 +22,12 @@ Backend: Firebase Cloud Functions (Node.js 22, asia-southeast1) สำหรั�
    - Save a local copy named `index_v{new_version}.html` — ไฟล์นี้ถูก .gitignore ไว้ ไม่ push ขึ้น GitHub
 
 ### Version locations in index.html (ต้องอัพเดททั้ง 3 ที่ทุกครั้ง)
-- Line ~30: `<!-- APP_VERSION: v48.10 -->`
-- Line ~1079: `>v48.10</div>`  (login page display)
-- Line ~13726: `const CURRENT_VERSION = 'v48.10';`  (version check script)
+- Line ~30: `<!-- APP_VERSION: v48.11 -->`
+- Line ~1082: `>v48.11</div>`  (login page display)
+- Line ~13729: `const CURRENT_VERSION = 'v48.11';`  (version check script)
 
-### Current version: v48.10
-When making the next change, bump to v48.11.
+### Current version: v48.11
+When making the next change, bump to v48.12.
 ⚠️ โน้ตนี้อาจตกยุค — ให้ grep `APP_VERSION` ใน index.html เพื่อยืนยันเลขปัจจุบันก่อน bump ทุกครั้ง
 
 ## Regression Tests (สำคัญ — รันก่อน push ทุกครั้งที่แก้ index.html)
