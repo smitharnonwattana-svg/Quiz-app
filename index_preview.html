@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.9p -->
+  <!-- APP_VERSION: v48.12p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -312,6 +312,7 @@
     .chip{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer;font-family:inherit;}
     .chip.bad{border-color:#ef4444;color:#b91c1c;background:#fff5f5;}
     .chip.good{border-color:#22c55e;color:#166534;background:#f0fdf4;}
+    .chip.skip{border-color:#d1d5db;color:#6b7280;background:#f9fafb;}
     .wrongText{font-size:15px;line-height:1.4;}
     .wrongText .label{color:#6b7280;}
     .wrongText .list{color:#b91c1c;font-weight:800;}
@@ -1079,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.9p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.12p</div>
     </div>
   </div>
 </div>
@@ -1177,6 +1178,7 @@
         </div>
         <div class="takeChoicesBlock" style="padding:16px;display:grid;gap:12px;">
           <div class="muted">เลือกคำตอบ</div>
+          <div id="takeHalfProgress" style="display:none;font-size:12px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:6px 10px;"></div>
           <div id="takeChoices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
           <div class="takeMobileNav" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <button class="btn" id="takePrevBtn" style="padding:10px 14px;font-size:14px;flex:1;white-space:nowrap;">ก่อนหน้า</button>
@@ -4751,14 +4753,16 @@ function initExams(){
     _resumeBadgeInterval = setInterval(() => {
       document.querySelectorAll('.resume-badge[data-startedAt]').forEach(badge => {
         const isPrac = badge.dataset.practice === '1';
+        const isHalf = badge.dataset.half === '1';
         const examDur = Number(badge.dataset.dur) || 0;
+        const effDur = isHalf ? Math.ceil(examDur/2/60)*60 : examDur;
         const startedAt = Number(badge.dataset.startedAt) || 0;
         if(!startedAt) return;
         const pauseOff = Number(badge.dataset.pauseoffset) || 0;
         const pausedAt = Number(badge.dataset.pausedat) || Date.now();
         const pausedAtOff = Math.floor((Date.now() - pausedAt) / 1000);
         const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000) - pauseOff - Math.max(0, pausedAtOff));
-        const val = isPrac ? elapsed : Math.max(0, examDur - elapsed);
+        const val = isPrac ? elapsed : Math.max(0, effDur - elapsed);
         const label = isPrac ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
         const el = badge.querySelector('.resume-time');
         if(el) el.textContent = label + ' ' + String(Math.floor(val/60)).padStart(2,'0') + ':' + String(val%60).padStart(2,'0');
@@ -4869,19 +4873,21 @@ function initExams(){
       let resumeHtml = '';
       if (_hasResume) {
         const _isPrac0 = !!_myResume.practiceMode;
+        const _isHalf0 = !!_myResume.halfMode;
+        const _effDur0 = _isHalf0 ? Math.ceil(e.durationSeconds/2/60)*60 : e.durationSeconds;
         const _pauseOff0 = _myResume.pauseOffset || 0;
         const _pausedAt0 = _myResume.pausedAt || Date.now();
         const _pausedAtOff0 = Math.floor((Date.now() - _pausedAt0) / 1000);
         const _elapsed0 = Math.max(0, Math.floor((Date.now() - _myResume.startedAt) / 1000) - _pauseOff0 - Math.max(0, _pausedAtOff0));
-        const _val0 = _isPrac0 ? _elapsed0 : Math.max(0, e.durationSeconds - _elapsed0);
+        const _val0 = _isPrac0 ? _elapsed0 : Math.max(0, _effDur0 - _elapsed0);
         const _fmt0 = String(Math.floor(_val0/60)).padStart(2,'0') + ':' + String(_val0%60).padStart(2,'0');
         const _label0 = _isPrac0 ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
-        const _title0 = _isPrac0 ? '📝 ฝึกซ้อมค้างอยู่' : 'ทำค้างอยู่';
-        const _bg0 = _isPrac0 ? '#ecfeff' : '#fffbeb';
-        const _border0 = _isPrac0 ? '#a5f3fc' : '#fde68a';
-        const _titleColor0 = _isPrac0 ? '#0e7490' : '#92400e';
-        const _timeColor0 = _isPrac0 ? '#0891b2' : '#b45309';
-        resumeHtml = `<div class="resume-badge" data-resumeid="${e.id}" data-practice="${_isPrac0?'1':'0'}" data-startedAt="${_myResume.startedAt}" data-dur="${e.durationSeconds}" data-pauseoffset="${_pauseOff0}" data-pausedat="${_pausedAt0}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:${_bg0};border:1px solid ${_border0};border-radius:10px;cursor:pointer;">
+        const _title0 = _isPrac0 ? '📝 ฝึกซ้อมค้างอยู่' : _isHalf0 ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
+        const _bg0 = _isPrac0 ? '#ecfeff' : _isHalf0 ? '#f5f3ff' : '#fffbeb';
+        const _border0 = _isPrac0 ? '#a5f3fc' : _isHalf0 ? '#c4b5fd' : '#fde68a';
+        const _titleColor0 = _isPrac0 ? '#0e7490' : _isHalf0 ? '#6d28d9' : '#92400e';
+        const _timeColor0 = _isPrac0 ? '#0891b2' : _isHalf0 ? '#7c3aed' : '#b45309';
+        resumeHtml = `<div class="resume-badge" data-resumeid="${e.id}" data-practice="${_isPrac0?'1':'0'}" data-half="${_isHalf0?'1':'0'}" data-startedAt="${_myResume.startedAt}" data-dur="${e.durationSeconds}" data-pauseoffset="${_pauseOff0}" data-pausedat="${_pausedAt0}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:${_bg0};border:1px solid ${_border0};border-radius:10px;cursor:pointer;">
           <span style="font-size:13px;">⏸️</span>
           <span style="font-size:13px;font-weight:700;color:${_titleColor0};">${_title0}</span>
           <span class="resume-time" style="font-size:12px;color:${_timeColor0};">${_label0} ${_fmt0}</span>
@@ -5026,7 +5032,8 @@ function initExams(){
         if(ev.target.closest('.resume-badge')){
           const _badgeEl = ev.target.closest('.resume-badge');
           const _isPrac = _badgeEl && _badgeEl.dataset.practice === '1';
-          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac});
+          const _isHalf = _badgeEl && _badgeEl.dataset.half === '1';
+          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf});
           return;
         }
         navigate('exam',{id:e.id});
@@ -5089,6 +5096,7 @@ function initExamDetail(id){
       <input id="detailTakerName" class="btn" style="text-align:left;padding:12px 14px;font-size:15px;border-radius:14px;" placeholder="ชื่อผู้ทำ (ไม่บังคับ)" />
       <button class="btn btnPrimary" id="examStartBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;">▶ เริ่มทำ (จับเวลา)</button>
       <button class="btn" id="examStartPracticeBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;color:#0891b2;border-color:#67e8f9;">📝 ฝึกซ้อม (ไม่จับเวลา)</button>
+      <button class="btn" id="examStartHalfBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;color:#7c3aed;border-color:#c4b5fd;">🤝 คนละครึ่ง (${Math.ceil((exam.questionCount||0)/2)} ข้อ · ${Math.ceil(exam.durationSeconds/2/60)} นาที)</button>
       <div class="muted" style="font-size:12px;">ไม่กรอกชื่อก็กดเริ่มได้เลย · ระบบจำชื่อล่าสุดให้อัตโนมัติ</div>
     </div>
   `;
@@ -5113,6 +5121,11 @@ function initExamDetail(id){
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
     navigate('take', {id:exam.id, takerName:name, practice:true});
+  };
+  document.getElementById('examStartHalfBtn').onclick=()=>{
+    const name = _memberName || takerEl.value.trim();
+    if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
+    navigate('take', {id:exam.id, takerName:name, half:true});
   };
   // กด Enter ก็เริ่มได้เลย
   takerEl.addEventListener('keydown', (e)=>{
@@ -5150,6 +5163,11 @@ function initTake(id){
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
   const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||(Auth.isTeacher()?'':Auth.getName())||'').trim();
   const _practiceMode = !!_pageParams.practice;
+  // v48.12: โหมด "คนละครึ่ง" — ทำครึ่งจำนวนข้อ (ปัดขึ้น) ในครึ่งเวลา (ปัดขึ้นเป็นนาที)
+  // เลือกทำข้อไหนก็ได้ ยังคงเป็นการสอบจับเวลาจริง (ไม่ใช่ฝึกซ้อม)
+  const _halfMode = !!_pageParams.half;
+  const _halfQuota = _halfMode ? Math.ceil(total/2) : 0;
+  const _effDuration = _halfMode ? Math.ceil(exam.durationSeconds/2/60)*60 : exam.durationSeconds;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
   // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
   if(!_practiceMode) lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
@@ -5160,11 +5178,20 @@ function initTake(id){
     mood:null,
     started:false,startedAt:null,createdAt:Date.now(),
     takerName:_takerName,
-    practiceMode:_practiceMode
+    practiceMode:_practiceMode,
+    halfMode:_halfMode,
+    halfQuota:_halfQuota
   };
   const st=_takeState;
+  // นับข้อที่ "ตอบแล้วจริง" สำหรับโหมดคนละครึ่ง — ต้องกัน '' ออก เพราะโหมดกรอกตัวเลข
+  // เก็บ '' ค้างใน st.answers ได้ (ยังไม่ได้กรอก แต่มี key อยู่)
+  function _answeredCount(){
+    return Object.keys(st.answers).filter(k=>{
+      const v=st.answers[k]; return v!=='' && v!=null;
+    }).length;
+  }
 
-  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
   document.getElementById('takeQTotal').textContent=total;
 
   // PDF.js viewer for take page
@@ -5275,6 +5302,15 @@ function initTake(id){
   function render(){
     const q=qsList[st.currentIndex];
     document.getElementById('takeQNo').textContent=q.number||q.no;
+    const _halfProg=document.getElementById('takeHalfProgress');
+    if(_halfProg){
+      if(_halfMode){
+        _halfProg.style.display='block';
+        _halfProg.textContent=`ตอบแล้ว ${_answeredCount()} / ${st.halfQuota} ข้อ`;
+      } else {
+        _halfProg.style.display='none';
+      }
+    }
     document.getElementById('takePdfPage').textContent=_isGDrive ? '📄 Google Drive (scroll ด้วยนิ้ว)' : 'PDF หน้า '+(q.page||1);
     const ub=document.getElementById('takeUnsureBtn');
     if(ub){
@@ -5312,6 +5348,11 @@ function initTake(id){
       // commit helper
       function _setAns(v){
         const prev=st.answers[q.id];
+        const _prevEmpty=(prev===''||prev==null);
+        if(_halfMode && _prevEmpty && v!=='' && _answeredCount()>=st.halfQuota){
+          toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
+          return;
+        }
         if(prev && prev!==v && v!==''){
           st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
         }
@@ -5327,6 +5368,12 @@ function initTake(id){
           const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
           if(v!==inp.value) inp.value=v;
           const prev=st.answers[q.id];
+          const _prevEmpty=(prev===''||prev==null);
+          if(_halfMode && _prevEmpty && v!=='' && _answeredCount()>=st.halfQuota){
+            toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
+            inp.value=prev||'';
+            return;
+          }
           if(prev && prev!==v && v!==''){
             st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
           }
@@ -5367,6 +5414,11 @@ function initTake(id){
         div.addEventListener('click',()=>{
           if(!st.started) return;
           const prev=st.answers[q.id];
+          if(prev===lab){ delete st.answers[q.id]; render(); return; } // กดซ้ำ = ยกเลิกคำตอบ
+          if(_halfMode && !prev && _answeredCount()>=st.halfQuota){
+            toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้กดคำตอบเดิมซ้ำเพื่อยกเลิกก่อน`);
+            return;
+          }
           if(prev && prev!==lab){
             st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
           }
@@ -5488,9 +5540,16 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
     leaveQuestion(); // flush current question time
     const _eType=exam.examType||'mc';
-    const _isWeighted=!!exam.weighted;
+    // v48.12: โหมดคนละครึ่ง คิดคะแนนข้อละ 1 คะแนนเสมอ (ไม่ใช้ระบบถ่วงน้ำหนักจริง)
+    // เพื่อกันเด็กเลือกเก็บเฉพาะข้อคะแนนสูงแล้วได้เปอร์เซ็นต์เกินจริง
+    const _isWeighted=!!exam.weighted && !_halfMode;
+    const _counted=q=>{
+      if(!_halfMode) return true;
+      const v=st.answers[q.id];
+      return v!=='' && v!=null;
+    };
     let score=0;
-    let total=qsList.length;
+    let total=_halfMode?st.halfQuota:qsList.length;
     if(_isWeighted){
       // weighted: total = sum points, score = sum points where correct
       let _sumAll=0,_sumOk=0;
@@ -5502,7 +5561,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       total=Math.round(_sumAll*100)/100;
       score=Math.round(_sumOk*100)/100;
     } else {
-      qsList.forEach(q=>{if(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType))) score++;});
+      qsList.forEach(q=>{if(_counted(q)&&(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType)))) score++;});
     }
     const perQuestion=qsList.map(q=>{
       const chosen=st.answers[q.id]||null;
@@ -5515,20 +5574,21 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       const _pq={qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,subTags:_finalSubTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
         visited,elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
       if(_isWeighted) _pq.points=getQPoints(q);
+      if(_halfMode) _pq.counted=_counted(q);
       return _pq;
     });
     // หัก _pauseOffset ออกด้วย (เวลาที่ออกจากแอปไประหว่างทำค้าง) — เหมือนสูตรเดียวกับ
     // นาฬิกาที่เดินสดใน doStart()/_calcRemaining() ไม่งั้นฝึกซ้อมที่ทำค้างข้ามวันจะได้
     // usedSeconds รวมเวลาที่ปิดแอปไปด้วย (บั๊กที่ทำให้เห็น "เวลาที่ใช้ 1440:00 นาที")
     const _rawElapsed = st.startedAt ? Math.max(0, Math.floor((Date.now()-st.startedAt)/1000) - _pauseOffset) : 0;
-    const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, exam.durationSeconds);
+    const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, _effDuration);
     // ไม่กรอกชื่อ = บันทึกเป็น 'ไม่ระบุชื่อ' (ห้าม block — คำตอบต้องไม่หาย)
     const takerName = st.takerName || 'ไม่ระบุชื่อ';
     // ⚠️ HIGH-RISK: ลำดับใน _doSave ห้ามสลับ — Store.save ต้องสำเร็จก่อนค่อย clearTakeResume
     // (v47.94: เคลียร์ก่อนเซฟ = ปิดแอประหว่าง check-in modal แล้วคำตอบหายทั้ง attempt)
     function _doSave(feeling, prediction){
       const savedS=Store.load();
-      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
+      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
       savedS.attempts.unshift(_newAttempt);
       const ok=Store.save(savedS);
       if (!ok) {
@@ -5569,7 +5629,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           Store.save(_s3);
         }
       }
-      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds });
+      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds, halfMode: !!st.halfMode });
       MemeScore.show(score, total, () => {
         navigate('review', {attemptId: st.attemptId});
       });
@@ -5590,7 +5650,14 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // remove old listeners by replacing
   const newSubmitBtn=submitBtn.cloneNode(true);
   submitBtn.parentNode.replaceChild(newSubmitBtn,submitBtn);
-  newSubmitBtn.addEventListener('click',()=>{if(confirm('ส่งคำตอบตอนนี้?\n\n(คำตอบจะถูกส่งและดูผลคะแนน)')) submit();});
+  newSubmitBtn.addEventListener('click',()=>{
+    let _msg='ส่งคำตอบตอนนี้?\n\n(คำตอบจะถูกส่งและดูผลคะแนน)';
+    if(_halfMode){
+      const _left=st.halfQuota-_answeredCount();
+      if(_left>0) _msg=`ยังเหลืออีก ${_left} ข้อ — ถ้าส่งตอนนี้จะไม่ได้คะแนนข้อที่ยังไม่ตอบ\n\nส่งคำตอบตอนนี้เลยไหม?`;
+    }
+    if(confirm(_msg)) submit();
+  });
 
   const t1=document.getElementById('takeTimer'),t2=document.getElementById('takeTimer2');
   function setTimerDisplay(value){
@@ -5611,7 +5678,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       t2.style.animation='pulse 1s infinite';
     }
   }
-  setTimerDisplay(_practiceMode ? 0 : exam.durationSeconds);
+  setTimerDisplay(_practiceMode ? 0 : _effDuration);
 
   // _pauseOffset: จำนวนวินาทีที่หยุดนับสะสม (pause-resume offset)
   let _pauseOffset = 0;
@@ -5620,7 +5687,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   function _calcRemaining() {
     const pauseGap = _pausedAt ? Math.floor((Date.now() - _pausedAt) / 1000) : 0;
     const elapsed = Math.floor((Date.now() - st.startedAt) / 1000) - _pauseOffset - pauseGap;
-    return Math.max(0, exam.durationSeconds - elapsed);
+    return Math.max(0, _effDuration - elapsed);
   }
 
   function doStart(restoredStartedAt, restoredOffset){
@@ -5660,7 +5727,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
   // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
   const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
-  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode) ? _rawResume : null;
+  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode) ? _rawResume : null;
   if (_resume) {
 
     // คำนวณเวลา ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
@@ -5670,7 +5737,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const _rawSec = Math.max(0, Math.floor((Date.now() - _resume.startedAt) / 1000) - _totalFrozenOffset);
     const _frozenVal = _practiceMode
       ? _rawSec                                        // นับขึ้น: เวลาที่ใช้ไปแล้ว
-      : Math.max(0, exam.durationSeconds - _rawSec);   // นับลง: เวลาที่เหลือ
+      : Math.max(0, _effDuration - _rawSec);   // นับลง: เวลาที่เหลือ
     const _frozenFmt = String(Math.floor(_frozenVal/60)).padStart(2,'0') + ':' + String(_frozenVal%60).padStart(2,'0');
     setTimerDisplay(_frozenVal); // แสดงค่า freeze บน take page ด้วย (ไม่เดิน)
 
@@ -5681,7 +5748,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
     const _resumeLabel = _practiceMode ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
-    const _resumeTitle = _practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : 'ทำค้างอยู่';
+    const _resumeTitle = _practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : _halfMode ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
     _resumeBox.innerHTML = `
       <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
       <div style="font-size:18px;font-weight:800;margin-bottom:6px;">${_resumeTitle}</div>
@@ -5724,9 +5791,9 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   } else {
     // มี resume ค้างอยู่ที่ไม่ตรงกับรอบนี้ (คนละชุด หรือชุดเดิมแต่คนละโหมด) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
     if (_rawResume && _rawResume.examId && _rawResume.startedAt &&
-        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode)) {
+        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode)) {
       const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
-      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : ' (จับเวลา)');
+      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : _rawResume.halfMode ? ' (คนละครึ่ง)' : ' (จับเวลา)');
       if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
         navigate('exams');
         return;
@@ -5774,7 +5841,8 @@ function initReview(attemptId){
 
   const taker=(att.takerName||'').trim()||'ไม่ระบุ';
   const subj=(exam&&exam.subject)?exam.subject:(att.examSubject||'ไม่ระบุ');
-  document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}`;
+  const _modeBadge=att.halfMode?` 🤝 คนละครึ่ง (${att.halfQuota||0}/${qs.length} ข้อ)`:att.practiceMode?' 📝 ฝึกซ้อม':'';
+  document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
 
@@ -5786,12 +5854,13 @@ function initReview(attemptId){
 
   const answers=att.answers||{};
   const _isWAtt=isWeightedAttempt(att);
-  const totalItems=Array.isArray(att.perQuestion)&&att.perQuestion.length?att.perQuestion.length:qs.length;
+  // v48.12: โหมดคนละครึ่ง — totalItems/correctCount นับเทียบกับโควตา ไม่ใช่จำนวนข้อเต็มชุด
+  const totalItems=att.halfMode?(att.halfQuota||0):(Array.isArray(att.perQuestion)&&att.perQuestion.length?att.perQuestion.length:qs.length);
   const totalPoints=Number(att.total||qs.length||0);
   // correctCount = จำนวนข้อที่ถูก (ไม่ใช่คะแนน)
   let correctCount=0;
   if(Array.isArray(att.perQuestion)&&att.perQuestion.length){
-    correctCount=att.perQuestion.filter(p=>p&&p.isCorrect).length;
+    correctCount=att.perQuestion.filter(p=>p&&p.isCorrect&&p.counted!==false).length;
   } else if(!_isWAtt){
     correctCount=Number.isFinite(Number(att.score))?Number(att.score):0;
   }
@@ -5802,7 +5871,8 @@ function initReview(attemptId){
 
   let wrongNos=[];
   if(Array.isArray(att.perQuestion)&&att.perQuestion.length){
-    wrongNos=att.perQuestion.filter(p=>!p.isCorrect).map(p=>Number(p.no)||0).filter(n=>n>0);
+    // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) ไม่นับเป็น "ผิดข้อ"
+    wrongNos=att.perQuestion.filter(p=>!p.isCorrect&&p.counted!==false).map(p=>Number(p.no)||0).filter(n=>n>0);
   } else {
     qs.forEach((q,idx)=>{
       const chosen=(answers[q.id]??answers[String(q.id)]??null);
@@ -5913,6 +5983,16 @@ function initReview(attemptId){
     }
     return false;
   }
+  // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) — แยกจาก "ผิด" จริง
+  function isCountedQ(q){
+    if(!att.halfMode) return true;
+    const no=Number(q.no)||0;
+    if(Array.isArray(att.perQuestion)&&att.perQuestion.length){
+      const p=att.perQuestion.find(x=>Number(x.no)===no);
+      if(p) return p.counted!==false;
+    }
+    return true;
+  }
 
   // Nav chips
   const nav=document.getElementById('reviewNavChips');
@@ -5920,10 +6000,12 @@ function initReview(attemptId){
   qs.forEach(q=>{
     const ok=isCorrectQ(q);
     const isUns=isUnsureQ(q);
+    const skipped=!isCountedQ(q);
     const b=document.createElement('button');
-    b.className='chip '+(ok?'good':'bad');
+    b.className='chip '+(skipped?'skip':(ok?'good':'bad'));
     b.innerHTML=q.no+(isUns?'<span style="font-size:9px;margin-left:1px;vertical-align:super;">🤔</span>':'');
     if(isUns){ b.title='🤔 ติ๊กไม่แน่ใจ'; }
+    else if(skipped){ b.title='— ไม่ได้เลือก (คนละครึ่ง)'; }
     b.onclick=()=>{
       if(!_reviewIsGDrive) setPdfPage(q.page||1);
     };
@@ -5978,8 +6060,11 @@ function initReview(attemptId){
     }
 
     // badge
-    const badgeCls = isFree?'skip':isCorrect?'good':'bad';
-    const badgeTxt = isFree?'ฟรี':isCorrect?'✓ ถูก':(chosen?'✗ ผิด':'— ไม่ตอบ');
+    // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) แสดง "ไม่ได้เลือก" สีเทา
+    // แยกจาก "ผิด" สีแดง — เพราะเด็กไม่เคยตัดสินใจกับข้อนี้จริง
+    const isSkippedQ = !isCountedQ(q);
+    const badgeCls = isFree?'skip':isSkippedQ?'skip':isCorrect?'good':'bad';
+    const badgeTxt = isFree?'ฟรี':isSkippedQ?'— ไม่ได้เลือก':isCorrect?'✓ ถูก':(chosen?'✗ ผิด':'— ไม่ตอบ');
 
     // answer summary (shown in row)
     wrap.innerHTML=`
@@ -6652,7 +6737,7 @@ function _renderDashSummary(attempts){
   if(!el) return;
   if(!attempts.length){el.innerHTML='';return;}
   // แบ่ง 3 กลุ่ม
-  const realOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&!a.practiceMode);   // สอบจริง
+  const realOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&!a.practiceMode&&!a.halfMode);   // สอบจริง
   const practiceOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&a.practiceMode); // ฝึกชุด
   const weaknessOnly=attempts.filter(a=>a.mode==='weakness_practice');                 // แก้จุดอ่อน
   // สำหรับ % metrics ใช้ real+practice (ตัด weakness ออก)
@@ -6708,8 +6793,8 @@ function _renderDashChart(attempts){
   const labels=sorted.map(a=>{const d=new Date(a.submittedAt||a.startedAt||0);return`${d.getDate()}/${d.getMonth()+1}`;});
   const scores=sorted.map(a=>a.total?Math.round(a.score/a.total*100):0);
   const dasData=sorted.map(a=>calcDAS(a));
-  // แยก marker/สี ระหว่างสอบจริง vs โหมดฝึก
-  const isPrac=sorted.map(a=>!!a.practiceMode);
+  // แยก marker/สี ระหว่างสอบจริง vs โหมดฝึก/คนละครึ่ง
+  const isPrac=sorted.map(a=>!!a.practiceMode||!!a.halfMode);
   const ptColors=isPrac.map(p=>p?'#9ca3af':'#111');
   const ptStyles=isPrac.map(p=>p?'triangle':'circle');
   const ptRadii=isPrac.map(p=>p?5:4);
@@ -7332,13 +7417,14 @@ function initStats(){
 
     // ── attempt cards (split by category) ──
     const rowsEl=document.getElementById('statsRows');
-    const realList=attempts.filter(a=>!a.practiceMode);
+    const realList=attempts.filter(a=>!a.practiceMode&&!a.halfMode);
     const practiceList=attempts.filter(a=>a.practiceMode===true);
+    const halfList=attempts.filter(a=>a.halfMode===true);
     let weaknessList=filterByTime(practiceAttempts);
     if(currentSubjectFilter!=='all') weaknessList=weaknessList.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     if(currentExamFilter!=='all') weaknessList=weaknessList.filter(a=>a.examId===currentExamFilter);
 
-    if(!realList.length&&!practiceList.length&&!weaknessList.length){
+    if(!realList.length&&!practiceList.length&&!halfList.length&&!weaknessList.length){
       const tabBar=document.getElementById('statsTabBar');
       if(tabBar) tabBar.innerHTML='';
       rowsEl.innerHTML=`<div class="muted" style="padding:24px;text-align:center;border:1px solid var(--border);border-radius:14px;">ยังไม่มีสถิติ</div>`;
@@ -7434,6 +7520,7 @@ function initStats(){
     const sections=[
       {key:'real',title:'จริง',icon:'⏱',list:realList},
       {key:'practice',title:'ฝึกซ้อม',icon:'📝',list:practiceList},
+      {key:'half',title:'คนละครึ่ง',icon:'🤝',list:halfList},
       {key:'weakness',title:'แก้จุดอ่อน',icon:'🎯',list:weaknessList},
     ];
 
@@ -11105,6 +11192,7 @@ function saveTakeResume(state) {
       takerName: state.takerName,
       attemptId: state.attemptId,
       practiceMode: !!state.practiceMode,
+      halfMode: !!state.halfMode,
     }));
   } catch(e) {}
 }
@@ -11183,6 +11271,10 @@ const WeaknessTracker = (() => {
     const ts = submittedAt || new Date().toISOString();
     perQuestion.forEach(q => {
       if (q.isFree) return;
+      // v48.12: โหมดคนละครึ่ง — ข้อที่ตั้งใจไม่ตอบ (counted:false) ไม่นับเป็นจุดอ่อน
+      // (ไม่ใช่ resolved ด้วย — เด็กไม่เคยเห็น/ตัดสินใจกับข้อนี้จริง ระบบมองไม่เห็นเลย)
+      // โหมดอื่น/ข้อมูลเก่าไม่มีฟิลด์นี้ (undefined) จึงไม่กระทบพฤติกรรมเดิม
+      if (q.counted === false) return;
       const no = q.no ?? q.number;
       if (no == null) return;
       const key = _itemKey(examId, no);
@@ -12664,7 +12756,7 @@ const _takeResume = loadTakeResume(Auth.getName());
 
 if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   if (_savedState.page === 'take' && _takeResume) {
-    navigate('take', { id: _takeResume.examId });
+    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode });
   } else {
     navigate(_savedState.page, _savedState.params);
   }
