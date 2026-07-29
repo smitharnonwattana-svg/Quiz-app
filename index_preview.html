@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.12p -->
+  <!-- APP_VERSION: v48.13p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.12p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.13p</div>
     </div>
   </div>
 </div>
@@ -1168,7 +1168,7 @@
       <div class="takeRight">
         <div class="stickyBar">
           <div>
-            <div style="font-weight:900;white-space:nowrap;">ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span></div>
+            <div id="takeQNoWrap" style="font-weight:900;white-space:nowrap;">ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span></div>
             <div class="muted" style="display:none;">เวลา <span id="takeTimer2">--:--</span></div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;flex-shrink:0;">
@@ -1178,7 +1178,6 @@
         </div>
         <div class="takeChoicesBlock" style="padding:16px;display:grid;gap:12px;">
           <div class="muted">เลือกคำตอบ</div>
-          <div id="takeHalfProgress" style="display:none;font-size:12px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:6px 10px;"></div>
           <div id="takeChoices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
           <div class="takeMobileNav" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <button class="btn" id="takePrevBtn" style="padding:10px 14px;font-size:14px;flex:1;white-space:nowrap;">ก่อนหน้า</button>
@@ -5192,6 +5191,12 @@ function initTake(id){
   }
 
   document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
+  // #page-take ไม่ได้ถูกสร้างใหม่จาก HTML ทุกครั้งที่ navigate('take') — เนื้อหาคงค้างข้าม
+  // รอบก่อนหน้า ถ้ารอบก่อนเป็นโหมดคนละครึ่ง #takeQNoWrap จะถูกเขียนทับด้วย .textContent=
+  // (ทำลาย span ลูก #takeQNo/#takeQTotal ทิ้ง) ต้อง reset โครงสร้างกลับก่อนเสมอ
+  // ไม่งั้นรอบถัดไปที่เป็นโหมดปกติจะหา #takeQTotal ไม่เจอแล้ว throw
+  const _qNoWrapReset=document.getElementById('takeQNoWrap');
+  if(_qNoWrapReset) _qNoWrapReset.innerHTML='ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span>';
   document.getElementById('takeQTotal').textContent=total;
 
   // PDF.js viewer for take page
@@ -5301,15 +5306,15 @@ function initTake(id){
 
   function render(){
     const q=qsList[st.currentIndex];
-    document.getElementById('takeQNo').textContent=q.number||q.no;
-    const _halfProg=document.getElementById('takeHalfProgress');
-    if(_halfProg){
-      if(_halfMode){
-        _halfProg.style.display='block';
-        _halfProg.textContent=`ตอบแล้ว ${_answeredCount()} / ${st.halfQuota} ข้อ`;
-      } else {
-        _halfProg.style.display='none';
-      }
+    // v48.13: โหมดคนละครึ่ง — แทนที่ "ข้อ 1/40" ในแถบบนด้วย "ตอบแล้ว N/โควตา" แทน
+    // (ของเดิมวางไว้เหนือ #takeChoices แล้วโดนบัง — ย้ายมาแถบบนซึ่งมีที่ว่างเสมอ)
+    // หมายเหตุ: ห้ามใช้ .textContent= ทับ #takeQNoWrap ตอนไม่ใช่ half mode เพราะจะทำลาย
+    // span ลูก #takeQNo/#takeQTotal ทิ้ง แล้ว getElementById ด้านล่างจะ null ในรอบ render ถัดไป
+    if(_halfMode){
+      const _qNoWrap=document.getElementById('takeQNoWrap');
+      if(_qNoWrap) _qNoWrap.textContent=`ตอบแล้ว ${_answeredCount()} / ${st.halfQuota} ข้อ`;
+    } else {
+      document.getElementById('takeQNo').textContent=q.number||q.no;
     }
     document.getElementById('takePdfPage').textContent=_isGDrive ? '📄 Google Drive (scroll ด้วยนิ้ว)' : 'PDF หน้า '+(q.page||1);
     const ub=document.getElementById('takeUnsureBtn');
