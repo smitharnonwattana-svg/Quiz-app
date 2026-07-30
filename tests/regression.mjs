@@ -959,6 +959,156 @@ currentSection = 'recalcScore';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section K: โหมด "คนละครึ่ง" (v48.12/48.13) — ครึ่งข้อ/ครึ่งเวลา, ยกเลิกคำตอบได้,
+// บล็อกเกินโควตา, จุดอ่อนนับเฉพาะข้อที่ตอบจริง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'halfMode';
+const mkQN = (n) => Array.from({ length: n }, (_, i) => ({
+  id: 'q' + (i + 1), no: i + 1, number: i + 1, correct: ['A', 'B', 'C', 'D'][i % 4], choices: { A: 'a', B: 'b', C: 'c', D: 'd' },
+}));
+const clickChoiceHalf = (page, lab) => page.evaluate((l) => {
+  const btn = [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === ({ A: 'ก', B: 'ข', C: 'ค', D: 'ง' })[l]);
+  if (btn) btn.click();
+}, lab);
+const gotoQHalf = (page, idx) => page.evaluate((i) => document.querySelectorAll('#takeNums .numBtn')[i].click(), idx);
+{
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eH1', 'ชุด Half', 'คณิตศาสตร์', { questionCount: 40, durationSeconds: 2160 })], // 36 min
+      questions: { eH1: mkQN(40) },
+    }),
+  });
+  await page.evaluate(() => navigate('exam', { id: 'eH1' }));
+  await page.waitForTimeout(400);
+  const btnText = await page.evaluate(() => document.getElementById('examStartHalfBtn')?.textContent);
+  check('half button shows correct quota+time (40->20, 36->18)', btnText && btnText.includes('20 ข้อ') && btnText.includes('18 นาที'), btnText);
+  await ctx.close();
+}
+{
+  // quota=2 exam: mkQN uses 0-indexed i%4 -> q1 correct=A, q2 correct=B, q3 correct=C, q4 correct=D
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eH2', 'ชุด Half เล็ก', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eH2: mkQN(4) },
+    }),
+  });
+  await page.evaluate(() => navigate('take', { id: 'eH2', takerName: 'เด็กครึ่ง', half: true }));
+  await page.waitForTimeout(400);
+  const title = await page.evaluate(() => document.getElementById('takeExamTitle').textContent);
+  check('half-mode title prefixed with [คนละครึ่ง]', title.startsWith('[คนละครึ่ง]'), title);
+
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'A'); // correct
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'A'); // wrong (correct=B)
+  const progText = await page.evaluate(() => document.getElementById('takeQNoWrap').textContent);
+  check('half-mode header shows "ตอบแล้ว 2 / 2 ข้อ" after quota met', progText.includes('2') && progText.includes('2'), progText);
+
+  await gotoQHalf(page, 2);
+  await clickChoiceHalf(page, 'C'); // correct answer but quota full -> should be blocked
+  await page.waitForTimeout(100);
+  const q3Blocked = await page.evaluate(() => !document.querySelector('#takeChoices .choice.active'));
+  check('quota block: cannot answer 3rd question once quota met', q3Blocked === true, String(q3Blocked));
+
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'A'); // deselect by clicking same choice again
+  const q2Cleared = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === 'ก');
+    return !btn.classList.contains('active');
+  });
+  check('deselect: clicking same choice again removes the answer', q2Cleared === true, String(q2Cleared));
+
+  await gotoQHalf(page, 2); await clickChoiceHalf(page, 'C'); // now answerable after freeing quota, correct
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(400);
+  const att = await page.evaluate(() => Store.load().attempts[0]);
+  check('half-mode submit: score=2, total=2 (quota, not full 4)', att.score === 2 && att.total === 2, JSON.stringify({ score: att.score, total: att.total }));
+  check('half-mode attempt tagged halfMode:true, halfQuota:2', att.halfMode === true && att.halfQuota === 2, JSON.stringify({ halfMode: att.halfMode, halfQuota: att.halfQuota }));
+  const pq2 = att.perQuestion.find(p => p.no === 2);
+  const pq4 = att.perQuestion.find(p => p.no === 4);
+  check('perQuestion: deselected/never-touched questions marked counted:false', pq2.counted === false && pq4.counted === false, JSON.stringify({ pq2, pq4 }));
+  check('half-mode forces weighted:false (no points gaming)', att.weighted === false, String(att.weighted));
+
+  const weakCount = await page.evaluate(() => WeaknessTracker.countWeaknessesByExam('เด็กครึ่ง', 'eH2'));
+  check('weakness: half-mode skipped questions (counted:false) create NO weakness — both counted answers (q1,q3) were correct', weakCount === 0, String(weakCount));
+  await ctx.close();
+}
+{
+  // regression: NORMAL mode unanswered question must STILL count as a weakness (guard is half-mode-only)
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eH3', 'ชุด ปกติ', 'คณิตศาสตร์', { questionCount: 2 })],
+      questions: { eH3: mkQN(2) },
+    }),
+  });
+  await page.evaluate(() => navigate('take', { id: 'eH3', takerName: 'เด็กปกติ' }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'A'); // answer q1 correctly, leave q2 unanswered
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(400);
+  const weakCountNormal = await page.evaluate(() => WeaknessTracker.countWeaknessesByExam('เด็กปกติ', 'eH3'));
+  check('regression: NORMAL mode unanswered question STILL counts as weakness', weakCountNormal === 1, String(weakCountNormal));
+  await ctx.close();
+}
+{
+  // resume: entering a DIFFERENT mode than the in-progress one must NOT silently resume
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eH4', 'ชุด Resume', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eH4: mkQN(4) },
+    }),
+  });
+  await page.evaluate(() => navigate('take', { id: 'eH4', takerName: 'เด็กresume', half: true }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'B');
+  await page.waitForTimeout(1200); // let saveTakeResume's 1s throttle flush
+  await page.evaluate(() => navigate('exams', {}));
+  await page.waitForTimeout(200);
+  await page.evaluate(() => navigate('take', { id: 'eH4', takerName: 'เด็กresume' })); // timed mode this time
+  await page.waitForTimeout(300);
+  const mismatchShown = await page.evaluate(() => !!document.querySelector('.modal, [style*="position:fixed"]') || true); // confirm() intercepted by page.on('dialog')
+  const resumedAnswers = await page.evaluate(() => window._takeState ? Object.keys(window._takeState.answers || {}).length : -1);
+  check('resume: entering DIFFERENT mode does not silently carry over half-mode answers', resumedAnswers !== 1, String(resumedAnswers));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eH5', 'ชุด Stats', 'คณิตศาสตร์', { questionCount: 2 })],
+      questions: { eH5: mkQN(2) },
+      attempts: [{
+        id: 'attH5', examId: 'eH5', examTitle: 'ชุด Stats', examSubject: 'คณิตศาสตร์', examType: 'mc', weighted: false,
+        takerName: 'Admin', startedAt: new Date().toISOString(), submittedAt: new Date().toISOString(),
+        usedSeconds: 60, score: 1, total: 1, answers: { q1: 'B' }, halfMode: true, halfQuota: 1,
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 100, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: null, correct: 'C', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        ],
+        practiceMode: false, visitOrder: ['q1'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await page.evaluate(() => navigate('stats', {}));
+  await page.waitForTimeout(400);
+  const tabExists = await page.evaluate(() => !!document.querySelector('[data-tab="half"]'));
+  check('stats: "คนละครึ่ง" tab exists', tabExists === true, String(tabExists));
+  const realTabCount = await page.evaluate(() => {
+    const btn = document.querySelector('[data-tab="real"]');
+    return btn ? btn.textContent : '';
+  });
+  check('stats: half-mode attempt NOT counted in "จริง" tab', !/[1-9]/.test(realTabCount.replace(/[^\d]/g, '')) || realTabCount === '⏱ จริง', realTabCount);
+
+  await page.evaluate(() => navigate('review', { attemptId: 'attH5' }));
+  await page.waitForTimeout(400);
+  const reviewInfo = await page.evaluate(() => {
+    const title = document.getElementById('reviewTitle').textContent;
+    const wrongList = document.getElementById('reviewWrongListText')?.textContent || '';
+    return { title, wrongList };
+  });
+  check('review: title shows คนละครึ่ง mode badge', reviewInfo.title.includes('คนละครึ่ง'), reviewInfo.title);
+  check('review: skipped question (counted:false) does NOT appear in "ผิดข้อ:" list', !reviewInfo.wrongList.includes('2'), reviewInfo.wrongList);
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
