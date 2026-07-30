@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.12 -->
+  <!-- APP_VERSION: v48.13 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.12</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.13</div>
     </div>
   </div>
 </div>
@@ -5198,6 +5198,16 @@ function initTake(id){
   // ไม่งั้นรอบถัดไปที่เป็นโหมดปกติจะหา #takeQTotal ไม่เจอแล้ว throw
   const _qNoWrapReset=document.getElementById('takeQNoWrap');
   if(_qNoWrapReset) _qNoWrapReset.innerHTML='ข้อ <span id="takeQNo">-</span> / <span id="takeQTotal">-</span>';
+  // v48.13: กันปุ่ม "ส่ง" เลยขอบจอ iPad ตอนโหมดคนละครึ่ง (ข้อความ "ตอบ N/โควตา" ยาวกว่า
+  // "ข้อ X/Y" เดิม จนดัน column ฝั่งขวากว้างเกิน 20vw — grid item มี min-width:auto โดย
+  // default) — reset inline style ของ div ที่ครอบ #takeQNoWrap กลับก่อนเสมอ (เผื่อรอบก่อน
+  // เป็นโหมดคนละครึ่งแล้ว inject style ค้างมา) แล้วค่อย apply ใหม่เฉพาะตอน _halfMode
+  // เท่านั้น — โหมดอื่นจึงไม่มี style พิเศษติดอยู่เลย ไม่กระทบ layout เดิม
+  const _qNoWrapParent=_qNoWrapReset&&_qNoWrapReset.parentElement;
+  if(_qNoWrapParent){
+    _qNoWrapParent.style.cssText='';
+    if(_halfMode) _qNoWrapParent.style.cssText='min-width:0;flex:1;overflow:hidden;';
+  }
   document.getElementById('takeQTotal').textContent=total;
 
   // PDF.js viewer for take page
@@ -5313,7 +5323,8 @@ function initTake(id){
     // span ลูก #takeQNo/#takeQTotal ทิ้ง แล้ว getElementById ด้านล่างจะ null ในรอบ render ถัดไป
     if(_halfMode){
       const _qNoWrap=document.getElementById('takeQNoWrap');
-      if(_qNoWrap) _qNoWrap.textContent=`ตอบแล้ว ${_answeredCount()} / ${st.halfQuota} ข้อ`;
+      // v48.13: ย่อจาก "ตอบแล้ว N / โควตา ข้อ" เป็น "ตอบ N/โควตา" กันปุ่ม "ส่ง" เลยขอบจอ iPad
+      if(_qNoWrap) _qNoWrap.textContent=`ตอบ ${_answeredCount()}/${st.halfQuota}`;
     } else {
       document.getElementById('takeQNo').textContent=q.number||q.no;
     }
@@ -13823,7 +13834,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.12';
+  const CURRENT_VERSION = 'v48.13';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

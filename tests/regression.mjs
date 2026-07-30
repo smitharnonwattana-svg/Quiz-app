@@ -1000,7 +1000,8 @@ const gotoQHalf = (page, idx) => page.evaluate((i) => document.querySelectorAll(
   await gotoQHalf(page, 0); await clickChoiceHalf(page, 'A'); // correct
   await gotoQHalf(page, 1); await clickChoiceHalf(page, 'A'); // wrong (correct=B)
   const progText = await page.evaluate(() => document.getElementById('takeQNoWrap').textContent);
-  check('half-mode header shows "ตอบแล้ว 2 / 2 ข้อ" after quota met', progText.includes('2') && progText.includes('2'), progText);
+  // v48.13: ย่อจาก "ตอบแล้ว N / โควตา ข้อ" เป็น "ตอบ N/โควตา" กันปุ่มส่งเลยขอบจอ iPad
+  check('half-mode header shows shortened "ตอบ 2/2" (no แล้ว/ข้อ) after quota met', progText === 'ตอบ 2/2', progText);
 
   await gotoQHalf(page, 2);
   await clickChoiceHalf(page, 'C'); // correct answer but quota full -> should be blocked
@@ -1106,6 +1107,65 @@ const gotoQHalf = (page, idx) => page.evaluate((i) => document.querySelectorAll(
   check('review: title shows คนละครึ่ง mode badge', reviewInfo.title.includes('คนละครึ่ง'), reviewInfo.title);
   check('review: skipped question (counted:false) does NOT appear in "ผิดข้อ:" list', !reviewInfo.wrongList.includes('2'), reviewInfo.wrongList);
   await ctx.close();
+}
+{
+  // v48.13: ปุ่ม "ส่ง" เลยขอบจอ iPad เฉพาะโหมดคนละครึ่ง — ข้อความ "ตอบแล้ว N/โควตา ข้อ"
+  // ยาวกว่า "ข้อ X/Y" เดิม จนดันคอลัมน์ฝั่งขวากว้างเกิน 20vw (grid item min-width:auto)
+  const IPAD = { width: 1024, height: 768 };
+  const submitBtnBox = (page) => page.evaluate(() => {
+    const el = document.getElementById('takeSubmitBtn');
+    const r = el.getBoundingClientRect();
+    return { right: r.right, viewportW: window.innerWidth, visible: r.width > 0 && r.right <= window.innerWidth };
+  });
+  const qNoWrapInfo = (page) => page.evaluate(() => {
+    const el = document.getElementById('takeQNoWrap');
+    return { text: el.textContent, parentStyle: el.parentElement.getAttribute('style') || '' };
+  });
+
+  const ctxIpad = await browser.newContext({ viewport: IPAD });
+  const pageH = await ctxIpad.newPage();
+  pageH.on('dialog', d => d.accept());
+  await pageH.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+  await pageH.waitForTimeout(800);
+  await pageH.evaluate((cache) => {
+    sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() }));
+    Store._cloudLoaded = true;
+    Store._cache = cache;
+    document.getElementById('offlineBanner')?.remove();
+  }, baseCache({
+    exams: [mkExam('eIpad', 'ชุด iPad', 'คณิตศาสตร์', { questionCount: 25, durationSeconds: 1200 })],
+    questions: { eIpad: mkQN(25) },
+  }));
+  await pageH.evaluate(() => navigate('take', { id: 'eIpad', takerName: 'เด็กipad', half: true }));
+  await pageH.waitForTimeout(500);
+  let boxH = await submitBtnBox(pageH);
+  check('iPad overflow fix: half-mode submit button fully visible on-screen', boxH.visible, JSON.stringify(boxH));
+  let infoH = await qNoWrapInfo(pageH);
+  check('iPad overflow fix: half-mode div gets min-width:0/flex:1/overflow:hidden safety style', infoH.parentStyle.includes('min-width') && infoH.parentStyle.includes('flex'), infoH.parentStyle);
+  await ctxIpad.close();
+
+  // regression: timed mode at the SAME iPad width must be completely untouched
+  const ctxIpadNormal = await browser.newContext({ viewport: IPAD });
+  const pageN = await ctxIpadNormal.newPage();
+  pageN.on('dialog', d => d.accept());
+  await pageN.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+  await pageN.waitForTimeout(800);
+  await pageN.evaluate((cache) => {
+    sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() }));
+    Store._cloudLoaded = true;
+    Store._cache = cache;
+    document.getElementById('offlineBanner')?.remove();
+  }, baseCache({
+    exams: [mkExam('eIpadN', 'ชุด iPad ปกติ', 'คณิตศาสตร์', { questionCount: 40 })],
+    questions: { eIpadN: mkQN(40) },
+  }));
+  await pageN.evaluate(() => navigate('take', { id: 'eIpadN', takerName: 'เด็กปกติ' }));
+  await pageN.waitForTimeout(500);
+  const boxN = await submitBtnBox(pageN);
+  check('iPad overflow fix regression: timed mode submit button visible (baseline unaffected)', boxN.visible, JSON.stringify(boxN));
+  const infoN = await qNoWrapInfo(pageN);
+  check('iPad overflow fix regression: timed mode shows "ข้อ X / Y" unchanged, no inline style', infoN.text.trim() === 'ข้อ 1 / 40' && infoN.parentStyle === '', JSON.stringify(infoN));
+  await ctxIpadNormal.close();
 }
 
 // ─────────────────────────────────────────────────────────────────
