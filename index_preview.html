@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.14p -->
+  <!-- APP_VERSION: v48.15p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.14p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.15p</div>
     </div>
   </div>
 </div>
@@ -1266,12 +1266,15 @@
               <div style="font-weight:800;" id="reviewScore">คะแนน -/-</div>
               <div class="muted" id="reviewMeta"></div>
               <div style="margin-top:6px;font-weight:700;" id="reviewSummaryLine"></div>
+              <div style="margin-top:4px;font-weight:700;color:#6d28d9;display:none;" id="reviewHalfCombinedLine"></div>
             </div>
             <button class="btn" id="reviewScrollTop">ขึ้นบน</button>
           </div>
           <div style="margin-top:10px;">
             <div id="reviewWrongListText" class="wrongText"></div>
           </div>
+          <button class="btn btnPrimary" id="reviewHalf2Btn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;">🤝 ทำครึ่งหลังต่อ</button>
+          <button class="btn" id="reviewRevealBtn" style="display:none;margin-top:8px;width:100%;font-size:12px;color:#b91c1c;border-color:#fca5a5;" title="ดูเฉลยข้อที่ยังไม่ได้ทำได้เลย แต่จะหมดโอกาสทำครึ่งหลังต่อ">👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)</button>
         </div>
         <div class="reviewCard" style="margin-top:12px;">
           <div class="muted" style="margin-bottom:6px;">ไปที่ข้อ</div>
@@ -4201,6 +4204,30 @@ function getRecentAttemptUsersByExam(attempts, examId, limit) {
   return result;
 }
 
+// v48.15: โหมด "คนละครึ่ง" — หา attempt ครึ่งแรกของ exam+ผู้ทำคนนี้ ที่ยังมีข้อเหลือให้ทำ
+// ต่อ (counted:false) และยังไม่มี attempt ไหนทำ "ครึ่งหลัง" ต่อจากมันแล้ว (parentAttemptId
+// ชี้มา) — ใช้ร่วมกันทั้งปุ่มบนหน้ารีวิวและ pill บนการ์ดข้อสอบ
+function findPendingHalf2(s, examId, takerName) {
+  const attempts = s.attempts || [];
+  const _name = (takerName || '').trim();
+  if (!_name) return null;
+  const halfAttempts = attempts.filter(a =>
+    a.examId === examId && (a.takerName || '').trim() === _name &&
+    a.halfMode === true && !a.halfPart && a.mode !== 'weakness_practice'
+  ).sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+  if (!halfAttempts.length) return null;
+  const parent = halfAttempts[0];
+  if (attempts.some(a => a.parentAttemptId === parent.id)) return null; // ทำครึ่งหลังไปแล้ว
+  if (parent.revealedAt) return null; // สละสิทธิ์ไปแล้ว (กดขอดูเฉลย)
+  const qs = s.questions[examId] || [];
+  const validIds = new Set(qs.map(q => q.id));
+  const remainingQids = (parent.perQuestion || [])
+    .filter(p => p.counted === false && validIds.has(p.qid))
+    .map(p => p.qid);
+  if (!remainingQids.length) return null; // ข้อถูกลบ/แก้ไปหมดแล้ว — ไม่มีอะไรให้ทำต่อ
+  return { parentAttempt: parent, qids: remainingQids };
+}
+
 // ===================== NUMPAD LOGIN =====================
 let _pinVal = '';
 function _updatePinDots(shake) {
@@ -4881,7 +4908,8 @@ function initExams(){
         const _val0 = _isPrac0 ? _elapsed0 : Math.max(0, _effDur0 - _elapsed0);
         const _fmt0 = String(Math.floor(_val0/60)).padStart(2,'0') + ':' + String(_val0%60).padStart(2,'0');
         const _label0 = _isPrac0 ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
-        const _title0 = _isPrac0 ? '📝 ฝึกซ้อมค้างอยู่' : _isHalf0 ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
+        const _isHalf2_0 = _isHalf0 && !!_myResume.half2Mode;
+        const _title0 = _isPrac0 ? '📝 ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? '🤝 ครึ่งหลังค้างอยู่' : _isHalf0 ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
         const _bg0 = _isPrac0 ? '#ecfeff' : _isHalf0 ? '#f5f3ff' : '#fffbeb';
         const _border0 = _isPrac0 ? '#a5f3fc' : _isHalf0 ? '#c4b5fd' : '#fde68a';
         const _titleColor0 = _isPrac0 ? '#0e7490' : _isHalf0 ? '#6d28d9' : '#92400e';
@@ -4893,6 +4921,19 @@ function initExams(){
           <span style="margin-left:auto;font-size:12px;font-weight:700;color:#111827;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;">▶ ทำต่อ</span>
         </div>`;
       }
+
+      // v48.15: pill "ทำครึ่งหลังต่อ" — โผล่เฉพาะตอนไม่มี resume ค้างอยู่แล้วสำหรับชุดนี้
+      // (ถ้ามี resume ค้าง ให้ใช้ปุ่ม "ทำต่อ" ข้างบนแทน กันสร้าง attempt ครึ่งหลังซ้ำ)
+      // ⚠️ ใช้ class "half2-badge" ไม่ใช่ "resume-badge" และไม่ใส่ data-startedAt เพราะมี
+      // interval ticker ทุก 250ms คอยเขียนเวลาลง .resume-badge[data-startedAt] .resume-time
+      // ถ้าใส่ผิด class จะพยายามเขียนลง element ที่ไม่มี .resume-time แล้ว error
+      const _pendingHalf2 = (!isTeacher && !_hasResume && _myName) ? findPendingHalf2(s, e.id, _myName) : null;
+      const half2Html = _pendingHalf2 ? `<div class="half2-badge" data-examid="${e.id}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;cursor:pointer;">
+          <span style="font-size:13px;">🤝</span>
+          <span style="font-size:13px;font-weight:700;color:#6d28d9;">ทำครึ่งหลังต่อ</span>
+          <span style="font-size:12px;color:#7c3aed;">เหลือ ${_pendingHalf2.qids.length} ข้อ</span>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;color:#111827;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;">▶ เริ่ม</span>
+        </div>` : '';
 
       card.innerHTML=`
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
@@ -4918,6 +4959,7 @@ function initExams(){
         ${weaknessHtml}
         ${practiceBtnHtml}
         ${resumeHtml}
+        ${half2Html}
       `;
 
       // Assignment + Notification Bell System
@@ -5032,7 +5074,14 @@ function initExams(){
           const _badgeEl = ev.target.closest('.resume-badge');
           const _isPrac = _badgeEl && _badgeEl.dataset.practice === '1';
           const _isHalf = _badgeEl && _badgeEl.dataset.half === '1';
-          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf});
+          // v48.15: ทำต่อ "ครึ่งหลัง" ค้างอยู่ — ต้องส่ง qids/parentAttemptId ตามที่บันทึกไว้
+          // ตอน saveTakeResume ไม่งั้น initTake จะ rebuild qsList เป็นชุดเต็มแทน subset เดิม
+          const _isHalf2 = _isHalf && _myResume && !!_myResume.half2Mode;
+          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:_isHalf2?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null});
+          return;
+        }
+        if(ev.target.closest('.half2-badge')){
+          if(_pendingHalf2) navigate('take',{id:e.id, takerName:_myName, half2:true, qids:_pendingHalf2.qids, parentAttemptId:_pendingHalf2.parentAttempt.id});
           return;
         }
         navigate('exam',{id:e.id});
@@ -5154,19 +5203,28 @@ function initTake(id){
   const exam=s.exams.find(e=>e.id===id);
   if(!exam){navigate('exams');return;}
 
+  // v48.15: โหมด "คนละครึ่ง — ครึ่งหลัง" ส่ง qids มาจำกัด qsList เหลือเฉพาะข้อที่ยังไม่ได้
+  // ทำจากครึ่งแรก — ระบบเดิม (navigate ด้วย index, ผูก identity ด้วย q.id) ไม่สนใจว่าข้อ
+  // เรียง 1..N ต่อเนื่องหรือไม่อยู่แล้ว จึงกรองตรงนี้จุดเดียวพอ (เหมือน initPractice)
+  const _qidSubset = (Array.isArray(_pageParams.qids) && _pageParams.qids.length) ? new Set(_pageParams.qids) : null;
   // normalize questions: ensure .no field
-  const qsList=(s.questions[id]||[]).map(q=>({...q, no: q.no??q.number??0}));
+  const qsList=(s.questions[id]||[]).map(q=>({...q, no: q.no??q.number??0}))
+    .filter(q=>!_qidSubset || _qidSubset.has(q.id));
   const total=qsList.length;
   const attemptId='att_'+Math.random().toString(16).slice(2);
   const LAST_TAKER_KEY='nanont:lastTakerName';
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
   const _takerName = (_pageParams.takerName||localStorage.getItem(LAST_TAKER_KEY)||(Auth.isTeacher()?'':Auth.getName())||'').trim();
   const _practiceMode = !!_pageParams.practice;
-  // v48.12: โหมด "คนละครึ่ง" — ทำครึ่งจำนวนข้อ (ปัดขึ้น) ในครึ่งเวลา (ปัดขึ้นเป็นนาที)
-  // เลือกทำข้อไหนก็ได้ ยังคงเป็นการสอบจับเวลาจริง (ไม่ใช่ฝึกซ้อม)
-  const _halfMode = !!_pageParams.half;
-  const _halfQuota = _halfMode ? Math.ceil(total/2) : 0;
+  // v48.15: "ครึ่งหลัง" — แยก flag จาก half เดิม กัน _halfQuota หารครึ่งซ้ำบน subset ที่ครึ่ง
+  // แล้ว (ดู qsList ข้างบน) — แต่ยังนับเป็น _halfMode ด้วย (union) เพื่อให้ logic เดิมทั้งหมด
+  // (จุดอ่อนนับเฉพาะข้อตอบจริง, บังคับ weighted:false, แท็บสถิติ, badge รีวิว ฯลฯ) ใช้ต่อได้
+  // โดยไม่ต้องแก้ซ้ำ — ครึ่งหลังแค่ไม่มีโควตาบล็อก (ตอบได้ทุกข้อที่เหลือ จึงตั้ง quota=total)
+  const _half2Mode = !!_pageParams.half2;
+  const _halfMode = !!_pageParams.half || _half2Mode;
+  const _halfQuota = _half2Mode ? total : (_halfMode ? Math.ceil(total/2) : 0);
   const _effDuration = _halfMode ? Math.ceil(exam.durationSeconds/2/60)*60 : exam.durationSeconds;
+  const _parentAttemptId = _half2Mode ? (_pageParams.parentAttemptId||null) : null;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
   // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
   if(!_practiceMode) lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
@@ -5179,7 +5237,10 @@ function initTake(id){
     takerName:_takerName,
     practiceMode:_practiceMode,
     halfMode:_halfMode,
-    halfQuota:_halfQuota
+    halfQuota:_halfQuota,
+    half2Mode:_half2Mode,
+    qids:_qidSubset?[..._qidSubset]:null,
+    parentAttemptId:_parentAttemptId
   };
   const st=_takeState;
   // นับข้อที่ "ตอบแล้วจริง" สำหรับโหมดคนละครึ่ง — ต้องกัน '' ออก เพราะโหมดกรอกตัวเลข
@@ -5190,7 +5251,7 @@ function initTake(id){
     }).length;
   }
 
-  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
   // #page-take ไม่ได้ถูกสร้างใหม่จาก HTML ทุกครั้งที่ navigate('take') — เนื้อหาคงค้างข้าม
   // รอบก่อนหน้า ถ้ารอบก่อนเป็นโหมดคนละครึ่ง #takeQNoWrap จะถูกเขียนทับด้วย .textContent=
   // (ทำลาย span ลูก #takeQNo/#takeQTotal ทิ้ง) ต้อง reset โครงสร้างกลับก่อนเสมอ
@@ -5605,6 +5666,9 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     function _doSave(feeling, prediction){
       const savedS=Store.load();
       const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
+      // v48.15: "ครึ่งหลัง" — เพิ่มเฉพาะตอน half2Mode เท่านั้น ครึ่งแรก/โหมดอื่นไม่มีฟิลด์นี้เลย
+      // (additive, legacy-safe — ไม่มี halfPart = ถือเป็นครึ่งแรกโดยปริยาย)
+      if(st.half2Mode){ _newAttempt.halfPart=2; _newAttempt.parentAttemptId=st.parentAttemptId||null; }
       savedS.attempts.unshift(_newAttempt);
       const ok=Store.save(savedS);
       if (!ok) {
@@ -5645,7 +5709,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           Store.save(_s3);
         }
       }
-      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds, halfMode: !!st.halfMode });
+      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds, halfMode: !!st.halfMode, halfPart: st.half2Mode?2:(st.halfMode?1:undefined) });
       MemeScore.show(score, total, () => {
         navigate('review', {attemptId: st.attemptId});
       });
@@ -5743,7 +5807,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
   // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
   const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
-  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode) ? _rawResume : null;
+  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode) ? _rawResume : null;
   if (_resume) {
 
     // คำนวณเวลา ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
@@ -5764,7 +5828,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
     const _resumeLabel = _practiceMode ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
-    const _resumeTitle = _practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : _halfMode ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
+    const _resumeTitle = _practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : _half2Mode ? '🤝 ครึ่งหลังค้างอยู่' : _halfMode ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
     _resumeBox.innerHTML = `
       <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
       <div style="font-size:18px;font-weight:800;margin-bottom:6px;">${_resumeTitle}</div>
@@ -5807,9 +5871,9 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   } else {
     // มี resume ค้างอยู่ที่ไม่ตรงกับรอบนี้ (คนละชุด หรือชุดเดิมแต่คนละโหมด) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
     if (_rawResume && _rawResume.examId && _rawResume.startedAt &&
-        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode)) {
+        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode || !!_rawResume.half2Mode !== !!_half2Mode)) {
       const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
-      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : _rawResume.halfMode ? ' (คนละครึ่ง)' : ' (จับเวลา)');
+      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : _rawResume.half2Mode ? ' (คนละครึ่ง ครึ่งหลัง)' : _rawResume.halfMode ? ' (คนละครึ่ง)' : ' (จับเวลา)');
       if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
         navigate('exams');
         return;
@@ -5857,10 +5921,52 @@ function initReview(attemptId){
 
   const taker=(att.takerName||'').trim()||'ไม่ระบุ';
   const subj=(exam&&exam.subject)?exam.subject:(att.examSubject||'ไม่ระบุ');
-  const _modeBadge=att.halfMode?` 🤝 คนละครึ่ง (${att.halfQuota||0}/${qs.length} ข้อ)`:att.practiceMode?' 📝 ฝึกซ้อม':'';
+  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${qs.length} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${qs.length} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':'';
   document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
+
+  // v48.15: โหมดคนละครึ่ง — บรรทัดสรุปคะแนนรวม (ครึ่งแรก+ครึ่งหลัง) เมื่อทำครบทั้งสองครึ่งแล้ว
+  // และปุ่ม "ทำครึ่งหลังต่อ" / "ขอดูเฉลยเลย" (แสดงเฉพาะตอนดูรีวิวของครึ่งแรกที่ยังค้างอยู่)
+  {
+    const _combinedEl=document.getElementById('reviewHalfCombinedLine');
+    let _part1=null,_part2=null;
+    if(att.halfPart===2 && att.parentAttemptId){
+      _part1=(s.attempts||[]).find(a=>a.id===att.parentAttemptId); _part2=att;
+    } else if(att.halfMode && !att.halfPart){
+      _part2=(s.attempts||[]).find(a=>a.parentAttemptId===att.id); _part1=_part2?att:null;
+    }
+    if(_combinedEl){
+      if(_part1 && _part2){
+        _combinedEl.style.display='';
+        _combinedEl.textContent=`ครึ่งแรก ${_part1.score}/${_part1.total} + ครึ่งหลัง ${_part2.score}/${_part2.total} = รวม ${(_part1.score||0)+(_part2.score||0)}/${(_part1.total||0)+(_part2.total||0)}`;
+      } else {
+        _combinedEl.style.display='none';
+      }
+    }
+
+    const _half2Btn=document.getElementById('reviewHalf2Btn');
+    const _revealBtn=document.getElementById('reviewRevealBtn');
+    const _pending=(att.halfMode && !att.halfPart) ? findPendingHalf2(s, att.examId, att.takerName) : null;
+    const _showHalf2=!!(_pending && _pending.parentAttempt.id===att.id);
+    if(_half2Btn){
+      _half2Btn.style.display=_showHalf2?'':'none';
+      _half2Btn.onclick=()=>{
+        navigate('take',{id:att.examId, takerName:att.takerName, half2:true, qids:_pending.qids, parentAttemptId:att.id});
+      };
+    }
+    if(_revealBtn){
+      const _showReveal=_showHalf2 && !Auth.isTeacher();
+      _revealBtn.style.display=_showReveal?'':'none';
+      _revealBtn.onclick=()=>{
+        if(!confirm('ถ้าดูเฉลยตอนนี้ จะไม่สามารถกลับมาทำ "ครึ่งหลัง" ของชุดนี้ได้อีก (เพื่อความยุติธรรม)\n\nยืนยันจะดูเฉลยเลยไหม?')) return;
+        const _s2=Store.load();
+        const _att2=(_s2.attempts||[]).find(a=>a.id===attemptId);
+        if(_att2){ _att2.revealedAt=new Date().toISOString(); Store.save(_s2); }
+        initReview(attemptId);
+      };
+    }
+  }
 
   function fmtDate(iso){try{return new Date(iso).toLocaleString('th-TH');}catch(e){return iso||'';}}
   function fmtDur(sec){sec=Math.max(0,Number(sec||0));const m=Math.floor(sec/60),ss=sec%60;return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
@@ -6040,7 +6146,13 @@ function initReview(attemptId){
     const isUns=isUnsureQ(q);
     const isFree=!!(q.isFree||(Array.isArray(att.perQuestion)&&att.perQuestion.find(p=>Number(p.no)===Number(q.no))?.isFree));
     const _isFillNum=_reviewExamType==='fillblank-num';
-    const hasText=_isFillNum?false:KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
+    // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) แสดง "ไม่ได้เลือก" สีเทา
+    // แยกจาก "ผิด" สีแดง — เพราะเด็กไม่เคยตัดสินใจกับข้อนี้จริง
+    const isSkippedQ = !isCountedQ(q);
+    // v48.15: ซ่อนเฉลยของข้อที่ยังไม่ได้ตอบ (จะเก็บไว้ทำ "ครึ่งหลัง") — เฉพาะเด็ก ไม่ใช่ครู
+    // และยังไม่ได้กดขอดูเฉลย (Auth.isTeacher()/att.revealedAt) กันสปอยล์ก่อนทำต่อ
+    const _hideAns = isSkippedQ && !Auth.isTeacher() && !att.revealedAt;
+    const hasText=(_isFillNum||_hideAns)?false:KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
 
     const wrap=document.createElement('div');
     wrap.className='qItem';
@@ -6048,7 +6160,9 @@ function initReview(attemptId){
 
     // ── pills row (mc) / answer display (fillblank-num) ──
     let pillsHtml='';
-    if(_isFillNum){
+    if(_hideAns){
+      pillsHtml=`<div style="font-size:12px;color:#9ca3af;">🔒 ยังไม่ได้ตอบ</div>`;
+    } else if(_isFillNum){
       const chosenDisp=chosen!=null&&String(chosen).trim()!==''?String(chosen):'—';
       const correctDisp=correct||'—';
       if(isFree){
@@ -6076,9 +6190,6 @@ function initReview(attemptId){
     }
 
     // badge
-    // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) แสดง "ไม่ได้เลือก" สีเทา
-    // แยกจาก "ผิด" สีแดง — เพราะเด็กไม่เคยตัดสินใจกับข้อนี้จริง
-    const isSkippedQ = !isCountedQ(q);
     const badgeCls = isFree?'skip':isSkippedQ?'skip':isCorrect?'good':'bad';
     const badgeTxt = isFree?'ฟรี':isSkippedQ?'— ไม่ได้เลือก':isCorrect?'✓ ถูก':(chosen?'✗ ผิด':'— ไม่ตอบ');
 
@@ -6093,7 +6204,7 @@ function initReview(attemptId){
       </div>
       <div class="qExpand">
         ${isFree?'<div style="font-size:12px;color:#d97706;font-weight:700;padding:2px 0;">★ ข้อฟรี — ทุกคนได้คะแนนข้อนี้</div>':''}
-        ${_isFillNum?'':KEYS.map(key=>{
+        ${(_isFillNum||_hideAns)?'':KEYS.map(key=>{
           const letter=KEY_TO_LETTER[key];
           const text=(q.choices&&(q.choices[letter]||q.choices[key]))||(q.options&&(q.options[letter]||q.options[key]))||'';
           if(!text.trim()) return '';
@@ -6190,7 +6301,10 @@ function initReview(attemptId){
   const _viewQ = document.getElementById('reviewPdfViewer');
   const _viewA = document.getElementById('reviewAnswerPdfViewer');
 
-  if(_answerPdfUrl && _tabA) {
+  // v48.15: ถ้ายังมีข้อที่ซ่อนเฉลยไว้ (รอทำ "ครึ่งหลัง") ต้องซ่อนแท็บเฉลย PDF ทั้งฉบับด้วย
+  // ไม่งั้นเด็กเปิดดูเฉลยทั้งชุดจากตรงนี้ได้เลย ทำให้การซ่อนรายข้อข้างบนไร้ความหมาย
+  const _anyHiddenAnswers = att.halfMode && !Auth.isTeacher() && !att.revealedAt && qs.some(q=>!isCountedQ(q));
+  if(_answerPdfUrl && _tabA && !_anyHiddenAnswers) {
     _tabA.style.display = '';  // show answer tab
     let _answerLoaded = false;
 
@@ -6242,6 +6356,12 @@ function initReview(attemptId){
 
     if(_tabQ) _tabQ.onclick = () => setReviewTab('question');
     if(_tabA) _tabA.onclick = () => setReviewTab('answer');
+  } else if(_tabA) {
+    // #page-review ไม่ได้ถูกสร้างใหม่ทุกครั้งที่ navigate('review') — ถ้ารอบก่อนโชว์แท็บนี้
+    // ไว้ (exam อื่นมี answerPdfUrl) ต้อง reset กลับ 'none' เสมอ ไม่งั้นจะค้างโชว์ข้ามรอบ
+    // (สำคัญกับโหมดคนละครึ่งที่ตั้งใจซ่อนแท็บนี้ไว้ตอนยังมีข้อ counted:false เหลือ)
+    _tabA.style.display = 'none';
+    _tabA.onclick = null;
   }
 
   // ── พัฒนาการ + TOP 5 ข้อผิดบ่อย ของชุดนี้ ──
@@ -11209,6 +11329,11 @@ function saveTakeResume(state) {
       attemptId: state.attemptId,
       practiceMode: !!state.practiceMode,
       halfMode: !!state.halfMode,
+      // v48.15: "ครึ่งหลัง" ต้องเก็บ qids ด้วย ไม่งั้น refresh กลางคันแล้ว initTake จะ
+      // rebuild qsList เป็นชุดเต็มแทนที่จะเป็น subset เดิม (เพราะ _pageParams หายไปตอน reload)
+      half2Mode: !!state.half2Mode,
+      qids: state.half2Mode ? (state.qids||null) : null,
+      parentAttemptId: state.half2Mode ? (state.parentAttemptId||null) : null,
     }));
   } catch(e) {}
 }
@@ -12772,7 +12897,7 @@ const _takeResume = loadTakeResume(Auth.getName());
 
 if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   if (_savedState.page === 'take' && _takeResume) {
-    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode });
+    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: _takeResume.half2Mode ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null });
   } else {
     navigate(_savedState.page, _savedState.params);
   }
