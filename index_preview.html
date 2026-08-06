@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.20p -->
+  <!-- APP_VERSION: v48.21p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.20p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.21p</div>
     </div>
   </div>
 </div>
@@ -6986,9 +6986,13 @@ function _renderDashboard(){
     el.style.borderColor=active?'#111':'var(--border)';
   });
 
-  _renderDashSummary(attempts);
-  _renderDashChart(attempts);
-  _renderDashAttempts(attempts,isTeacher);
+  // v48.21p: merge ครึ่งแรก+ครึ่งหลังเป็น session เดียวก่อนส่งต่อทั้ง 3 การ์ด/กราฟ/รายการ —
+  // ไม่งั้นนับซ้ำ 2 sittings และเฉลี่ย %/DAS แบบไม่ถ่วงน้ำหนักผิดความจริง (โค้ดนี้ยังไม่ได้
+  // เชื่อมกับหน้าไหนในแอปตอนนี้ แต่แก้ไว้ให้ถูกต้องเผื่อถูกเปิดใช้ทีหลัง)
+  const merged=mergeHalfModePairs(attempts);
+  _renderDashSummary(merged);
+  _renderDashChart(merged);
+  _renderDashAttempts(merged,isTeacher);
 }
 
 function _renderDashSummary(attempts){
@@ -6996,7 +7000,7 @@ function _renderDashSummary(attempts){
   if(!el) return;
   if(!attempts.length){el.innerHTML='';return;}
   // แบ่ง 3 กลุ่ม
-  const realOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&!a.practiceMode&&!a.halfMode);   // สอบจริง
+  const realOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&!a.practiceMode);   // สอบจริง (รวมคนละครึ่งที่ merge แล้ว)
   const practiceOnly=attempts.filter(a=>a.mode!=='weakness_practice'&&a.practiceMode); // ฝึกชุด
   const weaknessOnly=attempts.filter(a=>a.mode==='weakness_practice');                 // แก้จุดอ่อน
   // สำหรับ % metrics ใช้ real+practice (ตัด weakness ออก)
