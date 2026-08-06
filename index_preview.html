@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.15p -->
+  <!-- APP_VERSION: v48.16p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.15p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.16p</div>
     </div>
   </div>
 </div>
@@ -5921,7 +5921,12 @@ function initReview(attemptId){
 
   const taker=(att.takerName||'').trim()||'ไม่ระบุ';
   const subj=(exam&&exam.subject)?exam.subject:(att.examSubject||'ไม่ระบุ');
-  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${qs.length} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${qs.length} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':'';
+  // v48.15 fix: เดิมใช้ qs.length (จำนวนข้อเต็มชุด) เป็นตัวหารทั้งครึ่งแรก/ครึ่งหลัง ทำให้
+  // badge ทั้งสองครึ่งโชว์เลขเหมือนกันเป๊ะ (เช่น "2/4" ทั้งคู่) แยกไม่ออกว่าคนละชุดข้อกัน —
+  // เปลี่ยนเป็นจำนวนข้อของ attempt นั้นๆ เอง (perQuestion.length): ครึ่งแรกมีข้อครบทั้งชุด
+  // (นับ 2/4), ครึ่งหลังมีแค่ข้อที่เหลือจริง (นับ 2/2) ตัวเลขจึงต่างกันตามจริง
+  const _modeQTotal=(Array.isArray(att.perQuestion)&&att.perQuestion.length)||qs.length;
+  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':'';
   document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
@@ -6151,7 +6156,10 @@ function initReview(attemptId){
     const isSkippedQ = !isCountedQ(q);
     // v48.15: ซ่อนเฉลยของข้อที่ยังไม่ได้ตอบ (จะเก็บไว้ทำ "ครึ่งหลัง") — เฉพาะเด็ก ไม่ใช่ครู
     // และยังไม่ได้กดขอดูเฉลย (Auth.isTeacher()/att.revealedAt) กันสปอยล์ก่อนทำต่อ
-    const _hideAns = isSkippedQ && !Auth.isTeacher() && !att.revealedAt;
+    // ยกเว้นข้อฟรี (isFree) — ได้คะแนนอัตโนมัติอยู่แล้ว ไม่มีอะไรต้องกันสปอยล์ และ badge
+    // ข้างล่างก็โชว์ "ฟรี" เสมอไม่สนใจ isSkippedQ อยู่แล้ว ถ้าไม่กันตรงนี้ด้วยจะขึ้นข้อความ
+    // ขัดกัน (badge บอกฟรี แต่ pills บอกล็อกไว้)
+    const _hideAns = isSkippedQ && !isFree && !Auth.isTeacher() && !att.revealedAt;
     const hasText=(_isFillNum||_hideAns)?false:KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
 
     const wrap=document.createElement('div');
