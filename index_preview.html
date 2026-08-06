@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.19p -->
+  <!-- APP_VERSION: v48.20p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.19p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.20p</div>
     </div>
   </div>
 </div>
@@ -7493,7 +7493,11 @@ function initStats(){
     // แยก normal กับ practice
     const normalAttempts=allAttempts.filter(a=>a.mode!=='weakness_practice');
     const practiceAttempts=allAttempts.filter(a=>a.mode==='weakness_practice');
-    const timeFiltered=filterByTime(normalAttempts);
+    // v48.20p: merge ครึ่งแรก+ครึ่งหลังเป็น session เดียวก่อนส่งต่อไปการ์ดสรุป/ระดับความยาก/
+    // subject dashboard — ไม่งั้นนับเป็น 2 ครั้งและเฉลี่ย % แบบไม่ถ่วงน้ำหนักผิดความจริง
+    // (filterByTime ก่อน merge เพื่อให้ครึ่งที่ตกช่วงเวลาที่กรองไว้ fallback เป็นเดี่ยวได้ถูกต้อง
+    // เหมือน pattern เดียวกับ halfList/_allExamAttempts ที่แก้ไปแล้วก่อนหน้า)
+    const timeFiltered=mergeHalfModePairs(filterByTime(normalAttempts));
     const bySubject=currentSubjectFilter==='all'?timeFiltered:timeFiltered.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
 
