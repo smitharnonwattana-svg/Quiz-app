@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.18p -->
+  <!-- APP_VERSION: v48.19p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.18p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.19p</div>
     </div>
   </div>
 </div>
@@ -4229,6 +4229,32 @@ function findPendingHalf2(s, examId, takerName) {
   return { parentAttempt: parent, qids: remainingQids };
 }
 
+// v48.19p: รวม attempt ครึ่งแรก+ครึ่งหลังของ session เดียวกัน (จับคู่ผ่าน parentAttemptId)
+// เป็นก้อนเดียว — ใช้ร่วมกันทั้งหน้าสถิติ (แท็บคนละครึ่ง) และหน้ารีวิว (พัฒนาการ/ข้อผิดบ่อย)
+// attempt ที่ไม่ใช่ครึ่งหลัง หรือหา parent ไม่เจอ (ถูกกรอง/ถูกลบ) จะผ่านเข้า out ตามเดิมเฉยๆ
+function mergeHalfModePairs(list) {
+  const byId = {}; list.forEach(a => { byId[a.id] = a; });
+  const consumed = new Set();
+  const out = [];
+  list.forEach(a => {
+    if (consumed.has(a.id)) return;
+    if (a.halfMode && a.halfPart === 2) {
+      const parent = a.parentAttemptId && byId[a.parentAttemptId];
+      if (parent && !consumed.has(parent.id)) {
+        consumed.add(parent.id); consumed.add(a.id);
+        out.push({...a,
+          score: (parent.score||0)+(a.score||0), total: (parent.total||0)+(a.total||0),
+          usedSeconds: (parent.usedSeconds||0)+(a.usedSeconds||0),
+          perQuestion: [...(parent.perQuestion||[]), ...(a.perQuestion||[])],
+          startedAt: parent.startedAt});
+        return;
+      }
+    }
+    consumed.add(a.id); out.push(a);
+  });
+  return out;
+}
+
 // ===================== NUMPAD LOGIN =====================
 let _pinVal = '';
 function _updatePinDots(shake) {
@@ -6463,9 +6489,9 @@ function initReview(attemptId){
 
   // ── พัฒนาการ + TOP 5 ข้อผิดบ่อย ของชุดนี้ ──
   // ใช้ทุก mode สำหรับ TOP 5 (ดูข้อที่ผิดบ่อย)
-  const _allExamAttempts = (s.attempts||[])
-    .filter(a=>a.examId===att.examId)
-    .sort((a,b)=>new Date(a.startedAt||0)-new Date(b.startedAt||0));
+  const _allExamAttempts = mergeHalfModePairs(
+    (s.attempts||[]).filter(a=>a.examId===att.examId)
+  ).sort((a,b)=>new Date(a.startedAt||0)-new Date(b.startedAt||0));
   // กราฟพัฒนาการ: ตัด weakness_practice ออก (total ไม่ตรงชุด) + ซ่อน 0%
   const _chartExamAttempts = _allExamAttempts.filter(a=>a.mode!=='weakness_practice' && a.total>0 && (a.score||0)>0);
 
@@ -7653,28 +7679,10 @@ function initStats(){
     const rowsEl=document.getElementById('statsRows');
     const realList=attempts.filter(a=>!a.practiceMode&&!a.halfMode);
     const practiceList=attempts.filter(a=>a.practiceMode===true);
-    // v48.18p: ครึ่งแรก+ครึ่งหลังของ session เดียวกัน (จับคู่ผ่าน parentAttemptId) รวมเป็น
-    // การ์ดเดียวแทนที่จะโชว์แยก 2 การ์ดซ้ำของข้อสอบชุดเดียวกัน — ถ้าคู่หายไป (ถูกกรองด้วย
-    // เวลา/วิชา หรือถูกลบ) fallback เป็นการ์ดเดี่ยวเหมือนเดิม
-    const _halfRaw=attempts.filter(a=>a.halfMode===true);
-    const _halfById={}; _halfRaw.forEach(a=>{_halfById[a.id]=a;});
-    const _halfConsumed=new Set();
-    const halfList=[];
-    _halfRaw.forEach(a=>{
-      if(_halfConsumed.has(a.id)) return;
-      if(a.halfPart===2){
-        const _parent=a.parentAttemptId && _halfById[a.parentAttemptId];
-        if(_parent && !_halfConsumed.has(_parent.id)){
-          _halfConsumed.add(_parent.id); _halfConsumed.add(a.id);
-          halfList.push({...a,
-            score:(_parent.score||0)+(a.score||0), total:(_parent.total||0)+(a.total||0),
-            usedSeconds:(_parent.usedSeconds||0)+(a.usedSeconds||0),
-            perQuestion:[...(_parent.perQuestion||[]), ...(a.perQuestion||[])],
-            startedAt:_parent.startedAt});
-        } else { _halfConsumed.add(a.id); halfList.push(a); }
-      } else if(!_halfConsumed.has(a.id)){ _halfConsumed.add(a.id); halfList.push(a); }
-    });
-    halfList.sort((x,y)=>new Date(y.startedAt||0)-new Date(x.startedAt||0));
+    // v48.18p/v48.19p: ครึ่งแรก+ครึ่งหลังของ session เดียวกันรวมเป็นการ์ดเดียวแทนที่จะโชว์แยก
+    // 2 การ์ดซ้ำของข้อสอบชุดเดียวกัน (ใช้ mergeHalfModePairs กลาง ร่วมกับหน้ารีวิว)
+    const halfList=mergeHalfModePairs(attempts.filter(a=>a.halfMode===true))
+      .sort((x,y)=>new Date(y.startedAt||0)-new Date(x.startedAt||0));
     let weaknessList=filterByTime(practiceAttempts);
     if(currentSubjectFilter!=='all') weaknessList=weaknessList.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     if(currentExamFilter!=='all') weaknessList=weaknessList.filter(a=>a.examId===currentExamFilter);
