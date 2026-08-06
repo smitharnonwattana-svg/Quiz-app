@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.17p -->
+  <!-- APP_VERSION: v48.18p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.17p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.18p</div>
     </div>
   </div>
 </div>
@@ -5920,6 +5920,14 @@ function initReview(attemptId){
   // Normalize: seed data may use .number instead of .no
   qs.forEach(q=>{if(q.no==null&&q.number!=null) q.no=q.number;});
 
+  // v48.18p: attempt "ครึ่งหลัง" (halfPart:2) เก็บแค่ subset ข้อของตัวเอง — แต่ qs ข้างบน
+  // ดึงมาจากข้อสอบทั้งชุดปัจจุบันเสมอ ถ้าไม่กรอง หน้ารีวิวของครึ่งหลังจะโชว์ข้อของครึ่งแรก
+  // ปนมาด้วย (เฉลยโผล่มาเฉยๆ ไม่มีคำตอบ ไม่ตรงกับคะแนนที่ควรมีแค่ subset ของตัวเอง)
+  if(att.halfPart===2 && Array.isArray(att.perQuestion) && att.perQuestion.length){
+    const _ownQids2=new Set(att.perQuestion.map(p=>p.qid));
+    qs=qs.filter(q=>_ownQids2.has(q.id));
+  }
+
   const taker=(att.takerName||'').trim()||'ไม่ระบุ';
   const subj=(exam&&exam.subject)?exam.subject:(att.examSubject||'ไม่ระบุ');
   // v48.15 fix: เดิมใช้ qs.length (จำนวนข้อเต็มชุด) เป็นตัวหารทั้งครึ่งแรก/ครึ่งหลัง ทำให้
@@ -6471,7 +6479,7 @@ function initReview(attemptId){
   if(wrongCard && wrongTopEl && _wrongStatAttempts.length>=1){
     const wrongCount={};
     _wrongStatAttempts.forEach(a=>{
-      (a.perQuestion||[]).forEach(p=>{ if(!p.isCorrect&&p.no) wrongCount[p.no]=(wrongCount[p.no]||0)+1; });
+      (a.perQuestion||[]).forEach(p=>{ if(p.counted===false) return; if(!p.isCorrect&&p.no) wrongCount[p.no]=(wrongCount[p.no]||0)+1; });
     });
     const sorted=Object.entries(wrongCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
     if(sorted.length){
@@ -7482,6 +7490,7 @@ function initStats(){
         const sm=_ensureSubj(subj);
         sm.sum+=(a.score||0); sm.total+=(a.total||0); sm.cnt++;
         (a.perQuestion||[]).forEach(p=>{
+          if(p.counted===false) return; // v48.18p: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่งไม่นับเป็น "ผิด"
           const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
           _pt.forEach(t=>{
             if(!sm.tagMap[t]) sm.tagMap[t]={right:0,total:0};
@@ -7644,7 +7653,28 @@ function initStats(){
     const rowsEl=document.getElementById('statsRows');
     const realList=attempts.filter(a=>!a.practiceMode&&!a.halfMode);
     const practiceList=attempts.filter(a=>a.practiceMode===true);
-    const halfList=attempts.filter(a=>a.halfMode===true);
+    // v48.18p: ครึ่งแรก+ครึ่งหลังของ session เดียวกัน (จับคู่ผ่าน parentAttemptId) รวมเป็น
+    // การ์ดเดียวแทนที่จะโชว์แยก 2 การ์ดซ้ำของข้อสอบชุดเดียวกัน — ถ้าคู่หายไป (ถูกกรองด้วย
+    // เวลา/วิชา หรือถูกลบ) fallback เป็นการ์ดเดี่ยวเหมือนเดิม
+    const _halfRaw=attempts.filter(a=>a.halfMode===true);
+    const _halfById={}; _halfRaw.forEach(a=>{_halfById[a.id]=a;});
+    const _halfConsumed=new Set();
+    const halfList=[];
+    _halfRaw.forEach(a=>{
+      if(_halfConsumed.has(a.id)) return;
+      if(a.halfPart===2){
+        const _parent=a.parentAttemptId && _halfById[a.parentAttemptId];
+        if(_parent && !_halfConsumed.has(_parent.id)){
+          _halfConsumed.add(_parent.id); _halfConsumed.add(a.id);
+          halfList.push({...a,
+            score:(_parent.score||0)+(a.score||0), total:(_parent.total||0)+(a.total||0),
+            usedSeconds:(_parent.usedSeconds||0)+(a.usedSeconds||0),
+            perQuestion:[...(_parent.perQuestion||[]), ...(a.perQuestion||[])],
+            startedAt:_parent.startedAt});
+        } else { _halfConsumed.add(a.id); halfList.push(a); }
+      } else if(!_halfConsumed.has(a.id)){ _halfConsumed.add(a.id); halfList.push(a); }
+    });
+    halfList.sort((x,y)=>new Date(y.startedAt||0)-new Date(x.startedAt||0));
     let weaknessList=filterByTime(practiceAttempts);
     if(currentSubjectFilter!=='all') weaknessList=weaknessList.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
     if(currentExamFilter!=='all') weaknessList=weaknessList.filter(a=>a.examId===currentExamFilter);
@@ -7673,6 +7703,7 @@ function initStats(){
       const _subTagMap={}; // main → { sub → {right,total} }
       const _subjSubMap=(s.subjectSubTopics&&s.subjectSubTopics[examSubject])||{};
       (a.perQuestion||[]).forEach(p=>{
+        if(p.counted===false) return; // v48.18p: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่งไม่นับเป็น "ผิด"
         const _pt=(Array.isArray(p.tags)&&p.tags.length)?p.tags:(p.topic?[p.topic]:[]);
         _pt.forEach(t=>{
           if(!_tagMap[t]) _tagMap[t]={right:0,total:0};
