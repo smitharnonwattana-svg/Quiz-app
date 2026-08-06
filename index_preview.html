@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.16p -->
+  <!-- APP_VERSION: v48.17p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.16p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.17p</div>
     </div>
   </div>
 </div>
@@ -1273,6 +1273,7 @@
           <div style="margin-top:10px;">
             <div id="reviewWrongListText" class="wrongText"></div>
           </div>
+          <button class="btn" id="reviewRecalcBtn" style="display:none;margin-top:10px;width:100%;font-size:12px;" title="คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน — ใช้ตอนแก้เฉลยผิดในหน้า editor แล้วอยากให้คะแนนของครั้งนี้ตรงตาม">🔄 คำนวณคะแนนใหม่จากเฉลยปัจจุบัน</button>
           <button class="btn btnPrimary" id="reviewHalf2Btn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;">🤝 ทำครึ่งหลังต่อ</button>
           <button class="btn" id="reviewRevealBtn" style="display:none;margin-top:8px;width:100%;font-size:12px;color:#b91c1c;border-color:#fca5a5;" title="ดูเฉลยข้อที่ยังไม่ได้ทำได้เลย แต่จะหมดโอกาสทำครึ่งหลังต่อ">👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)</button>
         </div>
@@ -2145,8 +2146,8 @@
           <table style="min-width:300px;">
             <thead>
               <tr>
-                <th style="width:56px;">ข้อ</th>
                 <th style="width:56px;">หน้า</th>
+                <th style="width:56px;">ข้อ</th>
                 <th style="width:120px;">เฉลย</th>
                 <th style="width:80px;display:none;" class="editorPtsTh">คะแนน</th>
                 <th style="width:60px;">ฟรี</th>
@@ -5978,6 +5979,86 @@ function initReview(attemptId){
 
   document.getElementById('reviewMeta').textContent=`ส่งคำตอบ: ${fmtDate(att.submittedAt)} • เวลา: ${fmtDur(att.usedSeconds)}`;
   document.getElementById('reviewPdfLabel').textContent=exam?esc(exam.title||'PDF'):'PDF';
+
+  // ── Admin: คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน (กรณีแก้เฉลยผิดหลังทำข้อสอบไปแล้ว) ──
+  // สูตรคำนวณคะแนนก็อปมาจาก submit() ตรงๆ (ไม่แก้ submit()/_doSave เดิม — จุดนั้น
+  // ทำเครื่องหมาย HIGH-RISK ไว้แล้ว) ต่างกันแค่ใช้ att.answers ที่บันทึกไว้แทน st.answers สด
+  // และ qs (เฉลยปัจจุบัน) แทน qsList ตอนทำจริง — ไม่แตะ gamification/point/streak/รางวัล
+  // v48.17p: รองรับโหมดคนละครึ่ง (att.halfMode) — half-mode บังคับ unweighted และ total=halfQuota
+  // เดิมเหมือน submit() เป๊ะ, และคง field `counted` ของแต่ละข้อจาก attempt เดิมไว้ ไม่งั้นข้อที่
+  // ตั้งใจข้ามไว้ทำครึ่งหลัง (counted:false) จะถูกนับเป็น "ตอบผิด" ใหม่ทั้งคะแนนและจุดอ่อน
+  const recalcBtn = document.getElementById('reviewRecalcBtn');
+  if (recalcBtn) {
+    recalcBtn.style.display = Auth.isTeacher() ? '' : 'none';
+    recalcBtn.onclick = async () => {
+      if (!confirm(`คำนวณคะแนนใหม่จากเฉลยปัจจุบันของ "${att.examTitle||'ชุดนี้'}"?\n\nคะแนน/ถูกผิดของ "${taker}" ในครั้งนี้จะถูกเขียนทับ (กู้คืนได้จาก Backup) และจุดอ่อนของ "${taker}" จะถูกสร้างใหม่ทั้งหมดจากประวัติการทำข้อสอบทุกครั้ง — ไม่กระทบแต้มเกม/streak/รางวัลที่ได้ไปแล้ว`)) return;
+      const s2 = Store.load();
+      const att2 = (s2.attempts||[]).find(a => a.id === attemptId);
+      const exam2 = (s2.exams||[]).find(e => e.id === (att2&&att2.examId));
+      const qs2Full = (att2 && s2.questions[att2.examId]) || [];
+      if (!att2 || !exam2 || !qs2Full.length) { toast('⚠️ ไม่พบข้อมูลชุดข้อสอบ/คำถามปัจจุบัน'); return; }
+      const _eType2 = exam2.examType || 'mc';
+      const _halfMode2 = !!att2.halfMode;
+      const _isWeighted2 = !!exam2.weighted && !_halfMode2;
+      // v48.17p: attempt โหมดคนละครึ่งเก็บแค่ข้อของตัวเอง (ครึ่งหลังคือ subset จริงๆ,
+      // ครึ่งแรกคือทั้งชุดแต่มี counted:false ปนอยู่) ต้องคำนวณจากชุดข้อของ attempt เดิม
+      // เท่านั้น (ตาม qid ใน att2.perQuestion เดิม) ไม่ใช่ข้อสอบทั้งชุดปัจจุบัน — ไม่งั้น
+      // ครึ่งหลังจะถูกคำนวณคะแนนทับด้วยข้อของครึ่งแรกที่ไม่ใช่ของตัวเองไปด้วย
+      const qs2 = (_halfMode2 && Array.isArray(att2.perQuestion) && att2.perQuestion.length)
+        ? qs2Full.filter(q => att2.perQuestion.some(p => p && p.qid === q.id))
+        : qs2Full;
+      const answers2 = att2.answers || {};
+      const _oldPQFor2 = q => Array.isArray(att2.perQuestion) ? att2.perQuestion.find(p => p && (p.qid === q.id || p.no === (q.no??q.number))) : null;
+      const _isCountedFor2 = q => { if (!_halfMode2) return true; const _o = _oldPQFor2(q); return !_o || _o.counted !== false; };
+      let score2 = 0, total2 = _halfMode2 ? (att2.halfQuota||0) : qs2.length;
+      if (_isWeighted2) {
+        let _sumAll = 0, _sumOk = 0;
+        qs2.forEach(q => {
+          const pts = getQPoints(q);
+          _sumAll += pts;
+          if (q.isFree || (answers2[q.id] && isAnswerCorrect(answers2[q.id], q.correct, _eType2))) _sumOk += pts;
+        });
+        total2 = Math.round(_sumAll * 100) / 100;
+        score2 = Math.round(_sumOk * 100) / 100;
+      } else {
+        qs2.forEach(q => {
+          if (!_isCountedFor2(q)) return;
+          if (q.isFree || (answers2[q.id] && isAnswerCorrect(answers2[q.id], q.correct, _eType2))) score2++;
+        });
+      }
+      const perQuestion2 = qs2.map(q => {
+        const chosen = answers2[q.id] || null;
+        const correct = q.correct || null;
+        const isFree = !!q.isFree;
+        const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, _eType2) : false);
+        const _finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
+        const _finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
+        const _old = _oldPQFor2(q);
+        const _pq = {
+          qid: q.id, no: q.no??q.number, page: q.page, tags: _finalTags, subTags: _finalSubTags, topic: _finalTags[0]||'',
+          chosen, correct, isCorrect, isFree,
+          unsure: _old ? !!_old.unsure : false,
+          visited: _old ? !!_old.visited : true,
+          elapsedMs: _old ? (_old.elapsedMs||0) : 0,
+          changes: _old ? (_old.changes||0) : 0,
+        };
+        if (_isWeighted2) _pq.points = getQPoints(q);
+        if (_halfMode2) _pq.counted = _isCountedFor2(q);
+        return _pq;
+      });
+      att2.score = score2;
+      att2.total = total2;
+      att2.perQuestion = perQuestion2;
+      att2.weighted = _isWeighted2;
+      const ok = Store.save(s2);
+      if (!ok) { toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่'); return; }
+      if (att2.takerName && typeof WeaknessTracker !== 'undefined') {
+        await WeaknessTracker.rebuildWeaknessesForUser(att2.takerName);
+      }
+      toast('✅ คำนวณคะแนนใหม่แล้ว');
+      initReview(attemptId);
+    };
+  }
 
   const answers=att.answers||{};
   const _isWAtt=isWeightedAttempt(att);
@@ -10059,7 +10140,7 @@ function initAdminNew(){
     const examType=_activeType?_activeType.dataset.val:'mc';
     const folderId=document.getElementById('newFolderSelect')?.value||null;
     s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType,folderId});
-    const _emptyCorrect=examType==='fillblank-num'?'':'A';
+    const _emptyCorrect='';
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>{
       const _q={id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),correct:_emptyCorrect};
       if(examType!=='fillblank-num') _q.choices={A:'',B:'',C:'',D:''};
@@ -10389,7 +10470,7 @@ function initEditor(examId){
       const _ptsCellHtml=exam.weighted
         ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
         : '';
-      tr.innerHTML=`<td style="font-weight:900;">${q.number||q.no}</td><td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
+      tr.innerHTML=`<td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td style="font-weight:900;">${q.number||q.no}</td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
       if(exam.weighted){
         const ptsInput=tr.querySelector('input[data-field="points"]');
         if(ptsInput){
@@ -10417,9 +10498,9 @@ function initEditor(examId){
           });
         }
       } else {
-        const correctVal = q.correct||'A';
+        const correctVal = q.correct||'';
         tr.querySelectorAll('.correctBtn').forEach(btn=>{
-          if(btn.getAttribute('data-val')===correctVal) btn.classList.add('selected');
+          btn.classList.toggle('selected', !!correctVal && btn.getAttribute('data-val')===correctVal);
           btn.addEventListener('click',(e)=>{
             e.stopPropagation();
             select(idx);
@@ -10639,7 +10720,7 @@ function initEditor(examId){
       // เพิ่มข้อใหม่ต่อจากของเดิม
       const lastPage = list.length ? (list[list.length-1].page || 1) : 1;
       for(let i = oldCount; i < newCount; i++){
-        list.push({ id:'q'+(i+1), number:i+1, no:i+1, page:lastPage, correct:'A', choices:{A:'',B:'',C:'',D:''} });
+        list.push({ id:'q'+(i+1), number:i+1, no:i+1, page:lastPage, correct:'', choices:{A:'',B:'',C:'',D:''} });
       }
     }
     exam.questionCount = newCount;
@@ -11532,6 +11613,17 @@ const WeaknessTracker = (() => {
     localStorage.setItem(BACKFILL_FLAG + u, 'true');
   }
 
+  // เหมือน rebuildWeaknessesForCurrentUser แต่ให้ครู/แอดมินสั่งสร้างใหม่ให้ "คนอื่น" ได้
+  // (เช่น หลังแก้เฉลยแล้วคำนวณคะแนนย้อนหลังใหม่ — ต้องสร้างจุดอ่อนของนักเรียนคนนั้นใหม่ทั้งชุด
+  // จากประวัติทั้งหมด ไม่ใช่แค่ครั้งที่แก้ กันข้อมูลไม่ตรงกับ perQuestion ที่เพิ่งอัพเดต)
+  async function rebuildWeaknessesForUser(userId) {
+    if (!userId) return;
+    const s = Store.load();
+    const items = buildWeaknessItemsFromAttempts(s.attempts||[], userId);
+    _saveLocal(userId, items);
+    await _saveToCloud(userId, items);
+  }
+
   // Realtime listener สำหรับ weakness ของ user ปัจจุบัน
   let _weaknessUnsubscribe = null;
   function subscribeMyWeakness() {
@@ -11569,6 +11661,7 @@ const WeaknessTracker = (() => {
     resetWeaknessesForUser, resetWeaknessesForUserAndExam, cleanupOrphanWeaknesses,
     countWeaknessesByExam, countWeaknessesBySubject,
     buildWeaknessItemsFromAttempts, runBackfillIfNeeded, rebuildWeaknessesForCurrentUser,
+    rebuildWeaknessesForUser,
     flushPendingWeaknesses, subscribeMyWeakness, unsubscribeMyWeakness };
 })();
 
