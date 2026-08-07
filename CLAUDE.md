@@ -22,13 +22,29 @@ Backend: Firebase Cloud Functions (Node.js 22, asia-southeast1) สำหรั�
    - Save a local copy named `index_v{new_version}.html` — ไฟล์นี้ถูก .gitignore ไว้ ไม่ push ขึ้น GitHub
 
 ### Version locations in index.html (ต้องอัพเดททั้ง 3 ที่ทุกครั้ง)
-- Line ~30: `<!-- APP_VERSION: v48.13 -->`
-- Line ~1083: `>v48.13</div>`  (login page display)
-- Line ~13837: `const CURRENT_VERSION = 'v48.13';`  (version check script)
+- Line ~30: `<!-- APP_VERSION: v48.14 -->`
+- Line ~1083: `>v48.14</div>`  (login page display)
+- Line ~14088: `const CURRENT_VERSION = 'v48.14';`  (version check script)
 
-### Current version: v48.13
-When making the next change, bump to v48.14.
+### Current version: v48.14
+When making the next change, bump to v48.15.
 ⚠️ โน้ตนี้อาจตกยุค — ให้ grep `APP_VERSION` ใน index.html เพื่อยืนยันเลขปัจจุบันก่อน bump ทุกครั้ง
+
+## Preview/Production Sync Rule (สำคัญ — เช็คก่อนเริ่มฟีเจอร์ใหม่ทุกครั้ง)
+`index_preview.html` เป็นไฟล์ทดสอบ/sandbox แยกจาก `index.html` (production) — เวอร์ชันเลข
+คนละชุดกัน (`v{n}p` vs `v{n}`) และ**ไม่ได้ sync กันอัตโนมัติ** ทั้งสองไฟล์เคยเกิด "ของหาย"
+มาแล้วหลายครั้งในอดีต (เช่น v48.9 คำนวณคะแนนใหม่ มีใน production แต่ไม่มีใน preview,
+v48.10 สลับคอลัมน์ editor มีใน production แต่ตกหล่นไม่ได้ port เข้า preview จนเจอทีหลัง)
+
+**ก่อนเริ่มพัฒนาฟีเจอร์ใหม่ใน `index_preview.html` ทุกครั้ง ให้เช็คก่อนว่า:**
+1. `diff index.html index_preview.html` ดูภาพรวมความต่างทั้งหมดก่อน
+2. ยืนยันว่า preview มีฟังก์ชัน/ฟีเจอร์ล่าสุดที่มีใน production ครบแล้ว (ไม่มีอะไรตกหล่น)
+   ก่อนจะเริ่มเขียนของใหม่ทับลงไป — ถ้าเจอของหาย ให้แจ้งผู้ใช้ก่อนตัดสินใจว่าจะ port เข้ามา
+   พร้อมกันในรอบนี้ หรือแยกเป็นงานทีหลัง (อย่า port เงียบๆ โดยไม่แจ้ง)
+3. เมื่อ port ฟีเจอร์จาก preview กลับเข้า production (กลับทิศทาง) ก็ใช้หลักการเดียวกัน —
+   `diff` ดูให้ครบทุก hunk ก่อน, แยกแยะว่าอันไหนควร port อันไหนเป็นบั๊ก/ของเฉพาะไฟล์ preview
+   ที่ห้าม port (เช่น version-check-disable block ท้ายไฟล์ preview ที่ต้องไม่มีใน production)
+   ห้าม copy ทั้งไฟล์เด็ดขาด ต้องเป็น targeted diff/merge เสมอ
 
 ## Regression Tests (สำคัญ — รันก่อน push ทุกครั้งที่แก้ index.html)
 ```bash
