@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.21p -->
+  <!-- APP_VERSION: v48.22p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.21p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.22p</div>
     </div>
   </div>
 </div>
@@ -4218,7 +4218,12 @@ function findPendingHalf2(s, examId, takerName) {
   ).sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
   if (!halfAttempts.length) return null;
   const parent = halfAttempts[0];
-  if (attempts.some(a => a.parentAttemptId === parent.id)) return null; // ทำครึ่งหลังไปแล้ว
+  if (attempts.some(a => a.parentAttemptId === parent.id)) return null; // ทำครึ่งหลังไปแล้ว (แบบเก่า - มี attempt แยกชี้มา)
+  // v48.22p: ทำครึ่งหลังไปแล้ว (แบบใหม่ - รวมคำตอบเข้า attempt เดียวกันแล้ว ไม่มี attempt
+  // แยกให้เช็คแบบเดิมด้านบนอีกต่อไป) — เช็คจาก marker ตรงๆ แทนการนับข้อที่เหลืออย่างเดียว
+  // เพราะถ้าตอบครึ่งหลังไม่ครบทุกข้อแล้วส่ง ข้อที่เหลือจะยังเป็น counted:false อยู่ ทำให้
+  // เข้าใจผิดว่ายังค้างอยู่ทั้งที่ส่งไปแล้วจริง
+  if (parent.half2SubmittedAt) return null;
   if (parent.revealedAt) return null; // สละสิทธิ์ไปแล้ว (กดขอดูเฉลย)
   const qs = s.questions[examId] || [];
   const validIds = new Set(qs.map(q => q.id));
@@ -5693,17 +5698,56 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     function _doSave(feeling, prediction){
       const savedS=Store.load();
       const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
-      // v48.15: "ครึ่งหลัง" — เพิ่มเฉพาะตอน half2Mode เท่านั้น ครึ่งแรก/โหมดอื่นไม่มีฟิลด์นี้เลย
-      // (additive, legacy-safe — ไม่มี halfPart = ถือเป็นครึ่งแรกโดยปริยาย)
-      if(st.half2Mode){ _newAttempt.halfPart=2; _newAttempt.parentAttemptId=st.parentAttemptId||null; }
-      savedS.attempts.unshift(_newAttempt);
+      // v48.22p: ครึ่งหลัง — แทนที่จะสร้าง attempt ใหม่แยกแล้วเชื่อมด้วย parentAttemptId
+      // (แบบเดิม v48.15) ให้รวมคำตอบเข้ากับ attempt ครึ่งแรกแล้วคำนวณคะแนนใหม่ทั้งชุดเลย
+      // (สูตรเดียวกับปุ่ม "คำนวณคะแนนใหม่") เก็บเป็น attempt เดียวจริง ไม่มี record คู่กันอีก —
+      // ไม่กระทบ gamification (ตัวแปร score/total/usedSeconds/takerName ข้างล่างยังเป็นของ
+      // "รอบนี้" เท่านั้นเหมือนเดิมทุกอย่าง) เปลี่ยนแค่ขั้นตอนบันทึก/นับจุดอ่อน
+      let _mergedParent = null;
+      if (st.half2Mode) {
+        const _parent = (savedS.attempts||[]).find(a => a.id === st.parentAttemptId);
+        if (_parent) {
+          _parent.answers = {...(_parent.answers||{}), ...st.answers};
+          const _examQs = savedS.questions[exam.id] || [];
+          const _mergedHalfQuota = (_parent.halfQuota||0) + (st.halfQuota||0);
+          const _r = computeHalfAwareScoring(exam, _examQs, _parent.answers, true, _mergedHalfQuota, _parent.perQuestion);
+          _parent.score = _r.score;
+          _parent.total = _r.total;
+          _parent.perQuestion = _r.perQuestion;
+          _parent.weighted = _r.weighted;
+          _parent.halfQuota = _mergedHalfQuota;
+          _parent.usedSeconds = (_parent.usedSeconds||0) + usedSeconds;
+          _parent.submittedAt = new Date().toISOString();
+          // total เปลี่ยนไปแล้วหลัง merge — prediction เดิม (ทายไว้เทียบ total ของครึ่งแรก
+          // อย่างเดียว) จะเทียบกับ total ใหม่แล้วเพี้ยนกว่าไม่มีค่าเลย เลย null ทิ้งแทน
+          _parent.prediction = null;
+          _parent.half2SubmittedAt = new Date().toISOString();
+          _mergedParent = _parent;
+        } else {
+          // fallback: หา attempt ครึ่งแรกไม่เจอ (โดนลบไปก่อนหน้า) — เก็บพฤติกรรมเดิมไว้
+          // (บันทึกเป็นรายการแยก) กันคำตอบหาย
+          _newAttempt.halfPart = 2;
+          _newAttempt.parentAttemptId = st.parentAttemptId||null;
+          savedS.attempts.unshift(_newAttempt);
+          toast('⚠️ ไม่พบข้อมูลครึ่งแรก — บันทึกเป็นรายการแยกแทน');
+        }
+      } else {
+        savedS.attempts.unshift(_newAttempt);
+      }
       const ok=Store.save(savedS);
       if (!ok) {
         toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง — คำตอบยังกู้คืนได้จากหน้าเดิม');
         return;
       }
       if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
-      WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
+      if (_mergedParent) {
+        // นับจุดอ่อนเฉพาะข้อของครึ่งหลัง (ข้อของครึ่งแรกนับไปแล้วตอนส่งครึ่งแรก) — ใช้
+        // pseudo-attempt ที่มีแค่ perQuestion ของเซตครึ่งหลัง กันนับซ้ำ
+        const _half2Pq = _mergedParent.perQuestion.filter(p => qsList.some(q => q.id === p.qid));
+        WeaknessTracker.updateWeaknessAfterSubmit({..._mergedParent, perQuestion: _half2Pq});
+      } else {
+        WeaknessTracker.updateWeaknessAfterSubmit(_newAttempt);
+      }
       if (st.takerName && !Auth.isTeacher()) {
         updateCoachStreak(takerName);
       }
@@ -5738,7 +5782,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       }
       lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds, halfMode: !!st.halfMode, halfPart: st.half2Mode?2:(st.halfMode?1:undefined) });
       MemeScore.show(score, total, () => {
-        navigate('review', {attemptId: st.attemptId});
+        navigate('review', {attemptId: _mergedParent ? _mergedParent.id : st.attemptId});
       });
     }
 
@@ -6031,59 +6075,19 @@ function initReview(attemptId){
       const exam2 = (s2.exams||[]).find(e => e.id === (att2&&att2.examId));
       const qs2Full = (att2 && s2.questions[att2.examId]) || [];
       if (!att2 || !exam2 || !qs2Full.length) { toast('⚠️ ไม่พบข้อมูลชุดข้อสอบ/คำถามปัจจุบัน'); return; }
-      const _eType2 = exam2.examType || 'mc';
       const _halfMode2 = !!att2.halfMode;
-      const _isWeighted2 = !!exam2.weighted && !_halfMode2;
-      // v48.17p: attempt โหมดคนละครึ่งเก็บแค่ข้อของตัวเอง (ครึ่งหลังคือ subset จริงๆ,
-      // ครึ่งแรกคือทั้งชุดแต่มี counted:false ปนอยู่) ต้องคำนวณจากชุดข้อของ attempt เดิม
-      // เท่านั้น (ตาม qid ใน att2.perQuestion เดิม) ไม่ใช่ข้อสอบทั้งชุดปัจจุบัน — ไม่งั้น
-      // ครึ่งหลังจะถูกคำนวณคะแนนทับด้วยข้อของครึ่งแรกที่ไม่ใช่ของตัวเองไปด้วย
+      // attempt โหมดคนละครึ่งเก็บแค่ข้อของตัวเอง (ครึ่งหลังคือ subset จริงๆ, ครึ่งแรกคือทั้งชุด
+      // แต่มี counted:false ปนอยู่) ต้องคำนวณจากชุดข้อของ attempt เดิมเท่านั้น (ตาม qid ใน
+      // att2.perQuestion เดิม) ไม่ใช่ข้อสอบทั้งชุดปัจจุบัน — ไม่งั้นครึ่งหลังจะถูกคำนวณคะแนน
+      // ทับด้วยข้อของครึ่งแรกที่ไม่ใช่ของตัวเองไปด้วย
       const qs2 = (_halfMode2 && Array.isArray(att2.perQuestion) && att2.perQuestion.length)
         ? qs2Full.filter(q => att2.perQuestion.some(p => p && p.qid === q.id))
         : qs2Full;
-      const answers2 = att2.answers || {};
-      const _oldPQFor2 = q => Array.isArray(att2.perQuestion) ? att2.perQuestion.find(p => p && (p.qid === q.id || p.no === (q.no??q.number))) : null;
-      const _isCountedFor2 = q => { if (!_halfMode2) return true; const _o = _oldPQFor2(q); return !_o || _o.counted !== false; };
-      let score2 = 0, total2 = _halfMode2 ? (att2.halfQuota||0) : qs2.length;
-      if (_isWeighted2) {
-        let _sumAll = 0, _sumOk = 0;
-        qs2.forEach(q => {
-          const pts = getQPoints(q);
-          _sumAll += pts;
-          if (q.isFree || (answers2[q.id] && isAnswerCorrect(answers2[q.id], q.correct, _eType2))) _sumOk += pts;
-        });
-        total2 = Math.round(_sumAll * 100) / 100;
-        score2 = Math.round(_sumOk * 100) / 100;
-      } else {
-        qs2.forEach(q => {
-          if (!_isCountedFor2(q)) return;
-          if (q.isFree || (answers2[q.id] && isAnswerCorrect(answers2[q.id], q.correct, _eType2))) score2++;
-        });
-      }
-      const perQuestion2 = qs2.map(q => {
-        const chosen = answers2[q.id] || null;
-        const correct = q.correct || null;
-        const isFree = !!q.isFree;
-        const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, _eType2) : false);
-        const _finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
-        const _finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
-        const _old = _oldPQFor2(q);
-        const _pq = {
-          qid: q.id, no: q.no??q.number, page: q.page, tags: _finalTags, subTags: _finalSubTags, topic: _finalTags[0]||'',
-          chosen, correct, isCorrect, isFree,
-          unsure: _old ? !!_old.unsure : false,
-          visited: _old ? !!_old.visited : true,
-          elapsedMs: _old ? (_old.elapsedMs||0) : 0,
-          changes: _old ? (_old.changes||0) : 0,
-        };
-        if (_isWeighted2) _pq.points = getQPoints(q);
-        if (_halfMode2) _pq.counted = _isCountedFor2(q);
-        return _pq;
-      });
-      att2.score = score2;
-      att2.total = total2;
-      att2.perQuestion = perQuestion2;
-      att2.weighted = _isWeighted2;
+      const _result2 = computeHalfAwareScoring(exam2, qs2, att2.answers||{}, _halfMode2, att2.halfQuota, att2.perQuestion);
+      att2.score = _result2.score;
+      att2.total = _result2.total;
+      att2.perQuestion = _result2.perQuestion;
+      att2.weighted = _result2.weighted;
       const ok = Store.save(s2);
       if (!ok) { toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่'); return; }
       if (att2.takerName && typeof WeaknessTracker !== 'undefined') {
@@ -10952,6 +10956,56 @@ function isWeightedAttempt(att){
     return att.perQuestion.some(p=>p&&p.points!=null&&Number(p.points)!==1);
   }
   return false;
+}
+
+// v48.22p: ฟังก์ชันกลาง — คำนวณ score/total/perQuestion ใหม่จาก answers ปัจจุบันเทียบกับ
+// เฉลยของ qsFull ใช้ร่วมกันทั้งปุ่ม "คำนวณคะแนนใหม่" (ครูแก้เฉลยผิด) และตอนรวมคำตอบครึ่งหลัง
+// เข้ากับครึ่งแรก — halfQuota รับเป็น parameter ตรงๆ (โควตาที่ตั้งใจ ไม่ใช่จำนวนข้อที่ตอบ)
+// counted (เฉพาะ halfMode) derive จาก "มีคำตอบใน answers ไหม" เสมอ ไม่ใช่อ่าน counted เก่า
+// จาก perQuestion เดิม — ให้ผลเหมือนเดิมทุกกรณีที่ไม่ใช่การ merge เพราะ counted ตอน submit()
+// ก็มาจากนิยามเดียวกันนี้อยู่แล้ว (oldPerQuestion ใช้แค่สืบทอด unsure/visited/elapsedMs/changes)
+function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, oldPerQuestion){
+  const _eType = exam.examType || 'mc';
+  const _isWeighted = !!exam.weighted && !halfMode;
+  const _oldPQFor = q => Array.isArray(oldPerQuestion) ? oldPerQuestion.find(p => p && (p.qid === q.id || p.no === (q.no??q.number))) : null;
+  const _isCountedFor = q => { if (!halfMode) return true; const v = answers[q.id]; return v!=null && v!==''; };
+  let score = 0, total = halfMode ? (halfQuota||0) : qsFull.length;
+  if (_isWeighted) {
+    let _sumAll = 0, _sumOk = 0;
+    qsFull.forEach(q => {
+      const pts = getQPoints(q);
+      _sumAll += pts;
+      if (q.isFree || (answers[q.id] && isAnswerCorrect(answers[q.id], q.correct, _eType))) _sumOk += pts;
+    });
+    total = Math.round(_sumAll * 100) / 100;
+    score = Math.round(_sumOk * 100) / 100;
+  } else {
+    qsFull.forEach(q => {
+      if (!_isCountedFor(q)) return;
+      if (q.isFree || (answers[q.id] && isAnswerCorrect(answers[q.id], q.correct, _eType))) score++;
+    });
+  }
+  const perQuestion = qsFull.map(q => {
+    const chosen = answers[q.id] || null;
+    const correct = q.correct || null;
+    const isFree = !!q.isFree;
+    const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, _eType) : false);
+    const _finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
+    const _finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
+    const _old = _oldPQFor(q);
+    const _pq = {
+      qid: q.id, no: q.no??q.number, page: q.page, tags: _finalTags, subTags: _finalSubTags, topic: _finalTags[0]||'',
+      chosen, correct, isCorrect, isFree,
+      unsure: _old ? !!_old.unsure : false,
+      visited: _old ? !!_old.visited : true,
+      elapsedMs: _old ? (_old.elapsedMs||0) : 0,
+      changes: _old ? (_old.changes||0) : 0,
+    };
+    if (_isWeighted) _pq.points = getQPoints(q);
+    if (halfMode) _pq.counted = _isCountedFor(q);
+    return _pq;
+  });
+  return { score, total, perQuestion, weighted: _isWeighted };
 }
 
 // สร้าง numeric keypad inline สำหรับข้อสอบกรอกตัวเลข
