@@ -1169,6 +1169,164 @@ const gotoQHalf = (page, idx) => page.evaluate((i) => document.querySelectorAll(
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section L: โหมด "คนละครึ่ง" เฟส 2 (v48.15-v48.22, port จาก index_preview.html) —
+// ทำครึ่งหลังต่อ, รวมเป็น attempt เดียวจริงตอนส่ง (ไม่สร้าง record คู่กันแบบเดิมอีกต่อไป),
+// จุดอ่อนไม่นับซ้ำ, findPendingHalf2 ไม่เสนอทำต่อซ้ำถ้าส่งไปแล้ว, fallback ถ้าหาครึ่งแรกไม่เจอ,
+// คำนวณคะแนนใหม่รองรับ half-mode
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'halfMode2Merge';
+async function stubMemeScore(page) {
+  // MemeScore.show() เล่นแอนิเมชันที่รอโหลด CDN asset ซึ่งถูก sandbox บล็อกเสมอ — ถ้าไม่ stub
+  // callback onClose (ที่ทำ navigate ไปหน้ารีวิว) จะไม่ถูกเรียกเลย ทดสอบต่อไม่ได้
+  await page.evaluate(() => { MemeScore.show = (score, total, onClose) => { if (onClose) onClose(); }; });
+}
+{
+  // ทำครึ่งแรกจริงผ่าน UI (q1 ผิด, q2 ถูก) แล้วกด "ทำครึ่งหลังต่อ" จริงจากหน้ารีวิว
+  // ทำครึ่งหลัง (q3 ผิด, q4 ถูก) แล้วส่ง — ต้องรวมเป็น attempt เดียวจริง
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHM1', 'ชุด Merge', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHM1: mkQN(4) }, // correct: q1=A,q2=B,q3=C,q4=D
+    }),
+  });
+  await stubMemeScore(page);
+  await page.evaluate(() => navigate('take', { id: 'eHM1', takerName: 'เด็กmerge', half: true }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'B'); // q1 wrong (correct A)
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'B'); // q2 right (correct B)
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForFunction(() => window._currentPage === 'review', {}, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+
+  const weakAfterHalf1 = await page.evaluate(() => WeaknessTracker.countWeaknessesByExam('เด็กmerge', 'eHM1'));
+  check('จุดอ่อนหลังครึ่งแรก: นับ 1 ข้อ (q1 ผิด)', weakAfterHalf1 === 1, String(weakAfterHalf1));
+
+  const att1Id = await page.evaluate(() => Store.load().attempts[0].id);
+  await stubMemeScore(page); // initReview เพิ่ง re-render — override ใหม่กันโดนโหลดทับ
+  await page.evaluate(() => document.getElementById('reviewHalf2Btn').click());
+  await page.waitForFunction(() => window._currentPage === 'take', {}, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const half2Nums = await page.evaluate(() => [...document.querySelectorAll('#takeNums .numBtn')].map(b => b.textContent.trim()));
+  check('ครึ่งหลังมีแค่ 2 ข้อที่เหลือ (3,4)', half2Nums.length === 2 && half2Nums.includes('3') && half2Nums.includes('4'), JSON.stringify(half2Nums));
+
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'D'); // q3 wrong (correct C)
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'D'); // q4 right (correct D)
+  await page.waitForTimeout(200);
+  await stubMemeScore(page);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(500);
+
+  const cacheAfter = await page.evaluate(() => Store._cache);
+  check('รวมเป็น attempt เดียวจริงหลังส่งครึ่งหลัง (ไม่ใช่ 2 record)', cacheAfter.attempts.length === 1, JSON.stringify(cacheAfter.attempts.map(a => a.id)));
+  const merged = cacheAfter.attempts[0];
+  check('merge: id เดิมของครึ่งแรก, score=2/total=4 (halfQuota รวม), ไม่มี halfPart/parentAttemptId', merged.id === att1Id && merged.score === 2 && merged.total === 4 && merged.halfQuota === 4 && !merged.halfPart && !merged.parentAttemptId, JSON.stringify(merged));
+  check('merge: มี half2SubmittedAt marker', !!merged.half2SubmittedAt, String(merged.half2SubmittedAt));
+  check('merge: ทุกข้อ counted:true (ตอบครบแล้ว)', merged.perQuestion.every(p => p.counted === true), JSON.stringify(merged.perQuestion.map(p => p.counted)));
+
+  const weakAfterHalf2 = await page.evaluate(() => WeaknessTracker.countWeaknessesByExam('เด็กmerge', 'eHM1'));
+  check('จุดอ่อนหลังครึ่งหลัง: รวม 2 ข้อพอดี (q1,q3 ผิด) ไม่ใช่ 3 (ไม่นับ q1 ซ้ำ)', weakAfterHalf2 === 2, String(weakAfterHalf2));
+
+  const pending = await page.evaluate(() => findPendingHalf2(Store.load(), 'eHM1', 'เด็กmerge'));
+  check('findPendingHalf2 คืน null หลังทำครบแล้ว (ไม่เสนอทำต่อซ้ำ)', pending === null, JSON.stringify(pending));
+  await ctx.close();
+}
+{
+  // ตอบครึ่งหลังไม่ครบทุกข้อแล้วส่ง — findPendingHalf2 ต้องคืน null (marker เช็คตรงๆ ไม่ใช่
+  // นับจำนวนข้อเหลือ ซึ่งจะยังไม่ใช่ 0 ในเคสนี้)
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHM2', 'ชุด Merge Incomplete', 'คณิตศาสตร์', { questionCount: 6 })],
+      questions: { eHM2: mkQN(6) },
+      attempts: [{
+        id: 'attHM2', examId: 'eHM2', examTitle: 'ชุด Merge Incomplete', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กincomplete', halfMode: true, halfQuota: 3,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+        usedSeconds: 30, score: 3, total: 3, answers: { q1: 'A', q2: 'B', q3: 'C' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q3', no: 3, chosen: 'C', correct: 'C', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q4', no: 4, chosen: null, correct: 'D', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+          { qid: 'q5', no: 5, chosen: null, correct: 'A', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+          { qid: 'q6', no: 6, chosen: null, correct: 'B', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        ],
+        practiceMode: false, visitOrder: ['q1', 'q2', 'q3'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await stubMemeScore(page);
+  await page.evaluate(() => navigate('take', { id: 'eHM2', takerName: 'เด็กincomplete', half2: true, qids: ['q4', 'q5', 'q6'], parentAttemptId: 'attHM2' }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'D'); // ตอบแค่ q4 ข้อเดียว ทิ้ง q5,q6 ไว้
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(500);
+  const mergedIncomplete = await page.evaluate(() => Store.load().attempts.find(a => a.id === 'attHM2'));
+  check('merge สำเร็จแม้ตอบครึ่งหลังไม่ครบ (มี half2SubmittedAt)', !!mergedIncomplete.half2SubmittedAt, String(mergedIncomplete.half2SubmittedAt));
+  const pendingIncomplete = await page.evaluate(() => findPendingHalf2(Store.load(), 'eHM2', 'เด็กincomplete'));
+  check('findPendingHalf2 คืน null แม้ยังมีข้อเหลือ (ส่งไปแล้วจริง ไม่ควรเสนอทำต่อซ้ำ)', pendingIncomplete === null, JSON.stringify(pendingIncomplete));
+  await ctx.close();
+}
+{
+  // Fallback: parentAttemptId ชี้ไปหา attempt ที่ไม่มีจริง (โดนลบไปก่อนหน้า) — ต้องบันทึกเป็น
+  // record แยกเหมือนพฤติกรรมเดิม ไม่ error ไม่ทำคำตอบหาย
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHM3', 'ชุด Merge Fallback', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHM3: mkQN(4) },
+    }),
+  });
+  await stubMemeScore(page);
+  await page.evaluate(() => navigate('take', { id: 'eHM3', takerName: 'เด็กfallback', half2: true, qids: ['q3', 'q4'], parentAttemptId: 'DELETED_NOT_REAL' }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'C');
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'D');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(500);
+  const cacheFallback = await page.evaluate(() => Store._cache);
+  check('fallback: parent ไม่เจอ -> บันทึกเป็น record แยก ไม่ทำคำตอบหาย', cacheFallback.attempts.length === 1 && cacheFallback.attempts[0].halfPart === 2 && cacheFallback.attempts[0].parentAttemptId === 'DELETED_NOT_REAL', JSON.stringify(cacheFallback.attempts[0]));
+  await ctx.close();
+}
+{
+  // ปุ่ม "คำนวณคะแนนใหม่" ต้องรองรับ attempt โหมดคนละครึ่งที่ merge แล้ว (total=halfQuota,
+  // ไม่ใช่จำนวนข้อเต็มชุด) — ก่อนพอร์ตรอบนี้ production คำนวณผิดเพราะไม่รู้จัก halfMode เลย
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHM4', 'ชุด Recalc Half', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHM4: mkQN(4) }, // correct: q1=A,q2=B,q3=C,q4=D
+      attempts: [{
+        id: 'attHM4', examId: 'eHM4', examTitle: 'ชุด Recalc Half', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กrecalc', halfMode: true, halfQuota: 4,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date().toISOString(),
+        usedSeconds: 60, score: 4, total: 4, answers: { q1: 'A', q2: 'B', q3: 'C', q4: 'D' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q3', no: 3, chosen: 'C', correct: 'C', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q4', no: 4, chosen: 'D', correct: 'D', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+        ],
+        practiceMode: false, visitOrder: ['q1', 'q2', 'q3', 'q4'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await page.evaluate(() => navigate('review', { attemptId: 'attHM4' }));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    const s = Store.load();
+    s.questions.eHM4.find(q => q.id === 'q1').correct = 'B'; // แก้เฉลย q1 จาก A เป็น B (ตอนนี้ตอบผิด)
+    Store.save(s);
+  });
+  await page.evaluate(() => document.getElementById('reviewRecalcBtn').click());
+  await page.waitForTimeout(400);
+  const afterRecalc = await page.evaluate(() => Store.load().attempts.find(a => a.id === 'attHM4'));
+  check('recalc รองรับ half-mode: total ยังเท่ากับ halfQuota เดิม (4) ไม่ใช่คำนวณผิด', afterRecalc.total === 4, String(afterRecalc.total));
+  check('recalc รองรับ half-mode: score ลดเป็น 3/4 ถูกต้อง (q1 กลายเป็นผิดหลังแก้เฉลย)', afterRecalc.score === 3, String(afterRecalc.score));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
