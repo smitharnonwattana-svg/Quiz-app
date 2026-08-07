@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.22p -->
+  <!-- APP_VERSION: v48.23p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -517,15 +517,15 @@
         width: 100% !important;
         table-layout: fixed;
       }
-      /* col 1: ข้อ */
+      /* col 1: หน้า (was หน้า PDF) */
       #page-admin_editor table th:nth-child(1),
       #page-admin_editor table td:nth-child(1) {
-        width: 36px !important;
+        width: 60px !important;
       }
-      /* col 2: หน้า (was หน้า PDF) */
+      /* col 2: ข้อ */
       #page-admin_editor table th:nth-child(2),
       #page-admin_editor table td:nth-child(2) {
-        width: 60px !important;
+        width: 36px !important;
       }
       /* col 3: เฉลย — takes remaining space */
       #page-admin_editor table th:nth-child(3),
@@ -696,19 +696,19 @@
       }
       #page-admin_editor table th:nth-child(1),
       #page-admin_editor table td:nth-child(1) {
-        width: 32px !important;
-        font-size: 12px !important;
-        padding: 6px 2px !important;
-      }
-      #page-admin_editor table th:nth-child(2),
-      #page-admin_editor table td:nth-child(2) {
         width: 52px !important;
         padding: 6px 2px !important;
       }
-      #page-admin_editor table td:nth-child(2) input {
+      #page-admin_editor table td:nth-child(1) input {
         width: 44px !important;
         padding: 4px 6px !important;
         font-size: 13px !important;
+      }
+      #page-admin_editor table th:nth-child(2),
+      #page-admin_editor table td:nth-child(2) {
+        width: 32px !important;
+        font-size: 12px !important;
+        padding: 6px 2px !important;
       }
       #page-admin_editor table th:nth-child(3),
       #page-admin_editor table td:nth-child(3) {
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.22p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.23p</div>
     </div>
   </div>
 </div>
