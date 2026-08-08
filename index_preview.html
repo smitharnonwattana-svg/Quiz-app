@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.23p -->
+  <!-- APP_VERSION: v48.24p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.23p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.24p</div>
     </div>
   </div>
 </div>
@@ -5707,16 +5707,26 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       if (st.half2Mode) {
         const _parent = (savedS.attempts||[]).find(a => a.id === st.parentAttemptId);
         if (_parent) {
+          // Store.load() คืน _cache ตัวจริง ไม่ใช่ copy — ถ้า Store.save ล้มเหลวข้างล่างแล้ว
+          // ผู้ใช้กดส่งซ้ำตามที่ toast บอก _parent ตัวเดิมจะยังมีร่องรอยจากรอบก่อนติดอยู่
+          // (halfQuota/usedSeconds ถูกบวกไปแล้วก่อน save จะสำเร็จด้วยซ้ำ) ต้องเช็ค
+          // half2SubmittedAt (ตั้งตอนจบ merge) ก่อน mutate เพื่อไม่บวกทบซ้ำตอน retry
+          const _alreadyMerged = !!_parent.half2SubmittedAt;
           _parent.answers = {...(_parent.answers||{}), ...st.answers};
           const _examQs = savedS.questions[exam.id] || [];
-          const _mergedHalfQuota = (_parent.halfQuota||0) + (st.halfQuota||0);
-          const _r = computeHalfAwareScoring(exam, _examQs, _parent.answers, true, _mergedHalfQuota, _parent.perQuestion);
+          // ไม่ cap ที่จำนวนข้อจริงจะทำให้โควตาเกินได้ ถ้าครึ่งแรกถูกส่งทั้งที่ตอบไม่ครบ
+          // โควตาของตัวเอง (หมดเวลา auto-submit หรือกดส่งเอง) — ข้อที่เหลือทั้งหมดจะกลาย
+          // เป็นโควตาของครึ่งหลัง บวกกันแล้วเกินจำนวนข้อทั้งชุดได้
+          if (!_alreadyMerged) {
+            const _sumQuota = (_parent.halfQuota||0) + (st.halfQuota||0);
+            _parent.halfQuota = _examQs.length ? Math.min(_sumQuota, _examQs.length) : _sumQuota;
+            _parent.usedSeconds = (_parent.usedSeconds||0) + usedSeconds;
+          }
+          const _r = computeHalfAwareScoring(exam, _examQs, _parent.answers, true, _parent.halfQuota, [...perQuestion, ...(_parent.perQuestion||[])]);
           _parent.score = _r.score;
           _parent.total = _r.total;
           _parent.perQuestion = _r.perQuestion;
           _parent.weighted = _r.weighted;
-          _parent.halfQuota = _mergedHalfQuota;
-          _parent.usedSeconds = (_parent.usedSeconds||0) + usedSeconds;
           _parent.submittedAt = new Date().toISOString();
           // total เปลี่ยนไปแล้วหลัง merge — prediction เดิม (ทายไว้เทียบ total ของครึ่งแรก
           // อย่างเดียว) จะเทียบกับ total ใหม่แล้วเพี้ยนกว่าไม่มีค่าเลย เลย null ทิ้งแทน
@@ -6010,6 +6020,10 @@ function initReview(attemptId){
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
 
+  // v48.24p: flag เดียวบอกว่า "ยังทำครึ่งหลังต่อได้จริงไหม" ใช้ร่วมกับ _hideAns/
+  // _anyHiddenAnswers ข้างล่าง — คำนวณจริงในบล็อกถัดไปผ่าน findPendingHalf2 (ครอบคลุม
+  // half2SubmittedAt/revealedAt/ข้อที่เหลือจริงครบแล้ว ไม่ต้องคำนวณซ้ำ)
+  let _half2Pending=false;
   // v48.15: โหมดคนละครึ่ง — บรรทัดสรุปคะแนนรวม (ครึ่งแรก+ครึ่งหลัง) เมื่อทำครบทั้งสองครึ่งแล้ว
   // และปุ่ม "ทำครึ่งหลังต่อ" / "ขอดูเฉลยเลย" (แสดงเฉพาะตอนดูรีวิวของครึ่งแรกที่ยังค้างอยู่)
   {
@@ -6033,9 +6047,14 @@ function initReview(attemptId){
     const _revealBtn=document.getElementById('reviewRevealBtn');
     const _pending=(att.halfMode && !att.halfPart) ? findPendingHalf2(s, att.examId, att.takerName) : null;
     const _showHalf2=!!(_pending && _pending.parentAttempt.id===att.id);
+    _half2Pending=_showHalf2;
     if(_half2Btn){
       _half2Btn.style.display=_showHalf2?'':'none';
       _half2Btn.onclick=()=>{
+        // v48.24p: ครูเปิดรีวิวของนักเรียนแล้วเผลอกดปุ่มนี้ได้ (ไม่ได้ซ่อนปุ่มไว้เหมือน pill
+        // บนการ์ดข้อสอบ/ปุ่มขอดูเฉลย — ให้ครูยังทดสอบเองได้) แต่คำตอบที่ทำจะ merge เข้า
+        // attempt จริงของนักเรียนทันที ทับคะแนน/perQuestion เดิม — เตือนก่อนกดเสมอ
+        if(Auth.isTeacher() && !confirm(`กำลังจะทำ "ครึ่งหลัง" ในชื่อ "${att.takerName||'ไม่ระบุ'}"\n\nคำตอบที่ทำจะถูกรวมเข้ากับผลสอบจริงของ "${att.takerName||'ไม่ระบุ'}"\n\nยืนยันไหม?`)) return;
         navigate('take',{id:att.examId, takerName:att.takerName, half2:true, qids:_pending.qids, parentAttemptId:att.id});
       };
     }
@@ -6083,6 +6102,10 @@ function initReview(attemptId){
       const qs2 = (_halfMode2 && Array.isArray(att2.perQuestion) && att2.perQuestion.length)
         ? qs2Full.filter(q => att2.perQuestion.some(p => p && p.qid === q.id))
         : qs2Full;
+      // v48.24p: ถ้าครูลบชุดคำถามเดิมแล้วสร้าง/import ใหม่ (q.id เปลี่ยนไปทั้งชุด) qs2 จะ
+      // กรองเหลือ [] — ถ้าปล่อยผ่านไป computeHalfAwareScoring จะคืน score 0/perQuestion ว่าง
+      // แล้ว Store.save เขียนทับ กลายเป็นลบประวัติรายข้อของ attempt นี้ทิ้งทั้งหมดเงียบๆ
+      if (!qs2.length) { toast('⚠️ ข้อสอบชุดนี้ถูกแก้/สร้างใหม่จนไม่ตรงกับตอนที่ทำ — คำนวณคะแนนใหม่ไม่ได้'); return; }
       const _result2 = computeHalfAwareScoring(exam2, qs2, att2.answers||{}, _halfMode2, att2.halfQuota, att2.perQuestion);
       att2.score = _result2.score;
       att2.total = _result2.total;
@@ -6274,11 +6297,14 @@ function initReview(attemptId){
     // แยกจาก "ผิด" สีแดง — เพราะเด็กไม่เคยตัดสินใจกับข้อนี้จริง
     const isSkippedQ = !isCountedQ(q);
     // v48.15: ซ่อนเฉลยของข้อที่ยังไม่ได้ตอบ (จะเก็บไว้ทำ "ครึ่งหลัง") — เฉพาะเด็ก ไม่ใช่ครู
-    // และยังไม่ได้กดขอดูเฉลย (Auth.isTeacher()/att.revealedAt) กันสปอยล์ก่อนทำต่อ
     // ยกเว้นข้อฟรี (isFree) — ได้คะแนนอัตโนมัติอยู่แล้ว ไม่มีอะไรต้องกันสปอยล์ และ badge
     // ข้างล่างก็โชว์ "ฟรี" เสมอไม่สนใจ isSkippedQ อยู่แล้ว ถ้าไม่กันตรงนี้ด้วยจะขึ้นข้อความ
     // ขัดกัน (badge บอกฟรี แต่ pills บอกล็อกไว้)
-    const _hideAns = isSkippedQ && !isFree && !Auth.isTeacher() && !att.revealedAt;
+    // v48.24p: เดิมเช็คแค่ !att.revealedAt — ถ้าส่งครึ่งหลังไปแล้วแบบตอบไม่ครบทุกข้อ
+    // (half2SubmittedAt ถูกตั้ง) revealedAt จะไม่มีทางถูกตั้งอีกเลย (ปุ่มขอดูเฉลยหายไปแล้ว)
+    // ทำให้ข้อที่เหลือถูกล็อกถาวร — เปลี่ยนไปใช้ _half2Pending (จาก findPendingHalf2 ที่
+    // ครอบคลุม half2SubmittedAt/revealedAt/ข้อที่เหลือจริงครบแล้ว) แทนตรงๆ
+    const _hideAns = isSkippedQ && !isFree && !Auth.isTeacher() && _half2Pending;
     const hasText=(_isFillNum||_hideAns)?false:KEYS.some(k=>{const t=(q.choices&&q.choices[k])||(q.options&&q.options[k])||'';return t.trim()!=='';});
 
     const wrap=document.createElement('div');
@@ -6430,7 +6456,9 @@ function initReview(attemptId){
 
   // v48.15: ถ้ายังมีข้อที่ซ่อนเฉลยไว้ (รอทำ "ครึ่งหลัง") ต้องซ่อนแท็บเฉลย PDF ทั้งฉบับด้วย
   // ไม่งั้นเด็กเปิดดูเฉลยทั้งชุดจากตรงนี้ได้เลย ทำให้การซ่อนรายข้อข้างบนไร้ความหมาย
-  const _anyHiddenAnswers = att.halfMode && !Auth.isTeacher() && !att.revealedAt && qs.some(q=>!isCountedQ(q));
+  // v48.24p: ใช้ _half2Pending ตัวเดียวกับ _hideAns ข้างบน (เดิมเช็ค !att.revealedAt เอง
+  // ซึ่งค้างซ่อนถาวรถ้าส่งครึ่งหลังไปแบบตอบไม่ครบ — ดูเหตุผลเต็มที่ _hideAns)
+  const _anyHiddenAnswers = !Auth.isTeacher() && _half2Pending;
   if(_answerPdfUrl && _tabA && !_anyHiddenAnswers) {
     _tabA.style.display = '';  // show answer tab
     let _answerLoaded = false;
@@ -7692,8 +7720,9 @@ function initStats(){
     const realList=attempts.filter(a=>!a.practiceMode&&!a.halfMode);
     const practiceList=attempts.filter(a=>a.practiceMode===true);
     // v48.18p/v48.19p: ครึ่งแรก+ครึ่งหลังของ session เดียวกันรวมเป็นการ์ดเดียวแทนที่จะโชว์แยก
-    // 2 การ์ดซ้ำของข้อสอบชุดเดียวกัน (ใช้ mergeHalfModePairs กลาง ร่วมกับหน้ารีวิว)
-    const halfList=mergeHalfModePairs(attempts.filter(a=>a.halfMode===true))
+    // 2 การ์ดซ้ำของข้อสอบชุดเดียวกัน — v48.24p: attempts มาจาก timeFiltered ที่ merge ด้วย
+    // mergeHalfModePairs ไปแล้วตั้งแต่ต้นทาง (บรรทัด ~7536) ไม่ต้องเรียกซ้ำอีกรอบที่นี่
+    const halfList=attempts.filter(a=>a.halfMode===true)
       .sort((x,y)=>new Date(y.startedAt||0)-new Date(x.startedAt||0));
     let weaknessList=filterByTime(practiceAttempts);
     if(currentSubjectFilter!=='all') weaknessList=weaknessList.filter(a=>(a.examSubject||getExamSubjectById(s,a.examId))===currentSubjectFilter);
