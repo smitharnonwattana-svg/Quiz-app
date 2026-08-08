@@ -1325,6 +1325,305 @@ async function stubMemeScore(page) {
   check('recalc รองรับ half-mode: score ลดเป็น 3/4 ถูกต้อง (q1 กลายเป็นผิดหลังแก้เฉลย)', afterRecalc.score === 3, String(afterRecalc.score));
   await ctx.close();
 }
+{
+  // v48.15 port: cap halfQuota รวมที่จำนวนข้อจริงของชุด — ถ้าครึ่งแรกถูกส่งทั้งที่ตอบไม่ครบ
+  // โควตาตัวเอง (เช่น timeout auto-submit) ข้อที่เหลือทั้งหมดจะกลายเป็นโควตาของครึ่งหลัง
+  // รวมกันเกินจำนวนข้อทั้งชุดได้ถ้าไม่ cap
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHMQ', 'ชุด Quota Cap', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHMQ: mkQN(4) }, // correct: q1=A,q2=B,q3=C,q4=D
+      attempts: [{
+        id: 'attHMQ', examId: 'eHMQ', examTitle: 'ชุด Quota Cap', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กquota', halfMode: true, halfQuota: 2,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+        usedSeconds: 20, score: 1, total: 1, answers: { q1: 'A' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: null, correct: 'B', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+          { qid: 'q3', no: 3, chosen: null, correct: 'C', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+          { qid: 'q4', no: 4, chosen: null, correct: 'D', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        ],
+        practiceMode: false, visitOrder: ['q1'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await stubMemeScore(page);
+  await page.evaluate(() => navigate('take', { id: 'eHMQ', takerName: 'เด็กquota', half2: true, qids: ['q2', 'q3', 'q4'], parentAttemptId: 'attHMQ' }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'B'); // q2 correct
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'C'); // q3 correct
+  await gotoQHalf(page, 2); await clickChoiceHalf(page, 'D'); // q4 correct
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForFunction(() => window._currentPage === 'review', {}, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const mergedQuota = await page.evaluate(() => Store.load().attempts.find(a => a.id === 'attHMQ'));
+  check('quota cap: halfQuota รวม (2+3=5) ถูก cap ที่จำนวนข้อจริง (4) ไม่ใช่ 5', mergedQuota.halfQuota === 4, String(mergedQuota.halfQuota));
+  check('quota cap: total สอดคล้องกับ halfQuota ที่ cap แล้ว', mergedQuota.total === 4, String(mergedQuota.total));
+  check('quota cap: score ถูกต้อง 4/4 (ทุกข้อตอบถูก)', mergedQuota.score === 4, String(mergedQuota.score));
+  await ctx.close();
+}
+{
+  // v48.15 port: unsure/elapsedMs ของครึ่งหลังต้องไม่หายหลัง merge — เดิมส่ง _parent.perQuestion
+  // เก่าเป็น oldPerQuestion เพียงอย่างเดียว ทำให้ค่าจากครึ่งหลังที่เพิ่งตอบถูกทับด้วยค่าเก่า
+  // (unsure:false) ของครึ่งแรกที่ยังไม่เคยแตะข้อพวกนี้เลย
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHMU', 'ชุด Metadata', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHMU: mkQN(4) },
+      attempts: [{
+        id: 'attHMU', examId: 'eHMU', examTitle: 'ชุด Metadata', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กmeta', halfMode: true, halfQuota: 2,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+        usedSeconds: 20, score: 2, total: 2, answers: { q1: 'A', q2: 'B' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q3', no: 3, chosen: null, correct: 'C', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+          { qid: 'q4', no: 4, chosen: null, correct: 'D', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        ],
+        practiceMode: false, visitOrder: ['q1', 'q2'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await stubMemeScore(page);
+  await page.evaluate(() => navigate('take', { id: 'eHMU', takerName: 'เด็กmeta', half2: true, qids: ['q3', 'q4'], parentAttemptId: 'attHMU' }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0);
+  await page.evaluate(() => document.getElementById('takeUnsureBtn').click()); // มาร์ค "ไม่แน่ใจ" ที่ q3
+  await clickChoiceHalf(page, 'C'); // q3 correct
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'D'); // q4 correct
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForFunction(() => window._currentPage === 'review', {}, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const mergedMeta = await page.evaluate(() => Store.load().attempts.find(a => a.id === 'attHMU'));
+  const q3pq = mergedMeta.perQuestion.find(p => p.qid === 'q3');
+  check('metadata preservation: unsure ของ q3 (มาร์คไว้ตอนครึ่งหลัง) ไม่หายหลัง merge', q3pq && q3pq.unsure === true, JSON.stringify(q3pq));
+  await ctx.close();
+}
+{
+  // v48.15 port: ส่งครึ่งหลังไม่ครบทุกข้อ (ไม่ตอบข้อสุดท้าย) — เฉลยของข้อที่เหลือต้องไม่ถูกล็อก
+  // ค้างถาวร (เดิมเช็ค !att.revealedAt ตรงๆ ซึ่งไม่มีทางเป็น true ได้อีกเลยหลัง half2SubmittedAt
+  // ถูกตั้ง เพราะปุ่ม "ขอดูเฉลยเลย" หายไปแล้ว) — submit ด้วย role teacher ก่อน (ข้าม popup
+  // ความรู้สึก/ทายคะแนนของ student ตอน submit) แล้วเปิด context ใหม่ role student เพื่อเช็ค UI จริง
+  const examId = 'eHML';
+  const cache = baseCache({
+    exams: [mkExam(examId, 'ชุด Lockout', 'คณิตศาสตร์', { questionCount: 4 })],
+    questions: { [examId]: mkQN(4) },
+    attempts: [{
+      id: 'attHML', examId, examTitle: 'ชุด Lockout', examSubject: 'คณิตศาสตร์',
+      examType: 'mc', weighted: false, takerName: 'เด็กlock', halfMode: true, halfQuota: 2,
+      startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+      usedSeconds: 20, score: 2, total: 2, answers: { q1: 'A', q2: 'B' },
+      perQuestion: [
+        { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+        { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+        { qid: 'q3', no: 3, chosen: null, correct: 'C', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        { qid: 'q4', no: 4, chosen: null, correct: 'D', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+      ],
+      practiceMode: false, visitOrder: ['q1', 'q2'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+    }],
+  });
+  const { ctx, page } = await newSeededPage({ cache }); // role teacher (default) — ข้าม postCheckIn popup
+  await stubMemeScore(page);
+  await page.evaluate((id) => navigate('take', { id, takerName: 'เด็กlock', half2: true, qids: ['q3', 'q4'], parentAttemptId: 'attHML' }), examId);
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'C'); // ตอบแค่ q3 ทิ้ง q4 ไว้ไม่ตอบ
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(500);
+  const finalCacheHML = await page.evaluate(() => Store._cache);
+  await ctx.close();
+
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ role: 'student', name: 'เด็กlock', cache: finalCacheHML });
+  await page2.evaluate(() => navigate('review', { attemptId: 'attHML' }));
+  await page2.waitForTimeout(400);
+  const q4Locked = await page2.evaluate(() => (document.getElementById('rq-4')?.textContent || '').includes('🔒'));
+  check('lockout fix: ข้อที่ยังไม่ได้ตอบ (q4) ไม่ถูกล็อกเฉลยค้างหลังส่งครึ่งหลังไม่ครบ', !q4Locked, String(q4Locked));
+  await ctx2.close();
+}
+{
+  // v48.15 port: idempotent retry — Store.save ล้มเหลวรอบแรก (เช่น เน็ตหลุด) แล้วผู้ใช้กดส่งซ้ำ
+  // ต้องไม่บวกทบ halfQuota/usedSeconds ซ้ำสอง (Store.load() คืน _cache ตัวจริง ทำให้ merge
+  // mutate ไปแล้วก่อน save จะสำเร็จด้วยซ้ำ)
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHMR', 'ชุด Merge Retry', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHMR: mkQN(4) },
+      attempts: [{
+        id: 'attHMR', examId: 'eHMR', examTitle: 'ชุด Merge Retry', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กretry', halfMode: true, halfQuota: 2,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+        usedSeconds: 30, score: 2, total: 2, answers: { q1: 'A', q2: 'B' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q3', no: 3, chosen: null, correct: 'C', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+          { qid: 'q4', no: 4, chosen: null, correct: 'D', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        ],
+        practiceMode: false, visitOrder: ['q1', 'q2'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await stubMemeScore(page);
+  await page.evaluate(() => {
+    window.__saveFailOnce = true;
+    const _orig = Store.save.bind(Store);
+    Store.save = (s) => {
+      if (window.__saveFailOnce) { window.__saveFailOnce = false; return false; }
+      return _orig(s);
+    };
+  });
+  await page.evaluate(() => navigate('take', { id: 'eHMR', takerName: 'เด็กretry', half2: true, qids: ['q3', 'q4'], parentAttemptId: 'attHMR' }));
+  await page.waitForTimeout(400);
+  await gotoQHalf(page, 0); await clickChoiceHalf(page, 'C');
+  await gotoQHalf(page, 1); await clickChoiceHalf(page, 'D');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForTimeout(400);
+  const stillOnTake = await page.evaluate(() => window._currentPage === 'take');
+  check('save ล้มเหลวรอบแรก: ยังอยู่หน้า take ไม่ navigate ไปรีวิว', stillOnTake, String(stillOnTake));
+  const usedSecondsAfterFail = await page.evaluate(() => Store._cache.attempts.find(a => a.id === 'attHMR').usedSeconds);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click()); // retry
+  await page.waitForFunction(() => window._currentPage === 'review', {}, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const mergedRetry = await page.evaluate(() => Store.load().attempts.find(a => a.id === 'attHMR'));
+  check('retry หลัง save ล้มเหลว: halfQuota ไม่บวกทบซ้ำ (cap ที่ 4 ไม่ใช่ 6)', mergedRetry.halfQuota === 4, String(mergedRetry.halfQuota));
+  check('retry หลัง save ล้มเหลว: usedSeconds ไม่บวกทบซ้ำ (เท่าค่าหลัง fail รอบแรก)', mergedRetry.usedSeconds === usedSecondsAfterFail, `${usedSecondsAfterFail} -> ${mergedRetry.usedSeconds}`);
+  await ctx.close();
+}
+{
+  // v48.15 port: ครูเปิดรีวิวของนักเรียนที่ยังมี "ครึ่งหลัง" ค้างอยู่ แล้วกดปุ่ม "ทำครึ่งหลังต่อ"
+  // ต้องเจอ confirm เตือนก่อนเสมอ (ปุ่มยังคลิกได้ตามที่ผู้ใช้เลือก ไม่ซ่อนปุ่ม) — กด cancel
+  // ต้องไม่ navigate ไปหน้า take, กด confirm ต้อง navigate ไปได้ตามปกติ
+  const { ctx, page } = await newSeededPage({
+    role: 'teacher', name: 'ครู',
+    cache: baseCache({
+      exams: [mkExam('eHMT', 'ชุด Guard', 'คณิตศาสตร์', { questionCount: 2 })],
+      questions: { eHMT: mkQN(2) }, // correct: q1=A,q2=B
+      attempts: [{
+        id: 'attHMT', examId: 'eHMT', examTitle: 'ชุด Guard', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'นักเรียนคนนี้', halfMode: true, halfQuota: 1,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+        usedSeconds: 10, score: 1, total: 1, answers: { q1: 'A' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: null, correct: 'B', isCorrect: false, isFree: false, unsure: false, visited: false, elapsedMs: 0, changes: 0, counted: false },
+        ],
+        practiceMode: false, visitOrder: ['q1'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await page.evaluate(() => navigate('review', { attemptId: 'attHMT' }));
+  await page.waitForTimeout(300);
+  let dialogMsg = null;
+  page.removeAllListeners('dialog');
+  page.on('dialog', d => { dialogMsg = d.message(); d.dismiss(); });
+  await page.evaluate(() => document.getElementById('reviewHalf2Btn').click());
+  await page.waitForTimeout(300);
+  check('teacher guard: กดปุ่ม "ทำครึ่งหลังต่อ" เจอ confirm เตือนก่อนเสมอ', !!dialogMsg && dialogMsg.includes('ครึ่งหลัง'), String(dialogMsg));
+  const stillReview = await page.evaluate(() => window._currentPage === 'review');
+  check('teacher guard: กด cancel dialog ไม่ navigate ไปหน้า take', stillReview, String(stillReview));
+
+  page.removeAllListeners('dialog');
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => document.getElementById('reviewHalf2Btn').click());
+  await page.waitForFunction(() => window._currentPage === 'take', {}, { timeout: 5000 }).catch(() => {});
+  const nowTake = await page.evaluate(() => window._currentPage);
+  check('teacher guard: กด confirm แล้ว navigate ไปหน้า take ได้ตามปกติ', nowTake === 'take', String(nowTake));
+  await ctx.close();
+}
+{
+  // v48.15 port: recalc guard — ครูลบชุดคำถามเดิมแล้วสร้าง/import ใหม่ทั้งชุด (q.id เปลี่ยนหมด
+  // ไม่ตรงกับ perQuestion เดิมของ attempt เลย) กด "คำนวณคะแนนใหม่" ต้องไม่ลบ perQuestion/score
+  // เดิมทิ้งทั้งหมดเงียบๆ (เดิมจะได้ score 0 ทับของเก่าเพราะ qs2 กรองเหลือ [])
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('eHMG', 'ชุด Recalc Guard', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHMG: mkQN(4) },
+      attempts: [{
+        id: 'attHMG', examId: 'eHMG', examTitle: 'ชุด Recalc Guard', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กguard', halfMode: true, halfQuota: 4,
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date().toISOString(),
+        usedSeconds: 60, score: 4, total: 4, answers: { q1: 'A', q2: 'B', q3: 'C', q4: 'D' },
+        perQuestion: [
+          { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q3', no: 3, chosen: 'C', correct: 'C', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          { qid: 'q4', no: 4, chosen: 'D', correct: 'D', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+        ],
+        practiceMode: false, visitOrder: ['q1', 'q2', 'q3', 'q4'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await page.evaluate(() => navigate('review', { attemptId: 'attHMG' }));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    const s = Store.load();
+    // จำลองครูลบชุดคำถามเดิมแล้วสร้างใหม่ทั้งหมด — q.id เปลี่ยนไปหมด ไม่ตรงกับ perQuestion เดิมเลย
+    s.questions.eHMG = [
+      { id: 'newq1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'newq2', no: 2, number: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'newq3', no: 3, number: 3, correct: 'C', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'newq4', no: 4, number: 4, correct: 'D', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    ];
+    Store.save(s);
+  });
+  await page.evaluate(() => document.getElementById('reviewRecalcBtn').click());
+  await page.waitForTimeout(400);
+  const afterGuard = await page.evaluate(() => Store.load().attempts.find(a => a.id === 'attHMG'));
+  const toastTextGuard = await page.evaluate(() => document.getElementById('toast')?.textContent || '');
+  check('recalc guard: toast เตือนว่าคำนวณใหม่ไม่ได้ (qid ไม่ตรงกับชุดคำถามปัจจุบันทั้งหมด)', toastTextGuard.includes('คำนวณคะแนนใหม่ไม่ได้'), toastTextGuard);
+  check('recalc guard: perQuestion เดิมไม่ถูกลบทิ้ง (ยังมีครบ 4 ข้อ)', Array.isArray(afterGuard.perQuestion) && afterGuard.perQuestion.length === 4, String(afterGuard.perQuestion?.length));
+  check('recalc guard: score เดิมไม่ถูกรีเซ็ตเป็น 0', afterGuard.score === 4, String(afterGuard.score));
+  await ctx.close();
+}
+{
+  // v48.15 port (fix 8 regression): legacy paired record (2 attempt แยกกัน ผูกด้วย
+  // parentAttemptId แบบเก่า) ต้องยังรวมเป็นการ์ดเดียวในแท็บ "คนละครึ่ง" ของหน้าสถิติ แม้เอา
+  // mergeHalfModePairs ที่เรียกซ้ำ (ตอนสร้าง halfList) ออกไปแล้ว — เพราะ attempts ต้นทางถูก
+  // merge ไปแล้วผ่าน timeFiltered ตั้งแต่ต้นทาง
+  const { ctx, page } = await newSeededPage({
+    role: 'teacher',
+    cache: baseCache({
+      exams: [mkExam('eHML8', 'ชุด Legacy Pair', 'คณิตศาสตร์', { questionCount: 4 })],
+      questions: { eHML8: mkQN(4) },
+      attempts: [
+        {
+          id: 'attL1', examId: 'eHML8', examTitle: 'ชุด Legacy Pair', examSubject: 'คณิตศาสตร์',
+          examType: 'mc', weighted: false, takerName: 'เด็กlegacy', halfMode: true, halfQuota: 2,
+          startedAt: new Date(Date.now() - 120000).toISOString(), submittedAt: new Date(Date.now() - 90000).toISOString(),
+          usedSeconds: 30, score: 2, total: 2, answers: { q1: 'A', q2: 'B' },
+          perQuestion: [
+            { qid: 'q1', no: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+            { qid: 'q2', no: 2, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          ],
+          practiceMode: false, visitOrder: ['q1', 'q2'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+        },
+        {
+          id: 'attL2', examId: 'eHML8', examTitle: 'ชุด Legacy Pair', examSubject: 'คณิตศาสตร์',
+          examType: 'mc', weighted: false, takerName: 'เด็กlegacy', halfMode: true, halfPart: 2, parentAttemptId: 'attL1', halfQuota: 2,
+          startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date(Date.now() - 30000).toISOString(),
+          usedSeconds: 30, score: 2, total: 2, answers: { q3: 'C', q4: 'D' },
+          perQuestion: [
+            { qid: 'q3', no: 3, chosen: 'C', correct: 'C', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+            { qid: 'q4', no: 4, chosen: 'D', correct: 'D', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 0, changes: 0, counted: true },
+          ],
+          practiceMode: false, visitOrder: ['q3', 'q4'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+        },
+      ],
+    }),
+  });
+  await page.evaluate(() => navigate('stats'));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('[data-tab="half"]')?.click());
+  await page.waitForTimeout(300);
+  const halfCardCount = await page.evaluate(() => document.querySelectorAll('#statsRows [data-review]').length);
+  check('fix8 regression: legacy paired record ยังรวมเป็นการ์ดเดียวในแท็บคนละครึ่ง', halfCardCount === 1, String(halfCardCount));
+  await ctx.close();
+}
 
 // ─────────────────────────────────────────────────────────────────
 await browser.close();
