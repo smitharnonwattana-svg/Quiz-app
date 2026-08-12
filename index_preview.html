@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.25p -->
+  <!-- APP_VERSION: v48.26p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.25p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.26p</div>
     </div>
   </div>
 </div>
@@ -3780,18 +3780,6 @@ function getQuoteOfDay(){
   const dayIndex = Math.floor(Date.now() / 86400000);
   return QUOTE_OF_DAY_LIST[dayIndex % QUOTE_OF_DAY_LIST.length];
 }
-// ย่อ font-size ตามความยาวคำคม (40-124 ตัวอักษรในชุดจริง) แทนตัดคำ/ขึ้นบรรทัดใหม่ — กัน
-// layout กล่องชื่อ+กระดิ่งขยับ ellipsis ยังคงตัดคำคมยาวบนมือถือ (390px) แม้ font-size เล็กสุด
-// (9px) แล้วก็ตาม — รับทราบแล้วว่าเป็น trade-off ที่ยอมรับได้ ไม่ทำ font เล็กกว่านี้เพราะจะ
-// อ่านไม่ออก
-function getQuoteFontSize(text){
-  const n = text.length;
-  if (n <= 45) return 13;
-  if (n <= 65) return 12;
-  if (n <= 85) return 11;
-  if (n <= 105) return 10;
-  return 9;
-}
 
 // WHOOP UI — Stage 4
 let _whoopReqId = 0;
@@ -3879,12 +3867,11 @@ function renderHome(){
       </div>
     `;
     const _quoteToday = getQuoteOfDay();
-    const _quoteFontSize = getQuoteFontSize(_quoteToday);
     return `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;gap:10px;">
-        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-          <div style="font-weight:700;font-size:14px;color:#374151;white-space:nowrap;">${esc(userId)}</div>
-          <div style="font-size:${_quoteFontSize}px;color:#9ca3af;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">💬 ${esc(_quoteToday)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 4px;gap:10px;">
+        <div style="min-width:0;">
+          <span style="font-weight:700;font-size:14px;color:#374151;">${esc(userId)}</span>
+          <span style="font-size:13px;color:#4b5563;font-style:italic;">💬 ${esc(_quoteToday)}</span>
         </div>
         ${_bellHtml}
       </div>
