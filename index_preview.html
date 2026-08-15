@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.27p -->
+  <!-- APP_VERSION: v48.28p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -744,32 +744,36 @@
         padding: 4px 4px !important;
         width: 100% !important;
       }
+      /* v48.28p: คอลัมน์ Tag เดิมเป็นปุ่มเดี่ยว 36-42px — เปลี่ยนเป็น dropdown + ปุ่ม tag ย่อย
+         table-layout:fixed ทำให้คอลัมน์ "เฉลย" (auto) กินพื้นที่ที่เหลือหลังหักคอลัมน์ fixed —
+         ถ้าขยาย Tag กว้างเกิน (เคยลอง 110-120px) จะไปแย่งพื้นที่ "เฉลย" จนปุ่ม ก/ข/ค/ง บีบจนอ่านไม่ออก
+         แก้ด้วยการวางซ้อนแนวตั้ง (dropdown บน ปุ่ม tag ย่อยล่าง) แทนเรียงแนวนอน กว้างแค่ 74px พอ —
+         ตัวหนังสือใน select ที่ตัดด้วย ellipsis ไม่กระทบการใช้งานจริง เพราะแตะแล้ว browser
+         เปิด native picker แสดงตัวเลือกเต็มอยู่แล้วไม่ว่ากล่องจะแคบแค่ไหน */
       #page-admin_editor table th:nth-child(5),
       #page-admin_editor table td:nth-child(5) {
-        width: 36px !important;
-        padding: 6px 2px !important;
+        width: 74px !important;
+        padding: 4px 2px !important;
       }
-      #page-admin_editor table td:nth-child(5) button {
-        font-size: 14px !important;
-        padding: 4px 4px !important;
+      #page-admin_editor table td:nth-child(5) > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 2px !important;
+      }
+      #page-admin_editor table td:nth-child(5) select {
+        font-size: 9px !important;
+        padding: 2px !important;
         width: 100% !important;
-        max-width: 100% !important;
-        white-space: nowrap !important;
+        min-width: 0 !important;
         overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
       }
-      #page-admin_editor table td:nth-child(5) button span {
-        display: none !important;
-      }
-
-      #page-admin_editor table th:nth-child(5),
-      #page-admin_editor table td:nth-child(5) {
-        width: 42px !important;
-      }
-      #page-admin_editor table td:nth-child(5) button {
-        overflow: visible !important;
-        font-size: 16px !important;
-        padding: 4px !important;
-        min-width: 36px !important;
+      #page-admin_editor table td:nth-child(5) .subTagBtn {
+        font-size: 9px !important;
+        padding: 1px !important;
+        width: 100% !important;
+        min-width: 0 !important;
       }
 
       /* ── เปิดระบบคะแนน weighted (มี 6 คอลัมน์): override nth-child shift ── */
@@ -796,21 +800,32 @@
         width: 100% !important;
         min-width: 0 !important;
       }
-      /* คอลัมน์ 6 = Tag */
+      /* คอลัมน์ 6 = Tag — v48.28p: dropdown + ปุ่ม tag ย่อย วางซ้อนแนวตั้ง (เหมือนบล็อกไม่
+         weighted — เหตุผลเดียวกัน: ขยายแนวนอนแล้วไปแย่งพื้นที่คอลัมน์เฉลย/คะแนนที่แคบอยู่แล้ว) */
       #page-admin_editor table.weighted th:nth-child(6),
       #page-admin_editor table.weighted td:nth-child(6) {
-        width: 38px !important;
-        padding: 6px 2px !important;
+        width: 70px !important;
+        padding: 4px 2px !important;
       }
-      #page-admin_editor table.weighted td:nth-child(6) button {
-        overflow: visible !important;
-        font-size: 14px !important;
-        padding: 4px !important;
-        min-width: 0 !important;
+      #page-admin_editor table.weighted td:nth-child(6) > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 2px !important;
+      }
+      #page-admin_editor table.weighted td:nth-child(6) select {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 9px !important;
+        padding: 2px !important;
         width: 100% !important;
+        min-width: 0 !important;
       }
-      #page-admin_editor table.weighted td:nth-child(6) button span {
-        display: none !important;
+      #page-admin_editor table.weighted td:nth-child(6) .subTagBtn {
+        font-size: 9px !important;
+        padding: 1px !important;
+        width: 100% !important;
+        min-width: 0 !important;
       }
       /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
       #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
@@ -1080,7 +1095,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.27p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.28p</div>
     </div>
   </div>
 </div>
@@ -2739,7 +2754,106 @@ function _updateOfflineBanner() {
       if (document.body) document.body.appendChild(banner);
     }
     if (banner) banner.style.display = _isOffline ? 'block' : 'none';
+    // v48.18 diag: log เฉพาะตอน "เปลี่ยนสถานะ" ไม่ใช่ทุก 5 วิ (แถบนี้ z-index 99998 ทับปุ่มปากกา)
+    if (window._diagLastOffline !== _isOffline) {
+      window._diagLastOffline = _isOffline;
+      _takeDiag('offlineBanner', {offline:_isOffline, page:window._currentPage});
+    }
   } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// v48.18 (ชั่วคราว): diagnostic log จับบั๊ก "layout เลื่อน / ปากกาหาย" ตอนทำข้อสอบ
+// เก็บ localStorage เป็นหลัก (รอด reload) แล้วทยอยส่งขึ้น Firestore แบบ batch
+// ให้เปิดดูจากเครื่องอื่นได้ — ถอดออกทั้งบล็อกเมื่อจับตัวบั๊กจริงได้แล้ว
+// preview/production ใช้ hostname เดียวกัน (localStorage + Firestore doc ก้อนเดียวกัน) —
+// ใส่ src ตาม path อัตโนมัติ กันข้อมูลทดสอบจาก preview ปนกับ log จริงของ production
+// ═══════════════════════════════════════════════════════════════════
+const _TAKE_DIAG_KEY = 'nanont:takeDiag', _TAKE_DIAG_MAX = 200;
+function _sanitizeDiagName(s){ return (s||'').replace(/[^a-zA-Z0-9฀-๿]/g,'_').slice(0,60); }
+function _takeDiag(ev, data){
+  try{
+    const arr = JSON.parse(localStorage.getItem(_TAKE_DIAG_KEY) || '[]');
+    arr.push({t:new Date().toLocaleString('th-TH'), ev, w:window.innerWidth, h:window.innerHeight, src:(location.pathname.indexOf('preview')>=0?'preview':'prod'), ...(data||{})});
+    if(arr.length > _TAKE_DIAG_MAX) arr.splice(0, arr.length - _TAKE_DIAG_MAX);
+    localStorage.setItem(_TAKE_DIAG_KEY, JSON.stringify(arr));
+  }catch(e){ /* ห้าม log ทำแอปพังเด็ดขาด */ }
+  // ทยอยส่งขึ้น cloud เอง — throttle 30 วิอยู่ข้างใน ไม่ await (ห้ามหน่วงการทำข้อสอบ)
+  try{ _flushTakeDiag(false); }catch(e){}
+}
+let _takeDiagLastFlush = 0;
+async function _flushTakeDiag(force){
+  try{
+    const u = (typeof Auth !== 'undefined' && Auth.getName) ? Auth.getName() : '';
+    if(!u) return;
+    if(!force && Date.now() - _takeDiagLastFlush < 30000) return; // throttle 30 วิ
+    _takeDiagLastFlush = Date.now();
+    const flagKey = 'nanont:takeDiagPending_' + _sanitizeDiagName(u);
+    try{ localStorage.setItem(flagKey, '1'); }catch(e){}
+    if(typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) return; // ค้าง flag ไว้ flush ทีหลัง
+    const arr = JSON.parse(localStorage.getItem(_TAKE_DIAG_KEY) || '[]');
+    await FirebaseSync.saveDoc('takeDiag_' + _sanitizeDiagName(u), {entries:arr, updatedAt:new Date().toISOString()});
+    try{ localStorage.removeItem(flagKey); }catch(e){}
+  }catch(e){ /* ห้ามทำข้อสอบพัง */ }
+}
+
+// หน้าจอดู log — โครง modal/ปุ่ม copy ยืมจาก _diagnoseSync() ข้างล่าง
+async function _diagTake(fromCloudUser){
+  let entries = [], head = '';
+  try{
+    if(fromCloudUser){
+      const doc = await FirebaseSync.loadDoc('takeDiag_' + _sanitizeDiagName(fromCloudUser));
+      entries = (doc && doc.entries) || [];
+      head = '☁️ จาก cloud: "' + fromCloudUser + '" • อัปเดตล่าสุด ' + ((doc && doc.updatedAt) ? new Date(doc.updatedAt).toLocaleString('th-TH') : '(ไม่มี)');
+    } else {
+      entries = JSON.parse(localStorage.getItem(_TAKE_DIAG_KEY) || '[]');
+      head = '📱 เครื่องนี้ • ผู้ใช้: "' + ((typeof Auth!=='undefined'&&Auth.getName)?Auth.getName():'?') + '"';
+    }
+  }catch(e){ head = '⚠️ อ่านไม่สำเร็จ: ' + (e?.message||e); }
+
+  const lines = entries.slice().reverse().map(e => {
+    const {t, ev, w, h, ...rest} = e;
+    const extra = Object.keys(rest).length ? ' ' + JSON.stringify(rest) : '';
+    return `${t} [${ev}] ${w}x${h}${extra}`;
+  });
+  const txt = head + '\n' + `จำนวน ${entries.length} รายการ (ใหม่สุดอยู่บน) • จอตอนนี้ ${window.innerWidth}x${window.innerHeight}\n` + '─'.repeat(40) + '\n' + (lines.join('\n') || '(ยังไม่มี log)');
+
+  const old = document.getElementById('_diagModal');
+  if (old) old.remove();
+  const m = document.createElement('div');
+  m.id = '_diagModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:12px;padding:16px;max-width:640px;width:100%;max-height:80vh;overflow:auto;font-family:monospace;font-size:12px;line-height:1.5;';
+  const _members = (typeof Auth!=='undefined' && Auth.getMembers) ? (Auth.getMembers()||[]) : [];
+  box.innerHTML = '<div style="font-weight:800;margin-bottom:8px;font-family:sans-serif;">🩺 Take-page diagnostic log</div>'
+    + '<div style="margin-bottom:8px;font-family:sans-serif;">'
+    + '<select id="_diagTakeWho" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-family:sans-serif;">'
+    + '<option value="">📱 เครื่องนี้ (localStorage)</option>'
+    + _members.map(mb => `<option value="${esc(mb.name)}"${mb.name===fromCloudUser?' selected':''}>☁️ ${esc(mb.name)} (จาก cloud)</option>`).join('')
+    + '</select></div>'
+    + '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;">' + txt.replace(/</g,'&lt;') + '</pre>'
+    + '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap;">'
+    + '<button id="_diagTakeUp" style="padding:6px 12px;border:1px solid #d1d5db;background:#eff6ff;border-radius:6px;cursor:pointer;font-family:sans-serif;">⬆️ ส่งขึ้น cloud</button>'
+    + '<button id="_diagTakeClear" style="padding:6px 12px;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;cursor:pointer;font-family:sans-serif;">🗑 ล้าง (เครื่องนี้)</button>'
+    + '<button id="_diagTakeCopy" style="padding:6px 12px;border:1px solid #d1d5db;background:#f3f4f6;border-radius:6px;cursor:pointer;font-family:sans-serif;">📋 copy</button>'
+    + '<button id="_diagTakeClose" style="padding:6px 12px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-family:sans-serif;">ปิด</button>'
+    + '</div>';
+  m.appendChild(box);
+  document.body.appendChild(m);
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  document.getElementById('_diagTakeClose').onclick = () => m.remove();
+  document.getElementById('_diagTakeWho').onchange = (e) => { m.remove(); _diagTake(e.target.value || null); };
+  document.getElementById('_diagTakeUp').onclick = async () => { await _flushTakeDiag(true); toast('ส่งขึ้น cloud แล้ว'); };
+  document.getElementById('_diagTakeClear').onclick = () => {
+    if(!confirm('ล้าง log ในเครื่องนี้ทั้งหมด?')) return;
+    try{ localStorage.removeItem(_TAKE_DIAG_KEY); }catch(e){}
+    m.remove(); _diagTake(null);
+  };
+  document.getElementById('_diagTakeCopy').onclick = () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast('คัดลอกแล้ว'));
+    else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('คัดลอกแล้ว'); }
+  };
 }
 
 // แสดง diagnostic modal เพื่อตรวจสอบสถานะ sync บนเครื่องที่ข้อมูลไม่ตรง
@@ -3081,6 +3195,8 @@ const Store = {
     console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
     // Always refresh current page so stale empty-state render is replaced with real data
     if(typeof navigate==='function' && window._currentPage){
+      // v48.18 diag: ถ้า page เป็น 'take' = ข้อสอบกำลังจะถูกรีสตาร์ทกลางคัน (ผู้ต้องสงสัย #2)
+      _takeDiag('syncFromCloud.renav', {page:window._currentPage});
       navigate(window._currentPage, window._currentParams||{});
     }
   },
@@ -3923,6 +4039,7 @@ function renderHome(){
           <button class="btn" onclick="_testSync()" style="display:none;font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
           <button class="btn" onclick="_diagnoseSync()" style="display:none;font-size:12px;color:#0891b2;border-color:#67e8f9;">🔍 diagnose</button>
           <button class="btn" onclick="_forcePullFromCloud()" style="display:none;font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
+          ${isTeacher ? `<button class="btn" onclick="_diagTake()" style="font-size:12px;color:#0f766e;border-color:#5eead4;">🩺 log</button>` : ''}
           <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
         </div>
       </div>
@@ -4402,6 +4519,15 @@ function doLogin() {
 
 function navigate(page, params={}){
   // hide take page cleanup
+  // v48.18 diag ⭐ ผู้ต้องสงสัย #2: จับตรงนี้เพราะ cleanupTake() ล้าง _takeState ทิ้ง ทำให้
+  // ไปเช็คใน initTake ไม่ทันแล้ว — started:true + to:'take' = ข้อสอบที่กำลังทำอยู่ถูกรีสตาร์ทกลางคัน
+  if(_currentPage==='take' && _takeState){
+    _takeDiag('take.teardown', {
+      to: page,
+      started: !!_takeState.started,
+      answered: _takeState.answers ? Object.keys(_takeState.answers).length : 0
+    });
+  }
   if(_currentPage==='take') cleanupTake();
   if(_currentPage==='practice') cleanupPractice();
 
@@ -4553,7 +4679,13 @@ function _unliftTakeStickyBars(page) {
 // navigate() เท่านั้น ไม่รองรับหมุนจอกลางคัน
 function _syncTakeStickyBarLift() {
   if (_currentPage !== 'take' && _currentPage !== 'practice') return;
-  if (window.matchMedia('(min-width: 901px)').matches) {
+  const _wide = window.matchMedia('(min-width: 901px)').matches;
+  // v48.18 diag: log เฉพาะตอนข้าม breakpoint จริง — จุดนี้ย้าย DOM ของ stickyBar = layout ขยับ
+  if (window._diagLastWide !== _wide) {
+    window._diagLastWide = _wide;
+    _takeDiag('stickyBar.breakpoint', {wide:_wide, page:_currentPage});
+  }
+  if (_wide) {
     _liftTakeStickyBars(_currentPage);
   } else {
     _unliftTakeStickyBars(_currentPage);
@@ -5298,6 +5430,9 @@ function cleanupPractice(){
 }
 
 function initTake(id){
+  // v48.18 diag: คู่กับ 'take.teardown' ใน navigate() — ถ้าเห็น teardown(started:true, to:'take')
+  // แล้วตามด้วย initTake ทันที = ข้อสอบถูกรีสตาร์ทกลางคัน (ผู้ต้องสงสัย #2)
+  _takeDiag('initTake', {examId:id, page:window._currentPage});
   cleanupTake();
   const s=Store.load();
   const exam=s.exams.find(e=>e.id===id);
@@ -5399,9 +5534,15 @@ function initTake(id){
         pdfUrl = new URL(pdfUrl, window.location.href).href;
       }
       const url = pdfUrl.startsWith('localpdf:') ? await getPdfBlobUrl(pdfUrl) : pdfUrl;
+      _takeDiag('pdfLoad.start', {gdrive:_isGDrive});
       await _takePdfViewer.loadUrl(url, 1);
+      _takeDiag('pdfLoad.ok', {});
       if (typeof window.pdfAnnotateInit === 'function') window.pdfAnnotateInit('takePdfViewer');
-    } catch(err){ toast(err?.message||String(err)); }
+    } catch(err){
+      // v48.18 diag: PDF โหลดล้ม = pdfAnnotateInit ไม่ถูกเรียก → ปากกาค้าง instance เก่า (ผู้ต้องสงสัย #1)
+      _takeDiag('pdfLoad.FAIL', {err:String(err?.message||err).slice(0,120)});
+      toast(err?.message||String(err));
+    }
   }
 
   // setPdfPage ตอน take = แค่โหลดครั้งแรก ไม่ scroll
@@ -10621,16 +10762,23 @@ function initEditor(examId){
       tr.addEventListener('click',()=>select(idx));
       const _qTags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
       const _qSubTags=Array.isArray(q.subTags)?q.subTags:[];
-      const _mainChips=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'';
-      const _subChips=_qSubTags.length?_qSubTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:99px;color:#6d28d9;font-weight:700;">↳${esc(t)}</span>`).join(' '):'';
-      const _tagPreview=(_qTags.length||_qSubTags.length)?(_mainChips+(_subChips?' '+_subChips:'')):'<span style="font-size:11px;color:#9ca3af;">—</span>';
+      // v48.28p: เปลี่ยนช่อง Tag จากปุ่มเปิด modal เป็น dropdown เลือก tag หลักได้เร็วขึ้น —
+      // อ่านค่าปัจจุบันแบบ union กับ q.topic เพราะแถวที่มาจาก Excel import เขียนแค่ q.topic
+      // ไม่เคยเขียน q.tags เลย ถ้าอ่านจาก q.tags[0] เพียวๆ dropdown ของแถว import จะโชว์ว่าง
+      // เปล่าทั้งที่มี tag อยู่จริง
+      const _curTag=(_qTags[0])||'';
+      const _subjTopicsForSel=Array.isArray(s.subjectTopics[exam.subject])?s.subjectTopics[exam.subject]:[];
+      // กัน tag หาย: ถ้า tag ปัจจุบันไม่อยู่ใน subjectTopics แล้ว (เปลี่ยนวิชาทีหลัง/stale)
+      // ต้องเติมเป็น option พิเศษ ไม่งั้น dropdown จะเด้งไปค่าว่างแล้วลบ tag เดิมทิ้งเงียบๆ
+      const _tagOptsList=(_curTag&&!_subjTopicsForSel.includes(_curTag))?[..._subjTopicsForSel,_curTag]:_subjTopicsForSel;
+      const _tagOptsHtml='<option value="">— ไม่มี —</option>'+_tagOptsList.map(t=>`<option value="${esc(t)}"${t===_curTag?' selected':''}>${esc(t)}</option>`).join('');
       const _correctCellHtml=_isFillNum
         ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" value="${esc(q.correct||'')}" placeholder="0-999" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
         : `<div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div>`;
       const _ptsCellHtml=exam.weighted
         ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
         : '';
-      tr.innerHTML=`<td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td style="font-weight:900;">${q.number||q.no}</td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
+      tr.innerHTML=`<td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td style="font-weight:900;">${q.number||q.no}</td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><div style="display:flex;gap:3px;align-items:center;"><select class="tagSel" data-field="tags" style="flex:1;min-width:0;padding:4px 6px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;font-family:inherit;">${_tagOptsHtml}</select><button type="button" class="btn subTagBtn" data-field="subtags" title="tag ย่อย (↳)" style="font-size:11px;padding:3px 6px;flex-shrink:0;">↳${_qSubTags.length||''}</button></div></td>`;
       if(exam.weighted){
         const ptsInput=tr.querySelector('input[data-field="points"]');
         if(ptsInput){
@@ -10687,8 +10835,21 @@ function initEditor(examId){
           if(el) el.value=newPage;
         }
       });
-      const tagsBtn=tr.querySelector('button[data-field="tags"]');
-      if(tagsBtn){ tagsBtn.addEventListener('click',e=>{ e.stopPropagation(); window.openTagModal(q, idx, exam.subject||'', s, renderTable); }); }
+      const tagSel=tr.querySelector('select[data-field="tags"]');
+      if(tagSel){
+        tagSel.addEventListener('click',e=>e.stopPropagation()); // กันชนกับ tr.onclick=>select(idx)
+        tagSel.addEventListener('change',e=>{
+          e.stopPropagation();
+          const v=tagSel.value;
+          const _cur=(Array.isArray(q.tags)&&q.tags[0])||q.topic||'';
+          if(_cur!==v) q.subTags=[]; // เปลี่ยน tag หลัก → ล้าง tag ย่อย (semantics เดิมของ tag modal)
+          q.tags=v?[v]:[]; q.topic=v||'';
+          s.questions[examId]=list; Store.save(s);
+          renderTable();
+        });
+      }
+      const subTagBtn=tr.querySelector('button[data-field="subtags"]');
+      if(subTagBtn){ subTagBtn.addEventListener('click',e=>{ e.stopPropagation(); window.openTagModal(q, idx, exam.subject||'', s, renderTable); }); }
       const freeBtn = tr.querySelector('.freeBtn');
       refs[`${idx}:free`]=freeBtn;
       freeBtn.addEventListener('focus',()=>select(idx));
@@ -14209,10 +14370,16 @@ function initEntranceCompare(params) {
       const data = await res.json();
       if (data.version && data.version !== CURRENT_VERSION) {
         _prompted = true;
+        // v48.18 diag: เด้ง confirm กลางข้อสอบได้ ถ้ากดตกลง = reload ทั้งหน้า
+        // (ใน preview ไม่มีทางถึงจุดนี้จริง เพราะ __previewDisableVersionCheck กันไว้ตั้งแต่ต้น
+        // ฟังก์ชัน — เก็บโค้ดไว้ให้เหมือน production เพื่อ diff สะอาดตอน port)
+        if (typeof _takeDiag === 'function') _takeDiag('version.prompt', {from:CURRENT_VERSION, to:data.version, page:window._currentPage});
         if (confirm(
           '🆕 มีเวอร์ชันใหม่ (' + data.version + ')\n' +
           'อัพเดทเพื่อใช้ฟีเจอร์ล่าสุดไหม?'
         )) {
+          if (typeof _takeDiag === 'function') _takeDiag('version.RELOAD', {page:window._currentPage});
+          if (typeof _flushTakeDiag === 'function') { try{ await _flushTakeDiag(true); }catch(e){} }
           // reload(true) ใช้ไม่ได้แล้วในเบราว์เซอร์สมัยใหม่ — เปลี่ยน URL แทนเพื่อบังคับ bypass cache
           window.location.href = window.location.pathname + '?_v=' + Date.now();
         }
@@ -14234,7 +14401,13 @@ function initEntranceCompare(params) {
   // Check when app comes back to foreground
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
+      // v48.18 diag: กลับเข้าแอป — จับช่วงที่ iPad อาจ reclaim หน่วยความจำ/เปลี่ยนขนาดจอตอนอยู่ background
+      if (typeof _takeDiag === 'function') _takeDiag('app.foreground', {page:window._currentPage});
       checkVersion();
+    } else {
+      // ออกจากแอป (สลับแอป/ล็อกจอ) — รีบส่ง log ขึ้น cloud ก่อนโดน suspend
+      if (typeof _takeDiag === 'function') _takeDiag('app.background', {page:window._currentPage});
+      if (typeof _flushTakeDiag === 'function') { try{ _flushTakeDiag(true); }catch(e){} }
     }
   });
 })();
@@ -14520,6 +14693,8 @@ function initEntranceCompare(params) {
     if (elapsed > 300) return; // long-press ไม่นับ
     // สลับ tool
     const next = (tool === 'pen') ? 'eraser' : 'pen';
+    // v48.18 diag ⭐ ผู้ต้องสงสัย #4: วางสองนิ้วพักตอนเขียน Apple Pencil = สลับเป็นยางลบเงียบๆ
+    if (typeof _takeDiag === 'function') _takeDiag('scratch.twoFingerSwap', {from:tool, to:next});
     const nextBtn = pad.querySelector('.scratch-tool[data-tool="' + next + '"]');
     if (nextBtn) nextBtn.click();
   }, {passive: true});
@@ -14947,9 +15122,11 @@ function initEntranceCompare(params) {
   }
 
   function pdfAnnotateInit(containerId) {
-    if (!MQ.matches) return;
+    // v48.18 diag: mq=false → ปากกาไม่ถูกสร้างเลย (จอแคบกว่า 901px = Split View/แนวตั้ง)
+    if (!MQ.matches) { if(typeof _takeDiag==='function') _takeDiag('pdfAnnotateInit.skip', {cid:containerId, mq:false}); return; }
     teardown(containerId);
     const built = buildOverlaysFor(containerId);
+    if(typeof _takeDiag==='function') _takeDiag('pdfAnnotateInit', {cid:containerId, built:!!built, nOverlays: built && built.overlays ? built.overlays.length : 0});
     if (built) instances[containerId] = built;
     if (containerId === activeContainerId) {
       if (instances[containerId]) {
@@ -14965,6 +15142,19 @@ function initEntranceCompare(params) {
   window.pdfAnnotateShow = function(containerId) {
     if (activeContainerId !== containerId) resetDrawState();
     activeContainerId = containerId;
+    // v48.18 diag ⭐ ผู้ต้องสงสัย #1: ถ้า instance เก่ายังค้าง จะข้ามการสร้างใหม่ ทั้งที่ canvas
+    // ถูก innerHTML='' ลบไปแล้ว → ปุ่มปากกาโผล่แต่เขียนไม่ออก. connected:false = จับได้คาหนังคาเขา
+    try{
+      const _inst = instances[containerId];
+      const _o0 = _inst && _inst.overlays && _inst.overlays[0];
+      _takeDiag('pdfAnnotateShow', {
+        cid: containerId, mq: MQ.matches,
+        skipRebuild: !!_inst,
+        nOverlays: _inst && _inst.overlays ? _inst.overlays.length : 0,
+        connected: _o0 ? !!(_o0.overlay && _o0.overlay.isConnected) : null,
+        pdfConnected: _o0 ? !!(_o0.pdfCanvas && _o0.pdfCanvas.isConnected) : null
+      });
+    }catch(e){}
     if (MQ.matches) {
       if (!instances[containerId]) pdfAnnotateInit(containerId);
       if (instances[containerId]) {
@@ -14988,6 +15178,9 @@ function initEntranceCompare(params) {
     if (MQ.matches) {
       if (!instances[activeContainerId]) pdfAnnotateInit(activeContainerId);
     } else if (instances[activeContainerId]) {
+      // v48.18 diag ⭐ ผู้ต้องสงสัย #3: จอแคบกว่า 901px (Split View/Stage Manager/หมุนจอ)
+      // → ลบลายเส้นถาวร + ซ่อนปุ่มปากกา
+      if(typeof _takeDiag==='function') _takeDiag('pdfAnnotate.TEARDOWN', {cid:activeContainerId, mq:false});
       resetDrawState();
       instances[activeContainerId].overlays.forEach(clearOverlayFull);
       teardown(activeContainerId);
