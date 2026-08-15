@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.28p -->
+  <!-- APP_VERSION: v48.29p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1095,7 +1095,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.28p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.29p</div>
     </div>
   </div>
 </div>
@@ -14661,6 +14661,24 @@ function initEntranceCompare(params) {
   function _syncScratchSplit() {
     const split = pad.classList.contains('open') && !pad.classList.contains('full');
     document.querySelectorAll('.takeGrid').forEach(g => g.classList.toggle('scratchSplit', split));
+    // v48.19 diag: จับ geometry ปุ่มปากกา PDF ก่อน/หลัง toggle กระดาษทด — ทดสอบใน sandbox แล้ว
+    // ไม่พัง แต่ยังไม่รู้ว่า PDF.js จริงบน iPad ต่างออกไปหรือไม่ ต้องดูจาก production จริง
+    if (typeof _takeDiag === 'function') {
+      try {
+        const btn = document.getElementById('pdfAnnotateToggleBtn');
+        const overlay = document.querySelector('#takePdfViewer .pdfAnnotateCanvas');
+        let covered = null, btnRect = null;
+        if (btn) {
+          const r = btn.getBoundingClientRect();
+          btnRect = { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+          covered = document.elementFromPoint(r.x + r.width/2, r.y + r.height/2) !== btn;
+        }
+        _takeDiag('scratchSplit.toggle', {
+          split, btnExists: !!btn, btnDisplay: btn ? getComputedStyle(btn).display : null,
+          btnRect, covered, overlayConnected: overlay ? overlay.isConnected : null
+        });
+      } catch(e) {}
+    }
   }
 
   document.getElementById('scratchExpandBtn').addEventListener('click', () => {
@@ -15064,7 +15082,9 @@ function initEntranceCompare(params) {
 
       function syncGeometry() {
         const w = pdfCanvas.offsetWidth, h = pdfCanvas.offsetHeight;
-        if (!w || !h) return;
+        // v48.19 diag: ทฤษฎีที่เหลืออยู่ — offsetWidth/Height เป็น 0 ชั่วขณะตอน reflow (เช่น
+        // ตอน grid เปลี่ยนขนาดกลาง) ทำให้ overlay ค้างไม่ sync ตำแหน่ง/ขนาดตามจริง
+        if (!w || !h) { if(typeof _takeDiag==='function') _takeDiag('syncGeometry.zeroSize', {}); return; }
         const left = pdfCanvas.offsetLeft + 'px', top = pdfCanvas.offsetTop + 'px';
         overlay.style.left = left; overlay.style.top = top;
         overlay.style.width = w + 'px'; overlay.style.height = h + 'px';
