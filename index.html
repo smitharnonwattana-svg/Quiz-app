@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.19 -->
+  <!-- APP_VERSION: v48.20 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.19</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.20</div>
     </div>
   </div>
 </div>
@@ -4577,6 +4577,12 @@ function navigate(page, params={}){
   else if(page==='entrance_compare') initEntranceCompare(params);
   else if(page==='rewards') initRewards();
 
+  // ถ้า init ของหน้านี้ navigate() ต่อไปหน้าอื่นกลางคัน (เช่นกด "ยกเลิก" บน popup
+  // เตือนว่ามีชุดทำค้างอยู่ → navigate('exams')) เฟรมในทำ lifecycle ของหน้าใหม่ครบแล้ว
+  // เฟรมนอกต้องหยุดตรงนี้ ห้ามทำต่อด้วยค่า page เก่าที่ค้างอยู่ ไม่งั้นปุ่มลอย 📝/✏️
+  // ที่เฟรมในเพิ่งซ่อนไปจะถูกสั่งโชว์กลับมาทั้งที่ออกจากหน้าทำข้อสอบแล้ว
+  if (_currentPage !== page) return;
+
   // Scratch pad lifecycle (Phase 1 — iPad-only, no-op on other devices)
   if (typeof window.scratchShow === 'function') {
     if (page === 'take' || page === 'practice') window.scratchShow();
@@ -4614,23 +4620,61 @@ function navigate(page, params={}){
 function _liftTakeStickyBars(page) {
   if (!window.matchMedia('(min-width: 901px)').matches) return;
   const root = document.getElementById('page-' + page);
-  if (!root || root.dataset.sbLifted) return;
+  if (!root) return;
   const left = root.querySelector('.takeLeft');
   const right = root.querySelector('.takeRight');
   if (!left || !right) return;
-  const leftSb = left.querySelector(':scope > .stickyBar');
-  const rightSb = right.querySelector(':scope > .stickyBar');
-  if (leftSb) {
-    leftSb.classList.add('lifted-sb', 'lifted-sb-left');
-    root.insertBefore(leftSb, root.firstChild);
-    left.style.paddingTop = leftSb.getBoundingClientRect().height + 'px';
+  if (!root.dataset.sbLifted) {
+    // querySelector ในเพนจะเจอเฉพาะตอนแถบยังไม่ถูกย้าย — ถ้า flag หลุดไปทั้งที่แถบ
+    // ยังลอยอยู่ ทั้งคู่จะเป็น null แล้วไม่มีอะไรถูกย้ายซ้ำ (ตั้งใจ) padding ได้จาก
+    // _syncLiftedSbPadding ข้างล่างซึ่งหาแถบจาก .lifted-sb-* ที่ root แทน
+    const leftSb = left.querySelector(':scope > .stickyBar');
+    const rightSb = right.querySelector(':scope > .stickyBar');
+    if (leftSb) {
+      leftSb.classList.add('lifted-sb', 'lifted-sb-left');
+      root.insertBefore(leftSb, root.firstChild);
+    }
+    if (rightSb) {
+      rightSb.classList.add('lifted-sb', 'lifted-sb-right');
+      root.insertBefore(rightSb, root.firstChild);
+    }
+    root.dataset.sbLifted = '1';
+    _observeLiftedSb(root);
   }
-  if (rightSb) {
-    rightSb.classList.add('lifted-sb', 'lifted-sb-right');
-    root.insertBefore(rightSb, root.firstChild);
-    right.style.paddingTop = rightSb.getBoundingClientRect().height + 'px';
+  // ตั้ง padding ทุกครั้งที่ถูกเรียก แม้รอบนี้ไม่ได้ย้ายแถบ (idempotent)
+  _syncLiftedSbPadding(page);
+}
+
+// ชดเชยที่ว่างของแถบที่กลายเป็น position:fixed ด้วย padding-top บนเพน — วัดใหม่ได้
+// ตลอดเวลา ต่างจากของเดิมที่วัดครั้งเดียวตอน lift แล้วไม่แตะอีกเลย
+// ของเดิมพังได้ 2 ทาง: (1) flag sbLifted หลุดทั้งที่แถบยังลอยอยู่ → รอบถัดไปหาแถบใน
+// เพนไม่เจอ padding เลยไม่เคยถูกตั้ง (2) ความสูงแถบจริงเปลี่ยนทีหลัง (ฟอนต์ไทยโหลดเสร็จ,
+// ข้อความในแถบเปลี่ยนตอนโหมดคนละครึ่ง, หมุนจอ) → ค่าเก่าค้าง
+// ทั้งสองทางให้ผลเดียวกันคือแถบทับ ก ข ค ง แล้ว**หายถาวร** เพราะ .takeRight เป็น
+// overflow:hidden — ผู้ใช้ scroll กลับขึ้นไปดูส่วนที่ถูกทับไม่ได้เลย
+function _syncLiftedSbPadding(page) {
+  const root = document.getElementById('page-' + page);
+  if (!root || !root.dataset.sbLifted) return;
+  const pairs = [
+    [root.querySelector('.takeLeft'), root.querySelector(':scope > .lifted-sb-left')],
+    [root.querySelector('.takeRight'), root.querySelector(':scope > .lifted-sb-right')],
+  ];
+  for (const [pane, sb] of pairs) {
+    if (!pane || !sb) continue;
+    const want = sb.getBoundingClientRect().height + 'px';
+    // เขียนเฉพาะตอนค่าเปลี่ยนจริง — กัน ResizeObserver วนเรียกตัวเองไม่รู้จบ
+    if (pane.style.paddingTop !== want) pane.style.paddingTop = want;
   }
-  root.dataset.sbLifted = '1';
+}
+
+// ความสูงแถบเปลี่ยนเมื่อไหร่ padding ตามทันทีโดยไม่ต้องรอ resize/orientationchange
+let _liftedSbRO = null;
+function _observeLiftedSb(root) {
+  if (typeof ResizeObserver === 'undefined') return;
+  if (_liftedSbRO) _liftedSbRO.disconnect();
+  const page = root.id.replace('page-', '');
+  _liftedSbRO = new ResizeObserver(() => { try { _syncLiftedSbPadding(page); } catch(e) {} });
+  root.querySelectorAll(':scope > .lifted-sb').forEach(sb => _liftedSbRO.observe(sb));
 }
 
 // คืน .stickyBar กลับที่เดิมตอนหมุนจอกลับไป mobile/portrait breakpoint —
@@ -4654,6 +4698,11 @@ function _unliftTakeStickyBars(page) {
     right.insertBefore(rightSb, right.firstChild);
     right.style.paddingTop = '';
   }
+  // ถ้ายังมีแถบลอยค้างอยู่ (คืนกลับไม่สำเร็จเพราะหาเพนปลายทางไม่เจอ) ห้ามลบ flag —
+  // flag ที่หลุดทั้งที่แถบยัง position:fixed คือต้นเหตุที่ padding ไม่ถูกตั้งแล้วแถบ
+  // ไปทับ ก ข ค ง (_liftTakeStickyBars กู้เองได้ แต่อย่าสร้าง state เพี้ยนตั้งแต่แรก)
+  if (root.querySelector(':scope > .lifted-sb')) return;
+  if (_liftedSbRO) { _liftedSbRO.disconnect(); _liftedSbRO = null; }
   delete root.dataset.sbLifted;
 }
 
@@ -14318,7 +14367,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.19';
+  const CURRENT_VERSION = 'v48.20';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -15136,6 +15185,11 @@ function initEntranceCompare(params) {
   };
   window.pdfAnnotateHide = function() {
     resetDrawState();
+    // ต้องเคลียร์หลัง resetDrawState() (ฟังก์ชันนั้นใช้ activeContainerId อยู่) — กัน
+    // pdfAnnotateInit ที่ถูกเรียกทีหลังตอน PDF โหลดเสร็จ (loadPdfOnce ที่ยิงไปแล้ว
+    // ก่อนผู้ใช้ออกจากหน้า) ผ่านเงื่อนไข containerId === activeContainerId แล้วสั่ง
+    // โชว์ปุ่มปากกาซ้ำทั้งที่ออกจากหน้าทำข้อสอบไปแล้ว
+    activeContainerId = null;
     if (toggleBtn) toggleBtn.style.display = 'none';
     Object.keys(instances).forEach(cid => instances[cid].overlays.forEach(clearOverlayFull));
     hideCursor();

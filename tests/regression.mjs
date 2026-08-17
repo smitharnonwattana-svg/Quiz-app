@@ -29,8 +29,8 @@ function check(name, cond, detail = '') {
 const browser = await chromium.launch(launchOpts);
 
 // เปิดหน้าใหม่ + seed session/ข้อมูลพื้นฐาน — ทุก section เริ่มจาก state สะอาด
-async function newSeededPage({ role = 'teacher', name = 'Admin', cache }) {
-  const ctx = await browser.newContext();
+async function newSeededPage({ role = 'teacher', name = 'Admin', cache, viewport }) {
+  const ctx = await browser.newContext(viewport ? { viewport } : {});
   const page = await ctx.newPage();
   page.on('dialog', d => d.accept());
   await page.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
@@ -580,7 +580,7 @@ currentSection = 'scratchpad';
     }),
   });
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.evaluate(() => navigate('take', { examId: 'm1' }));
+  await page.evaluate(() => navigate('take', { id: 'm1' }));
   await page.waitForTimeout(500);
   // fabricate the PDF-page/canvas DOM pdfAnnotate's buildOverlaysFor() expects —
   // real PDF.js rendering needs network access this sandbox doesn't have
@@ -1622,6 +1622,113 @@ async function stubMemeScore(page) {
   await page.waitForTimeout(300);
   const halfCardCount = await page.evaluate(() => document.querySelectorAll('#statsRows [data-review]').length);
   check('fix8 regression: legacy paired record ยังรวมเป็นการ์ดเดียวในแท็บคนละครึ่ง', halfCardCount === 1, String(halfCardCount));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section: resumeCancel (v48.20) — กด "ยกเลิก" บน popup ชุดที่ทำค้างอยู่ ต้องไม่
+// ทิ้งปุ่มลอย 📝 กระดาษทด / ✏️ ขีดเขียน PDF ค้างไว้ — เดิม navigate() ที่ถูกเรียกซ้อน
+// (initTake → confirm → navigate('exams') ซ้อนเข้าไป) ทำให้เฟรมนอกทำต่อด้วยค่า page
+// เก่าที่ค้างอยู่ แล้วสั่งโชว์ปุ่มกลับมาทับ hide ที่เฟรมในเพิ่งทำไป (ดู navigate() guard
+// `if (_currentPage !== page) return;` และ pdfAnnotateHide() ที่เคลียร์ activeContainerId)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'resumeCancel';
+{
+  const cache = baseCache({
+    exams: [mkExam('rcA', 'ชุด A', 'ภาษาไทย', { pdfUrl: 'about:blank' }), mkExam('rcB', 'ชุด B', 'ภาษาไทย', { pdfUrl: 'about:blank' })],
+    questions: { rcA: mkQ(), rcB: mkQ() },
+  });
+  const { ctx, page } = await newSeededPage({ cache });
+
+  await page.evaluate(() => navigate('take', { id: 'rcA', practice: true, takerName: 'ครู' }));
+  await page.waitForTimeout(1300); // doStart() autostart (teacher, ไม่มี mood check-in) + autosave resume 1 รอบ
+  const before = await page.evaluate(() => ({
+    active: document.querySelector('.page.active')?.id,
+    scratch: document.getElementById('scratchToggleBtn')?.classList.contains('visible') ?? null,
+  }));
+  check('resumeCancel: exam A เริ่มปกติ อยู่หน้า take + ปุ่มกระดาษทดโชว์', before.active === 'page-take' && before.scratch === true, JSON.stringify(before));
+
+  // เริ่มชุด B ทับ (คนละชุดกับ resume ที่ save ไว้ของ A) → เจอ confirm → กด "ยกเลิก"
+  const decline = await page.evaluate(() => {
+    const orig = window.confirm;
+    let msg = null;
+    window.confirm = (m) => { msg = m; return false; };
+    navigate('take', { id: 'rcB', practice: true, takerName: 'ครู' });
+    window.confirm = orig;
+    return {
+      msg,
+      active: document.querySelector('.page.active')?.id,
+      scratch: document.getElementById('scratchToggleBtn')?.classList.contains('visible') ?? null,
+      pen: document.getElementById('pdfAnnotateToggleBtn') ? getComputedStyle(document.getElementById('pdfAnnotateToggleBtn')).display : null,
+    };
+  });
+  check('resumeCancel: confirm เตือนถูกชุด (A) ก่อนเริ่ม B', !!decline.msg && decline.msg.includes('ชุด A'), JSON.stringify(decline).slice(0, 150));
+  check('resumeCancel: กดยกเลิกแล้วกลับหน้า exams', decline.active === 'page-exams', 'active=' + decline.active);
+  check('resumeCancel: ปุ่มกระดาษทด 📝 ไม่โผล่ทันทีหลังยกเลิก', decline.scratch !== true, 'scratch=' + decline.scratch);
+  check('resumeCancel: ปุ่มปากกา ✏️ ไม่โผล่ทันทีหลังยกเลิก', decline.pen !== 'block', 'pen=' + decline.pen);
+
+  await page.waitForTimeout(1500); // กัน loadPdfOnce ของ exam B ที่ยิงไปก่อน confirm resolve ทีหลังแล้วเรียก pdfAnnotateInit ซ้ำ
+  const after = await page.evaluate(() => ({
+    scratch: document.getElementById('scratchToggleBtn')?.classList.contains('visible') ?? null,
+    pen: document.getElementById('pdfAnnotateToggleBtn') ? getComputedStyle(document.getElementById('pdfAnnotateToggleBtn')).display : null,
+  }));
+  check('resumeCancel: ปุ่มไม่เด้งกลับมาทีหลัง (PDF โหลดช้า)', after.scratch !== true && after.pen !== 'block', JSON.stringify(after));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section: takeChoicesLayout (v48.20) — แถบ ก ข ค ง ฝั่งขวาต้องไม่ถูกแถบหัวข้อ
+// (position:fixed หลัง _liftTakeStickyBars) ทับด้านบน บน desktop/iPad landscape
+// เดิม padding-top ชดเชยถูกวัด "ครั้งเดียว" ตอน lift — ถ้า flag sbLifted หลุดไปทั้งที่
+// แถบยัง fixed อยู่ (เช่น หมุนจอ/resize รัวๆ) รอบถัดไปจะหาแถบในเพนไม่เจอ (ย้ายไปแล้ว)
+// เลยไม่ตั้ง padding ใหม่ → แถบทับ ก ข ค ง ถาวร (.takeRight เป็น overflow:hidden
+// scroll ขึ้นไปดูส่วนที่ถูกทับไม่ได้เลย) ดู _syncLiftedSbPadding + ResizeObserver
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'takeChoicesLayout';
+{
+  const cache = baseCache({
+    exams: [mkExam('layE1', 'ชุด Layout', 'ภาษาไทย', { pdfUrl: 'about:blank' })],
+    questions: { layE1: mkQ() },
+  });
+  const { ctx, page } = await newSeededPage({ cache, viewport: { width: 1180, height: 820 } });
+
+  const GEO = () => {
+    const sbR = document.querySelector('#page-take .lifted-sb-right');
+    const block = document.querySelector('#page-take .takeChoicesBlock');
+    const choice = document.querySelector('#page-take #takeChoices .choice');
+    return {
+      overlap: (sbR && block) ? +(sbR.getBoundingClientRect().bottom - block.getBoundingClientRect().top).toFixed(1) : null,
+      choiceH: choice ? +choice.getBoundingClientRect().height.toFixed(1) : null,
+    };
+  };
+
+  await page.evaluate(() => navigate('take', { id: 'layE1', practice: true, takerName: 'ครู' }));
+  await page.waitForTimeout(700);
+  const g1 = await page.evaluate(GEO);
+  check('takeChoicesLayout: ปกติ แถบไม่ทับ ก ข ค ง', g1.overlap === 0, JSON.stringify(g1));
+  check('takeChoicesLayout: ปกติ ปุ่มเต็มความสูง (ไม่ถูกบีบ)', g1.choiceH !== null && g1.choiceH >= 50, JSON.stringify(g1));
+
+  // จำลอง flag sbLifted หลุดทั้งที่แถบยัง position:fixed อยู่ แล้วให้ lift รอบใหม่ทำงาน
+  // (เคสที่ทำให้บั๊กเกิดจริง — เดิมรอบใหม่จะหาแถบในเพนไม่เจอแล้วไม่ตั้ง padding เลย)
+  await page.evaluate(() => {
+    const root = document.getElementById('page-take');
+    delete root.dataset.sbLifted;
+    root.querySelector('.takeRight').style.paddingTop = '';
+    root.querySelector('.takeLeft').style.paddingTop = '';
+    _liftTakeStickyBars('take');
+  });
+  await page.waitForTimeout(300);
+  const g2 = await page.evaluate(GEO);
+  check('takeChoicesLayout: flag sbLifted หลุดแล้ว lift ใหม่ยังกู้ padding ได้ถูก', g2.overlap === 0, JSON.stringify(g2));
+
+  // แถบหัวข้อสูงขึ้นทีหลัง (เช่น ข้อความยาวขึ้น) → ResizeObserver ต้องปรับ padding ตามทัน
+  await page.evaluate(() => {
+    document.querySelector('#page-take .lifted-sb-right > div')?.insertAdjacentHTML(
+      'beforeend', '<div style="font-size:20px;line-height:2.4;">บรรทัดเพิ่ม</div>');
+  });
+  await page.waitForTimeout(400);
+  const g3 = await page.evaluate(GEO);
+  check('takeChoicesLayout: แถบสูงขึ้นทีหลัง padding ตามทัน (ResizeObserver)', g3.overlap === 0, JSON.stringify(g3));
   await ctx.close();
 }
 
