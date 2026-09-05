@@ -1733,6 +1733,79 @@ currentSection = 'takeChoicesLayout';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: penViewportSync (v48.21) — ปุ่มปากกา ✏️ หายตอนหมุนจอ/สลับ Split View
+// เดิม resize handler เชื่อ MQ.matches ทันทีทุก event → บน iPad ที่รายงานขนาดจอไม่ตรงกัน
+// ชั่วขณะ (log จริง 5/9: MQ.matches=false ทั้งที่ innerWidth=1180) จะ teardown ทิ้งกลางคัน
+// = ลบลายเส้นถาวร + ซ่อนปุ่ม แล้วไม่ฟื้นเอง ต้องออก-เข้าข้อสอบใหม่
+// หมายเหตุ: ตัว desync จริงจำลองใน Chromium ไม่ได้ (MQ กับ innerWidth ตรงกันเสมอ) —
+// ที่เทสต์ได้คือ "ทางฟื้นปุ่มที่ซ่อนค้าง" + "จอแคบจริงยัง teardown เหมือนเดิม" + debounce
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'penViewportSync';
+{
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('pv1', 'เลข ชุด pv', 'คณิตศาสตร์', { questionCount: 2, pdfUrl: 'https://x/pv1.pdf' })],
+      questions: { pv1: mkQ() },
+    }),
+    viewport: { width: 1280, height: 900 },
+  });
+  await page.evaluate(() => navigate('take', { id: 'pv1' }));
+  await page.waitForTimeout(500);
+  // fabricate PDF-page DOM เหมือน section scratchpad (sandbox ไม่มี PDF.js จริง)
+  await page.evaluate(() => {
+    const container = document.getElementById('takePdfViewer');
+    container.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.id = 'takePdfViewer-page-1';
+    const canvas = document.createElement('canvas');
+    canvas.width = 600; canvas.height = 800;
+    wrapper.appendChild(canvas);
+    container.appendChild(wrapper);
+    window.pdfAnnotateInit('takePdfViewer');
+  });
+  await page.waitForTimeout(300);
+  const penDisplay = () => page.evaluate(() => {
+    const b = document.getElementById('pdfAnnotateToggleBtn');
+    return b ? getComputedStyle(b).display : null;
+  });
+  check('penViewportSync: ปุ่มปากกาโชว์ปกติตอนจอกว้าง', (await penDisplay()) === 'block', String(await penDisplay()));
+
+  // ปุ่มถูกซ่อนค้าง (จำลองผลจาก teardown รอบก่อน) → resize ตอนจอกว้าง ต้องฟื้นเอง
+  await page.evaluate(() => { document.getElementById('pdfAnnotateToggleBtn').style.display = 'none'; });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await page.waitForTimeout(600); // > debounce 300ms
+  check('penViewportSync: ปุ่มที่ซ่อนค้างฟื้นเองหลัง resize (ไม่ต้องออก-เข้าใหม่)',
+    (await penDisplay()) === 'block', String(await penDisplay()));
+
+  // ยิง resize รัวๆ ต้องไม่พังและจบที่สถานะถูกต้อง (debounce รวบเป็นรอบเดียว)
+  await page.evaluate(() => { for (let i = 0; i < 12; i++) window.dispatchEvent(new Event('resize')); });
+  await page.waitForTimeout(600);
+  check('penViewportSync: ยิง resize รัวๆ แล้วสถานะยังถูกต้อง', (await penDisplay()) === 'block', String(await penDisplay()));
+
+  // จอแคบจริง (< 901px) ต้องยัง teardown + ซ่อนปุ่มเหมือนเดิม — พฤติกรรมเดิมห้ามเสีย
+  await page.setViewportSize({ width: 820, height: 1100 });
+  await page.waitForTimeout(700);
+  check('penViewportSync: จอแคบจริงยังซ่อนปุ่ม/teardown ตามเดิม', (await penDisplay()) === 'none', String(await penDisplay()));
+
+  // กลับมากว้าง → ต้องสร้างใหม่ + โชว์ปุ่มเอง
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => {
+    const container = document.getElementById('takePdfViewer');
+    if (!container.querySelector('[id^="takePdfViewer-page-"]')) {
+      const wrapper = document.createElement('div');
+      wrapper.id = 'takePdfViewer-page-1';
+      const canvas = document.createElement('canvas');
+      canvas.width = 600; canvas.height = 800;
+      wrapper.appendChild(canvas);
+      container.appendChild(wrapper);
+    }
+  });
+  await page.waitForTimeout(700);
+  check('penViewportSync: จอกลับมากว้างแล้วปุ่มกลับมาเอง', (await penDisplay()) === 'block', String(await penDisplay()));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

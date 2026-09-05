@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.20 -->
+  <!-- APP_VERSION: v48.21 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1080,7 +1080,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.20</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.21</div>
     </div>
   </div>
 </div>
@@ -14367,7 +14367,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.20';
+  const CURRENT_VERSION = 'v48.21';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -15195,19 +15195,46 @@ function initEntranceCompare(params) {
     hideCursor();
   };
 
-  window.addEventListener('resize', () => {
+  // v48.21: iPad รายงานขนาดจอไม่ตรงกันชั่วขณะตอนหมุนจอ/สลับ Split View/กลับจาก background —
+  // จับได้จาก log จริง (5/9 17:49:31): MQ.matches = false ทั้งที่ window.innerWidth = 1180
+  // ของเดิมเชื่อ MQ.matches ทันทีทุก resize event เลย teardown ทิ้งกลางคัน = ลบลายเส้นที่เขียนไว้
+  // ถาวร + ซ่อนปุ่มปากกา แล้วไม่มีทางฟื้นเอง (สาขาจอกว้างสร้างใหม่เฉพาะตอน !instances และต้องรอ
+  // resize รอบใหม่มายิง) ผู้ใช้ต้องออก-เข้าข้อสอบใหม่เท่านั้นถึงได้ปากกากลับมา
+  let _paSyncTimer = null;
+  function _paSyncViewport() {
     if (!activeContainerId) return;
-    if (MQ.matches) {
-      if (!instances[activeContainerId]) pdfAnnotateInit(activeContainerId);
+    // teardown = ลบงานที่เด็กเขียนไว้ จึงต้องให้ "ทั้งสองค่า" เห็นตรงกันว่าแคบจริงก่อนถึงจะยอมทำ
+    // ถ้าสองค่าขัดกันเมื่อไหร่ = กำลังอยู่กลาง transition → ถือว่ายังกว้างไว้ก่อน (ฝั่งที่ปลอดภัยกว่า)
+    const _wide = MQ.matches || window.innerWidth >= 901;
+    if (_wide) {
+      if (!instances[activeContainerId]) {
+        pdfAnnotateInit(activeContainerId);
+      } else if (toggleBtn && toggleBtn.style.display === 'none') {
+        // ฟื้นปุ่มที่ถูกซ่อนค้างไว้ (เช่นโดน teardown รอบก่อนซ่อนแล้วจอกลับมากว้าง) —
+        // ของเดิมไม่มีทางนี้ ปุ่มเลยหายยาวจนกว่าจะออก-เข้าหน้าใหม่
+        toggleBtn.style.display = 'block';
+        updateToggleBtnClass();
+      }
     } else if (instances[activeContainerId]) {
-      // v48.18 diag ⭐ ผู้ต้องสงสัย #3: จอแคบกว่า 901px (Split View/Stage Manager/หมุนจอ)
-      // → ลบลายเส้นถาวร + ซ่อนปุ่มปากกา
-      if(typeof _takeDiag==='function') _takeDiag('pdfAnnotate.TEARDOWN', {cid:activeContainerId, mq:false});
+      // จอแคบกว่า 901px จริง (ยืนยันตรงกันทั้ง MQ และ innerWidth) → ลบลายเส้น + ซ่อนปุ่มตามเดิม
+      if(typeof _takeDiag==='function') _takeDiag('pdfAnnotate.TEARDOWN', {cid:activeContainerId, mq:MQ.matches, w:window.innerWidth});
       resetDrawState();
       instances[activeContainerId].overlays.forEach(clearOverlayFull);
       teardown(activeContainerId);
       if (toggleBtn) toggleBtn.style.display = 'none';
     }
+  }
+  // หน่วงก่อนตัดสินใจ — ค่าที่อ่านได้กลางจังหวะจอกำลังเปลี่ยนเชื่อไม่ได้ รอให้นิ่งก่อน
+  function _paScheduleSync(delay) {
+    clearTimeout(_paSyncTimer);
+    _paSyncTimer = setTimeout(() => { try { _paSyncViewport(); } catch(e) {} }, delay);
+  }
+  window.addEventListener('resize', () => _paScheduleSync(300));
+  // iPad มักเปลี่ยนขนาดจอ "ตอนอยู่ background" แล้วไม่ยิง resize ที่เชื่อถือได้ตอนกลับมา
+  // (เจอในเคส 3/9 16:46 และ 5/9 17:35) — sync ซ้ำตอนหมุนจอ/กลับเข้าแอปด้วย
+  window.addEventListener('orientationchange', () => _paScheduleSync(400));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _paScheduleSync(400);
   });
 })();
 </script>
