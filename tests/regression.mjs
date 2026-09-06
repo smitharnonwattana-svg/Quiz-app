@@ -1910,6 +1910,32 @@ currentSection = 'backfillAttempt';
   check('backfillAttempt: หน้ารีวิวแสดงป้าย "(บันทึกย้อนหลัง)"', reviewTitle.includes('บันทึกย้อนหลัง'), reviewTitle);
 
   await ctx.close();
+
+  // v48.24: ข้อฟรี (isFree:true) ต้องโชว์ป้าย "★ ข้อฟรี" ไม่ใช่ตัวอักษรเฉลยดิบ (q.correct)
+  // ที่อาจติดค้างอยู่ — ทดสอบด้วย exam แยก (bf2) ไม่ปนกับเคสข้างบน
+  const { ctx: ctx2, page: page2 } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('bf2', 'ชุดทดสอบข้อฟรี', 'คณิตศาสตร์', { questionCount: 2 })],
+      questions: { bf2: [
+        { id: 'fq1', no: 1, number: 1, correct: 'A', isFree: true, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+        { id: 'fq2', no: 2, number: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      ] },
+      members: [{ pin: '311257', name: 'เด็กย้อนหลัง' }],
+    }),
+  });
+  await page2.evaluate(() => navigate('admin_exams', {}));
+  await page2.waitForTimeout(400);
+  await page2.evaluate(() => document.getElementById('offlineBanner')?.remove());
+  await page2.evaluate(() => document.querySelector('[data-backfill="bf2"]').click());
+  await page2.waitForTimeout(300);
+  const hints = await page2.evaluate(() => [...document.querySelectorAll('#backfillRows > div')].map(r => r.children[1].textContent));
+  check('backfillAttempt: ข้อฟรีโชว์ป้าย "★ ข้อฟรี" ไม่ใช่ตัวอักษรเฉลยดิบ', hints[0]?.includes('ข้อฟรี'), hints[0]);
+  check('backfillAttempt: ข้อปกติยังโชว์ป้ายเฉลยตามเดิม', hints[1]?.includes('ข') && !hints[1]?.includes('ฟรี'), hints[1]);
+  // ไม่ตอบข้อฟรีเลย แต่ตอบข้อปกติผิด (เลือก A แทนเฉลยจริง B) → คาด 1/2 (ข้อฟรีได้เสมอ)
+  await page2.evaluate(() => document.querySelector('.correctBtns[data-qid="fq2"] .correctBtn[data-val="A"]').click());
+  const freeLiveScore = await page2.evaluate(() => document.getElementById('backfillScoreLive').textContent);
+  check('backfillAttempt: ข้อฟรีได้คะแนนแม้ไม่ตอบเลย (คาด 1/2)', freeLiveScore.includes('1/2'), freeLiveScore);
+  await ctx2.close();
 }
 
 // ─────────────────────────────────────────────────────────────────
