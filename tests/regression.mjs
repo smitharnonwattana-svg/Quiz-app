@@ -1870,6 +1870,20 @@ currentSection = 'backfillAttempt';
     document.getElementById('backfillTaker').value = 'เด็กย้อนหลัง';
     document.getElementById('backfillDate').value = d;
   }, pastDate);
+
+  // v48.23: confirm() ยืนยันคะแนนก่อนบันทึกจริง — กด "ยกเลิก" ต้องไม่บันทึก, modal ยังเปิด
+  page.removeAllListeners('dialog'); // newSeededPage ตั้ง auto-accept ไว้ default — ปิดก่อนคุมเองในเคสนี้
+  let cancelDialogMsg = '';
+  page.once('dialog', async d => { cancelDialogMsg = d.message(); await d.dismiss(); });
+  await page.click('#backfillModalSave');
+  await page.waitForTimeout(300);
+  check('backfillAttempt: confirm dialog ก่อนบันทึกแสดงคะแนนถูกต้อง (2/3)', cancelDialogMsg.includes('2/3'), cancelDialogMsg);
+  check('backfillAttempt: กด "ยกเลิก" ที่ confirm แล้วไม่สร้าง attempt',
+    !(await page.evaluate(() => Store.load().attempts.find(a => a.examId === 'bf1'))));
+  check('backfillAttempt: กด "ยกเลิก" ที่ confirm แล้ว modal ยังเปิดอยู่ (คำตอบไม่หาย)',
+    await page.evaluate(() => document.getElementById('backfillModal').classList.contains('show')));
+
+  page.once('dialog', d => d.accept());
   await page.click('#backfillModalSave');
   await page.waitForTimeout(300);
 

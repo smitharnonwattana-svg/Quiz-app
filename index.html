@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.22 -->
+  <!-- APP_VERSION: v48.23 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1090,7 +1090,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.22</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.23</div>
     </div>
   </div>
 </div>
@@ -9255,6 +9255,10 @@ function saveBackfillAttempt() {
     if (isWeighted) pq.points = pts;
     return pq;
   });
+  const scoreDisplay = isWeighted ? fmtPts(score) : score;
+  const totalDisplay = isWeighted ? fmtPts(total) : total;
+  if (!confirm(`ยืนยันบันทึกผลย้อนหลัง — ${takerName}\n\nคะแนน: ${scoreDisplay}/${totalDisplay}\n\nยืนยันบันทึกใช่ไหม?`)) return;
+
   const answers = {};
   perQuestion.forEach(pq => { if (pq.chosen != null) answers[pq.qid] = pq.chosen; });
 
@@ -14576,7 +14580,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.22';
+  const CURRENT_VERSION = 'v48.23';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
