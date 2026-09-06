@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.31p -->
+  <!-- APP_VERSION: v48.32p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1095,7 +1095,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.31p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.32p</div>
     </div>
   </div>
 </div>
@@ -1660,6 +1660,7 @@
             <th style="width:150px;">อัพโหลด</th>
             <th style="width:60px;">PDF</th>
             <th style="width:110px;">แก้ไข</th>
+            <th style="width:110px;">ย้อนหลัง</th>
             <th style="width:70px;">ลบ</th>
           </tr>
         </thead>
@@ -1680,6 +1681,32 @@
       <div class="mrow">
         <button id="adminDeleteModalCancel" class="btn-ghost">ยกเลิก</button>
         <button id="adminDeleteModalOk" class="btn-danger">🗑️ ลบ</button>
+      </div>
+    </div>
+  </div>
+  <!-- v48.32p: บันทึกผลข้อสอบที่เคยทำมาก่อน (backfill) — สำหรับข้อสอบที่ลูกทำบนกระดาษมาก่อน
+       จะถูกแปลงเป็น PDF เข้าระบบ ไม่มีสถิติรอบแรกบันทึกไว้เลย ให้กรอกคำตอบย้อนหลังได้ครบทุกข้อ
+       เพื่อให้เข้าจุดอ่อน/กราฟพัฒนาการเหมือนทำผ่านแอปจริง แต่ไม่นับ gamification/streak
+       (ตั้งใจ ไม่ใช่การทำข้อสอบสดจริง) -->
+  <div id="backfillModal" class="modal-overlay" role="dialog">
+    <div class="modal" style="width:min(560px,96vw);max-height:88vh;display:flex;flex-direction:column;">
+      <h3 id="backfillModalTitle">📝 บันทึกผลย้อนหลัง</h3>
+      <p id="backfillModalSub" class="muted" style="margin-top:-8px;">กรอกคำตอบที่เคยทำไว้ก่อนหน้านี้ — ไม่นับแต้ม/streak เก็บไว้เป็นสถิติ/จุดอ่อนเฉยๆ</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="font-size:12px;font-weight:700;color:#6b7280;">ผู้ทำ</div>
+          <select id="backfillTaker" class="titleInput" style="min-width:140px;width:auto;"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="font-size:12px;font-weight:700;color:#6b7280;">วันที่ทำจริง</div>
+          <input id="backfillDate" class="titleInput" type="date" style="min-width:150px;width:auto;" />
+        </div>
+      </div>
+      <div id="backfillScoreLive" style="font-weight:900;font-size:15px;margin-bottom:8px;">คะแนนที่จะได้: -/-</div>
+      <div id="backfillRows" style="overflow-y:auto;flex:1;min-height:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px 2px;display:grid;gap:6px;"></div>
+      <div class="mrow" style="margin-top:12px;">
+        <button id="backfillModalCancel" class="btn-ghost">ยกเลิก</button>
+        <button id="backfillModalSave" class="btn btnPrimary">💾 บันทึกผล</button>
       </div>
     </div>
   </div>
@@ -6278,7 +6305,9 @@ function initReview(attemptId){
   // เปลี่ยนเป็นจำนวนข้อของ attempt นั้นๆ เอง (perQuestion.length): ครึ่งแรกมีข้อครบทั้งชุด
   // (นับ 2/4), ครึ่งหลังมีแค่ข้อที่เหลือจริง (นับ 2/2) ตัวเลขจึงต่างกันตามจริง
   const _modeQTotal=(Array.isArray(att.perQuestion)&&att.perQuestion.length)||qs.length;
-  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':'';
+  // v48.32p: attempt ที่กรอกย้อนหลัง (ไม่ใช่ทำสดผ่านแอปจริง) — usedSeconds/mood จะว่างเสมอ
+  // ต้องบอกไว้ชัดๆ กันดูเหมือนบั๊ก
+  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':att.manualEntry?' 🕰️ (บันทึกย้อนหลัง)':'';
   document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
@@ -8995,6 +9024,7 @@ function initAdminExams(){
             })()}
             <div style="display:flex;gap:8px;">
               <button class="btn" data-edit="${e.id}" style="flex:1;text-align:center;">เปิด Editor</button>
+              <button class="btn" data-backfill="${e.id}" style="flex:1;text-align:center;" title="กรอกคำตอบข้อสอบที่เคยทำมาก่อน">📝 ย้อนหลัง</button>
               <button class="btn" data-del="${e.id}" style="border-color:#ef4444;color:#b91c1c;padding:8px 16px;">ลบ</button>
             </div>
           </div>
@@ -9017,6 +9047,7 @@ function initAdminExams(){
         <td class="muted">${fmtDate(e.uploadedAt)}</td>
         <td style="text-align:center;">${hasPdf?`<button class="btn" style="padding:4px 10px;font-size:13px;" data-copy="${esc(e.pdfUrl)}" title="${esc(e.pdfUrl)}">📋</button>`:'<span class="muted">-</span>'}</td>
         <td><button class="btn" data-edit="${e.id}">เปิด Editor</button></td>
+        <td><button class="btn" data-backfill="${e.id}" title="กรอกคำตอบข้อสอบที่เคยทำมาก่อน">📝 ย้อนหลัง</button></td>
         <td><button class="btn" style="border-color:#ef4444;color:#b91c1c;" data-del="${e.id}">ลบ</button></td>
       `;
       tb.appendChild(tr);
@@ -9038,6 +9069,12 @@ function initAdminExams(){
       sel.addEventListener('change',()=>{
         const id=sel.getAttribute('data-folder');const exam=s.exams.find(x=>x.id===id);if(!exam) return;
         exam.folderId=sel.value||null;Store.save(s);toast('ย้ายโฟลเดอร์แล้ว');renderAdmin();
+      });
+    });
+    tb.querySelectorAll('[data-backfill]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const id=btn.getAttribute('data-backfill');
+        openBackfillModal(id);
       });
     });
     tb.querySelectorAll('[data-del]').forEach(btn=>{
@@ -9089,6 +9126,144 @@ function initAdminExams(){
 
   renderAdmin();
 }
+
+// ===================== BACKFILL ATTEMPT (v48.32p) =====================
+// บันทึกผลข้อสอบที่เคยทำมาก่อน (บนกระดาษ ก่อนถูกแปลงเป็น PDF เข้าระบบ) — กรอกคำตอบรายข้อ
+// ครบเหมือนทำข้อสอบจริง แล้วสร้าง attempt ปกติเข้า Store + WeaknessTracker ตรงๆ เพื่อให้เข้า
+// สถิติ/จุดอ่อน/กราฟพัฒนาการได้เหมือนทำผ่านแอปจริง — แต่ตั้งใจไม่เรียก lineNotify/gamification/
+// streak/MemeScore เพราะไม่ใช่การทำข้อสอบสดจริง (ตกลงกับผู้ใช้ไว้แล้ว)
+let _backfillExamId = null;
+function openBackfillModal(examId) {
+  const s = Store.load();
+  const exam = (s.exams || []).find(e => e.id === examId);
+  if (!exam) { toast('ไม่พบข้อสอบนี้'); return; }
+  _backfillExamId = examId;
+  const qs = (s.questions[examId] || []).map(q => ({ ...q, no: q.no ?? q.number ?? 0 })).sort((a, b) => a.no - b.no);
+  if (!qs.length) { toast('ชุดนี้ยังไม่มีข้อคำถาม — เพิ่มข้อก่อนที่ Editor'); return; }
+
+  document.getElementById('backfillModalTitle').textContent = `📝 บันทึกผลย้อนหลัง — ${exam.title}`;
+
+  const takerSel = document.getElementById('backfillTaker');
+  const members = (Auth.getMembers ? Auth.getMembers() : []);
+  const lastTaker = localStorage.getItem('nanont:lastTakerName') || '';
+  takerSel.innerHTML = members.map(m => `<option value="${esc(m.name)}" ${m.name === lastTaker ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+
+  const dateInput = document.getElementById('backfillDate');
+  dateInput.value = new Date().toISOString().slice(0, 10);
+
+  const labelMap = { A: 'ก', B: 'ข', C: 'ค', D: 'ง' };
+  const isFillNum = exam.examType === 'fillblank-num';
+  const rowsEl = document.getElementById('backfillRows');
+  rowsEl.innerHTML = qs.map(q => {
+    const correctHint = isFillNum ? esc(q.correct || '-') : (labelMap[q.correct] || '-');
+    const inputHtml = isFillNum
+      ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" data-qid="${esc(q.id)}" placeholder="ตอบ" style="width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;" />`
+      : `<div class="correctBtns" data-qid="${esc(q.id)}">${['A', 'B', 'C', 'D'].map(v => `<button type="button" class="correctBtn" data-val="${v}">${labelMap[v]}</button>`).join('')}</div>`;
+    return `<div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-weight:900;width:34px;flex-shrink:0;">${q.no}.</span>
+      <span class="muted" style="font-size:11px;width:70px;flex-shrink:0;">เฉลย: ${correctHint}</span>
+      ${inputHtml}
+    </div>`;
+  }).join('');
+
+  const updateScore = () => {
+    let score = 0, total = 0;
+    qs.forEach(q => {
+      const pts = getQPoints(q);
+      total += exam.weighted ? pts : 1;
+      const chosen = isFillNum
+        ? rowsEl.querySelector(`input[data-qid="${CSS.escape(q.id)}"]`)?.value || ''
+        : rowsEl.querySelector(`.correctBtns[data-qid="${CSS.escape(q.id)}"] .correctBtn.selected`)?.getAttribute('data-val') || '';
+      if (q.isFree || (chosen && isAnswerCorrect(chosen, q.correct, exam.examType || 'mc'))) score += exam.weighted ? pts : 1;
+    });
+    document.getElementById('backfillScoreLive').textContent =
+      `คะแนนที่จะได้: ${exam.weighted ? fmtPts(score) : score}/${exam.weighted ? fmtPts(total) : total}`;
+  };
+
+  rowsEl.querySelectorAll('.correctBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.correctBtns').querySelectorAll('.correctBtn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      updateScore();
+    });
+  });
+  rowsEl.querySelectorAll('input[data-qid]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const v = inp.value.replace(/[^\d]/g, '').slice(0, 3);
+      if (v !== inp.value) inp.value = v;
+      updateScore();
+    });
+  });
+  updateScore();
+
+  document.getElementById('backfillModal').classList.add('show');
+}
+
+function closeBackfillModal() {
+  document.getElementById('backfillModal').classList.remove('show');
+  _backfillExamId = null;
+}
+
+function saveBackfillAttempt() {
+  const examId = _backfillExamId;
+  const s = Store.load();
+  const exam = (s.exams || []).find(e => e.id === examId);
+  if (!exam) { toast('ไม่พบข้อสอบนี้'); closeBackfillModal(); return; }
+  const takerName = document.getElementById('backfillTaker').value;
+  const dateVal = document.getElementById('backfillDate').value;
+  if (!takerName) { toast('เลือกผู้ทำก่อน'); return; }
+  if (!dateVal) { toast('ระบุวันที่ทำก่อน'); return; }
+  // เที่ยงวันตามเวลาท้องถิ่น — กันปัญหา timezone ทำให้วันที่เลื่อนไปอีกวันตอนแปลงเป็น ISO
+  const submittedAt = new Date(dateVal + 'T12:00:00').toISOString();
+
+  const isFillNum = exam.examType === 'fillblank-num';
+  const qs = (s.questions[examId] || []).map(q => ({ ...q, no: q.no ?? q.number ?? 0 })).sort((a, b) => a.no - b.no);
+  const rowsEl = document.getElementById('backfillRows');
+  const isWeighted = !!exam.weighted;
+  let score = 0, total = 0;
+  const perQuestion = qs.map(q => {
+    const chosen = isFillNum
+      ? rowsEl.querySelector(`input[data-qid="${CSS.escape(q.id)}"]`)?.value || null
+      : rowsEl.querySelector(`.correctBtns[data-qid="${CSS.escape(q.id)}"] .correctBtn.selected`)?.getAttribute('data-val') || null;
+    const correct = q.correct || null;
+    const isFree = !!q.isFree;
+    const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, exam.examType || 'mc') : false);
+    const pts = getQPoints(q);
+    total += isWeighted ? pts : 1;
+    if (isCorrect) score += isWeighted ? pts : 1;
+    const finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
+    const finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
+    const pq = { qid: q.id, no: q.no, page: q.page, tags: finalTags, subTags: finalSubTags, topic: finalTags[0] || '',
+      chosen, correct, isCorrect, isFree, unsure: false, visited: true, elapsedMs: 0, changes: 0 };
+    if (isWeighted) pq.points = pts;
+    return pq;
+  });
+  const answers = {};
+  perQuestion.forEach(pq => { if (pq.chosen != null) answers[pq.qid] = pq.chosen; });
+
+  const attempt = {
+    id: 'att_' + Math.random().toString(16).slice(2),
+    examId: exam.id, examTitle: exam.title, examSubject: exam.subject || 'ไม่ระบุ', examType: exam.examType || 'mc',
+    weighted: isWeighted, takerName, startedAt: submittedAt, submittedAt, usedSeconds: 0,
+    score: isWeighted ? Math.round(score * 100) / 100 : score, total: isWeighted ? Math.round(total * 100) / 100 : total,
+    answers, perQuestion, practiceMode: false, halfMode: false, halfQuota: 0, visitOrder: [],
+    difficulty: exam.difficulty || 'develop', mood: null, feeling: null, prediction: null,
+    manualEntry: true, // ทำมาก่อนแล้ว บันทึกย้อนหลัง — ไม่ใช่การทำข้อสอบสดจริง (ไม่นับ gamification/streak)
+  };
+
+  s.attempts = s.attempts || [];
+  s.attempts.unshift(attempt);
+  const ok = Store.save(s);
+  if (!ok) { toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); return; }
+  // จุดอ่อนต้องอัพเดตด้วย เพื่อให้ "แก้จุดอ่อน" เห็นข้อที่เคยตอบผิดในรอบนี้
+  try { WeaknessTracker.updateWeaknessAfterSubmit(attempt); } catch (e) {}
+  localStorage.setItem('nanont:lastTakerName', takerName);
+  closeBackfillModal();
+  toast(`บันทึกผลย้อนหลังแล้ว — ${isWeighted ? fmtPts(attempt.score) : attempt.score}/${isWeighted ? fmtPts(attempt.total) : attempt.total}`);
+}
+
+document.getElementById('backfillModalCancel').addEventListener('click', closeBackfillModal);
+document.getElementById('backfillModalSave').addEventListener('click', saveBackfillAttempt);
 
 // ===================== ADMIN MEMBERS PAGE =====================
 // Gamification G3: Study Road Admin UI
@@ -14404,7 +14579,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.31p';
+  const CURRENT_VERSION = 'v48.32p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
