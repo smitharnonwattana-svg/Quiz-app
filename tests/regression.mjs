@@ -1806,6 +1806,99 @@ currentSection = 'penViewportSync';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: backfillAttempt (v48.22) — "บันทึกผลย้อนหลัง" กรอกคำตอบข้อสอบที่เคยทำ
+// มาก่อนบนกระดาษ (ก่อนถูกแปลงเป็น PDF เข้าระบบ) ให้เข้าสถิติ/จุดอ่อนได้เหมือนทำจริง
+// แต่ต้องไม่นับ gamification/streak/lineNotify (ตกลงกับผู้ใช้ไว้ตั้งแต่ต้น)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'backfillAttempt';
+{
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('bf1', 'ชุดทดสอบย้อนหลัง', 'คณิตศาสตร์', { questionCount: 3 })],
+      questions: { bf1: [
+        { id: 'q1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+        { id: 'q2', no: 2, number: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+        { id: 'q3', no: 3, number: 3, correct: 'C', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      ] },
+      members: [{ pin: '311257', name: 'เด็กย้อนหลัง' }],
+    }),
+  });
+  await page.evaluate(() => {
+    window._spyLineNotify = 0;
+    const origLine = window.lineNotify;
+    window.lineNotify = function (...args) { window._spyLineNotify++; return origLine?.apply(this, args); };
+  });
+  await page.evaluate(() => navigate('admin_exams', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+
+  check('backfillAttempt: ปุ่ม "📝 ย้อนหลัง" โผล่ในแถวข้อสอบ',
+    await page.evaluate(() => !!document.querySelector('[data-backfill="bf1"]')));
+
+  // ตารางไม่ล้นแนวนอน (v48.22 table-layout:fixed แก้ header/ปุ่มไม่ตรงกัน)
+  const tableFit = await page.evaluate(() => {
+    const wrap = document.querySelector('#page-admin_exams .tableWrap');
+    return wrap ? { scrollWidth: wrap.scrollWidth, clientWidth: wrap.clientWidth } : null;
+  });
+  check('backfillAttempt: ตาราง admin_exams ไม่ล้นแนวนอน', tableFit && tableFit.scrollWidth <= tableFit.clientWidth + 1, JSON.stringify(tableFit));
+
+  await page.evaluate(() => document.querySelector('[data-backfill="bf1"]').click());
+  await page.waitForTimeout(300);
+  check('backfillAttempt: เปิด modal สำเร็จ พร้อมแถวคำถามครบ 3 ข้อ',
+    (await page.evaluate(() => document.getElementById('backfillModal').classList.contains('show'))) &&
+    (await page.evaluate(() => document.querySelectorAll('#backfillRows .correctBtns').length)) === 3);
+
+  // เลือกคำตอบ q1=A(ถูก) แล้วกดซ้ำต้องยกเลิก (deselect)
+  await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').click());
+  const selAfterFirst = await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').classList.contains('selected'));
+  await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').click());
+  const selAfterSecond = await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').classList.contains('selected'));
+  check('backfillAttempt: กดปุ่มตอบซ้ำ = ยกเลิกคำตอบ (deselect)', selAfterFirst === true && selAfterSecond === false);
+
+  // ตอบจริง: q1=A(ถูก), q2=A(ผิด, เฉลยจริง B, มาร์คไม่แน่ใจ), q3=C(ถูก), q3 ไม่ตอบไม่ได้ตั้งใจ
+  await page.evaluate(() => {
+    document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').click();
+    document.querySelector('.correctBtns[data-qid="q2"] .correctBtn[data-val="A"]').click();
+    document.querySelector('.correctBtns[data-qid="q3"] .correctBtn[data-val="C"]').click();
+    document.querySelector('[data-unsure="q2"]').click();
+  });
+  const liveScore = await page.evaluate(() => document.getElementById('backfillScoreLive').textContent);
+  check('backfillAttempt: คะแนนพรีวิวสดถูกต้อง (คาด 2/3)', liveScore.includes('2/3'), liveScore);
+
+  const pastDate = new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10);
+  await page.evaluate((d) => {
+    document.getElementById('backfillTaker').value = 'เด็กย้อนหลัง';
+    document.getElementById('backfillDate').value = d;
+  }, pastDate);
+  await page.click('#backfillModalSave');
+  await page.waitForTimeout(300);
+
+  const att = await page.evaluate(() => Store.load().attempts.find(a => a.examId === 'bf1'));
+  check('backfillAttempt: attempt สร้างถูกต้อง (score 2/3, manualEntry:true, ไม่ใช่ practice/half)',
+    att && att.score === 2 && att.total === 3 && att.manualEntry === true && att.practiceMode === false && att.halfMode === false,
+    JSON.stringify({ score: att?.score, total: att?.total, manualEntry: att?.manualEntry }));
+  check('backfillAttempt: submittedAt ตรงกับวันที่ย้อนหลังที่เลือก', att && att.submittedAt.slice(0, 10) === pastDate, JSON.stringify({ got: att?.submittedAt, want: pastDate }));
+  check('backfillAttempt: perQuestion เก็บ unsure ต่อข้อถูกต้อง (q2 มาร์ค, q1/q3 ไม่มาร์ค)',
+    att && att.perQuestion.find(p => p.qid === 'q2')?.unsure === true &&
+    att.perQuestion.find(p => p.qid === 'q1')?.unsure === false &&
+    att.perQuestion.find(p => p.qid === 'q3')?.unsure === false,
+    JSON.stringify(att?.perQuestion?.map(p => ({ qid: p.qid, unsure: p.unsure }))));
+
+  const spyLine = await page.evaluate(() => window._spyLineNotify);
+  check('backfillAttempt: ไม่เรียก lineNotify เลย (ไม่นับ gamification)', spyLine === 0, 'calls=' + spyLine);
+
+  const weakCount = await page.evaluate(() => WeaknessTracker.countWeaknessesByExam('เด็กย้อนหลัง', 'bf1'));
+  check('backfillAttempt: WeaknessTracker บันทึกข้อที่ตอบผิด (คาด 1 ข้อ: q2)', weakCount === 1, 'weakCount=' + weakCount);
+
+  await page.evaluate((id) => navigate('review', { attemptId: id }), att.id);
+  await page.waitForTimeout(300);
+  const reviewTitle = await page.evaluate(() => document.getElementById('reviewTitle')?.textContent || '');
+  check('backfillAttempt: หน้ารีวิวแสดงป้าย "(บันทึกย้อนหลัง)"', reviewTitle.includes('บันทึกย้อนหลัง'), reviewTitle);
+
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
