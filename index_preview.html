@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.33p -->
+  <!-- APP_VERSION: v48.34p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -53,6 +53,16 @@
     .tableWrap{overflow:auto;border:1px solid var(--border);border-radius:14px;margin-top:16px;}
     table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
     th,td{padding:10px 12px;border-top:1px solid var(--border);vertical-align:top;text-align:left;}
+    /* v48.33p: ตาราง admin_exams ใช้ table-layout:auto (default) ซึ่งแอบบีบคอลัมน์ที่
+       ประกาศ width:Npx ไว้ให้แคบกว่าที่ตั้งจริงเพื่อยัดให้พอดี width:100% (พิสูจน์แล้วด้วย
+       การวัดตำแหน่งจริง) ทำให้ปุ่ม "เปิด Editor"/"📝 ย้อนหลัง" ยาวเกินจนตัดขึ้นบรรทัดใหม่
+       แนวคอลัมน์กับหัวตารางเลยเพี้ยน — บังคับ fixed layout เฉพาะตารางนี้ (เหมือน
+       .stats-table ที่ใช้ fixed อยู่แล้ว) ให้ทุกแถวเคารพ width ที่ประกาศไว้เป๊ะเสมอ */
+    #page-admin_exams .tableWrap table{table-layout:fixed;}
+    #page-admin_exams .tableWrap table th:first-child,
+    #page-admin_exams .tableWrap table td:first-child{width:55px;}
+    #page-admin_exams .tableWrap table [data-edit],
+    #page-admin_exams .tableWrap table [data-backfill]{white-space:nowrap;padding-left:6px;padding-right:6px;font-size:12px;}
     thead th{background:var(--bg);border-top:none;position:sticky;top:0;z-index:1;}
     .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);}
     .badge.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534;}
@@ -1095,7 +1105,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.33p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.34p</div>
     </div>
   </div>
 </div>
@@ -1652,12 +1662,12 @@
         <thead>
           <tr>
             <th>ชื่อชุด</th>
-            <th style="width:160px;">วิชา</th>
-            <th style="width:150px;">โฟลเดอร์</th>
-            <th style="width:120px;">จัดลำดับ</th>
-            <th style="width:160px;">สถานะ</th>
+            <th style="width:145px;">วิชา</th>
+            <th style="width:135px;">โฟลเดอร์</th>
+            <th style="width:110px;">จัดลำดับ</th>
+            <th style="width:148px;">สถานะ</th>
             <th style="width:70px;">ข้อ</th>
-            <th style="width:150px;">อัพโหลด</th>
+            <th style="width:135px;">อัพโหลด</th>
             <th style="width:60px;">PDF</th>
             <th style="width:110px;">แก้ไข</th>
             <th style="width:110px;">ย้อนหลัง</th>
@@ -14603,7 +14613,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.33p';
+  const CURRENT_VERSION = 'v48.34p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
