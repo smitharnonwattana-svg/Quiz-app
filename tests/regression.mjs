@@ -1939,6 +1939,145 @@ currentSection = 'backfillAttempt';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: fillblankNumDigits (v48.25) — เลือกจำนวนหลักคำตอบ (3/4) สำหรับ
+// ข้อสอบประเภทกรอกตัวเลข (fillblank-num) — เดิม hardcode ไว้ 3 หลักทุกจุด
+// isAnswerCorrect ไม่สนใจจำนวนหลักเลย (parseInt เทียบเป็นตัวเลข) จึงเป็นแค่
+// ข้อจำกัดฝั่ง UI (maxlength/pattern/slice/keypad) ที่ต้องอิง exam.numDigits||3
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'fillblankNumDigits';
+{
+  // ── สร้างชุด 4 หลักผ่านฟอร์ม admin_new จริง (ทดสอบ toggle visibility + creation) ──
+  const { ctx, page } = await newSeededPage({ cache: baseCache({ members: [{ pin: '311257', name: 'เด็กทดสอบ' }] }) });
+  await page.evaluate(() => navigate('admin_new'));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+
+  check('fillblankNumDigits: ปุ่มจำนวนหลักซ่อนอยู่ตอนเลือก mc (default)',
+    (await page.evaluate(() => document.getElementById('newNumDigitsWrap').style.display)) === 'none');
+
+  await page.evaluate(() => document.querySelector('#newExamTypeBtns .examTypeBtn[data-val="fillblank-num"]').click());
+  check('fillblankNumDigits: ปุ่มจำนวนหลักโผล่ทันทีที่เลือก "กรอกตัวเลข", ปุ่ม "3 หลัก" active โดย default',
+    (await page.evaluate(() => document.getElementById('newNumDigitsWrap').style.display)) === 'flex' &&
+    (await page.evaluate(() => document.querySelector('#newNumDigitsBtns .numDigitsBtn.active')?.dataset.val)) === '3');
+
+  await page.evaluate(() => document.querySelector('#newExamTypeBtns .examTypeBtn[data-val="mc"]').click());
+  check('fillblankNumDigits: สลับกลับ mc แล้วปุ่มจำนวนหลักซ่อนอีกครั้ง',
+    (await page.evaluate(() => document.getElementById('newNumDigitsWrap').style.display)) === 'none');
+
+  await page.evaluate(() => document.querySelector('#newExamTypeBtns .examTypeBtn[data-val="fillblank-num"]').click());
+  await page.evaluate(() => document.querySelector('#newNumDigitsBtns .numDigitsBtn[data-val="4"]').click());
+  const hint4 = await page.evaluate(() => document.getElementById('newNumDigitsHint').textContent);
+  check('fillblankNumDigits: hint อัพเดตเป็น "1-4 หลัก (0-9999)" ตอนเลือก 4 หลัก', hint4.includes('1-4 หลัก') && hint4.includes('0-9999'), hint4);
+
+  await page.evaluate(() => { document.getElementById('newTitle').value = 'ชุด 4 หลัก'; });
+  await page.evaluate(() => {
+    const sel = document.getElementById('newSubjectSelect');
+    if (!sel.querySelector('option[value="คณิตศาสตร์"]')) { const o = document.createElement('option'); o.value = 'คณิตศาสตร์'; o.textContent = 'คณิตศาสตร์'; sel.appendChild(o); }
+    sel.value = 'คณิตศาสตร์';
+  });
+  await page.evaluate(() => { document.getElementById('newCreatePlaceholder').checked = true; document.getElementById('newQCount').value = '2'; });
+  await page.evaluate(() => document.getElementById('newCreateBtn').click());
+  await page.waitForTimeout(400);
+  const created = await page.evaluate(() => Store.load().exams.find(e => e.title === 'ชุด 4 หลัก'));
+  check('fillblankNumDigits: สร้างชุดสำเร็จ examType=fillblank-num, numDigits=4',
+    created && created.examType === 'fillblank-num' && created.numDigits === 4,
+    JSON.stringify(created && { examType: created.examType, numDigits: created.numDigits }));
+  await ctx.close();
+}
+
+{
+  // ── Editor: narrow-guard (บล็อกย่อ 4→3 หลักถ้ามีเฉลยเกิน 3 หลักค้างอยู่) ──
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('nd4', 'ชุด 4 หลัก', 'คณิตศาสตร์', { questionCount: 2, examType: 'fillblank-num', numDigits: 4 })],
+      questions: { nd4: [{ id: 'q1', no: 1, number: 1, correct: '1234' }, { id: 'q2', no: 2, number: 2, correct: '' }] },
+    }),
+  });
+  await page.evaluate(() => navigate('admin_editor', { id: 'nd4' }));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+
+  check('fillblankNumDigits: Editor แสดงปุ่มจำนวนหลัก, "4 หลัก" active, ช่องเฉลย maxlength=4',
+    (await page.evaluate(() => document.getElementById('editorNumDigitsWrap').style.display)) === 'block' &&
+    (await page.evaluate(() => document.querySelector('#editorNumDigitsBtns .numDigitsBtn.active')?.dataset.val)) === '4' &&
+    (await page.evaluate(() => document.querySelectorAll('input[data-field="correctNum"]')[0]?.maxLength)) === 4);
+
+  await page.evaluate(() => document.querySelector('#editorNumDigitsBtns .numDigitsBtn[data-val="3"]').click());
+  await page.waitForTimeout(200);
+  check('fillblankNumDigits: ย่อ 4→3 หลักถูกบล็อกไว้เพราะมีเฉลย (q1="1234") เกิน 3 หลัก',
+    (await page.evaluate(() => Store.load().exams.find(e => e.id === 'nd4').numDigits)) === 4);
+
+  await page.evaluate(() => { const s = Store.load(); s.questions.nd4.find(q => q.id === 'q1').correct = '123'; Store.save(s); });
+  await page.evaluate(() => navigate('admin_editor', { id: 'nd4' }));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => document.querySelector('#editorNumDigitsBtns .numDigitsBtn[data-val="3"]').click());
+  await page.waitForTimeout(300);
+  check('fillblankNumDigits: หลังแก้เฉลยให้สั้นลงแล้ว ย่อ 4→3 หลักสำเร็จ',
+    (await page.evaluate(() => Store.load().exams.find(e => e.id === 'nd4').numDigits)) === 3);
+  await ctx.close();
+}
+
+{
+  // ── หน้าทำข้อสอบจริง: maxLength/pattern/keypad ต้องรองรับ 4 หลักไม่ตัดที่ 3 ──
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('take4d', 'ทำข้อสอบ 4 หลัก', 'คณิตศาสตร์', { questionCount: 1, examType: 'fillblank-num', numDigits: 4 })],
+      questions: { take4d: [{ id: 'q1', no: 1, number: 1, correct: '1234' }] },
+    }),
+  });
+  await page.evaluate(() => navigate('take', { id: 'take4d' }));
+  await page.waitForTimeout(500);
+  check('fillblankNumDigits: หน้าทำข้อสอบ input maxLength=4 และ hint "1-4 หลัก (0-9999)"',
+    (await page.evaluate(() => document.querySelector('#takeChoices .numAnsInput')?.maxLength)) === 4 &&
+    (await page.evaluate(() => document.querySelector('#takeChoices')?.textContent))?.includes('0-9999'));
+
+  await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('#takeChoices button')];
+    ['1', '2', '3', '4'].forEach(d => { const btn = buttons.find(b => b.textContent.trim() === d); if (btn) btn.click(); });
+  });
+  const kpValue = await page.evaluate(() => document.querySelector('#takeChoices .numAnsInput')?.value);
+  check('fillblankNumDigits: กด keypad 4 ครั้ง (1,2,3,4) ได้ "1234" ไม่ถูกตัดที่ 3 หลัก (จุดที่พลาดง่ายสุด)', kpValue === '1234', kpValue);
+  await ctx.close();
+}
+
+{
+  // ── โมดัลบันทึกย้อนหลัง: maxlength ต้องตาม numDigits ของข้อสอบ ──
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('bf4d', 'ย้อนหลัง 4 หลัก', 'คณิตศาสตร์', { questionCount: 1, examType: 'fillblank-num', numDigits: 4 })],
+      questions: { bf4d: [{ id: 'q1', no: 1, number: 1, correct: '9999' }] },
+    }),
+  });
+  await page.evaluate(() => navigate('admin_exams', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+  await page.evaluate(() => document.querySelector('[data-backfill="bf4d"]').click());
+  await page.waitForTimeout(300);
+  check('fillblankNumDigits: โมดัลย้อนหลัง maxlength=4 สำหรับข้อสอบ 4 หลัก',
+    (await page.evaluate(() => document.querySelector('#backfillRows input[data-qid]')?.maxLength)) === 4);
+  await ctx.close();
+}
+
+{
+  // ── ข้อสอบเก่าไม่มี numDigits field → fallback เป็น 3 หลักทุกจุด (legacy-data-fallback) ──
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('legacyNd', 'ชุดเก่า', 'คณิตศาสตร์', { questionCount: 1, examType: 'fillblank-num' })], // ไม่มี numDigits
+      questions: { legacyNd: [{ id: 'q1', no: 1, number: 1, correct: '42' }] },
+    }),
+  });
+  await page.evaluate(() => navigate('take', { id: 'legacyNd' }));
+  await page.waitForTimeout(500);
+  check('fillblankNumDigits: ข้อสอบเก่าไม่มี numDigits → หน้าทำข้อสอบ fallback maxLength=3',
+    (await page.evaluate(() => document.querySelector('#takeChoices .numAnsInput')?.maxLength)) === 3);
+  await page.evaluate(() => navigate('admin_editor', { id: 'legacyNd' }));
+  await page.waitForTimeout(400);
+  check('fillblankNumDigits: ข้อสอบเก่าใน Editor แสดงปุ่ม "3 หลัก" active (fallback ถูกต้อง)',
+    (await page.evaluate(() => document.querySelector('#editorNumDigitsBtns .numDigitsBtn.active')?.dataset.val)) === '3');
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

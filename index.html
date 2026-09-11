@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.24 -->
+  <!-- APP_VERSION: v48.25 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1090,7 +1090,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.24</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.25</div>
     </div>
   </div>
 </div>
@@ -1930,7 +1930,13 @@
           <button type="button" class="btn examTypeBtn active" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #c7d2fe;background:#eef2ff;font-weight:700;font-size:13px;color:#4338ca;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
           <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
         </div>
-        <div style="font-size:11px;color:#9ca3af;">กรอกตัวเลข: ตอบเป็นจำนวนเต็ม 1-3 หลัก (0-999)</div>
+        <div id="newNumDigitsWrap" style="display:none;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:8px;" id="newNumDigitsBtns">
+            <button type="button" class="btn numDigitsBtn active" data-val="3" style="flex:1;padding:8px;border-radius:10px;border:2px solid #c7d2fe;background:#eef2ff;font-weight:700;font-size:12px;color:#4338ca;">3 หลัก</button>
+            <button type="button" class="btn numDigitsBtn" data-val="4" style="flex:1;padding:8px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:12px;color:#6b7280;">4 หลัก</button>
+          </div>
+        </div>
+        <div id="newNumDigitsHint" style="font-size:11px;color:#9ca3af;">กรอกตัวเลข: ตอบเป็นจำนวนเต็ม 1-3 หลัก (0-999)</div>
       </label>
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">ระดับความยาก</span>
@@ -2115,6 +2121,13 @@
               <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
             </div>
             <div style="font-size:11px;color:#9ca3af;margin-top:4px;">⚠️ เปลี่ยนประเภทจะล้างเฉลยที่กรอกไว้ทั้งหมด (รูปแบบคำตอบข้ามประเภทกันไม่ได้)</div>
+            <div id="editorNumDigitsWrap" style="display:none;margin-top:10px;">
+              <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">จำนวนหลักคำตอบ</div>
+              <div style="display:flex;gap:8px;" id="editorNumDigitsBtns">
+                <button type="button" class="btn numDigitsBtn" data-val="3" style="flex:1;padding:8px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:12px;color:#6b7280;">3 หลัก</button>
+                <button type="button" class="btn numDigitsBtn" data-val="4" style="flex:1;padding:8px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:12px;color:#6b7280;">4 หลัก</button>
+              </div>
+            </div>
           </div>
 
           <!-- Row 2: PDF โจทย์ + PDF เฉลย -->
@@ -3468,6 +3481,8 @@ function fmtTime(sec){
   return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
 }
 function esc(v){return String(v??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+function numDigitsRangeText(n){return `1-${n} หลัก (0-${'9'.repeat(n)})`;}
+function numHintText(n){return `กรอกตัวเลข: ตอบเป็นจำนวนเต็ม ${numDigitsRangeText(n)}`;}
 function escHtml(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');}
 
 // ===================== ROUTER =====================
@@ -5722,6 +5737,7 @@ function initTake(id){
     wrap.innerHTML='';
     if(exam.examType==='fillblank-num'){
       // กรอกตัวเลข
+      const _numDigits=exam.numDigits||3;
       wrap.style.setProperty('grid-template-columns','1fr','important');
       wrap.style.setProperty('grid-template-rows','auto','important');
       wrap.style.setProperty('align-content','start','important');
@@ -5729,7 +5745,7 @@ function initTake(id){
       box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 4px;';
       const _isPhone=window.matchMedia&&window.matchMedia('(max-width:600px)').matches;
       const inp=document.createElement('input');
-      inp.type='text';inp.maxLength=3;inp.placeholder='ตอบ';
+      inp.type='text';inp.maxLength=_numDigits;inp.placeholder='ตอบ';
       inp.className='numAnsInput';
       inp.value=st.answers[q.id]||'';
       // commit helper
@@ -5749,10 +5765,10 @@ function initTake(id){
       if(_isPhone){
         // มือถือ: ใช้ keyboard ตัวเลขของเครื่อง
         inp.inputMode='numeric';
-        inp.pattern='[0-9]{1,3}';
+        inp.pattern=`[0-9]{1,${_numDigits}}`;
         inp.style.caretColor='auto';
         inp.addEventListener('input',()=>{
-          const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
+          const v=inp.value.replace(/[^\d]/g,'').slice(0,_numDigits);
           if(v!==inp.value) inp.value=v;
           const prev=st.answers[q.id];
           const _prevEmpty=(prev===''||prev==null);
@@ -5775,12 +5791,12 @@ function initTake(id){
       box.appendChild(inp);
       const hint=document.createElement('div');
       hint.style.cssText='font-size:11px;color:#9ca3af;';
-      hint.textContent='ตัวเลข 1-3 หลัก (0-999)';
+      hint.textContent=numDigitsRangeText(_numDigits);
       box.appendChild(hint);
       if(!_isPhone){
         // tablet/desktop: keypad
         const kp=createNumericKeypad(
-          d=>{ if(!st.started) return; const cur=inp.value||''; if(cur.length>=3) return; _setAns(cur+d); },
+          d=>{ if(!st.started) return; const cur=inp.value||''; if(cur.length>=_numDigits) return; _setAns(cur+d); },
           ()=>{ if(!st.started) return; const cur=inp.value||''; _setAns(cur.slice(0,-1)); },
           ()=>{ if(!st.started) return; _setAns(''); }
         );
@@ -8567,6 +8583,7 @@ function initPractice(params){
 
     const _pType=exam.examType||'mc';
     const _isFillNum=_pType==='fillblank-num';
+    const _numDigits=exam.numDigits||3;
 
     // If this question already answered in this session, show result
     if(st.currentIdx in st.results){
@@ -8635,7 +8652,7 @@ function initPractice(params){
       box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px;';
       const _isPhone=window.matchMedia&&window.matchMedia('(max-width:600px)').matches;
       const inp=document.createElement('input');
-      inp.type='text';inp.maxLength=3;inp.placeholder='ตอบ';
+      inp.type='text';inp.maxLength=_numDigits;inp.placeholder='ตอบ';
       inp.className='numAnsInput';
       function _setSel(v){
         inp.value=v;
@@ -8645,11 +8662,11 @@ function initPractice(params){
       }
       if(_isPhone){
         inp.inputMode='numeric';
-        inp.pattern='[0-9]{1,3}';
+        inp.pattern=`[0-9]{1,${_numDigits}}`;
         inp.style.caretColor='auto';
         inp.addEventListener('input',()=>{
           if(st.confirmed) return;
-          const v=inp.value.replace(/[^\d]/g,'').slice(0,3);
+          const v=inp.value.replace(/[^\d]/g,'').slice(0,_numDigits);
           if(v!==inp.value) inp.value=v;
           _setSel(v);
         });
@@ -8660,11 +8677,11 @@ function initPractice(params){
       box.appendChild(inp);
       const hint=document.createElement('div');
       hint.style.cssText='font-size:11px;color:#9ca3af;';
-      hint.textContent='ตัวเลข 1-3 หลัก (0-999)';
+      hint.textContent=numDigitsRangeText(_numDigits);
       box.appendChild(hint);
       if(!_isPhone){
         const kp=createNumericKeypad(
-          d=>{ if(st.confirmed) return; const cur=inp.value||''; if(cur.length>=3) return; _setSel(cur+d); },
+          d=>{ if(st.confirmed) return; const cur=inp.value||''; if(cur.length>=_numDigits) return; _setSel(cur+d); },
           ()=>{ if(st.confirmed) return; const cur=inp.value||''; _setSel(cur.slice(0,-1)); },
           ()=>{ if(st.confirmed) return; _setSel(''); }
         );
@@ -9146,11 +9163,12 @@ function openBackfillModal(examId) {
 
   const labelMap = { A: 'ก', B: 'ข', C: 'ค', D: 'ง' };
   const isFillNum = exam.examType === 'fillblank-num';
+  const numDigits = exam.numDigits || 3;
   const rowsEl = document.getElementById('backfillRows');
   rowsEl.innerHTML = qs.map(q => {
     const correctHint = q.isFree ? '★ ข้อฟรี' : (isFillNum ? esc(q.correct || '-') : (labelMap[q.correct] || '-'));
     const inputHtml = isFillNum
-      ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" data-qid="${esc(q.id)}" placeholder="ตอบ" style="width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;" />`
+      ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${numDigits}}" maxlength="${numDigits}" data-qid="${esc(q.id)}" placeholder="ตอบ" style="width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;" />`
       : `<div class="correctBtns" data-qid="${esc(q.id)}">${['A', 'B', 'C', 'D'].map(v => `<button type="button" class="correctBtn" data-val="${v}">${labelMap[v]}</button>`).join('')}</div>`;
     // ปุ่ม "ไม่แน่ใจ" ต่อข้อ — สไตล์เดียวกับ #takeUnsureBtn ในหน้าทำข้อสอบจริง
     // (toggle inline style สี var(--warn) ไม่ใช่ CSS class) ให้ "🧠 Anxiety Markers" ที่
@@ -9190,7 +9208,7 @@ function openBackfillModal(examId) {
   });
   rowsEl.querySelectorAll('input[data-qid]').forEach(inp => {
     inp.addEventListener('input', () => {
-      const v = inp.value.replace(/[^\d]/g, '').slice(0, 3);
+      const v = inp.value.replace(/[^\d]/g, '').slice(0, numDigits);
       if (v !== inp.value) inp.value = v;
       updateScore();
     });
@@ -10664,6 +10682,24 @@ function initAdminNew(){
         btn.style.borderColor='#fcd34d';
         btn.style.color='#b45309';
       }
+      document.getElementById('newNumDigitsWrap').style.display=(btn.dataset.val==='fillblank-num')?'flex':'none';
+    });
+  });
+
+  // numDigits toggle for create form (3/4 หลัก) — เลือกได้เฉพาะตอน examType เป็น fillblank-num
+  document.querySelectorAll('#newNumDigitsBtns .numDigitsBtn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('#newNumDigitsBtns .numDigitsBtn').forEach(b=>{
+        b.classList.remove('active');
+        b.style.background='#fff';
+        b.style.borderColor='#e5e7eb';
+        b.style.color='#6b7280';
+      });
+      btn.classList.add('active');
+      btn.style.background='#eef2ff';
+      btn.style.borderColor='#c7d2fe';
+      btn.style.color='#4338ca';
+      document.getElementById('newNumDigitsHint').textContent=numHintText(Number(btn.dataset.val));
     });
   });
 
@@ -10685,7 +10721,12 @@ function initAdminNew(){
     const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
     const examType=_activeType?_activeType.dataset.val:'mc';
     const folderId=document.getElementById('newFolderSelect')?.value||null;
-    s.exams.unshift({id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType,folderId});
+    const _newExam={id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType,folderId};
+    if(examType==='fillblank-num'){
+      const _activeNumDigits=document.querySelector('#newNumDigitsBtns .numDigitsBtn.active');
+      _newExam.numDigits=_activeNumDigits?Number(_activeNumDigits.dataset.val):3;
+    }
+    s.exams.unshift(_newExam);
     const _emptyCorrect='';
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>{
       const _q={id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),correct:_emptyCorrect};
@@ -10718,6 +10759,9 @@ function initEditor(examId){
   // examType — default 'mc' for legacy exams
   if(!exam.examType) exam.examType='mc';
   const _isFillNum=exam.examType==='fillblank-num';
+  // numDigits — default 3 หลักสำหรับข้อสอบเก่าที่ยังไม่มี field นี้ (legacy fallback)
+  if(!exam.numDigits) exam.numDigits=3;
+  const _numDigits=exam.numDigits;
   document.getElementById('editorTitle').textContent='แก้ไขข้อสอบ: '+exam.title;
   document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
   const _typeBadge=document.getElementById('editorTypeBadge');
@@ -10885,6 +10929,33 @@ function initEditor(examId){
     };
   });
 
+  // ── numDigits (จำนวนหลักคำตอบ — เฉพาะข้อสอบ fillblank-num) ──
+  const _numDigitsWrap=document.getElementById('editorNumDigitsWrap');
+  if(_numDigitsWrap) _numDigitsWrap.style.display=_isFillNum?'block':'none';
+  document.querySelectorAll('#editorNumDigitsBtns .numDigitsBtn').forEach(btn=>{
+    const active=Number(btn.dataset.val)===_numDigits;
+    btn.classList.toggle('active',active);
+    btn.style.background=active?'#eef2ff':'#fff';
+    btn.style.borderColor=active?'#c7d2fe':'#e5e7eb';
+    btn.style.color=active?'#4338ca':'#6b7280';
+    btn.onclick=()=>{
+      const newDigits=Number(btn.dataset.val);
+      if(newDigits===exam.numDigits) return;
+      if(newDigits<exam.numDigits){
+        // กันย่อหลักตอนมีเฉลยเกินหลักใหม่ค้างอยู่ — เทียบคะแนนไม่สนหลัก แต่ input field จะไม่ตรงกับข้อมูล
+        const overLong=list.filter(q=>q.correct && String(q.correct).length>newDigits);
+        if(overLong.length){
+          toast(`มี ${overLong.length} ข้อที่เฉลยเกิน ${newDigits} หลัก แก้เฉลยข้อนั้นก่อนถึงจะเปลี่ยนเป็น ${newDigits} หลักได้`);
+          return;
+        }
+      }
+      exam.numDigits=newDigits;
+      Store.save(s);
+      toast('เปลี่ยนจำนวนหลักแล้ว');
+      navigate('admin_editor', {id: examId});
+    };
+  });
+
   // ── Duration ──
   const durationInput=document.getElementById('editorDurationMin');
   const durationBtn=document.getElementById('editorDurationBtn');
@@ -11011,7 +11082,7 @@ function initEditor(examId){
       const _subChips=_qSubTags.length?_qSubTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:99px;color:#6d28d9;font-weight:700;">↳${esc(t)}</span>`).join(' '):'';
       const _tagPreview=(_qTags.length||_qSubTags.length)?(_mainChips+(_subChips?' '+_subChips:'')):'<span style="font-size:11px;color:#9ca3af;">—</span>';
       const _correctCellHtml=_isFillNum
-        ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" value="${esc(q.correct||'')}" placeholder="0-999" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
+        ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${_numDigits}}" maxlength="${_numDigits}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
         : `<div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div>`;
       const _ptsCellHtml=exam.weighted
         ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
@@ -11038,7 +11109,7 @@ function initEditor(examId){
         if(numInput){
           numInput.addEventListener('focus',()=>select(idx));
           numInput.addEventListener('input',()=>{
-            const v=numInput.value.replace(/[^\d]/g,'').slice(0,3);
+            const v=numInput.value.replace(/[^\d]/g,'').slice(0,_numDigits);
             if(v!==numInput.value) numInput.value=v;
             q.correct=v;
           });
@@ -11286,7 +11357,7 @@ function initEditor(examId){
   };
 
   // bind excel import สำหรับ editor
-  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted, exam.subject);
+  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted, exam.subject, _numDigits);
 }
 
 // ===================== ADMIN EXAM LIST — ดาวน์โหลด Template เฉลยทุกวิชา =====================
@@ -11333,13 +11404,14 @@ function downloadAllAnswerKeyTemplates(){
 }
 
 // ===================== EXCEL TEMPLATE DOWNLOAD =====================
-function downloadExcelTemplate(qCount, filename, topics, examType, weighted) {
+function downloadExcelTemplate(qCount, filename, topics, examType, weighted, numDigits) {
   if (typeof XLSX === 'undefined') { alert('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
 
   const _isFillNum=examType==='fillblank-num';
   const _isWeighted=!!weighted;
-  const _correctHeader=_isFillNum?'เฉลย (ตัวเลข 0-999)':'เฉลย (1/2/3/4)';
-  const _correctSample=_isFillNum?42:1;
+  const _numDigits=numDigits||3;
+  const _correctHeader=_isFillNum?`เฉลย (ตัวเลข 0-${'9'.repeat(_numDigits)})`:'เฉลย (1/2/3/4)';
+  const _correctSample=_isFillNum?(_numDigits<=3?42:Number('4'.repeat(_numDigits))):1;
   const _header=['ข้อที่', 'หน้า PDF', _correctHeader, 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)'];
   if(_isWeighted) _header.push('คะแนน (ค่าเริ่มต้น 1)');
   const rows = [_header];
@@ -11395,7 +11467,9 @@ function downloadExcelTemplate(qCount, filename, topics, examType, weighted) {
     const topics = (s2.subjectTopics&&subj&&s2.subjectTopics[subj]) ? s2.subjectTopics[subj] : [];
     const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
     const _examType=_activeType?_activeType.dataset.val:'mc';
-    downloadExcelTemplate(qCount, `template_${title}.xlsx`, topics, _examType);
+    const _activeNumDigits=document.querySelector('#newNumDigitsBtns .numDigitsBtn.active');
+    const _numDigits=_activeNumDigits?Number(_activeNumDigits.dataset.val):3;
+    downloadExcelTemplate(qCount, `template_${title}.xlsx`, topics, _examType, undefined, _numDigits);
   });
 })();
 
@@ -11413,11 +11487,11 @@ function normalizeAnswer(v) {
   return null;
 }
 // parse คำตอบกรอกตัวเลข — รับ string/number → คืน digit string ('042', '7', '') หรือ null ถ้าไม่ใช่ตัวเลข
-function normalizeNumericAnswer(v){
+function normalizeNumericAnswer(v, maxDigits){
   if(v==null) return null;
   const s=String(v).trim();
   if(!s) return '';
-  if(!/^\d{1,3}$/.test(s)) return null;
+  if(!new RegExp(`^\\d{1,${maxDigits||3}}$`).test(s)) return null;
   return s;
 }
 // type-aware comparison
@@ -11524,7 +11598,7 @@ function createNumericKeypad(onDigit, onDelete, onClear){
 }
 
 // อ่าน Excel/CSV แล้วคืน array [{no, page, correct, isFree}]
-function parseExcelFile(file, examType, weighted) {
+function parseExcelFile(file, examType, weighted, numDigits) {
   return new Promise((resolve, reject) => {
     if (typeof XLSX === 'undefined') {
       reject(new Error('SheetJS ยังโหลดไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่'));
@@ -11532,6 +11606,7 @@ function parseExcelFile(file, examType, weighted) {
     }
     const _isFillNum=examType==='fillblank-num';
     const _isWeighted=!!weighted;
+    const _numDigits=numDigits||3;
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -11553,7 +11628,7 @@ function parseExcelFile(file, examType, weighted) {
           const row = rows[i];
           const no = parseInt(row[0]);
           const page = parseInt(row[1]) || 1;
-          const correct=_isFillNum?normalizeNumericAnswer(row[2]):normalizeAnswer(row[2]);
+          const correct=_isFillNum?normalizeNumericAnswer(row[2],_numDigits):normalizeAnswer(row[2]);
           const topic = String(row[3]||'').trim();
           const isFreeVal = String(row[4]||'').trim();
           const isFree = isFreeVal==='1'||isFreeVal.toLowerCase()==='true'||isFreeVal==='ฟรี';
@@ -11602,7 +11677,9 @@ function parseExcelFile(file, examType, weighted) {
     try {
       const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
       const _examType=_activeType?_activeType.dataset.val:'mc';
-      const { rows: data, skipped } = await parseExcelFile(file, _examType);
+      const _activeNumDigits=document.querySelector('#newNumDigitsBtns .numDigitsBtn.active');
+      const _numDigits=_activeNumDigits?Number(_activeNumDigits.dataset.val):3;
+      const { rows: data, skipped } = await parseExcelFile(file, _examType, undefined, _numDigits);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
       window._newExcelData = data;
       // อัปเดต qCount จากเลขข้อสูงสุด ไม่ใช่จำนวนแถวที่รอด — กันแถวที่ถูกข้ามทำให้เลขข้อเลื่อน
@@ -11622,7 +11699,7 @@ function parseExcelFile(file, examType, weighted) {
 })();
 
 // ── admin_editor: bind excel input ──
-function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject) {
+function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject, numDigits) {
   // bind template download
   const dlBtn = document.getElementById('editorDownloadTemplate');
   if (dlBtn) {
@@ -11630,7 +11707,7 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject)
     dlBtn.parentNode.replaceChild(newDlBtn, dlBtn);
     newDlBtn.addEventListener('click', () => {
       const _s2=Store.load(); const _topics=(_s2.subjectTopics&&subject&&_s2.subjectTopics[subject])||[];
-      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, examType, !!(typeof getWeighted==='function'&&getWeighted()));
+      downloadExcelTemplate(list.length, `template_เฉลย_${examId}.xlsx`, _topics, examType, !!(typeof getWeighted==='function'&&getWeighted()), numDigits);
     });
   }
 
@@ -11648,7 +11725,7 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject)
     status.textContent = '⏳ กำลังอ่าน...';
     try {
       const _w=typeof getWeighted==='function'?getWeighted():false;
-      const { rows: data, skipped } = await parseExcelFile(file, examType, _w);
+      const { rows: data, skipped } = await parseExcelFile(file, examType, _w, numDigits);
       if (data.length === 0) throw new Error('ไม่พบข้อมูลที่ valid ในไฟล์');
 
       // merge เข้า list
@@ -14580,7 +14657,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.24';
+  const CURRENT_VERSION = 'v48.25';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
