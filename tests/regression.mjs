@@ -2112,6 +2112,67 @@ currentSection = 'fillblankNumDigits';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: sessionPersist (v48.27) — session + หน้าล่าสุดต้องรอดข้าม reload
+// บั๊กจริงจาก log iPad: iOS ล้างโปรเซส PWA ตอนสลับแอป → sessionStorage หาย →
+// เด้งกลับหน้า login กลางคัน (log เห็น syncFromCloud.renav {page:"login"} ทั้งที่
+// 4 วินาทีก่อนหน้ายังอยู่หน้า review) — ย้ายไป localStorage เหมือน takeResume
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'sessionPersist';
+{
+  const { ctx, page } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('sp1', 'ชุดทดสอบ session', 'คณิตศาสตร์')],
+      questions: { sp1: mkQ() },
+      members: [{ pin: '311257', name: 'เด็กเซสชัน' }],
+    }),
+  });
+  // login จริงผ่าน Auth.login() — ต้องลงที่ localStorage ไม่ใช่ sessionStorage
+  await page.evaluate(() => Auth.login('311257'));
+  const st = await page.evaluate(() => ({ local: localStorage.getItem('appSession'), session: sessionStorage.getItem('appSession') }));
+  check('sessionPersist: login แล้ว appSession อยู่ใน localStorage และไม่ค้างที่ sessionStorage',
+    !!st.local && st.local.includes('เด็กเซสชัน') && st.session === null, JSON.stringify(st));
+
+  // จำลองบั๊กจริง: อยู่หน้า exams → iOS ล้าง sessionStorage → reload → ต้องกลับหน้าเดิม
+  await page.evaluate(() => navigate('exams', {}));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1500);
+  const afterReload = await page.evaluate(() => ({
+    currentPage: window._currentPage,
+    loginVisible: document.getElementById('page-login')?.classList.contains('active'),
+    loggedIn: Auth.isLoggedIn(), name: Auth.getName(),
+  }));
+  check('sessionPersist: reload หลัง sessionStorage ถูกล้าง → ยังล็อกอินและกลับเข้าหน้าเดิม (ไม่เด้ง login)',
+    afterReload.loggedIn === true && afterReload.name === 'เด็กเซสชัน' &&
+    afterReload.currentPage === 'exams' && !afterReload.loginVisible, JSON.stringify(afterReload));
+
+  // logout ต้องล้างทั้งสอง storage — ไม่งั้น session ผีใน sessionStorage ฟื้นได้
+  await page.evaluate(() => sessionStorage.setItem('appSession', JSON.stringify({ role: 'student', name: 'ผี', ts: Date.now() })));
+  await page.evaluate(() => Auth.logout());
+  const afterLogout = await page.evaluate(() => ({
+    local: localStorage.getItem('appSession'), session: sessionStorage.getItem('appSession'), loggedIn: Auth.isLoggedIn(),
+  }));
+  check('sessionPersist: logout ล้าง appSession ทั้ง localStorage และ sessionStorage',
+    afterLogout.local === null && afterLogout.session === null && afterLogout.loggedIn === false, JSON.stringify(afterLogout));
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1500);
+  check('sessionPersist: logout แล้ว reload → อยู่หน้า login (session ไม่ฟื้น)',
+    (await page.evaluate(() => Auth.isLoggedIn())) === false &&
+    (await page.evaluate(() => document.getElementById('page-login')?.classList.contains('active'))) === true);
+  await ctx.close();
+
+  // fallback: session เก่าที่ค้างใน sessionStorage อย่างเดียว (ผู้ใช้ที่ login ไว้ก่อน deploy)
+  // ต้องยังใช้งานได้ ไม่โดนเตะออก — ชุดเทสเดิมทั้งหมดที่ seed sessionStorage ก็พิสูจน์ทางนี้
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: baseCache({ members: [{ pin: '311257', name: 'เด็กเก่า' }] }), name: 'เด็กเก่า', role: 'student' });
+  const legacy = await page2.evaluate(() => ({ loggedIn: Auth.isLoggedIn(), name: Auth.getName(), role: Auth.getRole() }));
+  check('sessionPersist: fallback อ่าน session เก่าจาก sessionStorage ได้ (ไม่เตะผู้ใช้ตอนอัปเดต)',
+    legacy.loggedIn === true && legacy.name === 'เด็กเก่า' && legacy.role === 'student', JSON.stringify(legacy));
+  await ctx2.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.26 -->
+  <!-- APP_VERSION: v48.27 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1091,7 +1091,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.26</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.27</div>
     </div>
   </div>
 </div>
@@ -4354,21 +4354,32 @@ const Auth = (() => {
     return null;
   }
 
+  // session เก็บใน localStorage — iOS ล้าง sessionStorage ทิ้งเวลา reclaim โปรเซส PWA
+  // ตอนสลับแอป/ล็อกจอ (ยืนยันจาก log จริง: reload แล้วเด้งกลับหน้า login ทั้งที่เพิ่ง
+  // ทำข้อสอบอยู่) — ให้พฤติกรรมตรงกับ nanont:takeResume:* ที่ใช้ localStorage อยู่แล้ว
+  // อ่านแบบ fallback ไป sessionStorage เผื่อ session ที่ค้างอยู่ก่อนอัปเดตเวอร์ชันนี้
+  function _readSession() {
+    try {
+      return JSON.parse(localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY));
+    } catch { return null; }
+  }
   function getRole() {
-    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.role || null; }
+    try { return _readSession()?.role || null; }
     catch { return null; }
   }
   function getName() {
-    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY))?.name || ''; }
+    try { return _readSession()?.name || ''; }
     catch { return ''; }
   }
   function setSession(role, name) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role, name, ts: Date.now() }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ role, name, ts: Date.now() }));
+    try { sessionStorage.removeItem(SESSION_KEY); } catch(e) {} // กันของเก่าค้างสองที่
   }
   function isLoggedIn() { return !!getRole(); }
   function isTeacher()  { return getRole() === 'teacher'; }
   function logout() {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    try { sessionStorage.removeItem(SESSION_KEY); } catch(e) {} // ต้องล้างทั้งคู่ ไม่งั้น session เก่าฟื้น
     if(typeof numpadClear === 'function') numpadClear();
     navigate('login');
     setTimeout(()=>{
@@ -12041,12 +12052,13 @@ const _PERSIST_KEY = 'nanont:pageState';
 function savePageState(page, params) {
   if (page === 'login') return; // never save login page
   try {
-    sessionStorage.setItem(_PERSIST_KEY, JSON.stringify({ page, params: params || {}, ts: Date.now() }));
+    localStorage.setItem(_PERSIST_KEY, JSON.stringify({ page, params: params || {}, ts: Date.now() }));
   } catch(e) {}
 }
 
 function loadPageState() {
-  try { return JSON.parse(sessionStorage.getItem(_PERSIST_KEY) || 'null'); } catch { return null; }
+  // localStorage เป็นหลัก (รอดตอน iOS ล้างโปรเซส) fallback ไป sessionStorage เผื่อของเก่า
+  try { return JSON.parse(localStorage.getItem(_PERSIST_KEY) || sessionStorage.getItem(_PERSIST_KEY) || 'null'); } catch { return null; }
 }
 
 // Patch navigate to auto-save page state
@@ -14682,7 +14694,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.26';
+  const CURRENT_VERSION = 'v48.27';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
