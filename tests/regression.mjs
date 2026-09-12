@@ -2173,6 +2173,114 @@ currentSection = 'sessionPersist';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: reviewHeaderStuck (v48.28) — กดแท็บ "เฉลย" ในหน้าทบทวนแล้วแถบหัวข้อ
+// + ปุ่ม "← ผลฝึกซ้อม" หายไป กดย้อนกลับไม่ได้ (รายงานจากผู้ใช้จริงพร้อมภาพ)
+// ต้นเหตุ: PdfViewer.scrollToPage() ใช้ scrollIntoView ซึ่งเลื่อน scroll container
+// ทุกชั้นที่เป็นบรรพบุรุษ (รวม .page.active / element ที่ overflow:hidden) — พิสูจน์แล้ว
+// บนโค้ดเดิม: window เลื่อนไป 83px ≈ ความสูงแถบหัวข้อพอดี
+// sandbox โหลด PDF.js จาก CDN ไม่ได้ → stub pdfjsLib เพื่อทดสอบ scrollToPage จริง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'reviewHeaderStuck';
+{
+  const { ctx, page } = await newSeededPage({
+    viewport: { width: 1180, height: 788 }, // iPad landscape
+    cache: baseCache({
+      exams: [mkExam('rh1', 'ชุดทดสอบหัวข้อ', 'คณิตศาสตร์', {
+        questionCount: 2, pdfUrl: 'https://example.com/q.pdf', answerPdfUrl: 'https://example.com/a.pdf',
+      })],
+      questions: { rh1: [
+        { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+        { id: 'q2', no: 2, number: 2, page: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      ] },
+      attempts: [{
+        id: 'attRH1', examId: 'rh1', examTitle: 'ชุดทดสอบหัวข้อ', examSubject: 'คณิตศาสตร์',
+        examType: 'mc', weighted: false, takerName: 'เด็กทดสอบ',
+        startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date().toISOString(),
+        usedSeconds: 60, score: 1, total: 2, answers: { q1: 'A', q2: 'A' },
+        perQuestion: [
+          { qid: 'q1', no: 1, page: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+          { qid: 'q2', no: 2, page: 2, chosen: 'A', correct: 'B', isCorrect: false, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+        ],
+        practiceMode: false, visitOrder: ['q1', 'q2'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+      }],
+    }),
+  });
+  await page.evaluate(() => navigate('review', { attemptId: 'attRH1' }));
+  await page.waitForTimeout(600);
+
+  check('reviewHeaderStuck: .reviewPdfWrap เป็น containing block (position:relative)',
+    (await page.evaluate(() => getComputedStyle(document.querySelector('#page-review .reviewPdfWrap')).position)) === 'relative');
+
+  await page.evaluate(() => document.getElementById('reviewTabAnswer').click());
+  await page.waitForTimeout(600);
+  const afterTab = await page.evaluate(() => {
+    const p = document.getElementById('page-review');
+    const back = [...document.querySelectorAll('#page-review button')].find(b => b.textContent.includes('ผลฝึกซ้อม'));
+    const r = back ? back.getBoundingClientRect() : null;
+    return { scrollTop: p.scrollTop, overflow: p.scrollHeight - p.clientHeight,
+      backVisible: r ? (r.top >= 0 && r.bottom <= window.innerHeight) : false };
+  });
+  check('reviewHeaderStuck: กดแท็บเฉลยแล้วหน้าไม่เกิด scroll overflow + ปุ่มย้อนกลับยังอยู่ในจอ',
+    afterTab.overflow <= 1 && afterTab.scrollTop === 0 && afterTab.backVisible === true, JSON.stringify(afterTab));
+
+  // stress: มี element สูงเกินใน PDF pane แล้วสั่ง scrollIntoView — หน้า/หน้าต่างต้องไม่ถูกดึงตาม
+  const stress = await page.evaluate(() => {
+    const viewer = document.getElementById('reviewAnswerPdfViewer');
+    const probe = document.createElement('div');
+    probe.style.cssText = 'height:2000px;width:10px;';
+    viewer.appendChild(probe);
+    probe.scrollIntoView({ block: 'start' });
+    const res = { pageScrollTop: document.getElementById('page-review').scrollTop, winScrollY: window.scrollY };
+    probe.remove();
+    return res;
+  });
+  check('reviewHeaderStuck: element สูงเกินใน PDF pane ไม่ทำให้หน้า/หน้าต่างเลื่อนตาม',
+    stress.pageScrollTop === 0 && stress.winScrollY === 0, JSON.stringify(stress));
+
+  // ทดสอบ scrollToPage จริง (stub pdfjsLib) — ต้องเลื่อนแค่ scrollArea ของ viewer เอง
+  const scrollRes = await page.evaluate(async () => {
+    window.pdfjsLib = { getDocument: () => ({ promise: Promise.resolve({
+      numPages: 5,
+      getPage: () => Promise.resolve({
+        getViewport: ({ scale = 1 }) => ({ width: 600 * scale, height: 800 * scale }),
+        render: () => ({ promise: Promise.resolve() }), cleanup() {},
+      }),
+    }) }) };
+    const outer = document.createElement('div');
+    outer.style.cssText = 'height:400px;overflow:auto;';
+    const spacer = document.createElement('div'); spacer.style.cssText = 'height:300px;';
+    const host = document.createElement('div'); host.id = '_pdfScrollProbe';
+    host.style.cssText = 'width:600px;height:300px;';
+    outer.appendChild(spacer); outer.appendChild(host); document.body.appendChild(outer);
+
+    const v = PdfViewer.create('_pdfScrollProbe');
+    await v.loadUrl('https://example.com/fake.pdf', 1);
+    await new Promise(r => setTimeout(r, 400));
+    const afterLoad = { outer: outer.scrollTop, win: window.scrollY };
+
+    outer.scrollTop = 0; window.scrollTo(0, 0);
+    await v.setPage(4);
+    await new Promise(r => setTimeout(r, 2000)); // รอ smooth scroll จบ
+    const area = host.firstElementChild;
+    const pg4 = document.getElementById('_pdfScrollProbe-page-4');
+    const res = {
+      pages: host.querySelectorAll('[id^="_pdfScrollProbe-page-"]').length,
+      afterLoad, innerScroll: Math.round(area.scrollTop),
+      align: Math.round(pg4.getBoundingClientRect().top - area.getBoundingClientRect().top),
+      outerAfterJump: outer.scrollTop, winAfterJump: window.scrollY,
+    };
+    outer.remove();
+    return res;
+  });
+  check('reviewHeaderStuck: loadUrl/setPage เลื่อนเฉพาะ scrollArea ของ viewer ไม่ดึงกล่องนอก/หน้าต่าง',
+    scrollRes.pages === 5 && scrollRes.afterLoad.outer === 0 && scrollRes.afterLoad.win === 0 &&
+    scrollRes.outerAfterJump === 0 && scrollRes.winAfterJump === 0, JSON.stringify(scrollRes));
+  check('reviewHeaderStuck: setPage(4) เลื่อนไปจัดหน้า 4 ชิดขอบบน scrollArea ถูกต้อง',
+    scrollRes.innerScroll > 0 && Math.abs(scrollRes.align) <= 12, JSON.stringify(scrollRes));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
