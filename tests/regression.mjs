@@ -1855,6 +1855,14 @@ currentSection = 'backfillAttempt';
   const selAfterSecond = await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').classList.contains('selected'));
   check('backfillAttempt: กดปุ่มตอบซ้ำ = ยกเลิกคำตอบ (deselect)', selAfterFirst === true && selAfterSecond === false);
 
+  // v48.26: เลือกคำตอบถูก/ผิด → ปุ่มไฮไลท์เขียว/แดงทันที (ไม่ต้องรอบันทึก/อ่านป้ายเฉลยเทียบเอง)
+  await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').click()); // q1 correct=A
+  const rightBg = await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').style.background);
+  check('backfillAttempt: เลือกคำตอบถูกไฮไลท์เขียวทันที', rightBg === 'rgb(240, 253, 244)', rightBg);
+  await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="B"]').click()); // เปลี่ยนเป็นผิด
+  const wrongBg = await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="B"]').style.background);
+  check('backfillAttempt: เลือกคำตอบผิดไฮไลท์แดงทันที', wrongBg === 'rgb(254, 242, 242)', wrongBg);
+
   // ตอบจริง: q1=A(ถูก), q2=A(ผิด, เฉลยจริง B, มาร์คไม่แน่ใจ), q3=C(ถูก), q3 ไม่ตอบไม่ได้ตั้งใจ
   await page.evaluate(() => {
     document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="A"]').click();
@@ -1935,7 +1943,33 @@ currentSection = 'backfillAttempt';
   await page2.evaluate(() => document.querySelector('.correctBtns[data-qid="fq2"] .correctBtn[data-val="A"]').click());
   const freeLiveScore = await page2.evaluate(() => document.getElementById('backfillScoreLive').textContent);
   check('backfillAttempt: ข้อฟรีได้คะแนนแม้ไม่ตอบเลย (คาด 1/2)', freeLiveScore.includes('1/2'), freeLiveScore);
+  const fq2WrongBg = await page2.evaluate(() => document.querySelector('.correctBtns[data-qid="fq2"] .correctBtn[data-val="A"]').style.background);
+  check('backfillAttempt: เลือกคำตอบผิด (fq2 เฉลยจริง B) ไฮไลท์แดง', fq2WrongBg === 'rgb(254, 242, 242)', fq2WrongBg);
+  await page2.evaluate(() => document.querySelector('.correctBtns[data-qid="fq1"] .correctBtn[data-val="D"]').click()); // fq1 isFree, เลือกอะไรก็ถือว่าถูก
+  const freeBg = await page2.evaluate(() => document.querySelector('.correctBtns[data-qid="fq1"] .correctBtn[data-val="D"]').style.background);
+  check('backfillAttempt: ข้อฟรีเลือกอะไรก็ไฮไลท์เขียวเสมอ (ไม่ตรงเฉลยก็ยังเขียว)', freeBg === 'rgb(240, 253, 244)', freeBg);
   await ctx2.close();
+}
+
+{
+  // v48.26: ไฮไลท์แถวสลับทุก 5 ข้อในโมดัลย้อนหลัง เหมือนตาราง Editor (.editorRowAlt)
+  const rowQs = Array.from({ length: 12 }, (_, i) => ({ id: 'rq' + (i + 1), no: i + 1, number: i + 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } }));
+  const { ctx: ctx3, page: page3 } = await newSeededPage({
+    cache: baseCache({
+      exams: [mkExam('bf3', 'ชุดทดสอบไฮไลท์แถว', 'คณิตศาสตร์', { questionCount: 12 })],
+      questions: { bf3: rowQs },
+    }),
+  });
+  await page3.evaluate(() => navigate('admin_exams', {}));
+  await page3.waitForTimeout(400);
+  await page3.evaluate(() => document.getElementById('offlineBanner')?.remove());
+  await page3.evaluate(() => document.querySelector('[data-backfill="bf3"]').click());
+  await page3.waitForTimeout(300);
+  const rowBgs = await page3.evaluate(() => [...document.querySelectorAll('#backfillRows > div')].map(d => getComputedStyle(d).backgroundColor));
+  check('backfillAttempt: แถวข้อ 1-5 ไม่ไฮไลท์, ข้อ 6-10 ไฮไลท์สลับ (เหมือนตาราง Editor)',
+    rowBgs.slice(0, 5).every(c => c !== 'rgb(239, 246, 255)') && rowBgs.slice(5, 10).every(c => c === 'rgb(239, 246, 255)'),
+    JSON.stringify(rowBgs));
+  await ctx3.close();
 }
 
 // ─────────────────────────────────────────────────────────────────

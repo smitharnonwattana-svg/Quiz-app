@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.37p -->
+  <!-- APP_VERSION: v48.38p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -411,6 +411,7 @@
     .bar2{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;}
     .rowActive{background:#f3f4f6 !important;}
     .editorRowAlt{background:#eff6ff;}
+    .backfillRowAlt{background:#eff6ff;}
     .ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
     .titleInput{min-width:260px;max-width:520px;width:38vw;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;}
     .correctBtns{display:flex;gap:4px;}
@@ -1105,7 +1106,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.37p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.38p</div>
     </div>
   </div>
 </div>
@@ -9182,7 +9183,7 @@ function openBackfillModal(examId) {
   const isFillNum = exam.examType === 'fillblank-num';
   const numDigits = exam.numDigits || 3;
   const rowsEl = document.getElementById('backfillRows');
-  rowsEl.innerHTML = qs.map(q => {
+  rowsEl.innerHTML = qs.map((q, idx) => {
     const correctHint = q.isFree ? '★ ข้อฟรี' : (isFillNum ? esc(q.correct || '-') : (labelMap[q.correct] || '-'));
     const inputHtml = isFillNum
       ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${numDigits}}" maxlength="${numDigits}" data-qid="${esc(q.id)}" placeholder="ตอบ" style="width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;" />`
@@ -9191,7 +9192,9 @@ function openBackfillModal(examId) {
     // (toggle inline style สี var(--warn) ไม่ใช่ CSS class) ให้ "🧠 Anxiety Markers" ที่
     // หน้ารีวิวมีข้อมูลใช้งานได้เหมือนทำสดจริง
     const unsureBtnHtml = `<button type="button" class="btn" data-unsure="${esc(q.id)}" style="padding:5px 10px;font-size:12px;flex-shrink:0;">❓</button>`;
-    return `<div style="display:flex;align-items:center;gap:10px;">
+    // ไฮไลท์สลับทุก 5 ข้อ เหมือนตาราง Editor (.editorRowAlt) ให้นับข้อง่ายขึ้นตอนกรอกยาวๆ
+    const rowAltClass = Math.floor(idx / 5) % 2 === 1 ? ' backfillRowAlt' : '';
+    return `<div class="${rowAltClass.trim()}" style="display:flex;align-items:center;gap:10px;padding:4px 6px;border-radius:8px;">
       <span style="font-weight:900;width:34px;flex-shrink:0;">${q.no}.</span>
       <span class="muted" style="font-size:11px;width:70px;flex-shrink:0;">เฉลย: ${correctHint}</span>
       ${inputHtml}
@@ -9217,9 +9220,21 @@ function openBackfillModal(examId) {
     btn.addEventListener('click', () => {
       // v48.33p: กดปุ่มเดิมซ้ำ = ยกเลิกคำตอบ (deselect) เหมือนหน้าทำข้อสอบจริง
       // (ของเดิม select อย่างเดียว ไม่มีทางล้างคำตอบกลับเป็นว่าง)
+      const group = btn.closest('.correctBtns');
       const already = btn.classList.contains('selected');
-      btn.closest('.correctBtns').querySelectorAll('.correctBtn').forEach(b => b.classList.remove('selected'));
-      if (!already) btn.classList.add('selected');
+      group.querySelectorAll('.correctBtn').forEach(b => {
+        b.classList.remove('selected');
+        b.style.background = ''; b.style.borderColor = ''; b.style.color = '';
+      });
+      if (!already) {
+        btn.classList.add('selected');
+        // ไฮไลท์เขียว/แดงทันทีตามถูก/ผิด — ให้เห็นผลไว ไม่ต้องไปอ่านป้าย "เฉลย:" เทียบเอง
+        const q = qs.find(qq => qq.id === group.getAttribute('data-qid'));
+        const isRight = q.isFree || isAnswerCorrect(btn.dataset.val, q.correct, exam.examType || 'mc');
+        btn.style.background = isRight ? '#f0fdf4' : '#fef2f2';
+        btn.style.borderColor = isRight ? '#86efac' : '#fca5a5';
+        btn.style.color = isRight ? '#16a34a' : '#dc2626';
+      }
       updateScore();
     });
   });
@@ -9227,6 +9242,16 @@ function openBackfillModal(examId) {
     inp.addEventListener('input', () => {
       const v = inp.value.replace(/[^\d]/g, '').slice(0, numDigits);
       if (v !== inp.value) inp.value = v;
+      // ไฮไลท์เขียว/แดงทันทีตามถูก/ผิด เหมือนปุ่ม ก/ข/ค/ง ด้านบน
+      const q = qs.find(qq => qq.id === inp.getAttribute('data-qid'));
+      if (v) {
+        const isRight = q.isFree || isAnswerCorrect(v, q.correct, exam.examType || 'mc');
+        inp.style.background = isRight ? '#f0fdf4' : '#fef2f2';
+        inp.style.borderColor = isRight ? '#86efac' : '#fca5a5';
+        inp.style.color = isRight ? '#16a34a' : '#dc2626';
+      } else {
+        inp.style.background = ''; inp.style.borderColor = ''; inp.style.color = '';
+      }
       updateScore();
     });
   });
@@ -14694,7 +14719,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.37p';
+  const CURRENT_VERSION = 'v48.38p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
