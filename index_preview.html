@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.40p -->
+  <!-- APP_VERSION: v48.41p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1109,7 +1109,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.40p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.41p</div>
     </div>
   </div>
 </div>
@@ -6807,6 +6807,21 @@ function initReview(attemptId){
   // v48.24p: ใช้ _half2Pending ตัวเดียวกับ _hideAns ข้างบน (เดิมเช็ค !att.revealedAt เอง
   // ซึ่งค้างซ่อนถาวรถ้าส่งครึ่งหลังไปแบบตอบไม่ครบ — ดูเหตุผลเต็มที่ _hideAns)
   const _anyHiddenAnswers = !Auth.isTeacher() && _half2Pending;
+
+  // #page-review ไม่ได้ถูกสร้างใหม่ทุกครั้งที่ navigate('review') — ต้องรีเซ็ตสถานะแท็บ PDF
+  // กลับไปที่ "โจทย์" ทุกครั้งที่เข้าหน้านี้ ไม่งั้นสถานะจากรอบก่อน (ค้างอยู่แท็บเฉลย) จะชนกับ
+  // loadReviewPdf() ที่เขียนทับ cssText ฝั่งโจทย์ให้กลับมามองเห็น → PDF โผล่ซ้อนกันทั้งสองชุด
+  // และ PDF เฉลยของชุดก่อนยังค้างข้ามไปโชว์ในชุดที่ไม่มีเฉลยได้ด้วย (เห็นเฉลยผิดชุด)
+  _viewA.innerHTML = '';
+  _viewA.style.visibility = 'hidden';
+  _viewA.style.position = 'absolute';
+  _viewA.style.pointerEvents = 'none';
+  _viewQ.style.visibility = '';
+  _viewQ.style.position = '';
+  _viewQ.style.pointerEvents = '';
+  if(_tabQ){ _tabQ.style.background='#111'; _tabQ.style.color='#fff'; _tabQ.style.borderColor='#111'; }
+  if(_tabA){ _tabA.style.background='#fff'; _tabA.style.color='#111'; _tabA.style.borderColor='var(--border)'; }
+
   if(_answerPdfUrl && _tabA && !_anyHiddenAnswers) {
     _tabA.style.display = '';  // show answer tab
     let _answerLoaded = false;
@@ -14742,7 +14757,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.40p';
+  const CURRENT_VERSION = 'v48.41p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

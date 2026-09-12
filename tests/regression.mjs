@@ -2281,6 +2281,77 @@ currentSection = 'reviewHeaderStuck';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: reviewTabReset (v48.29) — ดูแท็บ "เฉลย" → กด back → เข้าดูใหม่ แล้ว PDF
+// โผล่ซ้อนกัน 2 ชุด (โจทย์+เฉลย คนละครึ่งจอ) เพราะ #page-review ไม่ถูกสร้างใหม่ทุกครั้ง
+// ที่ navigate สถานะแท็บจากรอบก่อนจึงค้าง แล้วชนกับ loadReviewPdf() ที่เขียนทับ cssText
+// ฝั่งโจทย์ให้กลับมามองเห็น — พ่วงบั๊กร้ายกว่า: เปิดชุดที่ไม่มีเฉลย กลับเห็นเฉลยของชุดก่อน
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'reviewTabReset';
+{
+  const mkAtt = (id, examId, title) => ({
+    id, examId, examTitle: title, examSubject: 'คณิตศาสตร์', examType: 'mc', weighted: false,
+    takerName: 'เด็กทดสอบ', startedAt: new Date(Date.now() - 60000).toISOString(),
+    submittedAt: new Date().toISOString(), usedSeconds: 60, score: 1, total: 1, answers: { q1: 'A' },
+    perQuestion: [{ qid: 'q1', no: 1, page: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 }],
+    practiceMode: false, visitOrder: ['q1'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+  });
+  const { ctx, page } = await newSeededPage({
+    viewport: { width: 1180, height: 788 },
+    cache: baseCache({
+      exams: [
+        mkExam('rt1', 'ชุดมีเฉลย', 'คณิตศาสตร์', { pdfUrl: 'https://example.com/q1.pdf', answerPdfUrl: 'https://example.com/a1.pdf' }),
+        mkExam('rt2', 'ชุดไม่มีเฉลย', 'คณิตศาสตร์', { order: 2, pdfUrl: 'https://example.com/q2.pdf' }),
+      ],
+      questions: { rt1: mkQ(), rt2: mkQ() },
+      attempts: [mkAtt('attRT1', 'rt1', 'ชุดมีเฉลย'), mkAtt('attRT2', 'rt2', 'ชุดไม่มีเฉลย')],
+    }),
+  });
+  const viewerState = () => page.evaluate(() => {
+    const st = (id) => {
+      const el = document.getElementById(id); const cs = getComputedStyle(el); const r = el.getBoundingClientRect();
+      return { inFlow: cs.position !== 'absolute' && cs.visibility !== 'hidden' && r.height > 0, visibility: cs.visibility, position: cs.position, h: Math.round(r.height) };
+    };
+    return { q: st('reviewPdfViewer'), a: st('reviewAnswerPdfViewer') };
+  });
+
+  await page.evaluate(() => navigate('review', { attemptId: 'attRT1' }));
+  await page.waitForTimeout(600);
+  const s1 = await viewerState();
+  check('reviewTabReset: เข้าครั้งแรกโชว์แค่ PDF โจทย์', s1.q.inFlow === true && s1.a.inFlow === false, JSON.stringify(s1));
+
+  await page.evaluate(() => document.getElementById('reviewTabAnswer').click());
+  await page.waitForTimeout(600);
+  const s2 = await viewerState();
+  check('reviewTabReset: กดแท็บเฉลยแล้วโชว์แค่ PDF เฉลย', s2.a.inFlow === true && s2.q.inFlow === false, JSON.stringify(s2));
+
+  // ออกไปหน้าอื่นแล้วกลับเข้ามาใหม่ — จุดที่บั๊กเกิด
+  await page.evaluate(() => navigate('stats', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => navigate('review', { attemptId: 'attRT1' }));
+  await page.waitForTimeout(700);
+  const s3 = await viewerState();
+  const tabs = await page.evaluate(() => ({
+    q: document.getElementById('reviewTabQuestion').style.background,
+    a: document.getElementById('reviewTabAnswer').style.background,
+  }));
+  check('reviewTabReset: กลับเข้าดูใหม่ต้องโชว์แค่ PDF โจทย์ ไม่ซ้อนกัน 2 ชุด',
+    s3.q.inFlow === true && s3.a.inFlow === false, JSON.stringify(s3));
+  check('reviewTabReset: กลับเข้าดูใหม่ ปุ่มแท็บกลับไปไฮไลท์ "โจทย์" ตรงกับที่แสดงจริง',
+    tabs.q === 'rgb(17, 17, 17)' && tabs.a === 'rgb(255, 255, 255)', JSON.stringify(tabs));
+
+  // ข้ามชุด: ดูเฉลยชุดแรก แล้วไปเปิดชุดที่ไม่มี PDF เฉลย
+  await page.evaluate(() => document.getElementById('reviewTabAnswer').click());
+  await page.waitForTimeout(500);
+  await page.evaluate(() => navigate('review', { attemptId: 'attRT2' }));
+  await page.waitForTimeout(700);
+  const s4 = await viewerState();
+  const tabAHidden = await page.evaluate(() => document.getElementById('reviewTabAnswer').style.display);
+  check('reviewTabReset: เปิดชุดที่ไม่มีเฉลย ต้องไม่มี PDF เฉลยของชุดก่อนค้างโชว์ (เห็นเฉลยผิดชุด)',
+    s4.a.inFlow === false && s4.q.inFlow === true && tabAHidden === 'none', JSON.stringify({ ...s4, tabAHidden }));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
