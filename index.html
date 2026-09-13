@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.42 -->
+  <!-- APP_VERSION: v48.43 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -758,32 +758,36 @@
         padding: 4px 4px !important;
         width: 100% !important;
       }
+      /* v48.28p: คอลัมน์ Tag เดิมเป็นปุ่มเดี่ยว 36-42px — เปลี่ยนเป็น dropdown + ปุ่ม tag ย่อย
+         table-layout:fixed ทำให้คอลัมน์ "เฉลย" (auto) กินพื้นที่ที่เหลือหลังหักคอลัมน์ fixed —
+         ถ้าขยาย Tag กว้างเกิน (เคยลอง 110-120px) จะไปแย่งพื้นที่ "เฉลย" จนปุ่ม ก/ข/ค/ง บีบจนอ่านไม่ออก
+         แก้ด้วยการวางซ้อนแนวตั้ง (dropdown บน ปุ่ม tag ย่อยล่าง) แทนเรียงแนวนอน กว้างแค่ 74px พอ —
+         ตัวหนังสือใน select ที่ตัดด้วย ellipsis ไม่กระทบการใช้งานจริง เพราะแตะแล้ว browser
+         เปิด native picker แสดงตัวเลือกเต็มอยู่แล้วไม่ว่ากล่องจะแคบแค่ไหน */
       #page-admin_editor table th:nth-child(5),
       #page-admin_editor table td:nth-child(5) {
-        width: 36px !important;
-        padding: 6px 2px !important;
+        width: 74px !important;
+        padding: 4px 2px !important;
       }
-      #page-admin_editor table td:nth-child(5) button {
-        font-size: 14px !important;
-        padding: 4px 4px !important;
+      #page-admin_editor table td:nth-child(5) > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 2px !important;
+      }
+      #page-admin_editor table td:nth-child(5) select {
+        font-size: 9px !important;
+        padding: 2px !important;
         width: 100% !important;
-        max-width: 100% !important;
-        white-space: nowrap !important;
+        min-width: 0 !important;
         overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
       }
-      #page-admin_editor table td:nth-child(5) button span {
-        display: none !important;
-      }
-
-      #page-admin_editor table th:nth-child(5),
-      #page-admin_editor table td:nth-child(5) {
-        width: 42px !important;
-      }
-      #page-admin_editor table td:nth-child(5) button {
-        overflow: visible !important;
-        font-size: 16px !important;
-        padding: 4px !important;
-        min-width: 36px !important;
+      #page-admin_editor table td:nth-child(5) .subTagBtn {
+        font-size: 9px !important;
+        padding: 1px !important;
+        width: 100% !important;
+        min-width: 0 !important;
       }
 
       /* ── เปิดระบบคะแนน weighted (มี 6 คอลัมน์): override nth-child shift ── */
@@ -810,21 +814,32 @@
         width: 100% !important;
         min-width: 0 !important;
       }
-      /* คอลัมน์ 6 = Tag */
+      /* คอลัมน์ 6 = Tag — v48.28p: dropdown + ปุ่ม tag ย่อย วางซ้อนแนวตั้ง (เหมือนบล็อกไม่
+         weighted — เหตุผลเดียวกัน: ขยายแนวนอนแล้วไปแย่งพื้นที่คอลัมน์เฉลย/คะแนนที่แคบอยู่แล้ว) */
       #page-admin_editor table.weighted th:nth-child(6),
       #page-admin_editor table.weighted td:nth-child(6) {
-        width: 38px !important;
-        padding: 6px 2px !important;
+        width: 70px !important;
+        padding: 4px 2px !important;
       }
-      #page-admin_editor table.weighted td:nth-child(6) button {
-        overflow: visible !important;
-        font-size: 14px !important;
-        padding: 4px !important;
-        min-width: 0 !important;
+      #page-admin_editor table.weighted td:nth-child(6) > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 2px !important;
+      }
+      #page-admin_editor table.weighted td:nth-child(6) select {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 9px !important;
+        padding: 2px !important;
         width: 100% !important;
+        min-width: 0 !important;
       }
-      #page-admin_editor table.weighted td:nth-child(6) button span {
-        display: none !important;
+      #page-admin_editor table.weighted td:nth-child(6) .subTagBtn {
+        font-size: 9px !important;
+        padding: 1px !important;
+        width: 100% !important;
+        min-width: 0 !important;
       }
       /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
       #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
@@ -1285,7 +1300,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.42</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.43</div>
     </div>
   </div>
 </div>
@@ -3017,13 +3032,15 @@ function _updateOfflineBanner() {
 // v48.18 (ชั่วคราว): diagnostic log จับบั๊ก "layout เลื่อน / ปากกาหาย" ตอนทำข้อสอบ
 // เก็บ localStorage เป็นหลัก (รอด reload) แล้วทยอยส่งขึ้น Firestore แบบ batch
 // ให้เปิดดูจากเครื่องอื่นได้ — ถอดออกทั้งบล็อกเมื่อจับตัวบั๊กจริงได้แล้ว
+// preview/production ใช้ hostname เดียวกัน (localStorage + Firestore doc ก้อนเดียวกัน) —
+// ใส่ src ตาม path อัตโนมัติ กันข้อมูลทดสอบจาก preview ปนกับ log จริงของ production
 // ═══════════════════════════════════════════════════════════════════
 const _TAKE_DIAG_KEY = 'nanont:takeDiag', _TAKE_DIAG_MAX = 200;
 function _sanitizeDiagName(s){ return (s||'').replace(/[^a-zA-Z0-9฀-๿]/g,'_').slice(0,60); }
 function _takeDiag(ev, data){
   try{
     const arr = JSON.parse(localStorage.getItem(_TAKE_DIAG_KEY) || '[]');
-    arr.push({t:new Date().toLocaleString('th-TH'), ev, w:window.innerWidth, h:window.innerHeight, ...(data||{})});
+    arr.push({t:new Date().toLocaleString('th-TH'), ev, w:window.innerWidth, h:window.innerHeight, src:(location.pathname.indexOf('preview')>=0?'preview':'prod'), ...(data||{})});
     if(arr.length > _TAKE_DIAG_MAX) arr.splice(0, arr.length - _TAKE_DIAG_MAX);
     localStorage.setItem(_TAKE_DIAG_KEY, JSON.stringify(arr));
   }catch(e){ /* ห้าม log ทำแอปพังเด็ดขาด */ }
@@ -11470,16 +11487,23 @@ function initEditor(examId){
       tr.addEventListener('click',()=>select(idx));
       const _qTags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
       const _qSubTags=Array.isArray(q.subTags)?q.subTags:[];
-      const _mainChips=_qTags.length?_qTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:99px;color:#1d4ed8;font-weight:700;">${esc(t)}</span>`).join(' '):'';
-      const _subChips=_qSubTags.length?_qSubTags.map(t=>`<span style="font-size:10px;padding:1px 6px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:99px;color:#6d28d9;font-weight:700;">↳${esc(t)}</span>`).join(' '):'';
-      const _tagPreview=(_qTags.length||_qSubTags.length)?(_mainChips+(_subChips?' '+_subChips:'')):'<span style="font-size:11px;color:#9ca3af;">—</span>';
+      // v48.28p: เปลี่ยนช่อง Tag จากปุ่มเปิด modal เป็น dropdown เลือก tag หลักได้เร็วขึ้น —
+      // อ่านค่าปัจจุบันแบบ union กับ q.topic เพราะแถวที่มาจาก Excel import เขียนแค่ q.topic
+      // ไม่เคยเขียน q.tags เลย ถ้าอ่านจาก q.tags[0] เพียวๆ dropdown ของแถว import จะโชว์ว่าง
+      // เปล่าทั้งที่มี tag อยู่จริง
+      const _curTag=(_qTags[0])||'';
+      const _subjTopicsForSel=Array.isArray(s.subjectTopics[exam.subject])?s.subjectTopics[exam.subject]:[];
+      // กัน tag หาย: ถ้า tag ปัจจุบันไม่อยู่ใน subjectTopics แล้ว (เปลี่ยนวิชาทีหลัง/stale)
+      // ต้องเติมเป็น option พิเศษ ไม่งั้น dropdown จะเด้งไปค่าว่างแล้วลบ tag เดิมทิ้งเงียบๆ
+      const _tagOptsList=(_curTag&&!_subjTopicsForSel.includes(_curTag))?[..._subjTopicsForSel,_curTag]:_subjTopicsForSel;
+      const _tagOptsHtml='<option value="">— ไม่มี —</option>'+_tagOptsList.map(t=>`<option value="${esc(t)}"${t===_curTag?' selected':''}>${esc(t)}</option>`).join('');
       const _correctCellHtml=_isFillNum
         ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${_numDigits}}" maxlength="${_numDigits}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
         : `<div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div>`;
       const _ptsCellHtml=exam.weighted
         ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
         : '';
-      tr.innerHTML=`<td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td style="font-weight:900;">${q.number||q.no}</td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><button type="button" class="btn" data-field="tags" style="font-size:11px;padding:3px 8px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:180px;height:auto;white-space:normal;text-align:left;">🏷️ ${_tagPreview}</button></td>`;
+      tr.innerHTML=`<td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td style="font-weight:900;">${q.number||q.no}</td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><div style="display:flex;gap:3px;align-items:center;"><select class="tagSel" data-field="tags" style="flex:1;min-width:0;padding:4px 6px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;font-family:inherit;">${_tagOptsHtml}</select><button type="button" class="btn subTagBtn" data-field="subtags" title="tag ย่อย (↳)" style="font-size:11px;padding:3px 6px;flex-shrink:0;">↳${_qSubTags.length||''}</button></div></td>`;
       if(exam.weighted){
         const ptsInput=tr.querySelector('input[data-field="points"]');
         if(ptsInput){
@@ -11536,8 +11560,21 @@ function initEditor(examId){
           if(el) el.value=newPage;
         }
       });
-      const tagsBtn=tr.querySelector('button[data-field="tags"]');
-      if(tagsBtn){ tagsBtn.addEventListener('click',e=>{ e.stopPropagation(); window.openTagModal(q, idx, exam.subject||'', s, renderTable); }); }
+      const tagSel=tr.querySelector('select[data-field="tags"]');
+      if(tagSel){
+        tagSel.addEventListener('click',e=>e.stopPropagation()); // กันชนกับ tr.onclick=>select(idx)
+        tagSel.addEventListener('change',e=>{
+          e.stopPropagation();
+          const v=tagSel.value;
+          const _cur=(Array.isArray(q.tags)&&q.tags[0])||q.topic||'';
+          if(_cur!==v) q.subTags=[]; // เปลี่ยน tag หลัก → ล้าง tag ย่อย (semantics เดิมของ tag modal)
+          q.tags=v?[v]:[]; q.topic=v||'';
+          s.questions[examId]=list; Store.save(s);
+          renderTable();
+        });
+      }
+      const subTagBtn=tr.querySelector('button[data-field="subtags"]');
+      if(subTagBtn){ subTagBtn.addEventListener('click',e=>{ e.stopPropagation(); window.openTagModal(q, idx, exam.subject||'', s, renderTable); }); }
       const freeBtn = tr.querySelector('.freeBtn');
       refs[`${idx}:free`]=freeBtn;
       freeBtn.addEventListener('focus',()=>select(idx));
@@ -15140,7 +15177,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.42';
+  const CURRENT_VERSION = 'v48.43';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
