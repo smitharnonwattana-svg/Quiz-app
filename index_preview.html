@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.41p -->
+  <!-- APP_VERSION: v48.42p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1109,7 +1109,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.41p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.42p</div>
     </div>
   </div>
 </div>
@@ -7623,7 +7623,8 @@ function initStats(){
     // preserve current filter even if student has no attempts left after delete
     if(currentStudentFilter && currentStudentFilter!=='all') names.add(currentStudentFilter);
     const sorted=Array.from(names).sort((a,b)=>a.localeCompare(b,'th'));
-    studentEl.innerHTML=`<option value="all">ทั้งหมด</option>`+sorted.map(n=>`<option value="${n}">${n}</option>`).join('');
+    // ต้อง esc() ทั้ง value และข้อความ — ชื่อที่มี " หรือ < ทำให้ option ขาดกลางคัน เลือกแล้วกรองไม่เจอ
+    studentEl.innerHTML=`<option value="all">ทั้งหมด</option>`+sorted.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
     studentEl.value=currentStudentFilter;
   }
 
@@ -7644,7 +7645,15 @@ function initStats(){
   document.getElementById('statsConfirmOk').onclick=()=>{
     if(!pendingDeleteAttemptId) return closeConfirm();
     const s=Store.load();
-    s.attempts=(s.attempts||[]).filter(a=>a.id!==pendingDeleteAttemptId);
+    // การ์ด "คนละครึ่ง" ที่รวมคู่แล้วใช้ id ของครึ่งหลัง (ดู mergeHalfModePairs) — ถ้าลบแค่ id เดียว
+    // ครึ่งแรกจะค้างในฐานข้อมูลแล้วโผล่เป็นการ์ดคะแนนครึ่งเดียว ทำให้ค่าเฉลี่ย/กราฟเพี้ยนตาม
+    // จึงต้องลบทั้งคู่เสมอ และรองรับทั้งสองทิศทาง (ลบจากครึ่งหลัง → ตามไปลบครึ่งแรก และกลับกัน)
+    const _all=s.attempts||[];
+    const _target=_all.find(a=>a.id===pendingDeleteAttemptId);
+    const _delIds=new Set([pendingDeleteAttemptId]);
+    if(_target&&_target.parentAttemptId) _delIds.add(_target.parentAttemptId);
+    _all.forEach(a=>{ if(a.parentAttemptId===pendingDeleteAttemptId) _delIds.add(a.id); });
+    s.attempts=_all.filter(a=>!_delIds.has(a.id));
     Store.save(s);closeConfirm();render();
   };
 
@@ -8193,15 +8202,18 @@ function initStats(){
     ];
 
     // ── Tab bar ──
+    let _shownTab=_statsActiveTab; // แท็บที่แสดงรอบนี้ (อาจต่างจากที่ผู้ใช้เลือกถ้าแท็บนั้นว่าง)
     const tabBar=document.getElementById('statsTabBar');
     if(tabBar){
-      // auto-switch to first non-empty tab if active tab is empty
-      if(!sections.find(s=>s.key===_statsActiveTab)?.list.length){
+      // auto-switch to first non-empty tab if active tab is empty — แสดงชั่วคราวเท่านั้น
+      // ห้ามเขียนทับ _statsState.activeTab ไม่งั้นพอผู้ใช้ล้างตัวกรอง จะไม่ได้กลับไปแท็บที่
+      // ตัวเองเลือกไว้ (ต้องกดใหม่ทุกครั้ง) — ค่าจริงเปลี่ยนได้เฉพาะตอนผู้ใช้กดแท็บเอง
+      if(!sections.find(s=>s.key===_shownTab)?.list.length){
         const first=sections.find(s=>s.list.length);
-        if(first) _statsActiveTab=_statsState.activeTab=first.key;
+        if(first) _shownTab=first.key;
       }
       tabBar.innerHTML=sections.map(sec=>{
-        const active=_statsActiveTab===sec.key;
+        const active=_shownTab===sec.key;
         const cnt=sec.list.length;
         return`<button data-tab="${sec.key}" style="padding:10px 16px;font-size:13px;font-weight:${active?800:600};border:none;border-bottom:${active?'2px solid #111':'2px solid transparent'};background:none;cursor:pointer;color:${active?'#111':'#6b7280'};margin-bottom:-2px;white-space:nowrap;">${sec.icon} ${sec.title}${cnt?` <span style="font-size:11px;background:${active?'#111':'#e5e7eb'};color:${active?'#fff':'#6b7280'};border-radius:99px;padding:1px 6px;">${cnt}</span>`:''}</button>`;
       }).join('');
@@ -8215,7 +8227,7 @@ function initStats(){
     }
 
     // ── Active tab content ──
-    const activeSec=sections.find(s=>s.key===_statsActiveTab)||sections[0];
+    const activeSec=sections.find(s=>s.key===_shownTab)||sections[0];
     const _cardUids=[];
     let _secHtml='';
     if(activeSec&&activeSec.list.length){
@@ -14757,7 +14769,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.41p';
+  const CURRENT_VERSION = 'v48.42p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

@@ -2352,6 +2352,83 @@ currentSection = 'reviewTabReset';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: statsPage (v48.30) — บั๊ก 3 ข้อที่เจอจากการไล่เทสหน้า "ผลการฝึกซ้อม"
+//  1. ลบการ์ด "คนละครึ่ง" ที่รวมคู่แล้ว ลบแค่ครึ่งหลัง เหลือครึ่งแรกค้างเป็นการ์ดคะแนนครึ่งเดียว
+//  2. auto-switch แท็บตอนแท็บที่เลือกว่าง เขียนทับแท็บที่ผู้ใช้เลือกถาวร (ล้างตัวกรองก็ไม่กลับ)
+//  3. ชื่อนักเรียนที่มี " หรือ < ทำ <option> ใน dropdown ขาดกลางคัน เลือกแล้วกรองไม่เจอ
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'statsPage';
+{
+  const D = (d) => new Date(Date.now() - d * 86400000).toISOString();
+  const at = (o) => ({ examSubject: 'คณิตศาสตร์', examType: 'mc', weighted: false, takerName: 'เด็กสถิติ',
+    usedSeconds: 300, answers: {}, perQuestion: [], practiceMode: false, visitOrder: [], difficulty: 'develop', ...o });
+  const statsCache = () => baseCache({
+    exams: [
+      mkExam('sxA', 'เลข ชุด A', 'คณิตศาสตร์'),
+      mkExam('sxB', 'วิทย์ ชุด B', 'วิทยาศาสตร์', { order: 2 }),
+    ],
+    questions: { sxA: mkQ(), sxB: mkQ() },
+    attempts: [
+      at({ id: 's_real1', examId: 'sxA', examTitle: 'เลข ชุด A', score: 8, total: 10, startedAt: D(1), submittedAt: D(1) }),
+      at({ id: 's_realB', examId: 'sxB', examTitle: 'วิทย์ ชุด B', examSubject: 'วิทยาศาสตร์', score: 5, total: 10, startedAt: D(2), submittedAt: D(2) }),
+      at({ id: 's_half1', examId: 'sxA', examTitle: 'เลข ชุด A', score: 3, total: 5, startedAt: D(5), submittedAt: D(5), halfMode: true, halfQuota: 5 }),
+      at({ id: 's_half2', examId: 'sxA', examTitle: 'เลข ชุด A', score: 4, total: 5, startedAt: D(4), submittedAt: D(4), halfMode: true, halfPart: 2, parentAttemptId: 's_half1', halfQuota: 5 }),
+    ],
+    members: [{ pin: '311257', name: 'เด็กสถิติ' }, { pin: '311258', name: 'เด็ก"<b>x' }],
+  });
+  const openStats = async (page) => { await page.evaluate(() => navigate('stats', {})); await page.waitForTimeout(500); };
+  const cardIds = (page) => page.evaluate(() => [...document.querySelectorAll('#statsRows [data-review]')].map(b => b.getAttribute('data-review')));
+  const clickTab = async (page, k) => { await page.evaluate((k) => document.querySelector(`#statsTabBar [data-tab="${k}"]`)?.click(), k); await page.waitForTimeout(300); };
+
+  // ── 1. ลบการ์ดคนละครึ่งที่รวมคู่แล้ว ต้องลบทั้งคู่ ──
+  {
+    const { ctx, page } = await newSeededPage({ cache: statsCache() });
+    await openStats(page);
+    await clickTab(page, 'half');
+    const before = await cardIds(page);
+    const halfScore = await page.evaluate(() => (document.getElementById('statsRows').textContent.match(/\d+\/\d+/) || [])[0]);
+    check('statsPage: แท็บคนละครึ่งรวมคู่เป็นการ์ดเดียว คะแนนรวม 7/10',
+      before.length === 1 && halfScore === '7/10', JSON.stringify({ before, halfScore }));
+    await page.evaluate(() => document.querySelector('#statsRows [data-del]')?.click());
+    await page.waitForTimeout(250);
+    await page.evaluate(() => document.getElementById('statsConfirmOk').click());
+    await page.waitForTimeout(450);
+    const left = await page.evaluate(() => (Store.load().attempts || []).map(a => a.id));
+    check('statsPage: ลบการ์ดคนละครึ่ง → ลบทั้งคู่ ไม่เหลือครึ่งแรกค้างเป็นการ์ดคะแนนครึ่งเดียว',
+      !left.includes('s_half1') && !left.includes('s_half2') && left.includes('s_real1'), JSON.stringify(left));
+    await ctx.close();
+  }
+
+  // ── 2. ชื่อนักเรียนที่มีอักขระพิเศษต้องไม่ทำ dropdown ขาด ──
+  {
+    const { ctx, page } = await newSeededPage({ cache: statsCache() });
+    await openStats(page);
+    const opts = await page.evaluate(() => [...document.getElementById('statsFilterStudent').options].map(o => o.value));
+    check('statsPage: ชื่อนักเรียนที่มี " และ < อยู่ใน dropdown ครบ ไม่ถูกตัดกลางคัน',
+      opts.includes('เด็ก"<b>x'), JSON.stringify(opts));
+    await ctx.close();
+  }
+
+  // ── 3. auto-switch แท็บต้องไม่แย่งแท็บที่ผู้ใช้เลือกถาวร ──
+  {
+    const { ctx, page } = await newSeededPage({ cache: statsCache() });
+    await openStats(page);
+    await clickTab(page, 'half');
+    const picked = await page.evaluate(() => _statsState.activeTab);
+    const setSubject = async (v) => { await page.evaluate((v) => { const s = document.getElementById('statsFilterSubject'); s.value = v; s.dispatchEvent(new Event('change')); }, v); await page.waitForTimeout(350); };
+    await setSubject('วิทยาศาสตร์');   // แท็บคนละครึ่งว่าง → สลับให้ชั่วคราว
+    const during = await page.evaluate(() => ({ state: _statsState.activeTab, shown: document.querySelector('#statsTabBar [data-tab][style*="800"]')?.getAttribute('data-tab') }));
+    await setSubject('all');            // ล้างตัวกรอง
+    const after = await page.evaluate(() => _statsState.activeTab);
+    check('statsPage: กรองจนแท็บว่าง → สลับแสดงชั่วคราวได้ แต่ไม่เขียนทับแท็บที่ผู้ใช้เลือก',
+      picked === 'half' && during.state === 'half' && during.shown === 'real', JSON.stringify({ picked, during }));
+    check('statsPage: ล้างตัวกรองแล้วกลับไปแท็บ "คนละครึ่ง" ที่ผู้ใช้เลือกไว้เอง',
+      after === 'half', JSON.stringify({ picked, after }));
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
