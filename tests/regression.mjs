@@ -1906,6 +1906,69 @@ currentSection = 'backForwardNav';
     check('backForwardNav: popstate state เพี้ยน (หน้าไม่มีจริง) → fallback ไป home ไม่ใช่จอว่าง', result === 'page-home', 'active=' + result);
     await ctx.close();
   }
+
+  // 7: soft-refresh (navigate() ซ้ำด้วย page/params เดิม เช่นจาก Firestore realtime
+  // listener) ต้องไม่ push history ซ้ำ (v48.52) — ของเดิมพองด้วย entry ซ้ำทุกครั้งที่
+  // cloud data เปลี่ยนแม้ page จะไม่เปลี่ยนเลย ทำให้กด back แค่ 1-2 ครั้งไหลทะลุกลับไป
+  // ถึง entry เก่าๆ ได้ง่ายกว่าที่ควร
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache() });
+    await page.evaluate(() => navigate('exams', {}));
+    const lenAfterFirst = await page.evaluate(() => history.length);
+    await page.evaluate(() => { navigate('exams', {}); navigate('exams', {}); navigate('exams', {}); });
+    const lenAfterRefresh = await page.evaluate(() => history.length);
+    check('backForwardNav: soft-refresh ซ้ำด้วย page/params เดิม → history.length ไม่ขยับเพิ่ม',
+      lenAfterRefresh === lenAfterFirst, `before=${lenAfterFirst} after=${lenAfterRefresh}`);
+
+    await page.evaluate(() => navigate('stats', {}));
+    const lenAfterRealNav = await page.evaluate(() => history.length);
+    check('backForwardNav: navigate ไปหน้าอื่นจริง (ไม่ใช่ soft-refresh) → history.length ยังขยับปกติ',
+      lenAfterRealNav === lenAfterRefresh + 1, `after=${lenAfterRealNav}`);
+    await ctx.close();
+  }
+
+  // 8: entry เก่า {page:'login'} (จากตอนบูตแอปก่อน auth) ต้องไม่โผล่ทับหน้าจอทั้งที่
+  // ยัง login อยู่จริง (v48.52)
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache() });
+    await page.evaluate(() => { history.pushState({ page: 'login', params: {} }, '', location.href); });
+    await page.evaluate(() => navigate('home', {}));
+    await page.evaluate(() => navigate('exams', {}));
+    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForTimeout(300);
+    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForTimeout(300);
+    const result = await page.evaluate(() => ({ active: document.querySelector('.page.active')?.id, loggedIn: Auth.isLoggedIn() }));
+    check('backForwardNav: back ไปเจอ entry {page:login} เก่าทั้งที่ยัง login อยู่จริง → ได้ page-home ไม่ใช่ page-login',
+      result.active === 'page-home' && result.loggedIn === true, JSON.stringify(result));
+    await ctx.close();
+  }
+
+  // 9: Auth.login() ต้อง await claimSession ก่อนเรียก listenSession เสมอ (v48.52) —
+  // เดิมยิงพร้อมกัน (fire-and-forget) ทำให้ listener อาจเห็น token เก่าจาก cache
+  // ก่อนเขียนเสร็จ แล้วเข้าใจผิดว่าโดนเครื่องอื่น kick ทั้งที่เป็น timing ของตัวเอง
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache({ members: [{ pin: '311257', name: 'เด็กทดสอบ' }] }) });
+    const order = await page.evaluate(async () => {
+      const calls = [];
+      let resolveClaim;
+      const claimPromise = new Promise(r => { resolveClaim = r; });
+      FirebaseSync.ready = () => true;
+      FirebaseSync.claimSession = () => { calls.push('claimSession:start'); return claimPromise.then(() => calls.push('claimSession:resolved')); };
+      FirebaseSync.listenSession = () => { calls.push('listenSession:attached'); };
+      Auth.login('311257');
+      await new Promise(r => setTimeout(r, 1050));
+      const beforeResolve = [...calls];
+      resolveClaim();
+      await new Promise(r => setTimeout(r, 50));
+      return { beforeResolve, afterResolve: [...calls] };
+    });
+    check('backForwardNav: Auth.login() await claimSession ก่อนแนบ listenSession เสมอ',
+      JSON.stringify(order.beforeResolve) === JSON.stringify(['claimSession:start']) &&
+      JSON.stringify(order.afterResolve) === JSON.stringify(['claimSession:start', 'claimSession:resolved', 'listenSession:attached']),
+      JSON.stringify(order));
+    await ctx.close();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
