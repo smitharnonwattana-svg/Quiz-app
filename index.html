@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.41 -->
+  <!-- APP_VERSION: v48.42 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -313,10 +313,6 @@
     .examCard.drag-over{border-color:#6366f1;background:#eef2ff;transform:scale(1.01);}
     .examCard.dragging{opacity:.4;cursor:grabbing;}
     .examCard.drag-mode{cursor:grab;touch-action:none;}
-    .examEditBar{display:none;align-items:center;gap:10px;padding:10px 16px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;margin-top:12px;font-size:13px;font-weight:700;color:#4338ca;}
-    .examEditBar.show{display:flex;}
-    .subjCard{transition:all .18s;box-shadow:0 1px 4px rgba(0,0,0,.05);}
-    .subjCard:hover{box-shadow:0 6px 20px rgba(0,0,0,.1);transform:translateY(-2px);border-color:#a5b4fc;}
     @media(max-width:980px){.reviewLayout{grid-template-columns:1fr;height:auto;}.reviewSide{height:auto;overflow-y:visible;}}
     /* position:relative — viewer ที่ถูกซ่อนตอนสลับแท็บ โจทย์/เฉลย ถูกตั้ง position:absolute
        ถ้ากล่องนี้ไม่ใช่ containing block มันจะไปอิง viewport แล้วยื่นเลยขอบล่าง สร้าง
@@ -1015,6 +1011,97 @@
     }
     #page-home .home-primary-btn:active { background: #0052A3; }
 
+    /* Exams page (subject → folder → exam list) — redesign เป็น Apple HIG (grouped
+       list) ต่อจากหน้า home/login เดียวกันทุกจุด (#F2F2F7 พื้นหลัง, grouped-list ขาว
+       คั่นเส้นบาง, glyph badge สี่เหลี่ยมทึบสี+ไอคอนขาว, สี text 1C1C1E/6E6E73/8E8E93,
+       accent 0066CC) — ระดับวิชา/โฟลเดอร์ใช้ grouped-list แบบเดียวกับ home เป๊ะ ระดับ
+       รายการข้อสอบ (เนื้อหาต่อแถวซับซ้อนกว่า: คะแนน/badge ค้างทำ/จุดอ่อน) ยังคงโครง
+       .examGrid/.examCard เดิม (เพื่อไม่แตะ logic drag-reorder/resume-ticker/ปุ่มต่างๆ)
+       แต่เปลี่ยนจากการ์ดลอย+shadow เป็น grouped-list แถวคั่นเส้นบางแบบเดียวกัน สีทุกคู่
+       ตรวจ WCAG AA แล้ว ไม่มี emoji ในส่วน chrome (ไอคอนสถานะต่อรายการยังคงไว้ก่อน) */
+    #page-exams { background: #F2F2F7; }
+    #page-exams .h1 { font-size: 28px; }
+    #page-exams .exam-back-btn {
+      display: flex; align-items: center; gap: 2px;
+      border: none; background: none; padding: 4px 2px 4px 0;
+      color: #0066CC; font-size: 17px; font-family: inherit; cursor: pointer;
+    }
+    #page-exams .exam-header-btn {
+      display: flex; align-items: center; gap: 4px;
+      border: none; background: none; padding: 4px 2px;
+      color: #0066CC; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    #page-exams .exam-group {
+      background: #fff;
+      border-radius: 14px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+    #page-exams .exam-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      padding: 12px 16px;
+      cursor: pointer;
+      position: relative;
+    }
+    #page-exams .exam-row:not(:last-child) { border-bottom: 1px solid #C6C6C8; }
+    #page-exams .exam-row:active { background: #F2F2F7; }
+    #page-exams .exam-row-badge {
+      width: 29px; height: 29px; border-radius: 7px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+    }
+    #page-exams .exam-row-label { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; color: #1C1C1E; }
+    #page-exams .exam-row-sub { font-size: 13px; color: #6E6E73; margin-left: 8px; flex-shrink: 0; }
+    #page-exams .exam-row-chevron { color: #8E8E93; flex-shrink: 0; }
+    #page-exams .exam-row-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    #page-exams .exam-row-icon-btn {
+      border: none; background: #F2F2F7; color: #6E6E73; border-radius: 7px;
+      width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+    }
+    #page-exams .exam-row-icon-btn.danger { background: #FFE5E5; color: #D70015; }
+    #page-exams .exam-row.addRow { color: #0066CC; }
+    #page-exams .exam-row.addRow .exam-row-label { color: #0066CC; font-weight: 600; }
+    #page-exams .examEditBar {
+      display: none; align-items: center; gap: 10px; margin-top: 14px;
+      background: #fff; border-radius: 14px; padding: 10px 14px;
+      font-size: 13px; color: #6E6E73;
+    }
+    #page-exams .examEditBar.show { display: flex; }
+    #page-exams .examEditBar > span:first-child { margin-right: auto; }
+    /* exam-list level: คง .examGrid/.examCard เดิมไว้ (JS logic เดิมทั้งหมด) — v48.55p
+       กลับไปเป็น grid การ์ดแยกใบ 2-3 คอลัมน์/แถว ตามที่ผู้ใช้ทดสอบ live preview แล้ว
+       ไม่ชอบ layout list แถวเดียวเต็มความกว้างของรอบก่อน (v48.54p) แต่ยังคงโทนสี/
+       ไอคอน HIG ที่ทำไปแล้วทั้งหมด แค่เปลี่ยนภาชนะ/container กลับเป็น grid-of-cards */
+    #page-exams .examGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    #page-exams .examCard {
+      background: #fff;
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      padding: 16px;
+      transform: none !important;
+    }
+    #page-exams .examCard:active { background: #F2F2F7; }
+    #page-exams .examCard.drag-over { background: #EAF2FF; }
+    #page-exams .examCard .subj {
+      background: #F2F2F7; color: #6E6E73; font-weight: 600;
+    }
+    #page-exams .examCard .title { color: #1C1C1E; }
+    #page-exams .examCard .meta { color: #6E6E73; }
+    #page-exams .examCard .score-badge { background: #F2F2F7; border: none; color: #6E6E73; }
+    #page-exams .exam-row.drag-over { background: #EAF2FF; }
+    #page-exams .exam-row.dragging { opacity: .4; }
+    #page-exams .exam-row-drag-handle { cursor: grab; touch-action: none; color: #8E8E93; }
+
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
       position: fixed; right: 18px; bottom: 100px;
@@ -1198,7 +1285,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.41</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.42</div>
     </div>
   </div>
 </div>
@@ -1233,22 +1320,35 @@
 <!-- ===================== PAGE: EXAMS ===================== -->
 <div id="page-exams" class="page">
   <div class="container">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:4px;">
+    <button type="button" class="exam-back-btn" onclick="navigate('home')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      กลับ
+    </button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <h1 class="h1" style="margin:0;">เลือกชุดข้อสอบ</h1>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button id="examsEditBtn" class="btn" style="display:none;">✏️ จัดลำดับ</button>
-        <button class="btn" onclick="navigate('home')">← กลับ</button>
-      </div>
+      <button type="button" id="examsEditBtn" class="exam-header-btn" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+        จัดลำดับ
+      </button>
     </div>
     <div id="examEditBar" class="examEditBar">
-      <span>🖱️ ลากเพื่อเรียงลำดับ</span>
-      <button id="examCreateFolderBtn" class="btn" style="padding:6px 14px;font-size:12px;display:none;">📁 สร้างโฟลเดอร์</button>
-      <button id="examsEditDoneBtn" class="btn btnPrimary" style="padding:6px 14px;font-size:12px;">✅ เสร็จแล้ว</button>
+      <span>ลากเพื่อเรียงลำดับ</span>
+      <button id="examCreateFolderBtn" class="exam-header-btn" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        สร้างโฟลเดอร์
+      </button>
+      <button id="examsEditDoneBtn" class="exam-header-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        เสร็จแล้ว
+      </button>
     </div>
     <div id="examsSubjGrid"></div>
     <div id="examsBackToSubj" style="display:none;margin-top:14px;display:none;align-items:center;gap:10px;">
-      <button class="btn" id="examsBackToSubjBtn">← วิชา</button>
-      <span id="examsSelectedSubjLabel" style="font-weight:900;font-size:16px;"></span>
+      <button type="button" class="exam-back-btn" id="examsBackToSubjBtn" style="padding:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        วิชา
+      </button>
+      <span id="examsSelectedSubjLabel" style="font-weight:600;font-size:16px;color:#1C1C1E;"></span>
     </div>
     <select id="examsSubjFilter" style="display:none;"></select>
     <div id="examsList" class="list"></div>
@@ -4064,9 +4164,22 @@ const _ICONS = {
   bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
   messageCircle: '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
+  chevronLeft: '<path d="m15 18-6-6 6-6"/>',
   logOut: '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
   activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
-  bookOpen: '<path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/>'
+  bookOpen: '<path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/>',
+  calculator: '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
+  flaskConical: '<path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/>',
+  languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  graduationCap: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  layoutGrid: '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  folderOpen: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+  folderPlus: '<path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  gripVertical: '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+  trash2: '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>'
 };
 
 // WHOOP UI — Stage 4
@@ -4945,8 +5058,8 @@ window.addEventListener('orientationchange', _syncTakeStickyBarLift);
 // ===================== EXAMS PAGE =====================
 // รายชื่อวิชามาตรฐาน — จุดเดียวในไฟล์ (เพิ่มวิชาใหม่ที่นี่ที่เดียว)
 const KNOWN_SUBJS = ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา','สอบเข้า ม.1'];
-const SUBJ_EMOJI = {'คณิตศาสตร์':'🔢','วิทยาศาสตร์':'🔬','ภาษาไทย':'📖','ภาษาอังกฤษ':'🌐','สังคมศึกษา':'🌍','สอบเข้า ม.1':'🎓'};
-const SUBJ_BG = {'คณิตศาสตร์':'#eff6ff','วิทยาศาสตร์':'#f0fdf4','ภาษาไทย':'#fff7ed','ภาษาอังกฤษ':'#f0f9ff','สังคมศึกษา':'#fefce8','สอบเข้า ม.1':'#faf5ff'};
+const SUBJ_ICON = {'คณิตศาสตร์':'calculator','วิทยาศาสตร์':'flaskConical','ภาษาไทย':'bookOpen','ภาษาอังกฤษ':'languages','สังคมศึกษา':'globe','สอบเข้า ม.1':'graduationCap'};
+const SUBJ_COLOR = {'คณิตศาสตร์':'#0066CC','วิทยาศาสตร์':'#1F7A37','ภาษาไทย':'#BF5B00','ภาษาอังกฤษ':'#0E7C8C','สังคมศึกษา':'#A24DCB','สอบเข้า ม.1':'#5856D6'};
 function initExams(){
   if(!Store._cloudLoaded){
     const _sg=document.getElementById('examsSubjGrid');
@@ -5012,7 +5125,7 @@ function initExams(){
   }
   if(createFolderBtn) createFolderBtn.onclick = createFolderForCurrentSubject;
 
-  // KNOWN_SUBJS/SUBJ_EMOJI/SUBJ_BG ประกาศ module-level เหนือฟังก์ชันนี้
+  // KNOWN_SUBJS/SUBJ_ICON/SUBJ_COLOR ประกาศ module-level เหนือฟังก์ชันนี้
 
   const subjectGrid = document.getElementById('examsSubjGrid');
   const backRow = document.getElementById('examsBackToSubj');
@@ -5054,31 +5167,31 @@ function initExams(){
     if(subjectGrid){
       const otherCount = allPub.filter(e=>!KNOWN_SUBJS.includes(e.subject||'')).length;
       const handleHtml = _editMode
-        ? '<span class="subj-drag-handle" style="position:absolute;top:6px;right:6px;font-size:16px;color:#6b7280;background:#f3f4f6;border-radius:6px;padding:2px 5px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;line-height:1;">☰</span>'
+        ? `<span class="subj-drag-handle exam-row-drag-handle">${_icon(_ICONS.gripVertical,18)}</span>`
         : '';
       const gridEl = document.createElement('div');
-      gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:16px;';
+      gridEl.className = 'exam-group';
 
       subjList.filter(([subj])=>KNOWN_SUBJS.includes(subj)).forEach(([subj,cnt])=>{
         const card = document.createElement('div');
-        card.className = 'linkCard subjCard';
+        card.className = 'exam-row';
         card.dataset.subj = subj;
-        card.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
-        card.innerHTML = `${handleHtml}
-          <div style="width:54px;height:54px;border-radius:16px;background:${SUBJ_BG[subj]||'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">${SUBJ_EMOJI[subj]||'📚'}</div>
-          <div style="font-weight:900;font-size:14px;line-height:1.3;">${esc(subj)}</div>
-          <div class="muted" style="font-size:12px;margin-top:5px;">${cnt} ชุด</div>`;
+        card.innerHTML = `
+          <div class="exam-row-badge" style="background:${SUBJ_COLOR[subj]||'#8E8E93'};">${_icon(_ICONS[SUBJ_ICON[subj]]||_ICONS.bookOpen,16)}</div>
+          <div class="exam-row-label">${esc(subj)}</div>
+          <div class="exam-row-sub">${cnt} ชุด</div>
+          ${handleHtml || `<div class="exam-row-chevron">${_icon(_ICONS.chevronRight,18)}</div>`}`;
         gridEl.appendChild(card);
       });
       if(otherCount>0){
         const card = document.createElement('div');
-        card.className = 'linkCard subjCard';
+        card.className = 'exam-row';
         card.dataset.subj = 'อื่นๆ';
-        card.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
-        card.innerHTML = `${handleHtml}
-          <div style="width:54px;height:54px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">📚</div>
-          <div style="font-weight:900;font-size:14px;line-height:1.3;">อื่นๆ</div>
-          <div class="muted" style="font-size:12px;margin-top:5px;">${otherCount} ชุด</div>`;
+        card.innerHTML = `
+          <div class="exam-row-badge" style="background:#8E8E93;">${_icon(_ICONS.layoutGrid,16)}</div>
+          <div class="exam-row-label">อื่นๆ</div>
+          <div class="exam-row-sub">${otherCount} ชุด</div>
+          ${handleHtml || `<div class="exam-row-chevron">${_icon(_ICONS.chevronRight,18)}</div>`}`;
         gridEl.appendChild(card);
       }
 
@@ -5160,7 +5273,7 @@ function initExams(){
     listEl.className = '';
     listEl.innerHTML = '';
     const gridEl = document.createElement('div');
-    gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:16px;';
+    gridEl.className = 'exam-group';
 
     const sortedFolders = [...folders].sort((a,b)=>(a.order??0)-(b.order??0));
     const validIds = new Set(sortedFolders.map(f=>f.id));
@@ -5168,39 +5281,40 @@ function initExams(){
     sortedFolders.forEach(f=>{
       const cnt = examsInSubj.filter(e=>e.folderId===f.id).length;
       const card = document.createElement('div');
-      card.className = 'linkCard subjCard';
+      card.className = 'exam-row';
       card.dataset.folder = f.id;
-      card.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
       const editIconsHtml = _editMode
-        ? `<div style="position:absolute;top:6px;right:6px;display:flex;gap:4px;">
-             <span data-editfolder="${f.id}" title="แก้ชื่อ" style="cursor:pointer;font-size:13px;background:#f3f4f6;border-radius:6px;padding:2px 5px;">✏️</span>
-             <span data-delfolder="${f.id}" title="ลบโฟลเดอร์" style="cursor:pointer;font-size:13px;background:#fee2e2;border-radius:6px;padding:2px 5px;">🗑</span>
+        ? `<div class="exam-row-actions">
+             <button type="button" class="exam-row-icon-btn" data-editfolder="${f.id}" title="แก้ชื่อ">${_icon(_ICONS.pencil,14)}</button>
+             <button type="button" class="exam-row-icon-btn danger" data-delfolder="${f.id}" title="ลบโฟลเดอร์">${_icon(_ICONS.trash2,14)}</button>
            </div>`
-        : '';
-      card.innerHTML = `${editIconsHtml}
-        <div style="width:54px;height:54px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">📁</div>
-        <div style="font-weight:900;font-size:14px;line-height:1.3;">${esc(f.name)}</div>
-        <div class="muted" style="font-size:12px;margin-top:5px;">${cnt} ชุด</div>`;
+        : `<div class="exam-row-chevron">${_icon(_ICONS.chevronRight,18)}</div>`;
+      card.innerHTML = `
+        <div class="exam-row-badge" style="background:#8E8E93;">${_icon(_ICONS.folder,16)}</div>
+        <div class="exam-row-label">${esc(f.name)}</div>
+        <div class="exam-row-sub">${cnt} ชุด</div>
+        ${editIconsHtml}`;
       gridEl.appendChild(card);
     });
 
     // "ทั่วไป" — ข้อสอบที่ไม่มีโฟลเดอร์ หรือ folderId ชี้ไปโฟลเดอร์ที่ถูกลบไปแล้ว
     const ungroupedCount = examsInSubj.filter(e=>!e.folderId||!validIds.has(e.folderId)).length;
     const ungroupedCard = document.createElement('div');
-    ungroupedCard.className = 'linkCard subjCard';
+    ungroupedCard.className = 'exam-row';
     ungroupedCard.dataset.folder = 'none';
-    ungroupedCard.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;position:relative;';
     ungroupedCard.innerHTML = `
-      <div style="width:54px;height:54px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;">📂</div>
-      <div style="font-weight:900;font-size:14px;line-height:1.3;">ทั่วไป</div>
-      <div class="muted" style="font-size:12px;margin-top:5px;">${ungroupedCount} ชุด</div>`;
+      <div class="exam-row-badge" style="background:#8E8E93;">${_icon(_ICONS.folderOpen,16)}</div>
+      <div class="exam-row-label">ทั่วไป</div>
+      <div class="exam-row-sub">${ungroupedCount} ชุด</div>
+      <div class="exam-row-chevron">${_icon(_ICONS.chevronRight,18)}</div>`;
     gridEl.appendChild(ungroupedCard);
 
     if(_editMode){
       const addCard = document.createElement('div');
-      addCard.className = 'linkCard subjCard';
-      addCard.style.cssText = 'text-align:center;padding:22px 12px 18px;cursor:pointer;border:2px dashed #c7d2fe;background:#eef2ff;';
-      addCard.innerHTML = `<div style="font-size:26px;margin-bottom:10px;">➕</div><div style="font-weight:900;font-size:13px;color:#4338ca;">สร้างโฟลเดอร์</div>`;
+      addCard.className = 'exam-row addRow';
+      addCard.innerHTML = `
+        <div class="exam-row-badge" style="background:#0066CC;">${_icon(_ICONS.folderPlus,16)}</div>
+        <div class="exam-row-label">สร้างโฟลเดอร์</div>`;
       addCard.addEventListener('click', createFolderForCurrentSubject);
       gridEl.appendChild(addCard);
     }
@@ -5423,7 +5537,7 @@ function initExams(){
               <option value="">ไม่มีโฟลเดอร์</option>
               ${folders.map(f=>`<option value="${f.id}" ${e.folderId===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}
             </select>`:''}
-            ${_editMode?'<span class="drag-handle" style="font-size:20px;color:#6b7280;cursor:grab;padding:4px 8px;touch-action:none;user-select:none;-webkit-user-select:none;background:#f3f4f6;border-radius:8px;line-height:1;">☰</span>':''}
+            ${_editMode?`<span class="drag-handle exam-row-icon-btn" style="cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;">${_icon(_ICONS.gripVertical,16)}</span>`:''}
             ${Auth.isTeacher()?`<button title="คัดลอกลิ้งแชร์ข้อสอบนี้" data-examid="${e.id}" data-title="${esc(e.title)}" onclick="copyExamLink(this,event)"
               style="border:none;background:none;cursor:pointer;padding:2px 4px;font-size:16px;line-height:1;color:#9ca3af;border-radius:6px;"
               onmouseover="this.style.background='#f3f4f6';this.style.color='#3b82f6'"
@@ -15026,7 +15140,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.41';
+  const CURRENT_VERSION = 'v48.42';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
