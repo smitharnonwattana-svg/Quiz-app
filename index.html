@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <!-- ปิด auto-link ที่เบราว์เซอร์เดา (Safari/Chrome ชอบขีดเส้นใต้ข้อความที่ดู
+       เหมือนที่อยู่/เบอร์โทร/วันที่ แล้วเด้ง popup Google Maps เอง — เจอกับชื่อชุด
+       ข้อสอบที่มีคำ+ตัวเลขที่ดันไปแมตช์แพทเทิร์นที่อยู่พอดี) -->
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
   <script>
   (function(){
     if (/Line\//i.test(navigator.userAgent)) {
@@ -27,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.37 -->
+  <!-- APP_VERSION: v48.38 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1194,7 +1198,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.37</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.38</div>
     </div>
   </div>
 </div>
@@ -14950,7 +14954,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.37';
+  const CURRENT_VERSION = 'v48.38';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
