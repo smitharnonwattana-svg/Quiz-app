@@ -2,3 +2,4 @@ index_v*.html
 preview_*.html
 .claude-local
 functions/node_modules/
+scripts/__pycache__/
