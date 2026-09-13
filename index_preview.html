@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.54p -->
+  <!-- APP_VERSION: v48.55p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1087,25 +1087,25 @@
     }
     #page-exams .examEditBar.show { display: flex; }
     #page-exams .examEditBar > span:first-child { margin-right: auto; }
-    /* exam-list level: คง .examGrid/.examCard เดิมไว้ (JS logic เดิมทั้งหมด) แค่เปลี่ยน
-       จากการ์ดลอย+shadow เป็น grouped-list แถวคั่นเส้นบาง */
+    /* exam-list level: คง .examGrid/.examCard เดิมไว้ (JS logic เดิมทั้งหมด) — v48.55p
+       กลับไปเป็น grid การ์ดแยกใบ 2-3 คอลัมน์/แถว ตามที่ผู้ใช้ทดสอบ live preview แล้ว
+       ไม่ชอบ layout list แถวเดียวเต็มความกว้างของรอบก่อน (v48.54p) แต่ยังคงโทนสี/
+       ไอคอน HIG ที่ทำไปแล้วทั้งหมด แค่เปลี่ยนภาชนะ/container กลับเป็น grid-of-cards */
     #page-exams .examGrid {
-      display: block;
-      background: #fff;
-      border-radius: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
       margin-top: 14px;
-      overflow: hidden;
     }
     #page-exams .examCard {
       background: #fff;
       border: none;
-      border-radius: 0;
-      box-shadow: none;
-      padding: 14px 16px;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      padding: 16px;
       transform: none !important;
     }
-    #page-exams .examCard:not(:last-child) { border-bottom: 1px solid #C6C6C8; }
-    #page-exams .examCard:hover { border-color: transparent; box-shadow: none; transform: none; background: #F2F2F7; }
+    #page-exams .examCard:active { background: #F2F2F7; }
     #page-exams .examCard.drag-over { background: #EAF2FF; }
     #page-exams .examCard .subj {
       background: #F2F2F7; color: #6E6E73; font-weight: 600;
@@ -1300,7 +1300,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.54p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.55p</div>
     </div>
   </div>
 </div>
@@ -15178,7 +15178,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.54p';
+  const CURRENT_VERSION = 'v48.55p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
