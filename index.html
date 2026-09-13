@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <!-- ปิด auto-link ที่เบราว์เซอร์เดา (Safari/Chrome ชอบขีดเส้นใต้ข้อความที่ดู
+       เหมือนที่อยู่/เบอร์โทร/วันที่ แล้วเด้ง popup Google Maps เอง — เจอกับชื่อชุด
+       ข้อสอบที่มีคำ+ตัวเลขที่ดันไปแมตช์แพทเทิร์นที่อยู่พอดี) -->
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
   <script>
   (function(){
     if (/Line\//i.test(navigator.userAgent)) {
@@ -27,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.35 -->
+  <!-- APP_VERSION: v48.38 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -961,91 +965,55 @@
       }
     }
 
-    /* Home page redesign — ใช้ skill "redesign" (audit-first) เฉพาะหน้านี้ตามที่
-       ผู้ใช้ขอ ต่างจาก rewards-trophy กับ rewards-admin-pending เดิมตรงที่ตัด
-       left-border accent ออก (banned default ของ skill) และเลิกใช้ emoji เป็นไอคอน
-       (ดู _ICONS/_icon() ใน renderHome() แทน) — คงแค่การ์ดขาว 20px+shadow+แถบไล่สีบน
-       สำหรับ 2 การ์ดระดับ hero (วันนี้/ทำข้อสอบ) เพราะไม่ใช่ banned default ส่วน tile
-       รองแยกหมวดด้วยสี badge ไอคอนแทนแถบสีข้าง (สีผ่าน WCAG AA แล้ว ดู
-       scripts/contrast.py) */
-    #page-home .home-today-card {
-      position: relative;
-      margin-top: 14px;
-      padding: 18px 16px 16px;
+    /* Home page — redesign เป็น Apple HIG (grouped list) แทนที่ "Elevated Trophy
+       Road" เดิม (การ์ดลอยแยกใบ+shadow+แถบไล่สีบนขอบ ไม่ใช่ภาษา HIG) — ใช้ grouped
+       list container เดียวคั่นด้วยเส้นบาง + glyph badge สี่เหลี่ยมทึบสี+ไอคอนขาว
+       แบบ iOS Settings แทน สีทุกคู่ตรวจ WCAG AA แล้วด้วย scripts/contrast.py (ดู
+       plan สำหรับตาราง ratio เต็ม) — ยังคงใช้ _ICONS/_icon() เดิมจากรอบ redesign
+       ก่อนหน้า ไม่มี emoji */
+    #page-home { background: #F2F2F7; }
+    #page-home .h1 { font-size: 28px; }
+    #page-home .home-group {
       background: #fff;
-      border: 1px solid #f3f4f6;
-      border-radius: 20px;
-      box-shadow: 0 1px 3px rgba(17,24,39,.06), 0 8px 20px -14px rgba(37,99,235,.4);
-    }
-    #page-home .home-today-card::before {
-      content: '';
-      position: absolute;
-      left: 1px; right: 1px; top: 1px;
-      height: 4px;
-      border-radius: 19px 19px 0 0;
-      background: linear-gradient(90deg,#2563eb,#7c3aed);
-    }
-    #page-home .home-today-card svg { flex-shrink: 0; }
-
-    #page-home .home-hero-card {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-top: 16px;
-      padding: 20px 18px;
-      background: #fff;
-      border: 1px solid #f3f4f6;
-      border-radius: 20px;
-      box-shadow: 0 1px 3px rgba(17,24,39,.06), 0 8px 20px -14px rgba(59,130,246,.4);
-      cursor: pointer;
-    }
-    #page-home .home-hero-card::before {
-      content: '';
-      position: absolute;
-      left: 1px; right: 1px; top: 1px;
-      height: 4px;
-      border-radius: 19px 19px 0 0;
-      background: linear-gradient(90deg,#3b82f6,#16a34a);
-    }
-    #page-home .home-hero-card:active { transform: scale(.99); }
-    #page-home .home-hero-badge {
-      width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: #eff6ff; color: #1d4ed8;
-    }
-    #page-home .home-hero-title { font-size: 18px; font-weight: 900; color: #111827; }
-    #page-home .home-hero-sub { font-size: 13px; color: #6b7280; margin-top: 2px; }
-    #page-home .home-hero-arrow { margin-left: auto; color: #9ca3af; flex-shrink: 0; }
-
-    #page-home .home-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 12px;
-    }
-    @media (max-width: 420px) {
-      #page-home .home-grid { grid-template-columns: 1fr; }
-    }
-    #page-home .home-tile {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-height: 48px;
-      padding: 12px;
       border-radius: 14px;
-      border: 1px solid var(--border);
-      background: #fff;
-      color: #374151;
-      font-weight: 800;
-      font-size: 14px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+    #page-home .home-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      padding: 12px 16px;
       cursor: pointer;
     }
-    #page-home .home-tile:active { opacity: .85; }
-    #page-home .home-tile-badge {
-      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    #page-home .home-row:not(:last-child) { border-bottom: 1px solid #C6C6C8; }
+    #page-home .home-row:active { background: #F2F2F7; }
+    #page-home .home-row-badge {
+      width: 29px; height: 29px; border-radius: 7px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
+      color: #fff;
     }
+    #page-home .home-row-label { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; color: #1C1C1E; }
+    #page-home .home-row-chevron { color: #8E8E93; flex-shrink: 0; }
+    #page-home .home-primary-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 14px;
+      padding: 14px;
+      border: none;
+      border-radius: 14px;
+      background: #0066CC;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #page-home .home-primary-btn:active { background: #0052A3; }
 
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
@@ -1189,7 +1157,7 @@
       <div style="background:#fff;border-radius:24px;padding:32px 24px 24px;box-shadow:0 4px 24px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04);text-align:center;">
         <div style="width:56px;height:56px;background:linear-gradient(135deg,#5856D6,#007AFF);color:#fff;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
         <div style="font-size:20px;font-weight:800;color:#1C1C1E;margin-bottom:4px;letter-spacing:-0.3px;">My Exam Academia</div>
-        <div style="font-size:13px;color:#8E8E93;margin-bottom:24px;">กรอกรหัส PIN เพื่อเข้าใช้งาน</div>
+        <div style="font-size:13px;color:#6E6E73;margin-bottom:24px;">กรอกรหัส PIN เพื่อเข้าใช้งาน</div>
 
         <!-- shared exam hint -->
         <div id="loginExamHint" style="display:none;margin-bottom:18px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;font-size:13px;color:#1d4ed8;line-height:1.6;text-align:left;">
@@ -1205,7 +1173,7 @@
           <div class="iPadDot" id="pd4"></div>
           <div class="iPadDot" id="pd5"></div>
         </div>
-        <div id="loginError" style="color:#FF3B30;font-size:13px;min-height:20px;margin-bottom:20px;"></div>
+        <div id="loginError" style="color:#D70015;font-size:13px;min-height:20px;margin-bottom:20px;"></div>
 
         <!-- hidden input — focused always so keyboard works -->
         <input id="loginPinInput" type="tel" maxlength="6" inputmode="none"
@@ -1230,7 +1198,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#8E8E93;opacity:0.5;">v48.35</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.38</div>
     </div>
   </div>
 </div>
@@ -4174,12 +4142,12 @@ function renderHome(){
     })();
     const _bellHtml = `
       <div style="position:relative;display:inline-flex;
-        align-items:center;color:#6b7280;cursor:pointer;"
+        align-items:center;color:#8E8E93;cursor:pointer;"
         id="notifBell_${esc(userId)}" onclick="_toggleNotifDropdown('${esc(userId)}')">
         ${_icon(_ICONS.bell, 22)}
         ${_notifCount > 0 ? `
           <span style="position:absolute;top:-4px;right:-6px;
-            background:#ef4444;color:#fff;border-radius:99px;
+            background:#D70015;color:#fff;border-radius:99px;
             font-size:10px;font-weight:800;min-width:16px;height:16px;
             display:flex;align-items:center;justify-content:center;
             padding:0 3px;">${_notifCount}</span>
@@ -4190,10 +4158,10 @@ function renderHome(){
     return `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 4px;gap:10px;">
         <div style="min-width:0;display:flex;align-items:flex-start;gap:6px;">
-          <span style="color:#9ca3af;flex-shrink:0;margin-top:2px;">${_icon(_ICONS.messageCircle, 14)}</span>
+          <span style="color:#8E8E93;flex-shrink:0;margin-top:2px;">${_icon(_ICONS.messageCircle, 14)}</span>
           <span>
-            <span style="font-weight:700;font-size:14px;color:#374151;">${esc(userId)}</span>
-            <span style="font-size:13px;color:#4b5563;font-style:italic;">${esc(_quoteToday)}</span>
+            <span style="font-weight:700;font-size:14px;color:#1C1C1E;">${esc(userId)}</span>
+            <span style="font-size:13px;color:#6E6E73;font-style:italic;">${esc(_quoteToday)}</span>
           </span>
         </div>
         ${_bellHtml}
@@ -4202,12 +4170,12 @@ function renderHome(){
   }
   function tabStyle(active){
     return (active
-      ? 'background:#111;color:#fff;border:1px solid #111;'
-      : 'background:#fff;color:#111;border:1px solid #d1d5db;')
+      ? 'background:#1C1C1E;color:#fff;border:1px solid #1C1C1E;'
+      : 'background:#fff;color:#1C1C1E;border:1px solid #C6C6C8;')
       + 'padding:6px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;';
   }
   const loadingHtml = '<div style="text-align:center;padding:24px;' +
-    'color:#9ca3af;font-size:13px;">⏳ กำลังโหลด...</div>';
+    'color:#6E6E73;font-size:13px;">กำลังโหลด...</div>';
 
   // ── decide initial userId + teacher tabs ──────────────
   let teacherTabsHtml = '';
@@ -4239,48 +4207,47 @@ function renderHome(){
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
           <h1 class="h1">My Exam Academia</h1>
-          <div class="muted" style="margin-top:4px;">${isTeacher ? 'โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
+          <div class="muted" style="margin-top:4px;color:#6E6E73;">${isTeacher ? 'โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn" onclick="_testSync()" style="display:none;font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
           <button class="btn" onclick="_diagnoseSync()" style="display:none;font-size:12px;color:#0891b2;border-color:#67e8f9;">🔍 diagnose</button>
           <button class="btn" onclick="_forcePullFromCloud()" style="display:none;font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
           ${isTeacher ? `<button class="btn" onclick="_diagTake()" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0f766e;border-color:#5eead4;">${_icon(_ICONS.activity, 14)}log</button>` : ''}
-          <button class="btn" onclick="Auth.logout()" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;color:#dc2626;border-color:#fca5a5;">${_icon(_ICONS.logOut, 14)}ออกจากระบบ</button>
+          <button class="btn" onclick="Auth.logout()" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;color:#D70015;border-color:#fca5a5;">${_icon(_ICONS.logOut, 14)}ออกจากระบบ</button>
         </div>
       </div>
 
-      <div id="whoopSection" class="home-today-card">
+      <div id="whoopSection" class="home-group" style="padding:12px 16px 14px;">
         ${teacherTabsHtml}
         <div id="whoopBody">${whoopSectionHTML(initialUserId)}</div>
       </div>
 
-      <div class="home-hero-card" onclick="navigate('exams')">
-        <div class="home-hero-badge">${_icon(_ICONS.pencil, 26)}</div>
-        <div style="min-width:0;">
-          <div class="home-hero-title">ทำข้อสอบ</div>
-          <div class="home-hero-sub">เริ่มฝึกทำข้อสอบชุดใหม่วันนี้</div>
-        </div>
-        <div class="home-hero-arrow">${_icon(_ICONS.chevronRight, 22)}</div>
-      </div>
+      <button type="button" class="home-primary-btn" onclick="navigate('exams')">
+        ${_icon(_ICONS.pencil, 20)}<span>ทำข้อสอบ</span>
+      </button>
 
-      <div class="home-grid">
-        <div class="home-tile" onclick="navigate('stats')">
-          <span class="home-tile-badge" style="background:#f5f3ff;color:#6d28d9;">${_icon(_ICONS.chartColumn, 20)}</span>
-          <span>ผลการฝึกซ้อม</span>
+      <div class="home-group">
+        <div class="home-row" onclick="navigate('stats')">
+          <span class="home-row-badge" style="background:#5856D6;">${_icon(_ICONS.chartColumn, 16)}</span>
+          <span class="home-row-label">ผลการฝึกซ้อม</span>
+          <span class="home-row-chevron">${_icon(_ICONS.chevronRight, 18)}</span>
         </div>
-        <div class="home-tile" onclick="navigate('entrance_stats')">
-          <span class="home-tile-badge" style="background:#ecfeff;color:#0e7490;">${_icon(_ICONS.target, 20)}</span>
-          <span>สถิติการสอบเข้า ม.1</span>
+        <div class="home-row" onclick="navigate('entrance_stats')">
+          <span class="home-row-badge" style="background:#0E7C8C;">${_icon(_ICONS.target, 16)}</span>
+          <span class="home-row-label">สถิติการสอบเข้า ม.1</span>
+          <span class="home-row-chevron">${_icon(_ICONS.chevronRight, 18)}</span>
         </div>
-        <div class="home-tile" onclick="navigate('rewards')">
-          <span class="home-tile-badge" style="background:#fffbeb;color:#b45309;">${_icon(_ICONS.trophy, 20)}</span>
-          <span>Rewards</span>
+        <div class="home-row" onclick="navigate('rewards')">
+          <span class="home-row-badge" style="background:#BF5B00;">${_icon(_ICONS.trophy, 16)}</span>
+          <span class="home-row-label">Rewards</span>
+          <span class="home-row-chevron">${_icon(_ICONS.chevronRight, 18)}</span>
         </div>
         ${isTeacher ? `
-        <div class="home-tile" onclick="navigate('admin')">
-          <span class="home-tile-badge" style="background:#f1f5f9;color:#475569;">${_icon(_ICONS.settings, 20)}</span>
-          <span>Admin</span>
+        <div class="home-row" onclick="navigate('admin')">
+          <span class="home-row-badge" style="background:#8E8E93;">${_icon(_ICONS.settings, 16)}</span>
+          <span class="home-row-label">Admin</span>
+          <span class="home-row-chevron">${_icon(_ICONS.chevronRight, 18)}</span>
         </div>` : ''}
       </div>
     </div>
@@ -4366,20 +4333,21 @@ function _toggleNotifDropdown(userId) {
   const isTeacher = Auth.isTeacher();
 
   const itemsHtml = assignments.length === 0
-    ? '<div style="padding:12px;color:#9ca3af;font-size:13px;text-align:center;">ไม่มีการบ้านค้างอยู่</div>'
+    ? '<div style="padding:12px;color:#6E6E73;font-size:13px;text-align:center;">ไม่มีการบ้านค้างอยู่</div>'
     : assignments.map(a => `
         <div style="display:flex;justify-content:space-between;
           align-items:center;padding:10px 14px;
-          border-bottom:1px solid #f3f4f6;gap:8px;">
-          <div style="font-size:13px;color:#374151;flex:1;">
-            📝 ${esc(a.examTitle)}
+          border-bottom:1px solid #C6C6C8;gap:8px;">
+          <div style="font-size:13px;color:#1C1C1E;flex:1;display:flex;align-items:center;gap:6px;">
+            <span style="color:#8E8E93;flex-shrink:0;">${_icon(_ICONS.bookOpen, 14)}</span>${esc(a.examTitle)}
           </div>
           ${isTeacher
             ? `<button class="btn" style="font-size:11px;padding:3px 8px;
-                color:#dc2626;border-color:#fca5a5;"
+                color:#D70015;border-color:#D70015;"
                 onclick="_cancelAssignment('${esc(a.id)}','${esc(userId)}')">ยกเลิก</button>`
-            : `<button class="btn btnPrimary" style="font-size:11px;
-                padding:3px 8px;white-space:nowrap;"
+            : `<button class="btn" style="font-size:11px;
+                padding:3px 8px;white-space:nowrap;border:none;
+                background:#0066CC;color:#fff;"
                 onclick="_doAssignment('${esc(a.id)}','${esc(a.examId)}')">ทำเลย</button>`
           }
         </div>
@@ -4389,8 +4357,8 @@ function _toggleNotifDropdown(userId) {
   dropdown.id = 'notifDropdown';
   dropdown.style.cssText =
     'position:fixed;z-index:500;background:#fff;' +
-    'border:1px solid #e5e7eb;border-radius:14px;' +
-    'box-shadow:0 8px 24px rgba(0,0,0,0.12);' +
+    'border-radius:14px;' +
+    'box-shadow:0 1px 3px rgba(17,24,39,.06),0 8px 24px -10px rgba(17,24,39,.35);' +
     'min-width:280px;max-width:320px;overflow:hidden;';
 
   const rect = bell.getBoundingClientRect();
@@ -4398,8 +4366,8 @@ function _toggleNotifDropdown(userId) {
   dropdown.style.right = (window.innerWidth - rect.right) + 'px';
 
   dropdown.innerHTML =
-    '<div style="padding:10px 14px;font-weight:800;font-size:14px;' +
-    'border-bottom:1px solid #e5e7eb;">💌 พ่อฝากการบ้านไว้</div>' +
+    '<div style="padding:10px 14px;font-weight:800;font-size:14px;color:#1C1C1E;' +
+    'border-bottom:1px solid #C6C6C8;">พ่อฝากการบ้านไว้</div>' +
     itemsHtml;
 
   document.body.appendChild(dropdown);
@@ -14986,7 +14954,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.35';
+  const CURRENT_VERSION = 'v48.38';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
