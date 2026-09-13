@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.45p -->
+  <!-- APP_VERSION: v48.46p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -976,6 +976,92 @@
       }
     }
 
+    /* Home page redesign — ใช้ skill "redesign" (audit-first) เฉพาะหน้านี้ตามที่
+       ผู้ใช้ขอ ต่างจาก rewards-trophy กับ rewards-admin-pending เดิมตรงที่ตัด
+       left-border accent ออก (banned default ของ skill) และเลิกใช้ emoji เป็นไอคอน
+       (ดู _ICONS/_icon() ใน renderHome() แทน) — คงแค่การ์ดขาว 20px+shadow+แถบไล่สีบน
+       สำหรับ 2 การ์ดระดับ hero (วันนี้/ทำข้อสอบ) เพราะไม่ใช่ banned default ส่วน tile
+       รองแยกหมวดด้วยสี badge ไอคอนแทนแถบสีข้าง (สีผ่าน WCAG AA แล้ว ดู
+       scripts/contrast.py) */
+    #page-home .home-today-card {
+      position: relative;
+      margin-top: 14px;
+      padding: 18px 16px 16px;
+      background: #fff;
+      border: 1px solid #f3f4f6;
+      border-radius: 20px;
+      box-shadow: 0 1px 3px rgba(17,24,39,.06), 0 8px 20px -14px rgba(37,99,235,.4);
+    }
+    #page-home .home-today-card::before {
+      content: '';
+      position: absolute;
+      left: 1px; right: 1px; top: 1px;
+      height: 4px;
+      border-radius: 19px 19px 0 0;
+      background: linear-gradient(90deg,#2563eb,#7c3aed);
+    }
+    #page-home .home-today-card svg { flex-shrink: 0; }
+
+    #page-home .home-hero-card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 16px;
+      padding: 20px 18px;
+      background: #fff;
+      border: 1px solid #f3f4f6;
+      border-radius: 20px;
+      box-shadow: 0 1px 3px rgba(17,24,39,.06), 0 8px 20px -14px rgba(59,130,246,.4);
+      cursor: pointer;
+    }
+    #page-home .home-hero-card::before {
+      content: '';
+      position: absolute;
+      left: 1px; right: 1px; top: 1px;
+      height: 4px;
+      border-radius: 19px 19px 0 0;
+      background: linear-gradient(90deg,#3b82f6,#16a34a);
+    }
+    #page-home .home-hero-card:active { transform: scale(.99); }
+    #page-home .home-hero-badge {
+      width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #eff6ff; color: #1d4ed8;
+    }
+    #page-home .home-hero-title { font-size: 18px; font-weight: 900; color: #111827; }
+    #page-home .home-hero-sub { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    #page-home .home-hero-arrow { margin-left: auto; color: #9ca3af; flex-shrink: 0; }
+
+    #page-home .home-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    @media (max-width: 420px) {
+      #page-home .home-grid { grid-template-columns: 1fr; }
+    }
+    #page-home .home-tile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: #374151;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #page-home .home-tile:active { opacity: .85; }
+    #page-home .home-tile-badge {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+
     /* ── SCRATCH PAD — Phase 1 (iPad-only, Apple Pencil) ── */
     #scratchToggleBtn {
       position: fixed; right: 18px; bottom: 100px;
@@ -1159,7 +1245,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.45p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.46p</div>
     </div>
   </div>
 </div>
@@ -4012,6 +4098,25 @@ function getQuoteOfDay(){
   return QUOTE_OF_DAY_LIST[dayIndex % QUOTE_OF_DAY_LIST.length];
 }
 
+// lucide-style inline icon helper — ใช้แทน emoji เฉพาะหน้า home (redesign skill
+// ห้าม emoji ในโปรดักชัน UI) หน้าอื่นในแอปยังใช้ emoji ตามเดิม ไม่ migrate ทั้งแอป
+function _icon(pathsInner, size) {
+  size = size || 20;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${pathsInner}</svg>`;
+}
+const _ICONS = {
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  chartColumn: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  trophy: '<path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/>',
+  settings: '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  messageCircle: '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
+  chevronRight: '<path d="m9 18 6-6-6-6"/>',
+  logOut: '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+  activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>'
+};
+
 // WHOOP UI — Stage 4
 let _whoopReqId = 0;
 let _whoopFetching = false;
@@ -4026,12 +4131,12 @@ function renderHome(){
   function _getHomeGreeting(name){
     const h = new Date().getHours();
     const timeGreet = h >= 5 && h < 12
-      ? 'สวัสดีตอนเช้า 🌅'
+      ? 'สวัสดีตอนเช้า'
       : h >= 12 && h < 18
-      ? 'สวัสดีตอนบ่าย ☀️'
+      ? 'สวัสดีตอนบ่าย'
       : h >= 18 && h < 21
-      ? 'สวัสดีตอนเย็น 🌆'
-      : 'ดึกแลวนะ 🌙';
+      ? 'สวัสดีตอนเย็น'
+      : 'ดึกแล้วนะ';
     return name ? timeGreet + ' ' + name : timeGreet;
   }
   // ใช้ esc() global (escape ครบกว่า local เดิม — superset, ผล render เท่ากัน)
@@ -4085,9 +4190,9 @@ function renderHome(){
     })();
     const _bellHtml = `
       <div style="position:relative;display:inline-flex;
-        align-items:center;cursor:pointer;"
+        align-items:center;color:#6b7280;cursor:pointer;"
         id="notifBell_${esc(userId)}" onclick="_toggleNotifDropdown('${esc(userId)}')">
-        <span style="font-size:22px;">🔔</span>
+        ${_icon(_ICONS.bell, 22)}
         ${_notifCount > 0 ? `
           <span style="position:absolute;top:-4px;right:-6px;
             background:#ef4444;color:#fff;border-radius:99px;
@@ -4100,9 +4205,12 @@ function renderHome(){
     const _quoteToday = getQuoteOfDay();
     return `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 4px;gap:10px;">
-        <div style="min-width:0;">
-          <span style="font-weight:700;font-size:14px;color:#374151;">${esc(userId)}</span>
-          <span style="font-size:13px;color:#4b5563;font-style:italic;">💬 ${esc(_quoteToday)}</span>
+        <div style="min-width:0;display:flex;align-items:flex-start;gap:6px;">
+          <span style="color:#9ca3af;flex-shrink:0;margin-top:2px;">${_icon(_ICONS.messageCircle, 14)}</span>
+          <span>
+            <span style="font-weight:700;font-size:14px;color:#374151;">${esc(userId)}</span>
+            <span style="font-size:13px;color:#4b5563;font-style:italic;">${esc(_quoteToday)}</span>
+          </span>
         </div>
         ${_bellHtml}
       </div>
@@ -4147,41 +4255,50 @@ function renderHome(){
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
           <h1 class="h1">My Exam Academia</h1>
-          <div class="muted" style="margin-top:4px;">${isTeacher ? '👨‍🏫 โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
+          <div class="muted" style="margin-top:4px;">${isTeacher ? 'โหมดครู' : esc(_getHomeGreeting(Auth.getName()))}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn" onclick="_testSync()" style="display:none;font-size:12px;color:#2563eb;border-color:#93c5fd;">🧪 ทดสอบ sync</button>
           <button class="btn" onclick="_diagnoseSync()" style="display:none;font-size:12px;color:#0891b2;border-color:#67e8f9;">🔍 diagnose</button>
           <button class="btn" onclick="_forcePullFromCloud()" style="display:none;font-size:12px;color:#7c3aed;border-color:#c4b5fd;">⬇️ ดึงจาก cloud</button>
-          ${isTeacher ? `<button class="btn" onclick="_diagTake()" style="font-size:12px;color:#0f766e;border-color:#5eead4;">🩺 log</button>` : ''}
-          <button class="btn" onclick="Auth.logout()" style="font-size:13px;color:#dc2626;border-color:#fca5a5;">ออกจากระบบ</button>
+          ${isTeacher ? `<button class="btn" onclick="_diagTake()" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0f766e;border-color:#5eead4;">${_icon(_ICONS.activity, 14)}log</button>` : ''}
+          <button class="btn" onclick="Auth.logout()" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;color:#dc2626;border-color:#fca5a5;">${_icon(_ICONS.logOut, 14)}ออกจากระบบ</button>
         </div>
       </div>
 
-      <div id="whoopSection" style="margin-top:14px;padding:12px 12px 4px;border:1px solid #e5e7eb;border-radius:14px;background:#fafafa;">
+      <div id="whoopSection" class="home-today-card">
         ${teacherTabsHtml}
         <div id="whoopBody">${whoopSectionHTML(initialUserId)}</div>
       </div>
 
-      <div class="list" style="margin-top:16px;">
-        <div class="linkCard" onclick="navigate('exams')">
-          <div style="font-weight:900;">📝 ทำข้อสอบ</div>
+      <div class="home-hero-card" onclick="navigate('exams')">
+        <div class="home-hero-badge">${_icon(_ICONS.pencil, 26)}</div>
+        <div style="min-width:0;">
+          <div class="home-hero-title">ทำข้อสอบ</div>
+          <div class="home-hero-sub">เริ่มฝึกทำข้อสอบชุดใหม่วันนี้</div>
         </div>
-        <div class="linkCard" onclick="navigate('stats')">
-          <div style="font-weight:900;">📊 ผลการฝึกซ้อม</div>
+        <div class="home-hero-arrow">${_icon(_ICONS.chevronRight, 22)}</div>
+      </div>
+
+      <div class="home-grid">
+        <div class="home-tile" onclick="navigate('stats')">
+          <span class="home-tile-badge" style="background:#f5f3ff;color:#6d28d9;">${_icon(_ICONS.chartColumn, 20)}</span>
+          <span>ผลการฝึกซ้อม</span>
         </div>
-        <div class="linkCard" onclick="navigate('entrance_stats')">
-          <div style="font-weight:900;">🎯 สถิติการสอบเข้า ม.1</div>
+        <div class="home-tile" onclick="navigate('entrance_stats')">
+          <span class="home-tile-badge" style="background:#ecfeff;color:#0e7490;">${_icon(_ICONS.target, 20)}</span>
+          <span>สถิติการสอบเข้า ม.1</span>
         </div>
-        <div class="linkCard" onclick="navigate('rewards')">
-          <div style="font-weight:900;">🏆 Rewards</div>
+        <div class="home-tile" onclick="navigate('rewards')">
+          <span class="home-tile-badge" style="background:#fffbeb;color:#b45309;">${_icon(_ICONS.trophy, 20)}</span>
+          <span>Rewards</span>
         </div>
         ${isTeacher ? `
-        <div class="linkCard" onclick="navigate('admin')">
-          <div style="font-weight:900;">⚙️ Admin</div>
+        <div class="home-tile" onclick="navigate('admin')">
+          <span class="home-tile-badge" style="background:#f1f5f9;color:#475569;">${_icon(_ICONS.settings, 20)}</span>
+          <span>Admin</span>
         </div>` : ''}
       </div>
-      <div class="hr"></div>
     </div>
   `;
 
@@ -14906,7 +15023,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.45p';
+  const CURRENT_VERSION = 'v48.46p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
