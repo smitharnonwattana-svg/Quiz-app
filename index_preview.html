@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.51p -->
+  <!-- APP_VERSION: v48.52p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1213,7 +1213,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.51p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.52p</div>
     </div>
   </div>
 </div>
@@ -4559,10 +4559,15 @@ const Auth = (() => {
     if (!found) return false;
     setSession(found.role, found.name);
     // Claim session per-user (PIN) — A login เครื่อง 2 จะ kick เครื่อง 1 ของ A เท่านั้น
+    // v48.52: ต้อง await claimSession ก่อนแนบ listenSession เสมอ — เดิมยิงสองอย่าง
+    // พร้อมกัน (fire-and-forget) ทำให้ listener (onSnapshot, synchronizeTabs:true)
+    // อาจได้ snapshot แรกจาก cache ก่อนที่การเขียน token ใหม่ของตัวเองจะ apply เสร็จ
+    // เห็น token เก่าไม่ตรงกับ _mySessionToken ที่เพิ่ง generate แล้วเข้าใจผิดว่าโดน
+    // เครื่องอื่น kick ทั้งที่เป็นแค่ timing ของตัวเอง → logout() จริงโดยไม่ได้ตั้งใจ
     const _loginPin = found.pin;
-    setTimeout(() => {
+    setTimeout(async () => {
       if (FirebaseSync.ready()) {
-        FirebaseSync.claimSession(_loginPin);
+        await FirebaseSync.claimSession(_loginPin);
         FirebaseSync.listenSession(() => {
           if (isLoggedIn()) {
             logout();
@@ -12366,7 +12371,17 @@ window.navigate = function(page, params) {
   // `if (_currentPage !== page) return;`, ไม่ใช่หน้าที่ไม่มีจริง) — เช็คจาก
   // _currentPage ตรงกับ page ที่ขอ ครอบคลุมทั้ง 3 เคสนี้ในเงื่อนไขเดียว
   if (!_isPopstateNav && _currentPage === page) {
-    history.pushState({ page, params }, '', location.href);
+    // v48.52: ห้าม push ซ้ำถ้า page/params เดิมกับ entry บนสุดอยู่แล้ว — เดิมพอมี
+    // soft-refresh จาก Firestore realtime listener (Store.init()'s listenDoc)
+    // เรียก navigate(pg, params) ซ้ำเพื่อ re-render โดย page ไม่เปลี่ยนเลย ทำให้
+    // history พองด้วย entry ซ้ำๆ ทุกครั้งที่มีคนอื่นในระบบทำอะไรก็ตาม กด back แค่
+    // 1-2 ครั้งก็ไหลทะลุกลับไปถึง entry เก่าๆ ได้ง่ายกว่าที่ควร
+    const top = history.state;
+    const sameAsTop = top && top.page === page && JSON.stringify(top.params || {}) === JSON.stringify(params || {});
+    if (!sameAsTop) {
+      try { history.pushState({ page, params }, '', location.href); }
+      catch (e) { /* เช่น iOS Safari pushState rate limit — ข้ามได้ ไม่ critical พอจะ throw ทำลาย flow */ }
+    }
   }
 };
 navigate = window.navigate;
@@ -12381,14 +12396,20 @@ window.addEventListener('popstate', (e) => {
     // เรียก handler เดิมของปุ่ม "ออก" (ใช้ safety logic เดิมทั้งชุด — confirm +
     // savePracticeSession + cleanup — ไม่เขียน logic ซ้ำ, ปุ่มนี้เองจะเป็นคนเรียก
     // navigate() ต่อถ้าผู้ใช้กด "ตกลง")
-    history.pushState({ page: _currentPage, params: _pageParams }, '', location.href);
+    try { history.pushState({ page: _currentPage, params: _pageParams }, '', location.href); } catch (e) {}
     const btn = document.getElementById(leavingTake ? 'takeExitBtn' : 'pracExitBtn');
     if (btn) btn.click();
     return;
   }
 
   const state = (e.state && _KNOWN_PAGES.has(e.state.page)) ? e.state : null;
-  const target = state || { page: Auth.isLoggedIn() ? 'home' : 'login', params: {} };
+  let target = state || { page: Auth.isLoggedIn() ? 'home' : 'login', params: {} };
+  // v48.52: entry เก่าอาจเป็น 'login' จากตอนบูตแอปก่อน auth (ไม่ใช่การ logout จริง
+  // — ดูคอมเมนต์ตอน push 'login' ด้านล่างที่ยืนยันว่ามันถูก push เป็น entry จริง)
+  // ถ้ายัง login อยู่จริงตอนนี้ ห้ามโชว์หน้า login ทับ ไปหน้า home แทน
+  if (target.page === 'login' && Auth.isLoggedIn()) {
+    target = { page: 'home', params: {} };
+  }
   _isPopstateNav = true;
   navigate(target.page, target.params);
   _isPopstateNav = false;
@@ -15043,7 +15064,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.51p';
+  const CURRENT_VERSION = 'v48.52p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
