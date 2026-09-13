@@ -1771,6 +1771,144 @@ currentSection = 'resumeCancel';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: backForwardNav (v48.51) — เดิมแอปไม่เคย pushState เลยสักจุด (navigate()
+// แค่สลับ .active class) ทำให้ history.length ไม่ขยับ กด back จึงไม่มีอะไรให้กลับ
+// ภายในแอปจริงๆ — บนบางอุปกรณ์/บริบทเบราว์เซอร์ตัดสินใจ reload ทั้งหน้าใหม่แทน ซึ่ง
+// พลาดจังหวะเช็ค session แล้วโผล่หน้า login (บั๊กที่ผู้ใช้รายงาน) แก้ด้วยการเพิ่ม
+// pushState/popstate wrapper ชั้นที่ 3 ต่อจาก wrapper savePageState เดิม — ต้องเช็ค
+// ด้วยว่าออกจาก take/practice กลางคันผ่าน back ยังผ่าน confirm + savePracticeSession
+// เหมือนกดปุ่ม exit เอง ไม่ข้าม safety logic เดิมไปเฉยๆ
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'backForwardNav';
+{
+  // 1+2: back/forward ระหว่างหน้าธรรมดา
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache() });
+    await page.evaluate(() => navigate('exams', {}));
+    await page.evaluate(() => navigate('stats', {}));
+    const histLen = await page.evaluate(() => history.length);
+    check('backForwardNav: history.length ขยับขึ้นตาม navigate (pushState ทำงาน)', histLen >= 3, 'len=' + histLen);
+
+    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForTimeout(300);
+    const afterBack = await page.evaluate(() => ({ active: document.querySelector('.page.active')?.id, loggedIn: Auth.isLoggedIn() }));
+    check('backForwardNav: back จาก stats กลับไป exams (ไม่ใช่ blank/login)',
+      afterBack.active === 'page-exams' && afterBack.loggedIn === true, JSON.stringify(afterBack));
+
+    await page.goForward({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForTimeout(300);
+    const afterFwd = await page.evaluate(() => document.querySelector('.page.active')?.id);
+    check('backForwardNav: forward กลับไป stats', afterFwd === 'page-stats', 'active=' + afterFwd);
+    await ctx.close();
+  }
+
+  // 3+4: back กลางข้อสอบ (take) ต้องผ่าน confirm เดียวกับปุ่ม "ออกจากการทำข้อสอบ"
+  {
+    const cache = baseCache({
+      exams: [mkExam('bkA', 'ชุด Back', 'ภาษาไทย', { pdfUrl: 'about:blank' })],
+      questions: { bkA: mkQ() },
+    });
+    const { ctx, page } = await newSeededPage({ cache });
+    await page.evaluate(() => navigate('take', { id: 'bkA', practice: true, takerName: 'ครู' }));
+    await page.waitForTimeout(1300);
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === 'ก');
+      if (btn) btn.click();
+    });
+
+    // stub confirm ต้องคงอยู่ข้าม wait เพราะ history.back() ยิง popstate แบบ async
+    await page.evaluate(() => {
+      window._testConfirmMsg = null;
+      window._origConfirm = window.confirm;
+      window.confirm = (m) => { window._testConfirmMsg = m; return false; };
+      history.back();
+    });
+    await page.waitForTimeout(500);
+    const declineResult = await page.evaluate(() => {
+      const r = {
+        confirmMsg: window._testConfirmMsg,
+        active: document.querySelector('.page.active')?.id,
+        chosen: [...document.querySelectorAll('#takeChoices .choice')].find(el => el.classList.contains('active'))?.textContent?.trim(),
+      };
+      window.confirm = window._origConfirm;
+      return r;
+    });
+    check('backForwardNav: back กลางข้อสอบ + ยกเลิก confirm → ยังอยู่หน้า take, คำตอบไม่หาย',
+      !!declineResult.confirmMsg && declineResult.confirmMsg.includes('ออกจากการทำข้อสอบ') &&
+      declineResult.active === 'page-take' && declineResult.chosen === 'ก', JSON.stringify(declineResult));
+
+    await page.evaluate(() => {
+      window._testConfirmMsg = null;
+      window._origConfirm = window.confirm;
+      window.confirm = (m) => { window._testConfirmMsg = m; return true; };
+      history.back();
+    });
+    await page.waitForTimeout(500);
+    const confirmResult = await page.evaluate(() => {
+      const r = { confirmMsg: window._testConfirmMsg, active: document.querySelector('.page.active')?.id };
+      window.confirm = window._origConfirm;
+      return r;
+    });
+    check('backForwardNav: back กลางข้อสอบ + ยืนยัน confirm → ออกไปหน้า exams',
+      !!confirmResult.confirmMsg && confirmResult.active === 'page-exams', JSON.stringify(confirmResult));
+    await ctx.close();
+  }
+
+  // 5: back กลางแบบฝึกหัด (practice) — savePracticeSession ต้องถูกเรียกจริง ไม่ใช่แค่
+  // ข้าม confirm ไปเฉยๆ (ข้อมูลที่ทำค้างจะหายจริงถ้า wrapper ไม่ผ่านปุ่ม exit เดิม)
+  {
+    const cache = baseCache({
+      exams: [mkExam('bkP', 'ชุด Practice Back', 'คณิตศาสตร์', { pdfUrl: 'about:blank' })],
+      questions: { bkP: mkQ() },
+    });
+    const { ctx, page } = await newSeededPage({ role: 'student', name: 'เด็กแบ็ก', cache });
+    await page.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({
+      takerName: 'เด็กแบ็ก', examId: 'bkP', examTitle: 'ชุด Practice Back', examSubject: 'คณิตศาสตร์',
+      submittedAt: new Date().toISOString(),
+      perQuestion: [{ no: 1, isCorrect: false }],
+    }));
+    await page.evaluate(() => navigate('practice', { examId: 'bkP' }));
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      _pracState.answers.push({ questionNo: 1, isCorrect: true, chosen: 'A', correct: 'A', tags: [], subTags: [], topic: null });
+    });
+    const attemptsBefore = await page.evaluate(() => Store.load().attempts.length);
+    await page.evaluate(() => {
+      window._origConfirm = window.confirm;
+      window.confirm = () => true;
+      history.back();
+    });
+    await page.waitForTimeout(500);
+    const result = await page.evaluate(() => {
+      const r = {
+        active: document.querySelector('.page.active')?.id,
+        attemptsAfter: Store.load().attempts.length,
+        lastAttemptMode: Store.load().attempts[0]?.mode,
+      };
+      window.confirm = window._origConfirm;
+      return r;
+    });
+    check('backForwardNav: back กลางแบบฝึกหัด (มีคำตอบ) + ยืนยัน → savePracticeSession ถูกเรียกจริง',
+      result.attemptsAfter === attemptsBefore + 1 && result.lastAttemptMode === 'weakness_practice' && result.active === 'page-exams',
+      JSON.stringify({ attemptsBefore, ...result }));
+    await ctx.close();
+  }
+
+  // 6: popstate ด้วย state เพี้ยน (หน้าไม่มีจริง) ต้อง fallback ไม่ใช่จอว่างเปล่า
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache() });
+    await page.evaluate(() => navigate('exams', {}));
+    await page.evaluate(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { page: 'nonexistent_page_xyz', params: {} } }));
+    });
+    await page.waitForTimeout(300);
+    const result = await page.evaluate(() => document.querySelector('.page.active')?.id);
+    check('backForwardNav: popstate state เพี้ยน (หน้าไม่มีจริง) → fallback ไป home ไม่ใช่จอว่าง', result === 'page-home', 'active=' + result);
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section: takeChoicesLayout (v48.20) — แถบ ก ข ค ง ฝั่งขวาต้องไม่ถูกแถบหัวข้อ
 // (position:fixed หลัง _liftTakeStickyBars) ทับด้านบน บน desktop/iPad landscape
 // เดิม padding-top ชดเชยถูกวัด "ครั้งเดียว" ตอน lift — ถ้า flag sbLifted หลุดไปทั้งที่

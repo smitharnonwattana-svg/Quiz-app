@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.38 -->
+  <!-- APP_VERSION: v48.39 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1198,7 +1198,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.38</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.39</div>
     </div>
   </div>
 </div>
@@ -12306,6 +12306,57 @@ window.navigate = function(page, params) {
 };
 navigate = window.navigate;
 
+// ── Browser back/forward integration (v48.51) ──────────────────────────
+// เดิมแอปนี้ไม่เคย pushState เลยสักจุด (navigate() แค่สลับ .active class) ทำให้
+// history.length ไม่ขยับเลยไม่ว่า navigate ในแอปกี่ครั้ง — กด back จึงไม่มีอะไรให้
+// "กลับ" ภายในแอปจริงๆ เบราว์เซอร์เลยต้องตัดสินใจเองว่าจะทำอะไร (บางอุปกรณ์/บริบท
+// อาจ reload ทั้งหน้าใหม่ซึ่งพลาดจังหวะเช็ค session แล้วโผล่หน้า login) — เพิ่ม
+// wrapper ชั้นที่ 3 นี้ (สไตล์เดียวกับ wrapper ข้างบน) ให้ back/forward เป็นการ
+// เปลี่ยน state ภายใน document เดิมแทน ไม่มี reload เกิดขึ้นเลยโดยโครงสร้าง
+const _KNOWN_PAGES = new Set([
+  'login','home','exams','exam','take','practice','review','stats','rewards',
+  'entrance_stats','entrance_program','entrance_year','entrance_compare',
+  'admin','admin_new','admin_editor','admin_benchmark','admin_exams',
+  'admin_memes','admin_members','admin_rewards','admin_backup'
+]);
+let _isPopstateNav = false; // กัน push ซ้ำตอน navigate ถูกเรียกจาก popstate handler เอง
+
+const _origNavigateHist = navigate;
+window.navigate = function(page, params) {
+  _origNavigateHist(page, params);
+  // push เฉพาะตอน navigate "ติดจริง" (ไม่ใช่โดน auth-guard เด้งไป login, ไม่ใช่
+  // re-entrant call ที่โดน frame อื่นแทนที่ตามที่ navigate() เองกันไว้แล้วที่
+  // `if (_currentPage !== page) return;`, ไม่ใช่หน้าที่ไม่มีจริง) — เช็คจาก
+  // _currentPage ตรงกับ page ที่ขอ ครอบคลุมทั้ง 3 เคสนี้ในเงื่อนไขเดียว
+  if (!_isPopstateNav && _currentPage === page) {
+    history.pushState({ page, params }, '', location.href);
+  }
+};
+navigate = window.navigate;
+
+window.addEventListener('popstate', (e) => {
+  const leavingTake = _currentPage === 'take';
+  const leavingPractice = _currentPage === 'practice';
+
+  if (leavingTake || leavingPractice) {
+    // เบราว์เซอร์ขยับตำแหน่ง history ไปแล้วก่อน event นี้จะยิง — "ยกเลิก" การขยับ
+    // นั้นด้วยการ push state ปัจจุบันกลับเข้าไปทับ (ตำแหน่งกลับมาที่เดิม) แล้วค่อย
+    // เรียก handler เดิมของปุ่ม "ออก" (ใช้ safety logic เดิมทั้งชุด — confirm +
+    // savePracticeSession + cleanup — ไม่เขียน logic ซ้ำ, ปุ่มนี้เองจะเป็นคนเรียก
+    // navigate() ต่อถ้าผู้ใช้กด "ตกลง")
+    history.pushState({ page: _currentPage, params: _pageParams }, '', location.href);
+    const btn = document.getElementById(leavingTake ? 'takeExitBtn' : 'pracExitBtn');
+    if (btn) btn.click();
+    return;
+  }
+
+  const state = (e.state && _KNOWN_PAGES.has(e.state.page)) ? e.state : null;
+  const target = state || { page: Auth.isLoggedIn() ? 'home' : 'login', params: {} };
+  _isPopstateNav = true;
+  navigate(target.page, target.params);
+  _isPopstateNav = false;
+});
+
 // Subscribe weakness realtime listener ถ้า user logged in (รอ Firebase ready)
 (function _bootWeaknessSubscribe(){
   const _tryStart = () => {
@@ -14954,7 +15005,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.38';
+  const CURRENT_VERSION = 'v48.39';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
