@@ -1969,6 +1969,52 @@ currentSection = 'backForwardNav';
       JSON.stringify(order));
     await ctx.close();
   }
+
+  // 10: Auth.login() ด้วย PIN admin (ค่าคงที่ ADMIN_PIN ใช้ร่วมกันทุกอุปกรณ์) ต้องไม่
+  // เรียก claimSession/listenSession เลย (v48.53) — เดิม feature "kick session ซ้ำ PIN"
+  // ตั้งใจไว้เฉพาะนักเรียน (PIN ไม่ซ้ำกัน) แต่โค้ดจริงลืมเช็ค role ทำให้ admin ทุกเครื่อง
+  // ที่ login ด้วย PIN เดียวกัน "kick" กันเองข้ามอุปกรณ์ทั้งที่เป็นคนเดียวกัน
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache() });
+    const result = await page.evaluate(async () => {
+      const calls = [];
+      FirebaseSync.ready = () => true;
+      FirebaseSync.claimSession = () => { calls.push('claimSession'); return Promise.resolve(); };
+      FirebaseSync.listenSession = () => { calls.push('listenSession'); };
+      const role = Auth.login('134140');
+      await new Promise(r => setTimeout(r, 1050));
+      return { role, calls };
+    });
+    check('backForwardNav: Auth.login(PIN admin) → claimSession/listenSession ไม่ถูกเรียกเลย',
+      result.role === 'teacher' && result.calls.length === 0, JSON.stringify(result));
+    await ctx.close();
+  }
+
+  // 11: Auth.login() ด้วย PIN นักเรียน (ไม่ซ้ำกัน) ยังต้อง claim/listen ตามเดิม (v48.53
+  // — ยืนยันว่า fix ข้างบนจำกัดเฉพาะ role teacher จริง ไม่กระทบพฤติกรรมนักเรียน)
+  {
+    const { ctx, page } = await newSeededPage({ cache: baseCache({ members: [{ pin: '311257', name: 'เด็กทดสอบ' }] }) });
+    const order = await page.evaluate(async () => {
+      const calls = [];
+      let resolveClaim;
+      const claimPromise = new Promise(r => { resolveClaim = r; });
+      FirebaseSync.ready = () => true;
+      FirebaseSync.claimSession = () => { calls.push('claimSession:start'); return claimPromise.then(() => calls.push('claimSession:resolved')); };
+      FirebaseSync.listenSession = () => { calls.push('listenSession:attached'); };
+      const role = Auth.login('311257');
+      await new Promise(r => setTimeout(r, 1050));
+      const beforeResolve = [...calls];
+      resolveClaim();
+      await new Promise(r => setTimeout(r, 50));
+      return { role, beforeResolve, afterResolve: [...calls] };
+    });
+    check('backForwardNav: Auth.login(PIN นักเรียน) → ยัง claim/listen ตามเดิม (ไม่กระทบ)',
+      order.role === 'student' &&
+      JSON.stringify(order.beforeResolve) === JSON.stringify(['claimSession:start']) &&
+      JSON.stringify(order.afterResolve) === JSON.stringify(['claimSession:start', 'claimSession:resolved', 'listenSession:attached']),
+      JSON.stringify(order));
+    await ctx.close();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────

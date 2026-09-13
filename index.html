@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.40 -->
+  <!-- APP_VERSION: v48.41 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1198,7 +1198,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.40</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.41</div>
     </div>
   </div>
 </div>
@@ -4542,26 +4542,26 @@ const Auth = (() => {
     if (!found) return false;
     setSession(found.role, found.name);
     // Claim session per-user (PIN) — A login เครื่อง 2 จะ kick เครื่อง 1 ของ A เท่านั้น
-    // v48.52: ต้อง await claimSession ก่อนแนบ listenSession เสมอ — เดิมยิงสองอย่าง
-    // พร้อมกัน (fire-and-forget) ทำให้ listener (onSnapshot, synchronizeTabs:true)
-    // อาจได้ snapshot แรกจาก cache ก่อนที่การเขียน token ใหม่ของตัวเองจะ apply เสร็จ
-    // เห็น token เก่าไม่ตรงกับ _mySessionToken ที่เพิ่ง generate แล้วเข้าใจผิดว่าโดน
-    // เครื่องอื่น kick ทั้งที่เป็นแค่ timing ของตัวเอง → logout() จริงโดยไม่ได้ตั้งใจ
-    const _loginPin = found.pin;
-    setTimeout(async () => {
-      if (FirebaseSync.ready()) {
-        await FirebaseSync.claimSession(_loginPin);
-        FirebaseSync.listenSession(() => {
-          if (isLoggedIn()) {
-            logout();
-            setTimeout(() => {
-              const err = document.getElementById('loginError');
-              if (err) err.textContent = '⚠️ มีการ login จากอุปกรณ์อื่น — กรุณา login ใหม่';
-            }, 100);
-          }
-        }, _loginPin);
-      }
-    }, 1000);
+    // v48.53: เฉพาะ "student" เท่านั้น — admin PIN เป็นค่าคงที่ค่าเดียวที่ตั้งใจให้ใช้
+    // จากหลายอุปกรณ์พร้อมกันได้ (มือถือ+iPad+โน้ตบุ๊ก) การ "kick" ข้ามอุปกรณ์ตัวเองแบบนี้
+    // ไม่ใช่พฤติกรรมที่ต้องการ ต่างจากนักเรียนที่ PIN ไม่ซ้ำกัน = 1 คนควรใช้ทีละเครื่อง
+    if (found.role === 'student') {
+      const _loginPin = found.pin;
+      setTimeout(async () => {
+        if (FirebaseSync.ready()) {
+          await FirebaseSync.claimSession(_loginPin);
+          FirebaseSync.listenSession(() => {
+            if (isLoggedIn()) {
+              logout();
+              setTimeout(() => {
+                const err = document.getElementById('loginError');
+                if (err) err.textContent = '⚠️ มีการ login จากอุปกรณ์อื่น — กรุณา login ใหม่';
+              }, 100);
+            }
+          }, _loginPin);
+        }
+      }, 1000);
+    }
     return found.role;
   }
   return { login, logout, isLoggedIn, isTeacher, getRole, getName, getMembers, findByPin, ADMIN_PIN };
@@ -15026,7 +15026,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.40';
+  const CURRENT_VERSION = 'v48.41';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
