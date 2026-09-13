@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.31 -->
+  <!-- APP_VERSION: v48.32 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1116,7 +1116,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.31</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.32</div>
     </div>
   </div>
 </div>
@@ -6101,7 +6101,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
         updateCoachStreak(takerName);
       }
       if (st.takerName && !Auth.isTeacher()) {
-        processGamificationAfterSubmit(takerName);
+        processGamificationAfterSubmit(takerName, { source: 'exam', examTitle: _newAttempt.examTitle });
       }
       if (st.takerName && !Auth.isTeacher()) {
         const _completedTiers = updateBonusQuestProgress(takerName);
@@ -8913,7 +8913,7 @@ function initPractice(params){
     }
     // Gamification G5: Stamp UI + Points Wiring
     if (_practiceUserId && !Auth.isTeacher()) {
-      processGamificationAfterSubmit(_practiceUserId);
+      processGamificationAfterSubmit(_practiceUserId, { source: 'weakness_practice', examTitle: attempt.examTitle });
     }
     if (_practiceUserId && !Auth.isTeacher()) {
       // G8-D: Quest Complete Notification
@@ -9575,6 +9575,9 @@ function initRewards() {
   });
 }
 
+// key ตาม userId — เก็บจำนวนรายการ point log ที่โชว์อยู่ (เพิ่มเติมทีละ 20) คงอยู่ข้าม re-render
+const _pointLogLimits = {};
+
 function renderRewardsFor(userId, opts) {
   opts = opts || {};
   const showAdminTools = !!opts.adminTools;
@@ -9902,8 +9905,52 @@ function renderRewardsFor(userId, opts) {
     }
   });
 
-  // Admin Tools Panel — shown only when explicitly requested (admin_rewards page)
+  // ประวัติ Point — shown only when explicitly requested (admin_rewards page)
   if (showAdminTools) {
+    const pointLog = Array.isArray(state.pointLog) ? state.pointLog.slice().reverse() : [];
+    const limit = _pointLogLimits[userId] || 20;
+    const visible = pointLog.slice(0, limit);
+    const remaining = pointLog.length - limit;
+    const byDate = [];
+    visible.forEach(entry => {
+      let group = byDate.find(g => g.date === entry.date);
+      if (!group) { group = { date: entry.date, total: 0, entries: [] }; byDate.push(group); }
+      group.total += Number(entry.amount) || 0;
+      group.entries.push(entry);
+    });
+    const pointLogHtml = byDate.length
+      ? byDate.map(g => (
+          '<div style="margin-bottom:10px;">' +
+            '<div style="display:flex;justify-content:space-between;font-weight:800;font-size:12px;color:#374151;margin-bottom:4px;">' +
+              '<span>' + esc(g.date) + '</span><span>+' + g.total + 'pt</span>' +
+            '</div>' +
+            g.entries.map(e => (
+              '<div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;padding:3px 0 3px 10px;">' +
+                '<span>' + esc(e.reason || 'ไม่ระบุ') + '</span><span>+' + (Number(e.amount) || 0) + 'pt</span>' +
+              '</div>'
+            )).join('') +
+          '</div>'
+        )).join('')
+      : '<div class="muted" style="font-size:12px;padding:6px 0;">ยังไม่มีประวัติ point</div>';
+    const pointLogDiv = document.createElement('div');
+    pointLogDiv.style.cssText =
+      'background:#f9fafb;border:1px solid #e5e7eb;' +
+      'border-radius:14px;padding:14px;margin-top:14px;';
+    pointLogDiv.innerHTML =
+      '<div style="font-weight:800;font-size:13px;' +
+      'color:#6b7280;margin-bottom:10px;">📜 ประวัติ Point</div>' +
+      pointLogHtml +
+      (remaining > 0
+        ? '<div style="text-align:center;margin-top:8px;"><button class="btn statsMoreBtn" id="rt_pointLogMore" style="padding:6px 16px;font-size:12px;">▾ เพิ่มเติม (อีก ' + Math.min(20, remaining) + ' · เหลือ ' + remaining + ')</button></div>'
+        : '');
+    if (remaining > 0) {
+      pointLogDiv.querySelector('#rt_pointLogMore').onclick = () => {
+        _pointLogLimits[userId] = limit + 20;
+        renderRewardsFor(userId, opts);
+      };
+    }
+    host.appendChild(pointLogDiv);
+
     const adminToolsDiv = document.createElement('div');
     adminToolsDiv.style.cssText =
       'background:#f9fafb;border:1px solid #e5e7eb;' +
@@ -12995,6 +13042,7 @@ function getDailyCoachMetricsStage4(userId) {
 // ===================== GAMIFICATION G1: Point + Stamp Engine =====================
 // Pure additive engine. No UI, not wired to submit flows yet.
 
+const _POINT_LOG_MAX = 200; // ring buffer ต่อคน เหมือน _TAKE_DIAG_MAX — กัน payload บวมไม่จำกัด
 const _GAMIFICATION_DEFAULT = () => ({
   points: 0,
   stamps: 0,
@@ -13006,7 +13054,8 @@ const _GAMIFICATION_DEFAULT = () => ({
   lastStampDate: '',
   dailyQuest: null,
   bonusQuests: [],
-  questSalt: 0
+  questSalt: 0,
+  pointLog: [] // ประวัติที่มาของ point แต่ละรายการ {ts,date,amount,reason} — เพิ่มเข้ามาใหม่
 });
 
 function _getGamificationUser(userId) {
@@ -13028,7 +13077,8 @@ function _getGamificationUser(userId) {
       lastStampDate: typeof rec.lastStampDate === 'string' ? rec.lastStampDate : def.lastStampDate,
       dailyQuest: (rec.dailyQuest && typeof rec.dailyQuest === 'object') ? rec.dailyQuest : def.dailyQuest,
       bonusQuests: Array.isArray(rec.bonusQuests) ? rec.bonusQuests.slice() : def.bonusQuests,
-      questSalt: Number(rec.questSalt) || 0
+      questSalt: Number(rec.questSalt) || 0,
+      pointLog: Array.isArray(rec.pointLog) ? rec.pointLog.slice() : def.pointLog
     };
   } catch { return _GAMIFICATION_DEFAULT(); }
 }
@@ -13060,6 +13110,7 @@ function _saveGamificationUser(userId, data) {
     dailyQuest: (data.dailyQuest && typeof data.dailyQuest === 'object') ? data.dailyQuest : null,
     bonusQuests: Array.isArray(data.bonusQuests) ? data.bonusQuests.slice() : [],
     questSalt: Number(data.questSalt) || 0,
+    pointLog: Array.isArray(data.pointLog) ? data.pointLog.slice(-_POINT_LOG_MAX) : [],
     _updatedAt: ptsOrStampsChanged ? Date.now() : (existing._updatedAt || 0)
   };
   Store.save(s);
@@ -13129,12 +13180,26 @@ function adminClaimTierReward(userId, tierKey) {
   return { ok: true };
 }
 
+// ประวัติ point — ห่อรอบๆ จุดที่ให้แต้มอยู่แล้วเท่านั้น ไม่แตะสูตรคำนวณคะแนนเลย
+// (การ cap ขนาดจริงเกิดตอน _saveGamificationUser เขียนผ่าน whitelist)
+function _appendPointLog(rec, amount, reason) {
+  if (!Array.isArray(rec.pointLog)) rec.pointLog = [];
+  rec.pointLog.push({ ts: Date.now(), date: getDateKey(new Date()), amount, reason: String(reason || 'ไม่ระบุ') });
+}
+const _POINT_REASON_LABELS = {
+  daily_quest: 'ภารกิจหลักประจำวัน',
+  bonus_quest_easy: 'ภารกิจเสริม (ง่าย)',
+  bonus_quest_medium: 'ภารกิจเสริม (กลาง)',
+  bonus_quest_challenge: 'ภารกิจเสริม (ยาก)',
+  admin_test: 'แอดมินเพิ่มให้ (ทดสอบ)'
+};
 function awardPoints(userId, points, reason) {
   if (!userId) return 0;
   const n = Number(points) || 0;
   if (n <= 0) return _getGamificationUser(userId).points;
   const rec = _getGamificationUser(userId);
   rec.points = (Number(rec.points) || 0) + n;
+  _appendPointLog(rec, n, _POINT_REASON_LABELS[reason] || reason || 'ไม่ระบุ');
   _saveGamificationUser(userId, rec);
   return rec.points;
 }
@@ -13161,7 +13226,7 @@ function getGamificationState(userId) {
   return _getGamificationUser(userId);
 }
 
-function processGamificationAfterSubmit(userId /*, attemptData */) {
+function processGamificationAfterSubmit(userId, ctx) {
   if (!userId) return { pointsAwarded: 0, stampsAwarded: 0 };
 
   const rec = _getGamificationUser(userId);
@@ -13192,6 +13257,11 @@ function processGamificationAfterSubmit(userId /*, attemptData */) {
     rec.points = (Number(rec.points) || 0) + pointsAwarded;
     rec.pointsAwardedToday = totalToday;
     rec.lastPointDate = todayKey;
+    // log 1 รายการต่อการ submit นี้ (ไม่แยกย่อยโฟกัส/แก้จุดอ่อน/โบนัสในครั้งเดียวกัน —
+    // ตั้งใจเลือกความละเอียดนี้เพื่อไม่ต้องแตะสูตรคำนวณคะแนนด้านบนเลย)
+    const _title = (ctx && ctx.examTitle) ? ctx.examTitle : '-';
+    const _reason = (ctx && ctx.source === 'weakness_practice') ? `แก้จุดอ่อน: ${_title}` : `ทำข้อสอบ: ${_title}`;
+    _appendPointLog(rec, pointsAwarded, _reason);
     _saveGamificationUser(userId, rec);
   }
 
@@ -14769,7 +14839,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.31';
+  const CURRENT_VERSION = 'v48.32';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

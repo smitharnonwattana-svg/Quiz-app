@@ -203,6 +203,83 @@ currentSection = 'gamification';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section C2: pointLog — ประวัติ point รายรายการ (admin_rewards) v48.44
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'pointLog';
+{
+  const { ctx, page } = await newSeededPage({ cache: baseCache() });
+  const r = await page.evaluate(() => {
+    Store._cache.gamification = {};
+    window.calculateActivity = () => ({ focusSetCount: 1, nonFocusSetCount: 0, resolvedToday: 0 });
+    window.calculateScore = () => ({ hasScoreToday: false });
+    const r1 = processGamificationAfterSubmit('เด็กล็อก', { source: 'exam', examTitle: 'ชุด A' });
+    window.calculateActivity = () => ({ focusSetCount: 2, nonFocusSetCount: 0, resolvedToday: 0 });
+    const r2 = processGamificationAfterSubmit('เด็กล็อก', { source: 'weakness_practice', examTitle: 'ชุด B' });
+    const rec = Store.load().gamification['เด็กล็อก'];
+    return { p1: r1.pointsAwarded, p2: r2.pointsAwarded, total: rec.points, log: rec.pointLog };
+  });
+  check('points ยังคำนวณเหมือนเดิมทุกประการ (submit1 +10, submit2 delta +10, total 20) — สูตรคำนวณไม่ถูกแตะ',
+    r.p1 === 10 && r.p2 === 10 && r.total === 20, JSON.stringify({ p1: r.p1, p2: r.p2, total: r.total }));
+  check('pointLog มี 1 รายการต่อ 1 submit (2 submit → 2 รายการ)', r.log.length === 2, JSON.stringify(r.log));
+  check('submit จากส่งข้อสอบจริง → reason "ทำข้อสอบ: <ชื่อชุด>"',
+    r.log[0] && r.log[0].reason === 'ทำข้อสอบ: ชุด A' && r.log[0].amount === 10, JSON.stringify(r.log[0]));
+  check('submit จากแบบฝึกแก้จุดอ่อน → reason "แก้จุดอ่อน: <ชื่อชุด>"',
+    r.log[1] && r.log[1].reason === 'แก้จุดอ่อน: ชุด B' && r.log[1].amount === 10, JSON.stringify(r.log[1]));
+
+  const r3 = await page.evaluate(() => {
+    Store._cache.gamification = {};
+    awardPoints('เด็กเควส', 15, 'daily_quest');
+    awardPoints('เด็กเควส', 5, 'bonus_quest_easy');
+    awardPoints('เด็กเควส', 3, 'unknown_reason_xyz');
+    const rec = Store.load().gamification['เด็กเควส'];
+    return { total: rec.points, log: rec.pointLog };
+  });
+  check('awardPoints: total ถูกต้องและ reason แปลไทยตาม map', r3.total === 23 &&
+    r3.log[0].reason === 'ภารกิจหลักประจำวัน' && r3.log[1].reason === 'ภารกิจเสริม (ง่าย)',
+    JSON.stringify(r3));
+  check('awardPoints: reason ที่ไม่รู้จัก fallback เป็น raw string', r3.log[2].reason === 'unknown_reason_xyz', r3.log[2].reason);
+
+  const r4 = await page.evaluate(() => {
+    Store._cache.gamification = {};
+    const cur = _getGamificationUser('เด็กแคป');
+    const seeded = [];
+    for (let i = 0; i < 250; i++) seeded.push({ ts: i, date: '2026-01-01', amount: 1, reason: 'seed' + i });
+    _saveGamificationUser('เด็กแคป', { ...cur, pointLog: seeded });
+    awardPoints('เด็กแคป', 1, 'admin_test');
+    const rec = _getGamificationUser('เด็กแคป');
+    return { len: rec.pointLog.length, first: rec.pointLog[0].reason, last: rec.pointLog[rec.pointLog.length - 1].reason };
+  });
+  check('pointLog cap ที่ 200 รายการ (ring buffer เหมือน _takeDiag)', r4.len === 200, 'len=' + r4.len);
+  check('cap ตัดรายการเก่าสุดออกก่อน (ไม่ใช่รายการใหม่)', r4.first !== 'seed0' && r4.last === 'แอดมินเพิ่มให้ (ทดสอบ)', JSON.stringify(r4));
+
+  const r5 = await page.evaluate(() => {
+    Store._cache.gamification = {
+      'เด็กเก่าก่อนมีฟีเจอร์': { points: 50, pointsAwardedToday: 0, lastPointDate: '', stamps: 0, lastStampDate: '', claimedTiers: [], pendingTiers: [], bonusQuests: [], dailyQuest: null, questSalt: 0 },
+    };
+    let err = null, rec = null;
+    try { rec = _getGamificationUser('เด็กเก่าก่อนมีฟีเจอร์'); } catch (e) { err = e.message; }
+    return { err, pointLog: rec && rec.pointLog, points: rec && rec.points };
+  });
+  check('legacy record (ไม่มี pointLog field) อ่านได้ไม่ error, fallback เป็น []',
+    r5.err === null && Array.isArray(r5.pointLog) && r5.pointLog.length === 0 && r5.points === 50, JSON.stringify(r5));
+
+  const html = await page.evaluate(() => {
+    Store._cache.gamification = {};
+    awardPoints('เด็กยูไอ', 10, 'daily_quest');
+    window.calculateActivity = () => ({ focusSetCount: 1, nonFocusSetCount: 0, resolvedToday: 0 });
+    window.calculateScore = () => ({ hasScoreToday: false });
+    processGamificationAfterSubmit('เด็กยูไอ', { source: 'exam', examTitle: 'ชุด UI' });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    renderRewardsFor('เด็กยูไอ', { host, adminTools: true });
+    return host.innerHTML;
+  });
+  check('หน้า admin_rewards แสดง panel "ประวัติ Point" พร้อมรายการที่ถูกต้อง',
+    html.includes('ประวัติ Point') && html.includes('ภารกิจหลักประจำวัน') && html.includes('ทำข้อสอบ: ชุด UI'));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section D: Resume — เตือนทับ (คนละชุด + ชุดเดิมคนละโหมด v47.95), clamp index
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'resume';
