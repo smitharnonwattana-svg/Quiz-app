@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.30 -->
+  <!-- APP_VERSION: v48.31 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -863,6 +863,28 @@
     /* Prevent overscroll bounce on iOS/iPadOS */
     html { overscroll-behavior: none; }
     body { overscroll-behavior: none; }
+    /* Rewards page: "Elevated Trophy Road" — แถบสีบนการ์ดแต่ละ section (scope เฉพาะ
+       #page-rewards ไม่แตะ :root กลาง กันกระทบหน้าอื่น) ตั้งใจไม่ใช้ overflow:hidden บน
+       การ์ด เพราะจะไปลบล้าง fix เดิมที่กันข้อความ stamp node ถูกตัด (ดู
+       .rewards-stamp div[style*="overflow-x:auto"] ด้านล่าง) จึงมนมุมแถบสีให้ตรงกับ
+       มุมการ์ดแทน */
+    #page-rewards .rewards-trophy,
+    #page-rewards .rewards-quest,
+    #page-rewards .rewards-stamp {
+      position: relative;
+    }
+    #page-rewards .rewards-trophy::before,
+    #page-rewards .rewards-quest::before,
+    #page-rewards .rewards-stamp::before {
+      content: '';
+      position: absolute;
+      left: 1px; right: 1px; top: 1px;
+      height: 4px;
+      border-radius: 19px 19px 0 0;
+    }
+    #page-rewards .rewards-trophy::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
+    #page-rewards .rewards-quest::before  { background: linear-gradient(90deg,#2563eb,#7c3aed); }
+    #page-rewards .rewards-stamp::before  { background: linear-gradient(90deg,#3b82f6,#16a34a); }
     /* Rewards page wider on tablet */
     @media (min-width: 768px) {
       #page-rewards > div {
@@ -1094,7 +1116,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.30</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.31</div>
     </div>
   </div>
 </div>
@@ -1830,17 +1852,17 @@
       <h1 class="h1">🏆 Rewards</h1>
       <button class="btn" onclick="navigate('home')">กลับ</button>
     </div>
-    <div id="rewardsTierModal" style="display:none;position:fixed;inset:0;z-index:998;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;padding:20px;">
-      <div style="background:#fff;border-radius:20px;padding:24px;max-width:300px;width:100%;text-align:center;">
-        <div id="rewardsTierEmoji" style="font-size:40px;margin-bottom:8px;"></div>
-        <div id="rewardsTierLabel" style="font-weight:800;font-size:18px;margin-bottom:4px;"></div>
+    <div id="rewardsTierModal" style="display:none;position:fixed;inset:0;z-index:998;background:rgba(17,24,39,0.45);align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:24px;padding:28px 24px;max-width:300px;width:100%;text-align:center;box-shadow:0 20px 50px -12px rgba(17,24,39,.35);">
+        <div id="rewardsTierEmoji" style="font-size:48px;margin-bottom:10px;"></div>
+        <div id="rewardsTierLabel" style="font-weight:800;font-size:19px;margin-bottom:4px;"></div>
         <div id="rewardsTierPts" style="font-size:13px;color:#6b7280;margin-bottom:16px;"></div>
-        <div id="rewardsTierReward" style="background:#f9fafb;border-radius:12px;padding:12px;font-size:14px;font-weight:700;color:#374151;margin-bottom:16px;"></div>
-        <button id="rewardsTierClose" class="btn" style="width:100%;">ปิด</button>
+        <div id="rewardsTierReward" style="background:linear-gradient(160deg,#fffbeb,#fff7ed);border:1px solid #fde68a;border-radius:14px;padding:14px;font-size:14px;font-weight:700;color:#374151;margin-bottom:18px;"></div>
+        <button id="rewardsTierClose" class="btn" style="width:100%;border-radius:12px;">ปิด</button>
       </div>
     </div>
-    <div id="rewardsHelpModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:20px;">
-      <div style="background:#fff;border-radius:20px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;">
+    <div id="rewardsHelpModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(17,24,39,0.5);align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:24px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 50px -12px rgba(17,24,39,.35);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <div style="font-weight:800;font-size:16px;">วิธีสะสม Point และ Stamp</div>
           <button id="rewardsHelpClose" style="font-size:20px;background:none;border:none;cursor:pointer;color:#6b7280;padding:4px 8px;">✕</button>
@@ -9617,8 +9639,12 @@ function renderRewardsFor(userId, opts) {
     const isCurrent = i === currentIdx;
     const opacity = reached ? '1' : '0.3';
     const fontWeight = reached ? '800' : '500';
-    const ring = isCurrent ? 'border:3px solid #f59e0b;box-shadow:0 0 0 2px #fef3c7;' : 'border:2px solid #e5e7eb;';
-    const bg = reached ? '#fff' : '#f3f4f6';
+    const ring = isCurrent
+      ? 'border:3px solid #f59e0b;box-shadow:0 0 0 4px #fef3c7,0 2px 6px rgba(245,158,11,.35);'
+      : reached
+      ? 'border:2px solid #fde68a;box-shadow:0 2px 4px rgba(17,24,39,.08);'
+      : 'border:2px solid #e5e7eb;';
+    const bg = reached ? 'linear-gradient(160deg,#fffbeb,#fff)' : '#f3f4f6';
     const ptsText = t.pts === 0 ? 'จุดเริ่มต้น' : (t.pts + ' pt');
     const rewardForTier = esc(rewards[t.key] || '');
     const isPending = tierStatus.pending.includes(t.key);
@@ -9629,8 +9655,8 @@ function renderRewardsFor(userId, opts) {
       ? '<div style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:2px;">รอรับ</div>'
       : '<div style="height:16px;margin-top:2px;"></div>';
     return `
-      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;cursor:pointer;" onclick="showTierReward('${t.emoji}','${esc(t.label)}','${ptsText}','${rewardForTier}')">
-        <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${t.emoji}</div>
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:54px;cursor:pointer;" onclick="showTierReward('${t.emoji}','${esc(t.label)}','${ptsText}','${rewardForTier}')">
+        <div style="width:46px;height:46px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:23px;opacity:${opacity};">${t.emoji}</div>
         <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${t.pts}</div>
         ${badgeHtml}
         <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
@@ -9640,19 +9666,19 @@ function renderRewardsFor(userId, opts) {
   }).join('');
 
   const studyRoadHtml = `
-    <div class="rewards-trophy" style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div class="rewards-trophy" style="background:#fff;border:1px solid #f3f4f6;border-radius:20px;box-shadow:0 1px 3px rgba(17,24,39,.06),0 8px 20px -14px rgba(245,158,11,.5);padding:18px 16px 16px;margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-weight:800;font-size:15px;">🗺️ Trophy Road</div>
         <div>${tierBadgeHtml}</div>
       </div>
-      <div style="position:relative;margin:18px 6px 6px;overflow-x:auto;">
-        <div style="position:absolute;left:25px;right:25px;top:19px;height:4px;background:#e5e7eb;border-radius:2px;"></div>
-        <div style="position:absolute;left:25px;top:19px;height:4px;background:linear-gradient(90deg,#f59e0b,#16a34a);border-radius:2px;width:calc((100% - 50px) * ${roadPct/100});transition:width .3s;"></div>
+      <div style="position:relative;margin:20px 6px 6px;overflow-x:auto;">
+        <div style="position:absolute;left:27px;right:27px;top:23px;height:6px;background:#e5e7eb;border-radius:3px;"></div>
+        <div style="position:absolute;left:27px;top:23px;height:6px;background:linear-gradient(90deg,#f59e0b,#16a34a);border-radius:3px;width:calc((100% - 54px) * ${roadPct/100});transition:width .3s;"></div>
         <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:0;">
           ${trophyNodesHtml}
         </div>
       </div>
-      <div style="margin-top:10px;height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+      <div style="margin-top:12px;height:16px;background:#e5e7eb;border-radius:999px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);">
         <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#f59e0b,#16a34a);transition:width .3s;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#6b7280;">
@@ -9676,10 +9702,17 @@ function renderRewardsFor(userId, opts) {
       : tier === 'easy' ? '🟢 Easy'
       : tier === 'medium' ? '🟡 Medium'
       : '🔴 Challenge';
-    const tierColor = tier === 'main' ? '#2563eb'
-      : tier === 'easy' ? '#16a34a'
-      : tier === 'medium' ? '#d97706'
-      : '#dc2626';
+    // ใช้เฉด 700 (เข้มกว่าเดิม) ไม่ใช่ 500/600 ตอนอยู่บนพื้นสีอ่อน (tierBg) — เฉดเดิมผ่าน
+    // WCAG AA (4.5:1) แค่ตอนอยู่บนพื้นขาวล้วน พอย้ายไปพื้นสี tint แล้ว contrast ต่ำกว่าเกณฑ์
+    // (ตรวจด้วย scripts/contrast.py: green/amber เดิมแค่ ~3:1 อยู่แล้วแม้บนพื้นขาว)
+    const tierColor = tier === 'main' ? '#1d4ed8'
+      : tier === 'easy' ? '#15803d'
+      : tier === 'medium' ? '#b45309'
+      : '#b91c1c';
+    const tierBg = tier === 'main' ? '#eff6ff'
+      : tier === 'easy' ? '#f0fdf4'
+      : tier === 'medium' ? '#fffbeb'
+      : '#fef2f2';
     let actionHtml = '';
     if (q.claimed) {
       actionHtml = '<div style="margin-top:8px;font-size:11px;color:#16a34a;font-weight:700;">✅ รับแล้ว</div>';
@@ -9688,11 +9721,11 @@ function renderRewardsFor(userId, opts) {
     } else {
       actionHtml = '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">อีก ' + Math.max(0, q.target - q.progress) + ' เพื่อรับรางวัล</div>';
     }
-    return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;flex:1;min-width:0;display:flex;flex-direction:column;">'
-      + '<div style="font-size:11px;font-weight:700;color:' + tierColor + ';margin-bottom:4px;">' + tierLabel + '</div>'
-      + '<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">รางวัล: <b>+' + q.reward + 'pt</b></div>'
+    return '<div style="background:' + tierBg + ';border:1px solid ' + tierColor + '22;border-left:4px solid ' + tierColor + ';border-radius:14px;padding:12px;flex:1;min-width:0;display:flex;flex-direction:column;">'
+      + '<div style="font-size:11px;font-weight:800;color:' + tierColor + ';margin-bottom:4px;">' + tierLabel + '</div>'
+      + '<div style="font-size:13px;font-weight:800;color:#111827;margin-bottom:4px;">🎁 +' + q.reward + 'pt</div>'
       + '<div style="font-size:12px;color:#374151;flex:1;line-height:1.4;margin-bottom:8px;">' + esc(q.description||'') + '</div>'
-      + '<div style="height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin-bottom:4px;">'
+      + '<div style="height:8px;background:rgba(255,255,255,.65);border-radius:99px;overflow:hidden;margin-bottom:4px;box-shadow:inset 0 1px 2px rgba(0,0,0,.06);">'
       + '<div style="height:100%;width:' + pct + '%;background:' + tierColor + ';transition:width .3s;"></div>'
       + '</div>'
       + '<div style="font-size:11px;color:#6b7280;">' + q.progress + '/' + q.target + ' (' + pct + '%)</div>'
@@ -9702,7 +9735,7 @@ function renderRewardsFor(userId, opts) {
 
   const bonusCards = bonusQS.map(qs => renderQuestCard(qs, qs.quest ? qs.quest.tier : '')).join('');
 
-  const questHtml = '<div class="rewards-quest" style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">'
+  const questHtml = '<div class="rewards-quest" style="background:#fff;border:1px solid #f3f4f6;border-radius:20px;box-shadow:0 1px 3px rgba(17,24,39,.06),0 8px 20px -14px rgba(37,99,235,.4);padding:18px 16px 16px;margin-bottom:14px;">'
     + '<div style="font-weight:800;font-size:15px;margin-bottom:12px;">🎯 Daily Quests</div>'
     + '<div style="display:flex;gap:10px;flex-wrap:nowrap;align-items:stretch;">'
     + renderQuestCard(mainQS, 'main')
@@ -9750,8 +9783,12 @@ function renderRewardsFor(userId, opts) {
     const isCurrent = i === stCurIdx;
     const opacity = reached ? '1' : '0.3';
     const fontWeight = reached ? '800' : '500';
-    const ring = isCurrent ? 'border:3px solid #f59e0b;box-shadow:0 0 0 2px #fef3c7;' : 'border:2px solid #e5e7eb;';
-    const bg = reached ? '#fff' : '#f3f4f6';
+    const ring = isCurrent
+      ? 'border:3px solid #3b82f6;box-shadow:0 0 0 4px #dbeafe,0 2px 6px rgba(59,130,246,.35);'
+      : reached
+      ? 'border:2px solid #bfdbfe;box-shadow:0 2px 4px rgba(17,24,39,.08);'
+      : 'border:2px solid #e5e7eb;';
+    const bg = reached ? 'linear-gradient(160deg,#eff6ff,#fff)' : '#f3f4f6';
     const display = (m.key === 'start') ? '🏁' : m.emoji;
     const stOnclick = (m.key === 'start')
       ? `showTierReward('🏁','จุดเริ่มต้น','0 stamps','')`
@@ -9764,8 +9801,8 @@ function renderRewardsFor(userId, opts) {
       ? '<div style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:2px;">รอรับ</div>'
       : '<div style="height:16px;margin-top:2px;"></div>';
     return `
-      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:46px;cursor:pointer;" onclick="${stOnclick}">
-        <div style="width:38px;height:38px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:20px;opacity:${opacity};">${display}</div>
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:54px;cursor:pointer;" onclick="${stOnclick}">
+        <div style="width:46px;height:46px;border-radius:50%;background:${bg};${ring}display:flex;align-items:center;justify-content:center;font-size:23px;opacity:${opacity};">${display}</div>
         <div style="font-size:10px;color:#6b7280;margin-top:6px;font-weight:${fontWeight};">${m.threshold}</div>
         ${stBadgeHtml}
         <div style="height:18px;font-size:10px;color:#f59e0b;font-weight:800;line-height:1;margin-top:2px;">${isCurrent ? '▲' : ''}</div>
@@ -9775,19 +9812,19 @@ function renderRewardsFor(userId, opts) {
   }).join('');
 
   const stampHtml = `
-    <div class="rewards-stamp" style="background:#fafafa;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div class="rewards-stamp" style="background:#fff;border:1px solid #f3f4f6;border-radius:20px;box-shadow:0 1px 3px rgba(17,24,39,.06),0 8px 20px -14px rgba(59,130,246,.4);padding:18px 16px 16px;margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-weight:800;font-size:15px;">🎫 Stamp Road</div>
         <div style="font-weight:800;">${stamps} 🎫</div>
       </div>
-      <div style="position:relative;margin:18px 6px 6px;overflow-x:auto;">
-        <div style="position:absolute;left:25px;right:25px;top:19px;height:4px;background:#e5e7eb;border-radius:2px;"></div>
-        <div style="position:absolute;left:25px;top:19px;height:4px;background:linear-gradient(90deg,#3b82f6,#16a34a);border-radius:2px;width:calc((100% - 50px) * ${stRoadPct/100});transition:width .3s;"></div>
+      <div style="position:relative;margin:20px 6px 6px;overflow-x:auto;">
+        <div style="position:absolute;left:27px;right:27px;top:23px;height:6px;background:#e5e7eb;border-radius:3px;"></div>
+        <div style="position:absolute;left:27px;top:23px;height:6px;background:linear-gradient(90deg,#3b82f6,#16a34a);border-radius:3px;width:calc((100% - 54px) * ${stRoadPct/100});transition:width .3s;"></div>
         <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:0;">
           ${stampNodesHtml}
         </div>
       </div>
-      <div style="margin-top:10px;height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+      <div style="margin-top:12px;height:16px;background:#e5e7eb;border-radius:999px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.05);">
         <div style="height:100%;width:${stPct}%;background:linear-gradient(90deg,#3b82f6,#16a34a);transition:width .3s;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#6b7280;">
@@ -9808,17 +9845,17 @@ function renderRewardsFor(userId, opts) {
     const bannerItems = tierStatus.newlyReached.map(k => {
       const lbl = esc(tierLabelMap[k] || k);
       const rwd = esc(rewards[k] || '');
-      return `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:6px 0;border-bottom:1px solid #fde68a;">
+      return `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0;border-bottom:1px solid #fde68a;">
         <div>
-          <span style="font-weight:800;">${lbl}</span>
+          <span style="font-weight:800;font-size:14px;">${lbl}</span>
           ${rwd ? '<span class="muted" style="font-size:12px;margin-left:6px;">🎁 ' + rwd + '</span>' : ''}
         </div>
-        <button type="button" class="btn btnPrimary" style="padding:4px 12px;font-size:12px;" data-request-tier="${k}">แจ้ง Admin</button>
+        <button type="button" class="btn btnPrimary" style="padding:6px 14px;font-size:12px;border-radius:10px;" data-request-tier="${k}">แจ้ง Admin</button>
       </div>`;
     }).join('');
     newBannerHtml = `
-      <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:14px;padding:12px 14px;margin-bottom:14px;">
-        <div style="font-weight:800;font-size:14px;margin-bottom:6px;">🎉 คุณถึงระดับใหม่แล้ว!</div>
+      <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:18px;padding:14px 16px;margin-bottom:14px;box-shadow:0 4px 14px -8px rgba(245,158,11,.5);">
+        <div style="font-weight:800;font-size:15px;margin-bottom:8px;">🎉 คุณถึงระดับใหม่แล้ว!</div>
         ${bannerItems}
       </div>
     `;
@@ -14732,7 +14769,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.30';
+  const CURRENT_VERSION = 'v48.31';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
