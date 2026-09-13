@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.46p -->
+  <!-- APP_VERSION: v48.47p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -419,11 +419,11 @@
     .titleInput{min-width:260px;max-width:520px;width:38vw;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-family:inherit;}
     .correctBtns{display:flex;gap:4px;}
     .correctBtn{width:34px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:13px;font-family:inherit;transition:all .12s;}
-    .iPadDot{width:14px;height:14px;border-radius:50%;border:2px solid #d1d5db;background:transparent;transition:all .2s;}
-    .iPadDot.filled{background:#111827;border-color:#111827;box-shadow:0 0 0 3px rgba(17,24,39,.08);}
-    .iPadDot.error{background:#dc2626;border-color:#dc2626;}
+    .iPadDot{width:14px;height:14px;border-radius:50%;border:2px solid #C6C6C8;background:transparent;transition:all .2s;}
+    .iPadDot.filled{background:#1C1C1E;border-color:#1C1C1E;box-shadow:0 0 0 3px rgba(28,28,30,.08);}
+    .iPadDot.error{background:#FF3B30;border-color:#FF3B30;}
     @keyframes iPadShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
-    .iPadBtn{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-size:24px;font-weight:400;font-family:inherit;color:#111827;margin:0 auto;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);user-select:none;}
+    .iPadBtn{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;border:1.5px solid #C6C6C8;background:#fff;cursor:pointer;font-size:24px;font-weight:400;font-family:inherit;color:#1C1C1E;margin:0 auto;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);user-select:none;}
     .iPadBtn:active{background:#f3f4f6;box-shadow:0 1px 2px rgba(0,0,0,.06);transform:scale(.95);}
     .iPadBtnGhost{background:#f9fafb;font-size:15px;font-weight:600;color:#374151;border-color:#e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,.05);}
     .correctBtn:hover{border-color:#9ca3af;background:#f3f4f6;}
@@ -1198,17 +1198,17 @@
 
 <!-- ===================== PAGE: LOGIN ===================== -->
 <div id="page-login" class="page active">
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#f0f4ff 0%,#f9fafb 60%,#f5f0ff 100%);padding:24px 16px;">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F2F2F7;padding:24px 16px;">
     <div style="width:100%;max-width:320px;">
       <!-- Card -->
       <div style="background:#fff;border-radius:24px;padding:32px 24px 24px;box-shadow:0 4px 24px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04);text-align:center;">
-        <div style="width:56px;height:56px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px;">🎯</div>
-        <div style="font-size:20px;font-weight:800;color:#111827;margin-bottom:4px;letter-spacing:-0.3px;">My Exam Academia</div>
-        <div style="font-size:13px;color:#9ca3af;margin-bottom:24px;">กรอกรหัส PIN เพื่อเข้าใช้งาน</div>
+        <div style="width:56px;height:56px;background:linear-gradient(135deg,#5856D6,#007AFF);color:#fff;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <div style="font-size:20px;font-weight:800;color:#1C1C1E;margin-bottom:4px;letter-spacing:-0.3px;">My Exam Academia</div>
+        <div style="font-size:13px;color:#8E8E93;margin-bottom:24px;">กรอกรหัส PIN เพื่อเข้าใช้งาน</div>
 
         <!-- shared exam hint -->
         <div id="loginExamHint" style="display:none;margin-bottom:18px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;font-size:13px;color:#1d4ed8;line-height:1.6;text-align:left;">
-          📚 มีข้อสอบรอคุณอยู่<br><span id="loginExamHintTitle" style="font-weight:700;"></span><br><span style="font-size:12px;color:#3b82f6;">เข้าสู่ระบบเพื่อเริ่มทำได้เลย</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;vertical-align:middle;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/></svg>มีข้อสอบรอคุณอยู่</span><br><span id="loginExamHintTitle" style="font-weight:700;"></span><br><span style="font-size:12px;color:#3b82f6;">เข้าสู่ระบบเพื่อเริ่มทำได้เลย</span>
         </div>
 
         <!-- PIN dots -->
@@ -1220,7 +1220,7 @@
           <div class="iPadDot" id="pd4"></div>
           <div class="iPadDot" id="pd5"></div>
         </div>
-        <div id="loginError" style="color:#dc2626;font-size:13px;min-height:20px;margin-bottom:20px;"></div>
+        <div id="loginError" style="color:#FF3B30;font-size:13px;min-height:20px;margin-bottom:20px;"></div>
 
         <!-- hidden input — focused always so keyboard works -->
         <input id="loginPinInput" type="tel" maxlength="6" inputmode="none"
@@ -1245,7 +1245,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.46p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#8E8E93;opacity:0.5;">v48.47p</div>
     </div>
   </div>
 </div>
@@ -4114,7 +4114,8 @@ const _ICONS = {
   messageCircle: '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
   logOut: '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
-  activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>'
+  activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  bookOpen: '<path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/>'
 };
 
 // WHOOP UI — Stage 4
@@ -15023,7 +15024,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.46p';
+  const CURRENT_VERSION = 'v48.47p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
