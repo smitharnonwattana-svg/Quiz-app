@@ -2770,6 +2770,110 @@ currentSection = 'statsPage';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: versionAutoUpdate (v48.44) — PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url
+// ตายตัว "/Quiz-app/") เจอบั๊กค้างเวอร์ชันเก่าตลอด: reload ตอนกดยืนยันอัพเดทเดิมไปที่ URL
+// คนละอันกับ start_url (?_v=... vs ตัวเปล่า) เลยไม่เคยล้าง cache ที่ค้างอยู่หลัง start_url
+// นั้นสักที — แก้ด้วยการ auto-reload เงียบๆ เฉพาะการเช็คครั้งแรกสุดหลังเปิดแอป (ไม่มีอะไร
+// ให้เสีย) ส่วนเช็ครอบถัดไป/ตอนอยู่กลางข้อสอบยังคง confirm() เหมือนเดิมทุกประการ
+// หมายเหตุ: `_currentPage` เป็น page-scoped `let` (classic script แชร์ global lexical env
+// เดียวกัน) ไม่ใช่ `window` property — ต้องตั้งผ่าน page.evaluate() หลังสคริปต์จริงของแอป
+// รันไปแล้ว (ไม่ใช่ผ่าน addInitScript ซึ่งจะชน TDZ ก่อน `let _currentPage='home'` ของแอปเอง)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'versionAutoUpdate';
+{
+  // 1: เช็คครั้งแรกสุดหลังเปิดแอป (boot จริง) + เจอ mismatch + ไม่ได้อยู่หน้า take/practice
+  //    → ต้อง auto-reload เงียบๆ (URL เปลี่ยนเป็น ?_v=...) โดยไม่เรียก confirm() เลย
+  {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    page.on('dialog', d => d.dismiss());
+    await page.addInitScript(() => {
+      window._confirmCalls = 0;
+      window.confirm = () => { window._confirmCalls++; return false; };
+      const origFetch = window.fetch;
+      window.fetch = (url, opts) => {
+        if (String(url).includes('version.json')) {
+          return Promise.resolve({ ok: true, json: async () => ({ version: 'v99.99' }) });
+        }
+        return origFetch(url, opts);
+      };
+    });
+    const urlBefore = BASE + '/index.html';
+    await page.goto(urlBefore, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200); // real load event + 500ms timer + fetch round-trip
+    const urlAfter = page.url();
+    const confirmCalls = await page.evaluate(() => window._confirmCalls || 0).catch(() => 0);
+    check('versionAutoUpdate: เช็คแรกสุดหลังเปิดแอป + mismatch + ไม่ได้อยู่หน้า take/practice → auto-reload เงียบๆ ไม่เรียก confirm()',
+      urlAfter.includes('?_v=') && confirmCalls === 0,
+      'before=' + urlBefore + ' after=' + urlAfter + ' confirmCalls=' + confirmCalls);
+    await ctx.close();
+  }
+
+  // 2: เช็คครั้งแรกสุด + เจอ mismatch + อยู่หน้า take (กำลังทำข้อสอบ) → ต้องเด้ง confirm()
+  //    เหมือนเดิม ห้าม auto-reload ทับคนที่กำลังทำข้อสอบอยู่
+  {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    let dialogSeen = false;
+    page.on('dialog', d => { dialogSeen = true; d.dismiss(); });
+    await page.addInitScript(() => {
+      const origFetch = window.fetch;
+      window.fetch = (url, opts) => {
+        if (String(url).includes('version.json')) {
+          return Promise.resolve({ ok: true, json: async () => ({ version: 'v99.99' }) });
+        }
+        return origFetch(url, opts);
+      };
+    });
+    const urlBefore = BASE + '/index.html';
+    await page.goto(urlBefore, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => { _currentPage = 'take'; });
+    await page.waitForTimeout(1200);
+    const urlAfter = page.url();
+    check('versionAutoUpdate: เช็คแรกสุด + mismatch + อยู่หน้า take → เด้ง confirm() เหมือนเดิม ไม่ auto-reload',
+      dialogSeen === true && urlAfter === urlBefore,
+      'before=' + urlBefore + ' after=' + urlAfter + ' dialogSeen=' + dialogSeen);
+    await ctx.close();
+  }
+
+  // 3: เช็คแรกสุดเจอเวอร์ชันตรงกัน (no-op ไม่เกิดอะไร) แล้วเช็ครอบสอง (จำลอง interval/
+  //    foreground) เจอ mismatch → ต้องกลับไปใช้ confirm() เหมือนเดิม (auto-reload เงียบๆ
+  //    ใช้ได้แค่ครั้งเดียวจริงๆ ไม่ใช่ทุกครั้งที่ยังไม่เคย mismatch)
+  {
+    // อ่าน CURRENT_VERSION จริงจากไฟล์ (ไม่ hardcode) กัน test เพี้ยนเงียบๆ ทุกครั้งที่ bump
+    // เวอร์ชัน — CURRENT_VERSION เป็น const ในตัว IIFE เข้าถึงจาก page.evaluate ไม่ได้
+    const _indexSrc = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    const _realCurrentVersion = (_indexSrc.match(/const CURRENT_VERSION = '([^']+)'/) || [])[1];
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    let dialogSeen = false;
+    page.on('dialog', d => { dialogSeen = true; d.dismiss(); });
+    await page.addInitScript((matchingVersion) => {
+      const origFetch = window.fetch;
+      let fetchCount = 0;
+      window.fetch = (url, opts) => {
+        if (String(url).includes('version.json')) {
+          fetchCount++;
+          if (fetchCount === 1) return Promise.resolve({ ok: true, json: async () => ({ version: matchingVersion }) });
+          return Promise.resolve({ ok: true, json: async () => ({ version: 'v99.99' }) });
+        }
+        return origFetch(url, opts);
+      };
+    }, _realCurrentVersion);
+    const urlBefore = BASE + '/index.html';
+    await page.goto(urlBefore, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200); // เช็คแรกสุด (จริง) resolve แบบ no-op (ตรงกัน)
+    await page.evaluate(() => window.checkVersion()); // เช็คครั้งที่สอง (manual) → mismatch
+    await page.waitForTimeout(300);
+    const urlAfter = page.url();
+    check('versionAutoUpdate: เช็คแรกตรงกัน (no-op) แล้วเช็ครอบสอง mismatch → เด้ง confirm() ไม่ auto-reload',
+      dialogSeen === true && urlAfter === urlBefore,
+      'before=' + urlBefore + ' after=' + urlAfter + ' dialogSeen=' + dialogSeen);
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

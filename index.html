@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.43 -->
+  <!-- APP_VERSION: v48.44 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1300,7 +1300,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.43</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.44</div>
     </div>
   </div>
 </div>
@@ -15177,12 +15177,23 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.43';
+  const CURRENT_VERSION = 'v48.44';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
+  // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
+  // reload ตอนกดยืนยันอัพเดทเดิมไปที่ URL คนละอันกับ start_url (?_v=... vs ตัวเปล่า)
+  // เลยไม่เคยล้าง cache ที่ค้างอยู่หลัง start_url นั้นสักที ทำให้เปิดแอปใหม่ทุกครั้งเจอ
+  // เวอร์ชันเก่าซ้ำแล้วต้องกด confirm วนไม่รู้จบ — เช็คครั้งแรกสุดหลังเปิดแอป (ยังไม่ได้
+  // ทำอะไรค้างอยู่) ให้ reload เงียบๆ ไปเลยไม่ต้องถาม แก้ปัญหาที่ต้นตอ
+  let _isFirstCheck = true;
+  function _safeToAutoReload(){
+    return _currentPage !== 'take' && _currentPage !== 'practice';
+  }
 
   async function checkVersion(){
     if (_prompted) return;
+    const wasFirstCheck = _isFirstCheck;
+    _isFirstCheck = false; // ตัดสินใจก่อน await กัน race กับ visibilitychange ที่ยิงไล่ๆ กันมา
     try {
       const res = await fetch(
         '/Quiz-app/version.json?t=' + Date.now(),
@@ -15192,6 +15203,14 @@ function initEntranceCompare(params) {
       const data = await res.json();
       if (data.version && data.version !== CURRENT_VERSION) {
         _prompted = true;
+
+        if (wasFirstCheck && _safeToAutoReload()) {
+          if (typeof _takeDiag === 'function') _takeDiag('version.autoReload', {from:CURRENT_VERSION, to:data.version, page:window._currentPage});
+          if (typeof _flushTakeDiag === 'function') { try{ await _flushTakeDiag(true); }catch(e){} }
+          window.location.href = window.location.pathname + '?_v=' + Date.now();
+          return;
+        }
+
         // v48.18 diag: เด้ง confirm กลางข้อสอบได้ ถ้ากดตกลง = reload ทั้งหน้า
         if (typeof _takeDiag === 'function') _takeDiag('version.prompt', {from:CURRENT_VERSION, to:data.version, page:window._currentPage});
         if (confirm(
@@ -15211,7 +15230,7 @@ function initEntranceCompare(params) {
 
   // Check on app open
   window.addEventListener('load', () => {
-    setTimeout(checkVersion, 3000);
+    setTimeout(checkVersion, 500);
   });
 
   // Check every 5 minutes while app is open
