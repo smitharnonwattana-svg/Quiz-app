@@ -276,6 +276,23 @@ currentSection = 'pointLog';
   });
   check('หน้า admin_rewards แสดง panel "ประวัติ Point" พร้อมรายการที่ถูกต้อง',
     html.includes('ประวัติ Point') && html.includes('ภารกิจหลักประจำวัน') && html.includes('ทำข้อสอบ: ชุด UI'));
+
+  // v48.45 — admin_rewards redesign: แถบไล่สี .rewards-trophy ต้องติดแม้ render นอก
+  // #page-rewards (เช่นตอนแสดงในหน้า admin) — ก่อนหน้านี้ CSS ล็อก scope ไว้เฉพาะ
+  // #page-rewards ทำให้แถบสีหายไปเงียบๆ ตอน render ในหน้า admin (string-based check
+  // แบบข้างบนจับบั๊กนี้ไม่ได้เลยเพราะไม่ได้เช็ค CSS เอง จึงต้องเช็ค computed style ตรงๆ)
+  const stripe = await page.evaluate(() => {
+    Store._cache.gamification = {};
+    awardPoints('เด็กสไตรป์', 10, 'admin_test');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    renderRewardsFor('เด็กสไตรป์', { host, adminTools: true });
+    const el = host.querySelector('.rewards-trophy');
+    const bg = el ? getComputedStyle(el, '::before').backgroundImage : null;
+    return { found: !!el, bg };
+  });
+  check('.rewards-trophy ที่ render นอก #page-rewards (เช่นในหน้า admin) ยังมีแถบไล่สี::before ติดอยู่',
+    stripe.found && typeof stripe.bg === 'string' && stripe.bg.includes('gradient'), JSON.stringify(stripe));
   await ctx.close();
 }
 

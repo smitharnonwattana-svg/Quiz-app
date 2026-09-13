@@ -27,7 +27,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.44p -->
+  <!-- APP_VERSION: v48.45p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -878,28 +878,56 @@
     /* Prevent overscroll bounce on iOS/iPadOS */
     html { overscroll-behavior: none; }
     body { overscroll-behavior: none; }
-    /* Rewards page: "Elevated Trophy Road" — แถบสีบนการ์ดแต่ละ section (scope เฉพาะ
-       #page-rewards ไม่แตะ :root กลาง กันกระทบหน้าอื่น) ตั้งใจไม่ใช้ overflow:hidden บน
-       การ์ด เพราะจะไปลบล้าง fix เดิมที่กันข้อความ stamp node ถูกตัด (ดู
+    /* "Elevated Trophy Road" — แถบสีบนการ์ดแต่ละ section ไม่ scope เฉพาะ #page-rewards
+       อีกต่อไป เพราะ renderRewardsFor ถูกเรียกซ้ำจากหน้า admin (#page-admin_rewards)
+       ด้วย — ต้องการแถบสีทั้งสองที่ (ยืนยันแล้วว่า class เหล่านี้มาจาก renderRewardsFor
+       จุดเดียวทั้งไฟล์ ขยาย scope ปลอดภัย ไม่กระทบที่อื่น) ตั้งใจไม่ใช้ overflow:hidden
+       บนการ์ด เพราะจะไปลบล้าง fix เดิมที่กันข้อความ stamp node ถูกตัด (ดู
        .rewards-stamp div[style*="overflow-x:auto"] ด้านล่าง) จึงมนมุมแถบสีให้ตรงกับ
        มุมการ์ดแทน */
-    #page-rewards .rewards-trophy,
-    #page-rewards .rewards-quest,
-    #page-rewards .rewards-stamp {
+    .rewards-trophy,
+    .rewards-quest,
+    .rewards-stamp {
       position: relative;
     }
-    #page-rewards .rewards-trophy::before,
-    #page-rewards .rewards-quest::before,
-    #page-rewards .rewards-stamp::before {
+    .rewards-trophy::before,
+    .rewards-quest::before,
+    .rewards-stamp::before {
       content: '';
       position: absolute;
       left: 1px; right: 1px; top: 1px;
       height: 4px;
       border-radius: 19px 19px 0 0;
     }
-    #page-rewards .rewards-trophy::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
-    #page-rewards .rewards-quest::before  { background: linear-gradient(90deg,#2563eb,#7c3aed); }
-    #page-rewards .rewards-stamp::before  { background: linear-gradient(90deg,#3b82f6,#16a34a); }
+    .rewards-trophy::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
+    .rewards-quest::before  { background: linear-gradient(90deg,#2563eb,#7c3aed); }
+    .rewards-stamp::before  { background: linear-gradient(90deg,#3b82f6,#16a34a); }
+    /* Admin rewards page: ยกระดับ 4 การ์ด section หลักให้เข้าชุด "Elevated Trophy Road"
+       เดียวกับหน้ารางวัลนักเรียน — 3 ใน 4 มีแถบไล่สีของตัวเอง (โทนตามกลุ่มความหมายเดิม:
+       ทอง/อำพัน=กลุ่ม trophy, น้ำเงิน/ม่วง=กลุ่ม quest) ส่วนการ์ด "ความคืบหน้านักเรียน"
+       (wrapper ที่ครอบการ์ด Trophy/Quest/Stamp ที่มีแถบสีของตัวเองอยู่แล้ว) ไม่ใส่แถบสีซ้ำ
+       กันดูรก ยกระดับแค่มุมมน+shadow */
+    #page-admin_rewards .rewards-admin-pending,
+    #page-admin_rewards .rewards-admin-progress,
+    #page-admin_rewards .rewards-admin-studyroad,
+    #page-admin_rewards .rewards-admin-quest {
+      position: relative;
+      border-radius: 20px;
+      border-color: #f3f4f6;
+      box-shadow: 0 1px 3px rgba(17,24,39,.06), 0 8px 20px -14px rgba(17,24,39,.35);
+    }
+    #page-admin_rewards .rewards-admin-pending::before,
+    #page-admin_rewards .rewards-admin-studyroad::before,
+    #page-admin_rewards .rewards-admin-quest::before {
+      content: '';
+      position: absolute;
+      left: 1px; right: 1px; top: 1px;
+      height: 4px;
+      border-radius: 19px 19px 0 0;
+    }
+    #page-admin_rewards .rewards-admin-pending::before   { background: linear-gradient(90deg,#f59e0b,#dc2626); }
+    #page-admin_rewards .rewards-admin-studyroad::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
+    #page-admin_rewards .rewards-admin-quest::before     { background: linear-gradient(90deg,#2563eb,#7c3aed); }
     /* Rewards page wider on tablet */
     @media (min-width: 768px) {
       #page-rewards > div {
@@ -1131,7 +1159,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.44p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#9ca3af;opacity:0.5;">v48.45p</div>
     </div>
   </div>
 </div>
@@ -1833,26 +1861,26 @@
     </div>
 
     <!-- Pending tier claims (inbox) -->
-    <div class="card" style="margin-top:16px;padding:16px;">
+    <div class="card rewards-admin-pending" style="margin-top:16px;padding:16px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🎁 รายการรอมอบ <span id="adminRewardsPendingCount" style="font-size:12px;color:#6b7280;font-weight:600;"></span></div>
       <div id="adminRewardsPendingList"></div>
     </div>
 
     <!-- Per-student progress: Trophy Road + Stamp Road + Admin Tools -->
-    <div class="card" style="margin-top:14px;padding:16px;">
+    <div class="card rewards-admin-progress" style="margin-top:14px;padding:16px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">👤 ความคืบหน้านักเรียน</div>
       <div id="adminRewardsStudentTabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
       <div id="adminRewardsStudentView"></div>
     </div>
 
     <!-- Study Road config -->
-    <div class="card" style="margin-top:14px;padding:16px;">
+    <div class="card rewards-admin-studyroad" style="margin-top:14px;padding:16px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🗺️ Study Road — ชื่อรางวัลแต่ละระดับ</div>
       <div id="adminRewardsStudyRoad"></div>
     </div>
 
     <!-- Daily Quest config -->
-    <div class="card" style="margin-top:14px;padding:16px;">
+    <div class="card rewards-admin-quest" style="margin-top:14px;padding:16px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🎯 ปรับแต่ง Daily Quest</div>
       <div class="muted" style="font-size:12px;margin-bottom:10px;">แก้รางวัล/เป้า/ข้อความ และเปิด-ปิดแต่ละเควส — มีผลกับทุกคนตั้งแต่เควสรอบถัดไป (เควสที่นักเรียนถืออยู่วันนี้จะอัปเดตค่าให้อัตโนมัติ)</div>
       <div id="adminRewardsQuestConfig"></div>
@@ -10161,7 +10189,7 @@ function initAdminRewards(){
           <button type="button" class="btn" style="padding:4px 12px;font-size:12px;border-color:#16a34a;color:#15803d;font-weight:700;" data-admin-claim="${k}" data-claim-user="${esc(g.name)}">มอบแล้ว ✓</button>
         </div>`;
       }).join('');
-      return `<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      return `<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:14px;padding:10px 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(217,119,6,.08);">
         <div style="font-weight:800;font-size:14px;margin-bottom:6px;color:#92400e;">👤 ${esc(g.name)} <span style="font-size:11px;color:#b45309;font-weight:600;">(${g.keys.length} รายการ)</span></div>
         ${items}
       </div>`;
@@ -10216,7 +10244,8 @@ function initAdminRewards(){
     if(!host) return;
     const cfg = getQuestConfig();
     const escAttr = esc; // ใช้ esc() global
-    const tierColor = { easy:'#16a34a', medium:'#b45309', challenge:'#dc2626' };
+    // เฉด 700 เดียวกับที่ renderQuestCard ใช้ (ผ่าน WCAG AA 4.5:1 — ดูคอมเมนต์ ~L9725)
+    const tierColor = { easy:'#15803d', medium:'#b45309', challenge:'#b91c1c' };
 
     // Main quest rows — target + reward only (description is auto-generated from the student's weakness)
     const mainRowHtml = (d) => {
@@ -14877,7 +14906,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.44p';
+  const CURRENT_VERSION = 'v48.45p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
