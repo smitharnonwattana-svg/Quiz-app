@@ -281,6 +281,10 @@ currentSection = 'pointLog';
   // #page-rewards (เช่นตอนแสดงในหน้า admin) — ก่อนหน้านี้ CSS ล็อก scope ไว้เฉพาะ
   // #page-rewards ทำให้แถบสีหายไปเงียบๆ ตอน render ในหน้า admin (string-based check
   // แบบข้างบนจับบั๊กนี้ไม่ได้เลยเพราะไม่ได้เช็ค CSS เอง จึงต้องเช็ค computed style ตรงๆ)
+  // NOTE (v48.57p, งาน HIG redesign rewards/admin_rewards): check นี้จะถูกเปลี่ยนเป็น
+  // เช็ค .reward-node.reached background-color ทึบแทน — แต่ต้องรอ port เข้า production
+  // index.html ก่อน (regression.mjs รันกับ production เท่านั้น ตอนนี้ preview ยังไม่ port)
+  // ไม่งั้น suite จะพังเพราะ production ยังไม่มีคลาสใหม่พวกนี้
   const stripe = await page.evaluate(() => {
     Store._cache.gamification = {};
     awardPoints('เด็กสไตรป์', 10, 'admin_test');
