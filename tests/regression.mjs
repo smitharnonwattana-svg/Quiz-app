@@ -2874,6 +2874,93 @@ currentSection = 'versionAutoUpdate';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: examCardIcons (v48.45) — การ์ดรายข้อสอบ (ระดับที่ 3 ของ exams page) เปลี่ยน
+// emoji ทั้งหมด (📝⏱🏆⚠️🎯⏸️🤝📤🔗🧹✓▶) เป็น stroke icon จาก _ICONS/_icon() และเปลี่ยน
+// สี badge แบบ pastel Tailwind เดิมเป็นโทน Apple HIG เดียวกับส่วนอื่นของหน้า — ไม่แตะ
+// logic/data-attribute ใดๆ เลย (resume-ticker, assign modal, weakness reset ยังทำงานเหมือนเดิม)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'examCardIcons';
+{
+  const emojiCount = (text) => (text.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) || []).length;
+  const now = Date.now();
+  const iconsCache = () => baseCache({
+    exams: [
+      mkExam('ic1', 'เลข ชุด 1', 'คณิตศาสตร์'),
+      mkExam('ic2', 'เลข ชุด 2', 'คณิตศาสตร์'),
+    ],
+    questions: { ic1: mkQ(), ic2: mkQ() },
+    attempts: [
+      { id: 'icatt1', examId: 'ic1', examTitle: 'เลข ชุด 1', examSubject: 'คณิตศาสตร์', takerName: 'เด็กทดสอบ', score: 8, total: 10, startedAt: now - 100000, submittedAt: now - 90000, usedSeconds: 300, answers: {}, perQuestion: [], mode: 'normal' },
+    ],
+    members: [{ pin: '311257', name: 'เด็กทดสอบ' }],
+  });
+
+  // 1: มุมมองนักเรียน — resume-badge (ค้างทำ), score-badge, ไม่มี emoji เหลือเลย
+  {
+    const { ctx, page } = await newSeededPage({ role: 'student', name: 'เด็กทดสอบ', cache: iconsCache(), viewport: { width: 500, height: 900 } });
+    await page.evaluate((now) => {
+      localStorage.setItem('nanont:takeResume:เด็กทดสอบ', JSON.stringify({
+        examId: 'ic2', startedAt: now - 60000, pauseOffset: 0, pausedAt: now, practiceMode: false, halfMode: false, takerName: 'เด็กทดสอบ',
+      }));
+    }, now);
+    await page.evaluate(() => navigate('exams'));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#examsSubjGrid [data-subj="คณิตศาสตร์"]').click());
+    await page.waitForTimeout(300);
+
+    const examsListHtml = await page.evaluate(() => document.getElementById('examsList').innerHTML);
+    check('examCardIcons: มุมมองนักเรียน — ไม่มี emoji เหลือใน #examsList เลย', emojiCount(examsListHtml) === 0, 'count=' + emojiCount(examsListHtml));
+
+    const hasScoreBadgeSvg = await page.evaluate(() => !!document.querySelector('.score-badge svg'));
+    check('examCardIcons: score-badge มี SVG icon (trophy) แทน emoji', hasScoreBadgeSvg === true);
+
+    const resumeBadge = await page.evaluate(() => {
+      const b = document.querySelector('.resume-badge');
+      return b ? { hasSvg: !!b.querySelector('svg'), dataStartedAt: b.getAttribute('data-startedAt'), dataResumeId: b.getAttribute('data-resumeid') } : null;
+    });
+    check('examCardIcons: resume-badge มี SVG icon + data-attribute ครบ (ticker ยัง query ได้)',
+      resumeBadge && resumeBadge.hasSvg && !!resumeBadge.dataStartedAt && !!resumeBadge.dataResumeId, JSON.stringify(resumeBadge));
+
+    const resumeTimeText = await page.evaluate(() => document.querySelector('.resume-badge .resume-time')?.textContent);
+    check('examCardIcons: resume-badge ticker render ค่า MM:SS ถูกต้อง (ไม่ throw)',
+      /^เวลาเหลือ \d{2}:\d{2}$/.test(resumeTimeText || ''), resumeTimeText);
+
+    await ctx.close();
+  }
+
+  // 2: มุมมองครู — admin per-student block, copy-link button, assign button
+  {
+    const { ctx, page } = await newSeededPage({ role: 'teacher', name: 'Admin', cache: iconsCache(), viewport: { width: 1280, height: 900 } });
+    await page.evaluate(() => navigate('exams'));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#examsSubjGrid [data-subj="คณิตศาสตร์"]').click());
+    await page.waitForTimeout(300);
+
+    const examsListHtml = await page.evaluate(() => document.getElementById('examsList').innerHTML);
+    check('examCardIcons: มุมมองครู — ไม่มี emoji เหลือใน #examsList เลย', emojiCount(examsListHtml) === 0, 'count=' + emojiCount(examsListHtml));
+
+    const copyLinkBtn = await page.evaluate(() => {
+      const b = document.querySelector('[onclick^="copyExamLink"]');
+      return b ? { hasSvg: !!b.querySelector('svg'), className: b.className } : null;
+    });
+    check('examCardIcons: ปุ่มคัดลอกลิงก์ใช้ class exam-row-icon-btn + SVG icon',
+      copyLinkBtn && copyLinkBtn.hasSvg && copyLinkBtn.className.includes('exam-row-icon-btn'), JSON.stringify(copyLinkBtn));
+
+    const assignBtnHasSvg = await page.evaluate(() => {
+      const btns = [...document.querySelectorAll('.examCard button')];
+      const assignBtn = btns.find(b => b.textContent.includes('ส่งให้นักเรียน'));
+      return assignBtn ? !!assignBtn.querySelector('svg') : null;
+    });
+    check('examCardIcons: ปุ่ม "ส่งให้นักเรียน" มี SVG icon', assignBtnHasSvg === true);
+
+    const resetBtnExists = await page.evaluate(() => !!document.querySelector('[data-resetweakness]'));
+    check('examCardIcons: admin per-student block ยังโชว์ปุ่มล้างจุดอ่อนตามเดิม', resetBtnExists === true);
+
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
