@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.55p -->
+  <!-- APP_VERSION: v48.56p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1078,6 +1078,7 @@
       cursor: pointer; flex-shrink: 0;
     }
     #page-exams .exam-row-icon-btn.danger { background: #FFE5E5; color: #D70015; }
+    #page-exams .exam-row-icon-btn:hover { background: #E5E5EA; color: #0066CC; }
     #page-exams .exam-row.addRow { color: #0066CC; }
     #page-exams .exam-row.addRow .exam-row-label { color: #0066CC; font-weight: 600; }
     #page-exams .examEditBar {
@@ -1300,7 +1301,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.55p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.56p</div>
     </div>
   </div>
 </div>
@@ -4196,7 +4197,16 @@ const _ICONS = {
   folderPlus: '<path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   gripVertical: '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
   trash2: '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>'
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  fileText: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  clock: '<path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/>',
+  alertTriangle: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
+  eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>'
 };
 
 // WHOOP UI — Stage 4
@@ -5487,12 +5497,12 @@ function initExams(){
           const uPct=uLast&&uLast.total?Math.round((uLast.score||0)/uLast.total*100):0;
           const uWc=WeaknessTracker.countWeaknessesByExam(uName,e.id);
           const wLine = uWc > 0
-            ? `<div style="font-size:11px;color:#dc2626;margin-top:2px;">⚠️ จุดอ่อน: ${uWc} ข้อ</div>`
-            : `<div style="font-size:11px;color:#16a34a;margin-top:2px;">✓ ไม่มีจุดอ่อน</div>`;
-          const resetBtnHtml = `<button data-resetweakness="${esc(uName)}" style="margin-top:4px;padding:3px 8px;font-size:11px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-weight:600;">🧹 ล้างจุดอ่อนชุดนี้${uWc>0?' ('+uWc+')':''}</button>`;
-          return `<div style="margin-top:6px;padding:6px 8px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
-            <div style="font-size:12px;font-weight:700;color:#374151;">${esc(uName)}</div>
-            <div style="font-size:11px;color:#6b7280;margin-top:1px;">🏆 ${uBest}/${uBestTotal} &nbsp;•&nbsp; ล่าสุด ${uLast.score||0}/${uLast.total||0} (${uPct}%) &nbsp;•&nbsp; ${uAtts.length} ครั้ง</div>
+            ? `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#D70015;margin-top:2px;">${_icon(_ICONS.alertTriangle,12)} จุดอ่อน: ${uWc} ข้อ</div>`
+            : `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#1F7A37;margin-top:2px;">${_icon(_ICONS.check,12)} ไม่มีจุดอ่อน</div>`;
+          const resetBtnHtml = `<button data-resetweakness="${esc(uName)}" style="display:flex;align-items:center;gap:4px;margin-top:4px;padding:3px 8px;font-size:11px;background:#FFF3E0;color:#A34E00;border:1px solid #FFD9A8;border-radius:6px;cursor:pointer;font-weight:600;">${_icon(_ICONS.eraser,12)} ล้างจุดอ่อนชุดนี้${uWc>0?' ('+uWc+')':''}</button>`;
+          return `<div style="margin-top:6px;padding:6px 8px;background:#F2F2F7;border-radius:8px;">
+            <div style="font-size:12px;font-weight:700;color:#1C1C1E;">${esc(uName)}</div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#6E6E73;margin-top:1px;">${_icon(_ICONS.trophy,12)} ${uBest}/${uBestTotal} &nbsp;•&nbsp; ล่าสุด ${uLast.score||0}/${uLast.total||0} (${uPct}%) &nbsp;•&nbsp; ${uAtts.length} ครั้ง</div>
             ${wLine}
             ${resetBtnHtml}
           </div>`;
@@ -5501,11 +5511,11 @@ function initExams(){
 
       // ── Student: own stats ──
       const scoreHtml=!isTeacher?(last
-        ?`<div class="score-badge">🏆 สูงสุด <b>${bestScore}/${bestTotal}</b> &nbsp;•&nbsp; ล่าสุด <b>${last.score}/${last.total}</b> (${Math.round(last.score/last.total*100)}%) &nbsp;•&nbsp; ทำแล้ว ${myAttempts.length} ครั้ง</div>`
+        ?`<div class="score-badge" style="display:flex;align-items:center;gap:4px;">${_icon(_ICONS.trophy,13)} สูงสุด <b>${bestScore}/${bestTotal}</b> &nbsp;•&nbsp; ล่าสุด <b>${last.score}/${last.total}</b> (${Math.round(last.score/last.total*100)}%) &nbsp;•&nbsp; ทำแล้ว ${myAttempts.length} ครั้ง</div>`
         :`<div class="score-badge" style="color:var(--muted);">ยังไม่เคยทำ</div>`):'';
       const _wc=(!isTeacher&&_myName)?WeaknessTracker.countWeaknessesByExam(_myName,e.id):0;
-      const weaknessHtml=(!isTeacher&&_wc>0)?`<div style="margin-top:4px;font-size:12px;color:#dc2626;font-weight:600;">⚠️ จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>`:'';
-      const practiceBtnHtml=(!isTeacher&&_wc>0)?`<button class="btn btnPrimary" data-practiceexam="${e.id}" style="margin-top:8px;padding:8px 14px;font-size:13px;width:100%;">🎯 แก้จุดอ่อนชุดนี้ (${_wc} ข้อ)</button>`:'';
+      const weaknessHtml=(!isTeacher&&_wc>0)?`<div style="display:flex;align-items:center;gap:4px;margin-top:4px;font-size:12px;color:#D70015;font-weight:600;">${_icon(_ICONS.alertTriangle,14)} จุดอ่อนค้างอยู่: ${_wc} ข้อ</div>`:'';
+      const practiceBtnHtml=(!isTeacher&&_wc>0)?`<button class="btn btnPrimary" data-practiceexam="${e.id}" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;padding:8px 14px;font-size:13px;width:100%;">${_icon(_ICONS.target,14)} แก้จุดอ่อนชุดนี้ (${_wc} ข้อ)</button>`:'';
       const _hasResume = _myResume && _myResume.examId === e.id && _myResume.startedAt;
       let resumeHtml = '';
       if (_hasResume) {
@@ -5520,16 +5530,16 @@ function initExams(){
         const _fmt0 = String(Math.floor(_val0/60)).padStart(2,'0') + ':' + String(_val0%60).padStart(2,'0');
         const _label0 = _isPrac0 ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
         const _isHalf2_0 = _isHalf0 && !!_myResume.half2Mode;
-        const _title0 = _isPrac0 ? '📝 ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? '🤝 ครึ่งหลังค้างอยู่' : _isHalf0 ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
-        const _bg0 = _isPrac0 ? '#ecfeff' : _isHalf0 ? '#f5f3ff' : '#fffbeb';
-        const _border0 = _isPrac0 ? '#a5f3fc' : _isHalf0 ? '#c4b5fd' : '#fde68a';
-        const _titleColor0 = _isPrac0 ? '#0e7490' : _isHalf0 ? '#6d28d9' : '#92400e';
-        const _timeColor0 = _isPrac0 ? '#0891b2' : _isHalf0 ? '#7c3aed' : '#b45309';
+        const _title0 = _isPrac0 ? 'ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? 'ครึ่งหลังค้างอยู่' : _isHalf0 ? 'คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
+        const _bg0 = _isPrac0 ? '#F0FBFC' : _isHalf0 ? '#ECECFC' : '#FFF3E0';
+        const _border0 = _isPrac0 ? '#B2EBF2' : _isHalf0 ? '#D1D1F0' : '#FFD9A8';
+        const _titleColor0 = _isPrac0 ? '#0E7C8C' : _isHalf0 ? '#5856D6' : '#A34E00';
+        const _timeColor0 = _titleColor0;
         resumeHtml = `<div class="resume-badge" data-resumeid="${e.id}" data-practice="${_isPrac0?'1':'0'}" data-half="${_isHalf0?'1':'0'}" data-startedAt="${_myResume.startedAt}" data-dur="${e.durationSeconds}" data-pauseoffset="${_pauseOff0}" data-pausedat="${_pausedAt0}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:${_bg0};border:1px solid ${_border0};border-radius:10px;cursor:pointer;">
-          <span style="font-size:13px;">⏸️</span>
+          <span style="display:flex;color:${_titleColor0};">${_icon(_ICONS.pause,14)}</span>
           <span style="font-size:13px;font-weight:700;color:${_titleColor0};">${_title0}</span>
           <span class="resume-time" style="font-size:12px;color:${_timeColor0};">${_label0} ${_fmt0}</span>
-          <span style="margin-left:auto;font-size:12px;font-weight:700;color:#111827;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;">▶ ทำต่อ</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#1C1C1E;background:#fff;border:1px solid #C6C6C8;border-radius:6px;padding:3px 8px;">${_icon(_ICONS.play,11)} ทำต่อ</span>
         </div>`;
       }
 
@@ -5539,11 +5549,11 @@ function initExams(){
       // interval ticker ทุก 250ms คอยเขียนเวลาลง .resume-badge[data-startedAt] .resume-time
       // ถ้าใส่ผิด class จะพยายามเขียนลง element ที่ไม่มี .resume-time แล้ว error
       const _pendingHalf2 = (!isTeacher && !_hasResume && _myName) ? findPendingHalf2(s, e.id, _myName) : null;
-      const half2Html = _pendingHalf2 ? `<div class="half2-badge" data-examid="${e.id}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;cursor:pointer;">
-          <span style="font-size:13px;">🤝</span>
-          <span style="font-size:13px;font-weight:700;color:#6d28d9;">ทำครึ่งหลังต่อ</span>
-          <span style="font-size:12px;color:#7c3aed;">เหลือ ${_pendingHalf2.qids.length} ข้อ</span>
-          <span style="margin-left:auto;font-size:12px;font-weight:700;color:#111827;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;">▶ เริ่ม</span>
+      const half2Html = _pendingHalf2 ? `<div class="half2-badge" data-examid="${e.id}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#ECECFC;border:1px solid #D1D1F0;border-radius:10px;cursor:pointer;">
+          <span style="display:flex;color:#5856D6;">${_icon(_ICONS.users,14)}</span>
+          <span style="font-size:13px;font-weight:700;color:#5856D6;">ทำครึ่งหลังต่อ</span>
+          <span style="font-size:12px;color:#5856D6;">เหลือ ${_pendingHalf2.qids.length} ข้อ</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#1C1C1E;background:#fff;border:1px solid #C6C6C8;border-radius:6px;padding:3px 8px;">${_icon(_ICONS.play,11)} เริ่ม</span>
         </div>` : '';
 
       card.innerHTML=`
@@ -5555,16 +5565,13 @@ function initExams(){
               ${folders.map(f=>`<option value="${f.id}" ${e.folderId===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}
             </select>`:''}
             ${_editMode?`<span class="drag-handle exam-row-icon-btn" style="cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;">${_icon(_ICONS.gripVertical,16)}</span>`:''}
-            ${Auth.isTeacher()?`<button title="คัดลอกลิ้งแชร์ข้อสอบนี้" data-examid="${e.id}" data-title="${esc(e.title)}" onclick="copyExamLink(this,event)"
-              style="border:none;background:none;cursor:pointer;padding:2px 4px;font-size:16px;line-height:1;color:#9ca3af;border-radius:6px;"
-              onmouseover="this.style.background='#f3f4f6';this.style.color='#3b82f6'"
-              onmouseout="this.style.background='none';this.style.color='#9ca3af'">🔗</button>`:''}
+            ${Auth.isTeacher()?`<button title="คัดลอกลิ้งแชร์ข้อสอบนี้" data-examid="${e.id}" data-title="${esc(e.title)}" onclick="copyExamLink(this,event)" class="exam-row-icon-btn">${_icon(_ICONS.link,14)}</button>`:''}
           </div>
         </div>
         <div class="title">${esc(e.title)}</div>
         <div class="meta">
-          <span>📝 ${e.questionCount} ข้อ</span>
-          <span>⏱ ${Math.round(e.durationSeconds/60)} นาที</span>
+          <span style="display:flex;align-items:center;gap:4px;">${_icon(_ICONS.fileText,13)} ${e.questionCount} ข้อ</span>
+          <span style="display:flex;align-items:center;gap:4px;">${_icon(_ICONS.clock,13)} ${Math.round(e.durationSeconds/60)} นาที</span>
         </div>
         ${isTeacher ? _adminBlocksHtml : scoreHtml}
         ${weaknessHtml}
@@ -5578,8 +5585,8 @@ function initExams(){
         const assignBtn = document.createElement('button');
         assignBtn.className = 'btn';
         assignBtn.style.cssText =
-          'font-size:12px;padding:4px 10px;margin-top:8px;width:100%;';
-        assignBtn.textContent = '📤 ส่งให้นักเรียน';
+          'display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:4px 10px;margin-top:8px;width:100%;';
+        assignBtn.innerHTML = `${_icon(_ICONS.send,13)} ส่งให้นักเรียน`;
         assignBtn.onclick = (ev) => {
           ev.stopPropagation();
           _showAssignModal(e.id, e.title, e.subject);
@@ -15178,7 +15185,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.55p';
+  const CURRENT_VERSION = 'v48.56p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
