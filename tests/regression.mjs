@@ -2697,6 +2697,86 @@ currentSection = 'reviewTabReset';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: reviewQuestionTime (v48.46) — เพิ่ม badge "เวลาที่ใช้ทำข้อนี้" ต่อแถวใน
+// หน้าทบทวน — elapsedMs มีอยู่แล้วในระบบตั้งแต่หน้า take (enterQuestion/leaveQuestion)
+// งานนี้แค่เอามาโชว์ ต้องเช็คว่า format ถูกต้อง (MM:SS), ข้อที่ไม่มีข้อมูล (จาก
+// initPractice/backfill) ไม่โชว์ "00:00" หลอกๆ, badge ถูก-ผิดเดิมยังถูกต้องหลัง
+// รวมจุด lookup att.perQuestion เป็นตัวแปรเดียว (pq), และไม่ overflow แนวนอนที่จอแคบ
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'reviewQuestionTime';
+{
+  const cache = baseCache({
+    exams: [mkExam('rqt1', 'ชุดทดสอบเวลา', 'คณิตศาสตร์', { questionCount: 4 })],
+    questions: { rqt1: [
+      { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q3', no: 3, number: 3, page: 1, correct: 'C', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q4', no: 4, number: 4, page: 1, correct: 'D', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    ] },
+    attempts: [{
+      id: 'attRQT1', examId: 'rqt1', examTitle: 'ชุดทดสอบเวลา', examSubject: 'คณิตศาสตร์',
+      examType: 'mc', weighted: false, takerName: 'เด็กทดสอบ',
+      startedAt: new Date(Date.now() - 120000).toISOString(), submittedAt: new Date().toISOString(),
+      usedSeconds: 120, score: 3, total: 4, answers: { q1: 'A', q2: 'B', q3: 'C', q4: 'A' },
+      perQuestion: [
+        { qid: 'q1', no: 1, page: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 5000, changes: 0 },
+        { qid: 'q2', no: 2, page: 1, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 45230, changes: 1 },
+        { qid: 'q3', no: 3, page: 1, chosen: 'C', correct: 'C', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 65000, changes: 0 },
+        // q4: ไม่มี elapsedMs เลย — จำลอง attempt จาก initPractice/backfill ที่ไม่เก็บเวลา
+        { qid: 'q4', no: 4, page: 1, chosen: 'A', correct: 'D', isCorrect: false, isFree: false, unsure: false, visited: true, changes: 0 },
+      ],
+      practiceMode: false, visitOrder: ['q1', 'q2', 'q3', 'q4'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+    }],
+  });
+  const { ctx, page } = await newSeededPage({ cache, viewport: { width: 1180, height: 900 } });
+  await page.evaluate(() => navigate('review', { attemptId: 'attRQT1' }));
+  await page.waitForTimeout(600);
+
+  const rows = await page.evaluate(() => [1, 2, 3, 4].map(no => {
+    const row = document.getElementById('rq-' + no).querySelector('.qRow');
+    const badge = row.querySelector('.qBadge');
+    const rowRect = row.getBoundingClientRect(), badgeRect = badge.getBoundingClientRect();
+    return { no, text: row.textContent, hasClock: row.textContent.includes('⏱'), badgeRight: Math.round(badgeRect.right), rowRight: Math.round(rowRect.right) };
+  }));
+  check('reviewQuestionTime: ข้อ 1 (elapsedMs=5000) โชว์ 00:05', rows[0].text.includes('00:05'), rows[0].text);
+  check('reviewQuestionTime: ข้อ 2 (elapsedMs=45230) โชว์ 00:45', rows[1].text.includes('00:45'), rows[1].text);
+  check('reviewQuestionTime: ข้อ 3 (elapsedMs=65000) โชว์ 01:05', rows[2].text.includes('01:05'), rows[2].text);
+  check('reviewQuestionTime: ข้อ 4 (ไม่มี elapsedMs) ไม่โชว์ badge เวลาเลย ไม่ใช่ "00:00"',
+    !rows[3].hasClock && !rows[3].text.includes('00:00'), rows[3].text);
+  check('reviewQuestionTime: badge ถูก-ผิด ยังชิดขวาสุดของแถวเหมือนเดิมทุกแถว (ไม่กระทบจากการรวม pq lookup)',
+    rows.every(r => (r.rowRight - r.badgeRight) <= 4), JSON.stringify(rows.map(r => [r.rowRight, r.badgeRight])));
+  const badgeTexts = await page.evaluate(() => [1, 2, 3, 4].map(no => document.getElementById('rq-' + no).querySelector('.qBadge').textContent.trim()));
+  check('reviewQuestionTime: badge text ยังถูกต้องตาม isCorrect เดิม (ถูก/ถูก/ถูก/ผิด)',
+    badgeTexts[0].includes('ถูก') && badgeTexts[1].includes('ถูก') && badgeTexts[2].includes('ถูก') && badgeTexts[3].includes('ผิด'),
+    JSON.stringify(badgeTexts));
+  await ctx.close();
+
+  // จอแคบ (390px) + fillblank-num ที่มีค่าเปลี่ยนยาว (worst-case width) ต้องไม่ overflow แนวนอน
+  const cache2 = baseCache({
+    exams: [mkExam('rqt2', 'ชุดทดสอบเวลา (fillblank)', 'คณิตศาสตร์', { questionCount: 1, examType: 'fillblank-num', numDigits: 4 })],
+    questions: { rqt2: [{ id: 'q1', no: 1, number: 1, page: 1, correct: '1296' }] },
+    attempts: [{
+      id: 'attRQT2', examId: 'rqt2', examTitle: 'ชุดทดสอบเวลา (fillblank)', examSubject: 'คณิตศาสตร์',
+      examType: 'fillblank-num', weighted: false, takerName: 'เด็กทดสอบ',
+      startedAt: new Date(Date.now() - 125000).toISOString(), submittedAt: new Date().toISOString(),
+      usedSeconds: 125, score: 0, total: 1, answers: { q1: '1440' },
+      perQuestion: [{ qid: 'q1', no: 1, page: 1, chosen: '1440', correct: '1296', isCorrect: false, isFree: false, unsure: true, visited: true, elapsedMs: 125000, changes: 3 }],
+      practiceMode: true, visitOrder: ['q1'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+    }],
+  });
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: cache2, viewport: { width: 390, height: 844 } });
+  await page2.evaluate(() => navigate('review', { attemptId: 'attRQT2' }));
+  await page2.waitForTimeout(600);
+  const overflowInfo = await page2.evaluate(() => {
+    const list = document.getElementById('reviewQList');
+    return [...list.querySelectorAll('.qRow')].map(r => ({ scrollWidth: r.scrollWidth, clientWidth: r.parentElement.clientWidth }));
+  });
+  check('reviewQuestionTime: จอแคบ 390px มี pills ยาว (1440→1296) + time badge (02:05) ไม่ overflow แนวนอน',
+    overflowInfo.every(r => r.scrollWidth <= r.clientWidth + 2), JSON.stringify(overflowInfo));
+  await ctx2.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section: statsPage (v48.30) — บั๊ก 3 ข้อที่เจอจากการไล่เทสหน้า "ผลการฝึกซ้อม"
 //  1. ลบการ์ด "คนละครึ่ง" ที่รวมคู่แล้ว ลบแค่ครึ่งหลัง เหลือครึ่งแรกค้างเป็นการ์ดคะแนนครึ่งเดียว
 //  2. auto-switch แท็บตอนแท็บที่เลือกว่าง เขียนทับแท็บที่ผู้ใช้เลือกถาวร (ล้างตัวกรองก็ไม่กลับ)
