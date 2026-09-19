@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.59p -->
+  <!-- APP_VERSION: v48.60p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1331,7 +1331,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.59p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.60p</div>
     </div>
   </div>
 </div>
@@ -5893,7 +5893,7 @@ function initTake(id){
 
   _takeState={s,exam,qsList,total,attemptId,
     currentIndex:0,answers:{},unsure:{},
-    qElapsedMs:{},answerChanges:{},visitOrder:[],qStartTs:null,
+    qElapsedMs:{},answerChanges:{},visitOrder:[],qStartTs:null,qEnterVal:null,
     mood:null,
     started:false,startedAt:null,createdAt:Date.now(),
     takerName:_takerName,
@@ -5987,12 +5987,23 @@ function initTake(id){
     if(delta>0 && delta<10*60*1000){ // ignore >10min (likely tab inactive)
       st.qElapsedMs[q.id]=(st.qElapsedMs[q.id]||0)+delta;
     }
+    // v48.48: fillblank-num เท่านั้น — เทียบค่าคำตอบตอนเข้า vs ตอนออกจากข้อ (ไม่นับทุก
+    // keystroke ที่พิมพ์ระหว่างทาง) กัน Panic Changes สูงเทียมจากการพิมพ์เลขหลายหลักตามปกติ
+    // (ดูเหตุผลเต็มใน _setAns()/input handler ด้านล่าง — MC ไม่ต้องแก้ เพราะนับถูกอยู่แล้ว)
+    if((exam.examType||'mc')==='fillblank-num' && st.qEnterVal!=null){
+      const finalVal=st.answers[q.id];
+      if(st.qEnterVal!=='' && finalVal!=null && finalVal!=='' && finalVal!==st.qEnterVal){
+        st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
+      }
+    }
     st.qStartTs=null;
+    st.qEnterVal=null;
   }
   function enterQuestion(){
     if(!st.started) return;
     const q=qsList[st.currentIndex]; if(!q) return;
     st.qStartTs=Date.now();
+    st.qEnterVal=st.answers[q.id]??'';
     const qno=q.no||q.number;
     const last=st.visitOrder[st.visitOrder.length-1];
     if(last!==qno) st.visitOrder.push(qno);
@@ -6099,9 +6110,6 @@ function initTake(id){
           toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
           return;
         }
-        if(prev && prev!==v && v!==''){
-          st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
-        }
         st.answers[q.id]=v;
         inp.value=v;
       }
@@ -6119,9 +6127,6 @@ function initTake(id){
             toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
             inp.value=prev||'';
             return;
-          }
-          if(prev && prev!==v && v!==''){
-            st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
           }
           st.answers[q.id]=v;
         });
@@ -15222,7 +15227,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.59p';
+  const CURRENT_VERSION = 'v48.60p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

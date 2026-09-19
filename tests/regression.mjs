@@ -2457,6 +2457,123 @@ currentSection = 'fillblankNumDigits';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: fillNumChangeCount (v48.48) — "Panic Changes" (Anxiety Markers) เคยนับ
+// answerChanges ผิดสำหรับ fillblank-num เพราะนับทุก keystroke ตอนพิมพ์เลข (ไม่ใช่แค่ตอน
+// แก้ไขคำตอบจริง) ทำให้พิมพ์เลข 4 หลักจากว่างเปล่าธรรมดาก็นับเป็น "เปลี่ยนคำตอบ" ไปแล้ว 3
+// ครั้ง — แก้ให้เทียบค่าคำตอบตอนเข้า vs ตอนออกจากข้อ (ผ่าน enterQuestion()/leaveQuestion()
+// เดิม) แทน นับแค่ 1 ครั้งต่อการแก้ไขจริงต่อการมาเยือนข้อนั้น เหมือน semantics ของ MC
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'fillNumChangeCount';
+{
+  const digitClick = (page) => async (d) => page.evaluate((d) => {
+    const btn = [...document.querySelectorAll('#takeChoices button')].find(b => b.textContent.trim() === d);
+    if (btn) btn.click();
+  }, d);
+
+  // พิมพ์เลขจากว่างเปล่าปกติ ไม่แก้ไข → ไม่นับเป็น change เลย, แก้ไขจริง 1 ครั้ง → นับ 1 พอดี
+  {
+    const cache = baseCache({
+      exams: [mkExam('fnc1', 'ชุดเช็คการนับเปลี่ยนคำตอบ', 'คณิตศาสตร์', { examType: 'fillblank-num', numDigits: 4, questionCount: 2 })],
+      questions: { fnc1: [
+        { id: 'q1', no: 1, number: 1, page: 1, correct: '9999' },
+        { id: 'q2', no: 2, number: 2, page: 1, correct: '56' },
+      ] },
+    });
+    const { ctx, page } = await newSeededPage({ cache, viewport: { width: 1180, height: 900 } });
+    await page.evaluate(() => navigate('take', { id: 'fnc1' }));
+    await page.waitForTimeout(500);
+    const click = digitClick(page);
+
+    for (const d of ['1', '2', '0', '0']) await click(d);
+    await page.waitForTimeout(100);
+    const changesAfterFreshType = await page.evaluate(() => _takeState.answerChanges['q1']);
+    check('fillNumChangeCount: พิมพ์เลข 4 หลักจากว่างเปล่าโดยไม่แก้ไข ไม่นับเป็น "เปลี่ยนคำตอบ" เลย (ไม่ใช่ 3 แบบเดิม)',
+      changesAfterFreshType === undefined || changesAfterFreshType === 0, 'changesAfterFreshType=' + changesAfterFreshType);
+
+    await page.click('#takeNextBtn');
+    await page.waitForTimeout(200);
+    for (const d of ['5', '6']) await click(d);
+    await page.waitForTimeout(100);
+
+    await page.click('#takePrevBtn');
+    await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('#takeChoices button')].find(b => b.textContent.trim() === 'ล้าง');
+      if (btn) btn.click();
+    });
+    for (const d of ['9', '9', '9', '9']) await click(d);
+    await page.waitForTimeout(100);
+
+    await page.click('#takeNextBtn');
+    await page.waitForTimeout(200);
+    const q1Changes = await page.evaluate(() => _takeState.answerChanges['q1']);
+    check('fillNumChangeCount: แก้คำตอบจริง 1 ครั้ง (1200→9999 ผ่านหลาย keystroke) นับได้ "1" พอดี',
+      q1Changes === 1, 'q1Changes=' + q1Changes);
+
+    const q2Changes = await page.evaluate(() => _takeState.answerChanges['q2']);
+    check('fillNumChangeCount: ข้อ 2 พิมพ์ครั้งเดียวไม่เคยแก้ไข ไม่นับเป็นการเปลี่ยนคำตอบ',
+      q2Changes === undefined || q2Changes === 0, 'q2Changes=' + q2Changes);
+    await ctx.close();
+  }
+
+  // MC exam ต้องนับแบบเดิมถูกต้อง ไม่กระทบจากการแก้ (regression safety)
+  {
+    const cache = baseCache({
+      exams: [mkExam('mcc1', 'ชุด MC เช็คไม่กระทบ', 'คณิตศาสตร์', { examType: 'mc', questionCount: 1 })],
+      questions: { mcc1: [{ id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } }] },
+    });
+    const { ctx, page } = await newSeededPage({ cache, viewport: { width: 1180, height: 900 } });
+    await page.evaluate(() => navigate('take', { id: 'mcc1' }));
+    await page.waitForTimeout(500);
+    await page.evaluate(() => document.querySelectorAll('#takeChoices .choice')[0].click());
+    await page.waitForTimeout(80);
+    await page.evaluate(() => document.querySelectorAll('#takeChoices .choice')[1].click());
+    await page.waitForTimeout(80);
+    await page.evaluate(() => document.querySelectorAll('#takeChoices .choice')[2].click());
+    await page.waitForTimeout(80);
+    const mcChanges = await page.evaluate(() => _takeState.answerChanges['q1']);
+    check('fillNumChangeCount: MC exam ยังนับ answerChanges แบบเดิมถูกต้อง (A→B→C = 2 ครั้ง)',
+      mcChanges === 2, 'mcChanges=' + mcChanges);
+    await ctx.close();
+  }
+
+  // End-to-end: พิมพ์เลขปกติทั้งชุดไม่แก้ไขเลย → submit → calcAnxietyMarkers ต้องไม่ flag
+  {
+    const cache = baseCache({
+      exams: [mkExam('e2e1', 'ชุด End-to-end Panic Check', 'คณิตศาสตร์', { examType: 'fillblank-num', numDigits: 4, questionCount: 4 })],
+      questions: { e2e1: [
+        { id: 'q1', no: 1, number: 1, page: 1, correct: '1000' },
+        { id: 'q2', no: 2, number: 2, page: 1, correct: '2000' },
+        { id: 'q3', no: 3, number: 3, page: 1, correct: '3000' },
+        { id: 'q4', no: 4, number: 4, page: 1, correct: '4000' },
+      ] },
+    });
+    const { ctx, page } = await newSeededPage({ cache, viewport: { width: 1180, height: 900 } });
+    await page.evaluate(() => navigate('take', { id: 'e2e1' }));
+    await page.waitForTimeout(500);
+    const click = digitClick(page);
+    for (let i = 0; i < 4; i++) {
+      for (const d of [String(i + 1), '0', '0', '0']) await click(d);
+      await page.waitForTimeout(60);
+      if (i < 3) { await page.click('#takeNextBtn'); await page.waitForTimeout(150); }
+    }
+    await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+    await page.waitForTimeout(400);
+    const att = await page.evaluate(() => (Store.load().attempts || [])[0]);
+    const totalChanges = att ? (att.perQuestion || []).reduce((s, p) => s + (p.changes || 0), 0) : -1;
+    check('fillNumChangeCount (end-to-end): พิมพ์เลข 4 ข้อปกติไม่แก้ไขเลย → totalChanges เป็น 0 ไม่ใช่หลักสิบ',
+      totalChanges === 0, 'totalChanges=' + totalChanges);
+    const anxiety = att ? await page.evaluate((id) => {
+      const a2 = (Store.load().attempts || []).find(x => x.id === id);
+      return calcAnxietyMarkers(a2);
+    }, att.id) : null;
+    check('fillNumChangeCount (end-to-end): calcAnxietyMarkers ไม่ flag panicChanges ให้ session ที่พิมพ์เลขปกติ',
+      anxiety && anxiety.panicChanges === false && anxiety.totalChanges === 0, JSON.stringify(anxiety));
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section: sessionPersist (v48.27) — session + หน้าล่าสุดต้องรอดข้าม reload
 // บั๊กจริงจาก log iPad: iOS ล้างโปรเซส PWA ตอนสลับแอป → sessionStorage หาย →
 // เด้งกลับหน้า login กลางคัน (log เห็น syncFromCloud.renav {page:"login"} ทั้งที่
