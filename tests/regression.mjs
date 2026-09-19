@@ -2777,6 +2777,93 @@ currentSection = 'reviewQuestionTime';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: practiceQuestionTime (v48.47) — โหมด "แก้จุดอ่อน" (initPractice) เดิมไม่เก็บ
+// elapsedMs ต่อข้อเลย ทำให้หน้าทบทวนของ attempt จากโหมดนี้ไม่เคยเห็น badge เวลา (ต่างจาก
+// attempt จากหน้า take ปกติ) — เพิ่ม accumulator เดียวกับ enterQuestion()/leaveQuestion()
+// ของ initTake เพราะปุ่ม number-box อนุญาตกระโดดไปมาระหว่างข้อที่ยังไม่ confirm ได้อิสระ
+// ต้องสะสมเวลาข้ามหลายรอบที่แวะดูก่อน confirm จริงได้ ไม่ใช่แค่ reset ทุกครั้ง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'practiceQuestionTime';
+{
+  const cache = baseCache({
+    exams: [mkExam('pqt1', 'ชุดแก้จุดอ่อนเวลา', 'คณิตศาสตร์', { pdfUrl: 'about:blank' })],
+    questions: { pqt1: [
+      { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    ] },
+  });
+  const { ctx, page } = await newSeededPage({ role: 'student', name: 'เด็กทดสอบ', cache, viewport: { width: 1180, height: 900 } });
+  await page.evaluate(() => {
+    WeaknessTracker.updateWeaknessAfterSubmit({
+      takerName: 'เด็กทดสอบ', examId: 'pqt1', examTitle: 'ชุดแก้จุดอ่อนเวลา', examSubject: 'คณิตศาสตร์',
+      submittedAt: new Date().toISOString(),
+      perQuestion: [{ no: 1, isCorrect: false }, { no: 2, isCorrect: false }],
+    });
+  });
+  await page.evaluate(() => navigate('practice', { examId: 'pqt1' }));
+  await page.waitForTimeout(600);
+
+  const qStartTs0 = await page.evaluate(() => _pracState.qStartTs);
+  check('practiceQuestionTime: qStartTs ถูกตั้งค่าตั้งแต่ข้อแรก (เริ่มจับเวลาทันทีที่เข้าโหมดแก้จุดอ่อน)',
+    typeof qStartTs0 === 'number' && qStartTs0 > 0, 'qStartTs=' + qStartTs0);
+
+  await page.click('#pracChoices .choice >> nth=0'); // A (ถูก)
+  await page.waitForTimeout(320);
+  await page.click('#pracConfirmBtn');
+  await page.waitForTimeout(200);
+  const a1 = await page.evaluate(() => _pracState.answers[0]);
+  check('practiceQuestionTime: ข้อ 1 elapsedMs สมเหตุสมผลกับเวลาที่รอจริง (>=250ms, <5000ms)',
+    a1 && a1.elapsedMs >= 250 && a1.elapsedMs < 5000, JSON.stringify(a1));
+
+  const qStartTsAfterConfirm = await page.evaluate(() => _pracState.qStartTs);
+  check('practiceQuestionTime: ยังอยู่หน้าฟีดแบ็กข้อ 1 (ยังไม่กด "ข้อต่อไป") qStartTs ต้อง null (ข้อ confirm แล้วไม่จับเวลาต่อ)',
+    qStartTsAfterConfirm === null, 'qStartTsAfterConfirm=' + qStartTsAfterConfirm);
+
+  await page.click('#pracNextBtn');
+  await page.waitForTimeout(50);
+  const qStartTs1 = await page.evaluate(() => _pracState.qStartTs);
+  check('practiceQuestionTime: กด "ข้อต่อไป" เข้าข้อ 2 แล้ว qStartTs ถูกตั้งใหม่ (ไม่ inherit จากข้อ 1)',
+    typeof qStartTs1 === 'number' && (Date.now() - qStartTs1) < 500, 'qStartTs1=' + qStartTs1);
+
+  await page.waitForTimeout(180);
+  await page.click('#pracNums button >> nth=0'); // กระโดดไปดูข้อ 1 (confirm แล้ว, read-only)
+  await page.waitForTimeout(150);
+  const q1RevisitStartTs = await page.evaluate(() => _pracState.qStartTs);
+  check('practiceQuestionTime: กระโดดกลับไปดูข้อที่ confirm แล้ว (read-only) qStartTs ต้องเป็น null ไม่จับเวลาซ้ำ',
+    q1RevisitStartTs === null, 'q1RevisitStartTs=' + q1RevisitStartTs);
+  const q2ElapsedAfterFirstVisit = await page.evaluate(() => _pracState.qElapsedMs[2]);
+  check('practiceQuestionTime: ออกจากข้อ 2 รอบแรก เวลาที่แวะดู (~180ms) ถูกสะสมเข้า qElapsedMs[2] แล้ว',
+    q2ElapsedAfterFirstVisit >= 150 && q2ElapsedAfterFirstVisit < 2000, 'q2ElapsedAfterFirstVisit=' + q2ElapsedAfterFirstVisit);
+
+  await page.click('#pracNums button >> nth=1'); // กระโดดกลับมาข้อ 2 (ยังไม่ confirm) รอบสอง
+  await page.waitForTimeout(220);
+  const q2ResumedStartTs = await page.evaluate(() => _pracState.qStartTs);
+  check('practiceQuestionTime: กระโดดกลับมาข้อ 2 (ยังไม่ confirm) รอบที่สอง ต้องเริ่มจับเวลาใหม่ (ไม่ null)',
+    typeof q2ResumedStartTs === 'number', 'q2ResumedStartTs=' + q2ResumedStartTs);
+
+  await page.click('#pracChoices .choice >> nth=1'); // B (ถูก)
+  await page.waitForTimeout(60);
+  await page.click('#pracConfirmBtn');
+  await page.waitForTimeout(200);
+  const a2 = await page.evaluate(() => _pracState.answers.find(a => a.questionNo === 2));
+  check('practiceQuestionTime: ข้อ 2 elapsedMs สะสมข้ามหลายรอบที่แวะดูก่อน confirm ถูกต้อง (>=380ms รวม 2 รอบ+ตอนตอบ, <8000ms)',
+    a2 && a2.elapsedMs >= 380 && a2.elapsedMs < 8000, JSON.stringify(a2));
+
+  await page.click('#pracNextBtn'); // เสร็จสิ้น → savePracticeSession
+  await page.waitForTimeout(600);
+  const savedAttempt = await page.evaluate(() => Store.load().attempts.find(a => a.mode === 'weakness_practice'));
+  check('practiceQuestionTime: attempt ที่บันทึกจาก savePracticeSession มี elapsedMs>0 ทุกข้อที่ตอบจริง',
+    savedAttempt && savedAttempt.perQuestion.every(p => p.elapsedMs > 0), JSON.stringify(savedAttempt && savedAttempt.perQuestion));
+
+  await page.evaluate((id) => navigate('review', { attemptId: id }), savedAttempt.id);
+  await page.waitForTimeout(600);
+  const reviewRows = await page.evaluate(() => [1, 2].map(no => document.getElementById('rq-' + no)?.querySelector('.qRow')?.textContent || ''));
+  check('practiceQuestionTime: หน้าทบทวนโชว์ badge เวลา "⏱" ให้ attempt จากโหมดแก้จุดอ่อนแล้ว (end-to-end, ไม่ต้องแก้ initReview เลย)',
+    reviewRows.every(t => t.includes('⏱')), JSON.stringify(reviewRows));
+  await ctx.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section: statsPage (v48.30) — บั๊ก 3 ข้อที่เจอจากการไล่เทสหน้า "ผลการฝึกซ้อม"
 //  1. ลบการ์ด "คนละครึ่ง" ที่รวมคู่แล้ว ลบแค่ครึ่งหลัง เหลือครึ่งแรกค้างเป็นการ์ดคะแนนครึ่งเดียว
 //  2. auto-switch แท็บตอนแท็บที่เลือกว่าง เขียนทับแท็บที่ผู้ใช้เลือกถาวร (ล้างตัวกรองก็ไม่กลับ)

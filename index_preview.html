@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.58p -->
+  <!-- APP_VERSION: v48.59p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1331,7 +1331,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.58p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.59p</div>
     </div>
   </div>
 </div>
@@ -8889,8 +8889,10 @@ function initPractice(params){
   // selected = choice highlighted before confirm; confirmed = after confirm button pressed
   // results[idx] = 'correct'|'wrong' for number box coloring
   _pracState={exam,queue,userId,attemptId,startedAt,
-    currentIdx:0,answers:[],selected:null,confirmed:false,results:{},pdfLoaded:false};
+    currentIdx:0,answers:[],selected:null,confirmed:false,results:{},pdfLoaded:false,
+    qElapsedMs:{},qStartTs:null};
   const st=_pracState;
+  _pracEnterQuestion();
 
   const labelMap={A:'ก',B:'ข',C:'ค',D:'ง'};
   const isGDrive=!!(exam.pdfUrl||'').match(/drive\.google\.com/);
@@ -8915,6 +8917,30 @@ function initPractice(params){
     }catch(err){toast(err?.message||String(err));}
   }
 
+  // v48.47: จับเวลาต่อข้อสำหรับโหมดแก้จุดอ่อน (เดิมไม่มีเลย ทำให้หน้าทบทวนไม่มี badge
+  // เวลาให้โหมดนี้) — ใช้ accumulator pattern เดียวกับ enterQuestion()/leaveQuestion()
+  // ใน initTake เพราะปุ่ม number-box (ข้างล่าง) อนุญาตให้กระโดดไปมาระหว่างข้อที่ยังไม่
+  // confirm ได้อิสระ ต้องสะสมเวลาข้ามหลายรอบที่แวะดูก่อน confirm จริงได้ ไม่ใช่แค่ reset
+  function _pracLeaveQuestion(){
+    if(st.qStartTs==null) return;
+    const q=st.queue[st.currentIdx]; if(!q) return;
+    const qNo=q.no||q.number;
+    const delta=Date.now()-st.qStartTs;
+    if(delta>0 && delta<10*60*1000) st.qElapsedMs[qNo]=(st.qElapsedMs[qNo]||0)+delta;
+    st.qStartTs=null;
+  }
+  function _pracEnterQuestion(){
+    const q=st.queue[st.currentIdx]; if(!q) return;
+    // ข้อที่ confirm ไปแล้วเป็นแค่ read-only view ตอนกดย้อนดูผ่าน number-box ไม่ต้องจับเวลาต่อ
+    st.qStartTs=(st.results[st.currentIdx]===undefined)?Date.now():null;
+  }
+  function _pracGoto(idx){
+    _pracLeaveQuestion();
+    st.currentIdx=idx;
+    _pracEnterQuestion();
+    renderPrac();
+  }
+
   function updateNumBoxes(){
     const el=document.getElementById('pracNums');
     if(!el) return;
@@ -8934,8 +8960,7 @@ function initPractice(params){
           // Allow jump only if current question is already answered or unanswered-but-unselected
           // Actually just allow free navigation — user might want to skip
         }
-        st.currentIdx=idx;
-        renderPrac();
+        _pracGoto(idx);
       });
       el.appendChild(b);
     });
@@ -9095,6 +9120,7 @@ function initPractice(params){
   // Confirm button
   document.getElementById('pracConfirmBtn').onclick=()=>{
     if(!_pracState||!st.selected||st.confirmed) return;
+    _pracLeaveQuestion();
     st.confirmed=true;
     const q=st.queue[st.currentIdx];
     const lab=st.selected;
@@ -9122,6 +9148,7 @@ function initPractice(params){
     const alreadyAnswered=st.answers.some(a=>a.questionNo===(q.no||q.number));
     if(!alreadyAnswered){
       st.answers.push({questionNo:q.no||q.number,chosen:lab,correct:q.correct,isCorrect,
+        elapsedMs:st.qElapsedMs[q.no||q.number]||0,
         tags:Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]),subTags:Array.isArray(q.subTags)?q.subTags:[],topic:q.topic||''});
     }
     st.results[st.currentIdx]=isCorrect?'correct':'wrong';
@@ -9187,8 +9214,7 @@ function initPractice(params){
       });
       return;
     }
-    st.currentIdx=next;
-    renderPrac();
+    _pracGoto(next);
   };
 
   // Exit button
@@ -9209,7 +9235,7 @@ function initPractice(params){
       id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'',
       examType:exam.examType||'mc',
       takerName:st.userId,score,total,
-      perQuestion:st.answers.map(a=>({no:a.questionNo,isCorrect:a.isCorrect,chosen:a.chosen,correct:a.correct,tags:a.tags,subTags:Array.isArray(a.subTags)?a.subTags:[],topic:a.topic})),
+      perQuestion:st.answers.map(a=>({no:a.questionNo,isCorrect:a.isCorrect,chosen:a.chosen,correct:a.correct,elapsedMs:a.elapsedMs||0,tags:a.tags,subTags:Array.isArray(a.subTags)?a.subTags:[],topic:a.topic})),
       startedAt:st.startedAt,submittedAt:new Date().toISOString(),
       usedSeconds:Math.round((Date.now()-new Date(st.startedAt).getTime())/1000),
       mode:'weakness_practice',
@@ -15196,7 +15222,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.58p';
+  const CURRENT_VERSION = 'v48.59p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
