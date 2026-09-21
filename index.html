@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.48 -->
+  <!-- APP_VERSION: v48.49 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1301,7 +1301,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.48</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.49</div>
     </div>
   </div>
 </div>
@@ -1510,6 +1510,7 @@
           <button class="btn" id="reviewRecalcBtn" style="display:none;margin-top:10px;width:100%;font-size:12px;" title="คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน — ใช้ตอนแก้เฉลยผิดในหน้า editor แล้วอยากให้คะแนนของครั้งนี้ตรงตาม">🔄 คำนวณคะแนนใหม่จากเฉลยปัจจุบัน</button>
           <button class="btn btnPrimary" id="reviewHalf2Btn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;">🤝 ทำครึ่งหลังต่อ</button>
           <button class="btn" id="reviewRevealBtn" style="display:none;margin-top:8px;width:100%;font-size:12px;color:#b91c1c;border-color:#fca5a5;" title="ดูเฉลยข้อที่ยังไม่ได้ทำได้เลย แต่จะหมดโอกาสทำครึ่งหลังต่อ">👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)</button>
+          <button class="btn btnPrimary" id="reviewPracticeBtn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;background:#0d7f81;border-color:#0d7f81;"></button>
         </div>
         <div class="reviewCard" style="margin-top:12px;">
           <div class="muted" style="margin-bottom:6px;">ไปที่ข้อ</div>
@@ -6676,6 +6677,19 @@ function initReview(attemptId){
         if(_att2){ _att2.revealedAt=new Date().toISOString(); Store.save(_s2); }
         initReview(attemptId);
       };
+    }
+
+    const _practiceBtn=document.getElementById('reviewPracticeBtn');
+    if(_practiceBtn){
+      const _myName=Auth.getName();
+      const _wc=(!Auth.isTeacher() && _myName && _myName===att.takerName)
+        ? WeaknessTracker.countWeaknessesByExam(_myName, att.examId)
+        : 0;
+      _practiceBtn.style.display=_wc>0?'':'none';
+      if(_wc>0){
+        _practiceBtn.textContent=`🎯 แก้จุดอ่อนชุดนี้ (${_wc} ข้อ)`;
+        _practiceBtn.onclick=()=>navigate('practice',{examId:att.examId});
+      }
     }
   }
 
@@ -15227,7 +15241,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.48';
+  const CURRENT_VERSION = 'v48.49';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

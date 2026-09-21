@@ -2894,6 +2894,130 @@ currentSection = 'reviewQuestionTime';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: reviewPracticeShortcut (v48.49) — เพิ่มปุ่ม "แก้จุดอ่อนชุดนี้" ในหน้าทบทวน
+// เชื่อม review → practice ตรงๆ (ก่อนหน้านี้ต้องกลับไปหน้า exams รอ badge ก่อนถึงจะกดแก้
+// จุดอ่อนได้) — ต้องเช็คว่าโชว์เฉพาะเจ้าของ attempt ที่เป็นนักเรียนและมีจุดอ่อนค้างจริง
+// (กันครู/กันดูของคนอื่นแล้วดึงจุดอ่อนของผู้ดูเองมาแทน)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'reviewPracticeShortcut';
+{
+  const examQuestions = [
+    { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    { id: 'q3', no: 3, number: 3, page: 1, correct: 'C', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+  ];
+  const baseAttempt = (over = {}) => ({
+    id: 'attRPB1', examId: 'rpb1', examTitle: 'ชุดทดสอบแก้จุดอ่อน', examSubject: 'คณิตศาสตร์',
+    examType: 'mc', weighted: false, takerName: 'เด็กทดสอบ',
+    startedAt: new Date(Date.now() - 60000).toISOString(), submittedAt: new Date().toISOString(),
+    usedSeconds: 60, score: 1, total: 3, answers: { q1: 'A', q2: 'A', q3: 'A' },
+    perQuestion: [
+      { qid: 'q1', no: 1, page: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+      { qid: 'q2', no: 2, page: 1, chosen: 'A', correct: 'B', isCorrect: false, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+      { qid: 'q3', no: 3, page: 1, chosen: 'A', correct: 'C', isCorrect: false, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+    ],
+    practiceMode: false, visitOrder: ['q1', 'q2', 'q3'], difficulty: 'develop', mood: null, feeling: null, prediction: null,
+    ...over,
+  });
+
+  // owner เป็นนักเรียน + มีจุดอ่อนค้าง → ปุ่มโชว์พร้อมจำนวนข้อ, กดแล้วไปหน้า practice ของ exam เดียวกัน
+  {
+    const cache = baseCache({
+      exams: [mkExam('rpb1', 'ชุดทดสอบแก้จุดอ่อน', 'คณิตศาสตร์', { questionCount: 3 })],
+      questions: { rpb1: examQuestions },
+      attempts: [baseAttempt()],
+    });
+    const { ctx, page } = await newSeededPage({ role: 'student', name: 'เด็กทดสอบ', cache });
+    await page.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({
+      takerName: 'เด็กทดสอบ', examId: 'rpb1', examTitle: 'ชุดทดสอบแก้จุดอ่อน', examSubject: 'คณิตศาสตร์',
+      submittedAt: new Date().toISOString(),
+      perQuestion: [{ no: 1, isCorrect: true }, { no: 2, isCorrect: false }, { no: 3, isCorrect: false }],
+    }));
+    await page.evaluate(() => navigate('review', { attemptId: 'attRPB1' }));
+    await page.waitForTimeout(500);
+    const info = await page.evaluate(() => {
+      const btn = document.getElementById('reviewPracticeBtn');
+      return { display: btn.style.display, text: btn.textContent };
+    });
+    check('reviewPracticeShortcut: owner+จุดอ่อนค้าง → ปุ่มโชว์', info.display !== 'none', JSON.stringify(info));
+    check('reviewPracticeShortcut: ข้อความมีจำนวนข้อถูกต้อง (2 ข้อ)', info.text.includes('2 ข้อ'), info.text);
+
+    await page.click('#reviewPracticeBtn');
+    await page.waitForTimeout(500);
+    const nav = await page.evaluate(() => ({
+      active: document.querySelector('.page.active')?.id,
+      examId: _pracState?.exam?.id,
+    }));
+    check('reviewPracticeShortcut: กดแล้วไปหน้า practice ของ exam เดียวกัน',
+      nav.active === 'page-practice' && nav.examId === 'rpb1', JSON.stringify(nav));
+    await ctx.close();
+  }
+
+  // ไม่มีจุดอ่อนค้าง (ทำถูกหมด) → ปุ่มไม่โชว์เลย
+  {
+    const cache = baseCache({
+      exams: [mkExam('rpb2', 'ชุดทำถูกหมด', 'คณิตศาสตร์', { questionCount: 3 })],
+      questions: { rpb2: examQuestions },
+      attempts: [baseAttempt({
+        id: 'attRPB2', examId: 'rpb2', score: 3,
+        perQuestion: [
+          { qid: 'q1', no: 1, page: 1, chosen: 'A', correct: 'A', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+          { qid: 'q2', no: 2, page: 1, chosen: 'B', correct: 'B', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+          { qid: 'q3', no: 3, page: 1, chosen: 'C', correct: 'C', isCorrect: true, isFree: false, unsure: false, visited: true, elapsedMs: 1000, changes: 0 },
+        ],
+      })],
+    });
+    const { ctx, page } = await newSeededPage({ role: 'student', name: 'เด็กทดสอบ', cache });
+    await page.evaluate(() => navigate('review', { attemptId: 'attRPB2' }));
+    await page.waitForTimeout(500);
+    const display = await page.evaluate(() => document.getElementById('reviewPracticeBtn').style.display);
+    check('reviewPracticeShortcut: ไม่มีจุดอ่อนค้าง → ปุ่มไม่โชว์', display === 'none', display);
+    await ctx.close();
+  }
+
+  // ครูเปิดดู attempt ของนักเรียน (มีจุดอ่อนค้างจริง) → ปุ่มไม่โชว์ (กันดึงจุดอ่อนของครูเองมาแทน
+  // เพราะ initPractice() ใช้ Auth.getName() เป็น userId เสมอ ไม่ใช่ att.takerName)
+  {
+    const cache = baseCache({
+      exams: [mkExam('rpb3', 'ชุดครูดู', 'คณิตศาสตร์', { questionCount: 3 })],
+      questions: { rpb3: examQuestions },
+      attempts: [baseAttempt({ id: 'attRPB3', examId: 'rpb3', takerName: 'เด็กA' })],
+    });
+    const { ctx, page } = await newSeededPage({ role: 'teacher', name: 'ครูใหญ่', cache });
+    await page.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({
+      takerName: 'เด็กA', examId: 'rpb3', examTitle: 'ชุดครูดู', examSubject: 'คณิตศาสตร์',
+      submittedAt: new Date().toISOString(),
+      perQuestion: [{ no: 1, isCorrect: true }, { no: 2, isCorrect: false }, { no: 3, isCorrect: false }],
+    }));
+    await page.evaluate(() => navigate('review', { attemptId: 'attRPB3' }));
+    await page.waitForTimeout(500);
+    const display = await page.evaluate(() => document.getElementById('reviewPracticeBtn').style.display);
+    check('reviewPracticeShortcut: ครูดู attempt นักเรียน (มีจุดอ่อนจริง) → ปุ่มไม่โชว์', display === 'none', display);
+    await ctx.close();
+  }
+
+  // นักเรียนเปิดดู attempt ของคนอื่น (ชื่อไม่ตรง) → ปุ่มไม่โชว์
+  {
+    const cache = baseCache({
+      exams: [mkExam('rpb4', 'ชุดของคนอื่น', 'คณิตศาสตร์', { questionCount: 3 })],
+      questions: { rpb4: examQuestions },
+      attempts: [baseAttempt({ id: 'attRPB4', examId: 'rpb4', takerName: 'เด็กB' })],
+    });
+    const { ctx, page } = await newSeededPage({ role: 'student', name: 'เด็กC', cache });
+    await page.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({
+      takerName: 'เด็กB', examId: 'rpb4', examTitle: 'ชุดของคนอื่น', examSubject: 'คณิตศาสตร์',
+      submittedAt: new Date().toISOString(),
+      perQuestion: [{ no: 1, isCorrect: true }, { no: 2, isCorrect: false }, { no: 3, isCorrect: false }],
+    }));
+    await page.evaluate(() => navigate('review', { attemptId: 'attRPB4' }));
+    await page.waitForTimeout(500);
+    const display = await page.evaluate(() => document.getElementById('reviewPracticeBtn').style.display);
+    check('reviewPracticeShortcut: นักเรียนดู attempt คนอื่น (ชื่อไม่ตรง) → ปุ่มไม่โชว์', display === 'none', display);
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section: practiceQuestionTime (v48.47) — โหมด "แก้จุดอ่อน" (initPractice) เดิมไม่เก็บ
 // elapsedMs ต่อข้อเลย ทำให้หน้าทบทวนของ attempt จากโหมดนี้ไม่เคยเห็น badge เวลา (ต่างจาก
 // attempt จากหน้า take ปกติ) — เพิ่ม accumulator เดียวกับ enterQuestion()/leaveQuestion()
