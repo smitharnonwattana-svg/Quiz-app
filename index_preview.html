@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.62p -->
+  <!-- APP_VERSION: v48.63p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -769,46 +769,24 @@
          แถวแรกเท่านั้น (ความกว้างที่ตั้งบน <td> ถูกเบราว์เซอร์เพิกเฉยเสมอ) และ <th> ที่
          display:none (คะแนน, ตอนไม่เปิดระบบคะแนน) จะถูกตัดออกจากผังคอลัมน์ที่มองเห็นไปเลย —
          ผลคือตัวขับความกว้างจริงของคอลัมน์ "ฟรี" คือ th:nth-child(5) (ไม่ใช่ th:nth-child(4)
-         ที่โดนซ่อนอยู่ ใช้ไม่ได้ผล) และตัวขับจริงของคอลัมน์ "Tag" คือ th:nth-child(6) (ไม่ใช่
-         th:nth-child(5) ตามที่กฎเดิมด้านบนเข้าใจผิดมาตลอด) — เดิมเลยกลายเป็นคอลัมน์ "ฟรี" ได้
-         74px ไปเต็มๆ ส่วน "Tag" ได้แค่ค่า default จาก desktop 100px มาตลอด ไม่เคยเหลือ 74px
-         ตามที่ตั้งใจเลยสักครั้ง (ยืนยันด้วยการวัด getBoundingClientRect() จริงก่อนแก้) */
+         ที่โดนซ่อนอยู่ ใช้ไม่ได้ผล) */
       #page-admin_editor table th:nth-child(5) {
         width: 40px !important;
       }
+      /* v48.51: ซ่อนคอลัมน์ Tag ไปเลยทั้งคอลัมน์บนมือถือ (ไม่มี toggle ให้กดขยายอีกต่อไป
+         อย่าง v48.50 — เปลี่ยนใจให้เรียบง่ายกว่าเดิม) กรอก/แก้ tag ได้เฉพาะบน Tablet/PC
+         (>600px, ไม่ใช้ table-layout:fixed ไม่มีปัญหาพื้นที่แคบอยู่แล้ว) — th:nth-child(6)
+         คือ "Tag" เสมอทั้ง 2 โหมด (ตำแหน่ง "คะแนน" คงที่ที่ 4 เสมอไม่ว่าจะซ่อนหรือไม่) แต่ td
+         ตำแหน่งต่างกันตามโหมด (ไม่ weighted=nth-child(5) เพราะไม่มี td คะแนนแทรก, weighted=
+         nth-child(6) เพราะมี td คะแนนแทรกก่อน) */
       #page-admin_editor table th:nth-child(6) {
-        width: 32px !important;
-        padding: 4px 2px !important;
-      }
-      #page-admin_editor table td:nth-child(5) {
-        padding: 4px 2px !important;
-      }
-      #page-admin_editor table td:nth-child(5) > div {
         display: none !important;
       }
-      #page-admin_editor table.tagsOpen th:nth-child(6) {
-        width: 74px !important;
+      #page-admin_editor table:not(.weighted) td:nth-child(5) {
+        display: none !important;
       }
-      #page-admin_editor table.tagsOpen td:nth-child(5) > div {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 2px !important;
-      }
-      #page-admin_editor table td:nth-child(5) select {
-        font-size: 9px !important;
-        padding: 2px !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-      #page-admin_editor table td:nth-child(5) .subTagBtn {
-        font-size: 9px !important;
-        padding: 1px !important;
-        width: 100% !important;
-        min-width: 0 !important;
+      #page-admin_editor table.weighted td:nth-child(6) {
+        display: none !important;
       }
 
       /* ── เปิดระบบคะแนน weighted (มี 6 คอลัมน์): override nth-child shift ── */
@@ -835,44 +813,9 @@
         width: 100% !important;
         min-width: 0 !important;
       }
-      /* คอลัมน์ 6 = Tag — v48.28p: dropdown + ปุ่ม tag ย่อย วางซ้อนแนวตั้ง (เหมือนบล็อกไม่
-         weighted — เหตุผลเดียวกัน: ขยายแนวนอนแล้วไปแย่งพื้นที่คอลัมน์เฉลย/คะแนนที่แคบอยู่แล้ว) */
-      /* v48.50: ย่อเป็นค่าเริ่มต้นเหมือนโหมดปกติ (32px) — ขยายด้วย table.tagsOpen เดียวกัน
-         (โหมด weighted นี้ th/td ตำแหน่งตรงกันอยู่แล้วเพราะคะแนน th ไม่ถูกซ่อน ไม่มีบั๊กแบบ
-         โหมดปกติ แต่ทำให้สอดคล้องกันเพื่อ toggle เดียวคุมได้ทั้งสองโหมด) */
-      #page-admin_editor table.weighted th:nth-child(6),
-      #page-admin_editor table.weighted td:nth-child(6) {
-        width: 32px !important;
-        padding: 4px 2px !important;
-      }
-      #page-admin_editor table.weighted td:nth-child(6) > div {
-        display: none !important;
-      }
-      #page-admin_editor table.weighted.tagsOpen th:nth-child(6),
-      #page-admin_editor table.weighted.tagsOpen td:nth-child(6) {
-        width: 70px !important;
-      }
-      #page-admin_editor table.weighted.tagsOpen td:nth-child(6) > div {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 2px !important;
-      }
-      #page-admin_editor table.weighted td:nth-child(6) select {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        font-size: 9px !important;
-        padding: 2px !important;
-        width: 100% !important;
-        min-width: 0 !important;
-      }
-      #page-admin_editor table.weighted td:nth-child(6) .subTagBtn {
-        font-size: 9px !important;
-        padding: 1px !important;
-        width: 100% !important;
-        min-width: 0 !important;
-      }
+      /* คอลัมน์ 6 = Tag — v48.51: ซ่อนทั้งคอลัมน์บนมือถือ (กฎ th:nth-child(6)/
+         table.weighted td:nth-child(6) ที่ display:none อยู่ด้านบนแล้ว ครอบคลุมโหมดนี้ไว้แล้ว
+         ไม่ต้องเพิ่มกฎซ้ำ) */
       /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
       #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
         height: auto !important;
@@ -1364,7 +1307,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.62p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.63p</div>
     </div>
   </div>
 </div>
@@ -2490,7 +2433,7 @@
                 <th style="width:120px;">เฉลย</th>
                 <th style="width:80px;display:none;" class="editorPtsTh">คะแนน</th>
                 <th style="width:60px;">ฟรี</th>
-                <th id="editorTagTh" style="width:100px;cursor:pointer;" title="แตะเพื่อขยาย/ย่อคอลัมน์ Tag">Tag</th>
+                <th style="width:100px;">Tag</th>
               </tr>
             </thead>
             <tbody id="editorTbody"></tbody>
@@ -11316,18 +11259,6 @@ function initEditor(examId){
     }
   }
 
-  // v48.50: ย่อคอลัมน์ Tag ในตารางเป็นค่าเริ่มต้นเสมอ (มือถือ) ให้ปุ่ม ก/ข/ค/ง ได้พื้นที่
-  // มากขึ้น — กดหัวคอลัมน์ Tag เพื่อขยายกลับชั่วคราว (ไม่ persist ข้าม session)
-  let _tagColOpen=false;
-  const _tagTh=document.getElementById('editorTagTh');
-  function _syncTagColUI(){
-    const _editorTbl=document.querySelector('#page-admin_editor .tableBox table');
-    if(_editorTbl) _editorTbl.classList.toggle('tagsOpen',_tagColOpen);
-    if(_tagTh) _tagTh.textContent=_tagColOpen?'Tag ▾':'🏷️';
-  }
-  if(_tagTh) _tagTh.onclick=()=>{ _tagColOpen=!_tagColOpen; _syncTagColUI(); };
-  _syncTagColUI();
-
   if(_weightedToggleBtn){
     _weightedToggleBtn.onclick=()=>{
       if(exam.weighted){
@@ -15287,7 +15218,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.62p';
+  const CURRENT_VERSION = 'v48.63p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

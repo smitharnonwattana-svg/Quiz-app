@@ -3018,18 +3018,18 @@ currentSection = 'reviewPracticeShortcut';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: editorTagCollapse (v48.50) — ย่อคอลัมน์ Tag ในหน้ากรอกเฉลย (admin_editor,
-// มือถือ) เป็นค่าเริ่มต้นเสมอ ให้ปุ่ม ก/ข/ค/ง ได้พื้นที่มากขึ้น กดหัวคอลัมน์ 🏷️ เพื่อขยายกลับ
-// ได้ — ระหว่างทำเจอบั๊กแฝงเดิม: table-layout:fixed กำหนดความกว้างคอลัมน์จาก <th> แถวแรก
-// เท่านั้น (ไม่สนใจ width บน <td>) และ <th> ที่ display:none (คะแนน, ตอนไม่เปิด weighted)
-// ถูกตัดออกจากผังคอลัมน์ที่มองเห็นไปเลย ทำให้ตัวขับจริงของคอลัมน์ "Tag" คือ th:nth-child(6)
-// ไม่ใช่ th:nth-child(5) ตามที่โค้ดเดิมเข้าใจผิดมาตลอด — เทสนี้ครอบคลุมทั้งจุดที่ต้องแก้ตรงๆ
-// และกันบั๊กแฝงนี้กลับมาไม่ให้เนียนหายไปอีกครั้ง
+// Section: editorTagCollapse (v48.51) — ซ่อนคอลัมน์ Tag ทั้งคอลัมน์บนมือถือในหน้ากรอกเฉลย
+// (admin_editor) ให้ปุ่ม ก/ข/ค/ง ได้พื้นที่มากขึ้น (ไม่มี toggle — แก้ tag ได้เฉพาะบน
+// Tablet/PC เท่านั้น) — ระหว่างทำ (v48.50) เจอบั๊กแฝงเดิม: table-layout:fixed กำหนดความกว้าง
+// คอลัมน์จาก <th> แถวแรกเท่านั้น (ไม่สนใจ width บน <td>) และ <th> ที่ display:none (คะแนน,
+// ตอนไม่เปิด weighted) ถูกตัดออกจากผังคอลัมน์ที่มองเห็นไปเลย ทำให้ตัวขับจริงของคอลัมน์ "Tag"
+// คือ th:nth-child(6) ไม่ใช่ th:nth-child(5) ตามที่โค้ดเดิมเข้าใจผิดมาตลอด — เทสนี้ครอบคลุม
+// ทั้งจุดที่ต้องแก้ตรงๆ และกันบั๊กแฝงนี้กลับมาไม่ให้เนียนหายไปอีกครั้ง
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'editorTagCollapse';
 {
   const cache = baseCache({
-    exams: [mkExam('etc1', 'ชุดทดสอบ Tag ย่อ', 'คณิตศาสตร์', { questionCount: 3 })],
+    exams: [mkExam('etc1', 'ชุดทดสอบ Tag ซ่อน', 'คณิตศาสตร์', { questionCount: 3 })],
     questions: { etc1: [
       { id: 'q1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
       { id: 'q2', no: 2, number: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
@@ -3037,51 +3037,49 @@ currentSection = 'editorTagCollapse';
     ] },
     subjectTopics: { 'คณิตศาสตร์': ['เรขาคณิต'] },
   });
+
+  // 1) มือถือ (390px): คอลัมน์ Tag หายไปทั้งคอลัมน์ (ไม่มีแม้แต่ไอคอนให้กด) + ปุ่มเฉลยใหญ่ขึ้น
   const { ctx, page } = await newSeededPage({ cache, viewport: { width: 390, height: 844 } });
   await page.evaluate(() => navigate('admin_editor', { id: 'etc1' }));
   await page.waitForTimeout(500);
-
-  // 1) ค่าเริ่มต้น: Tag column ย่อ (32px) + เนื้อหาข้างในซ่อน + ปุ่มเฉลยใหญ่ขึ้น
-  const initial = await page.evaluate(() => {
-    const th = document.getElementById('editorTagTh');
+  const mobileState = await page.evaluate(() => {
+    const ths = [...document.querySelectorAll('#page-admin_editor .tableBox thead th')];
+    const tagTh = ths[5]; // nth-child(6) 0-indexed
     const td = document.querySelector('#editorTbody tr:first-child td:nth-child(5)');
     const btn = document.querySelector('#editorTbody tr:first-child .correctBtn');
-    const tdInnerDiv = td.querySelector('div');
     return {
-      thText: th.textContent,
-      tdWidth: Math.round(td.getBoundingClientRect().width),
-      tdDivDisplay: tdInnerDiv ? getComputedStyle(tdInnerDiv).display : null,
+      tagThDisplay: getComputedStyle(tagTh).display,
+      tagTdDisplay: getComputedStyle(td).display,
       btnHeight: Math.round(btn.getBoundingClientRect().height),
       btnFontSize: getComputedStyle(btn).fontSize,
-      tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
     };
   });
-  check('editorTagCollapse: ค่าเริ่มต้น หัวคอลัมน์โชว์ไอคอน 🏷️ (ไม่ใช่ "Tag" เต็ม)', initial.thText.includes('🏷️'), initial.thText);
-  check('editorTagCollapse: ค่าเริ่มต้น table ไม่มี class tagsOpen', !initial.tableHasTagsOpen, JSON.stringify(initial));
-  check('editorTagCollapse: ค่าเริ่มต้น คอลัมน์ Tag ย่อเหลือ ~32px (ไม่ใช่ 100px เดิม)', initial.tdWidth <= 40, initial.tdWidth);
-  check('editorTagCollapse: ค่าเริ่มต้น เนื้อหา select/subTagBtn ใน Tag cell ถูกซ่อน', initial.tdDivDisplay === 'none', initial.tdDivDisplay);
-  check('editorTagCollapse: ค่าเริ่มต้น ปุ่มเฉลยสูงขึ้นกว่าของเดิม (>=38px, เดิม ~28px)', initial.btnHeight >= 38, initial.btnHeight);
-  check('editorTagCollapse: ค่าเริ่มต้น ปุ่มเฉลย font-size ใหญ่ขึ้น (17px)', initial.btnFontSize === '17px', initial.btnFontSize);
+  check('editorTagCollapse: มือถือ หัวคอลัมน์ Tag ถูกซ่อนไปเลย (display:none)', mobileState.tagThDisplay === 'none', mobileState.tagThDisplay);
+  check('editorTagCollapse: มือถือ เซลล์ Tag ต่อแถวถูกซ่อนไปเลย (display:none)', mobileState.tagTdDisplay === 'none', mobileState.tagTdDisplay);
+  check('editorTagCollapse: มือถือ ปุ่มเฉลยสูงขึ้นกว่าของเดิม (>=38px, เดิม ~28px)', mobileState.btnHeight >= 38, mobileState.btnHeight);
+  check('editorTagCollapse: มือถือ ปุ่มเฉลย font-size ใหญ่ขึ้น (17px)', mobileState.btnFontSize === '17px', mobileState.btnFontSize);
+  await ctx.close();
 
-  // 2) กดหัวคอลัมน์ Tag → ขยายกลับ 74px, เนื้อหาโชว์กลับมาใช้งานได้จริง (ไม่ใช่แค่ CSS เฉยๆ)
-  await page.click('#editorTagTh');
-  await page.waitForTimeout(200);
-  const opened = await page.evaluate(() => {
-    const th = document.getElementById('editorTagTh');
+  // 2) Tablet/PC (>600px): คอลัมน์ Tag ยังกรอก/เลือกได้ปกติทุกอย่าง ไม่ถูกซ่อน
+  const { ctx: ctxD, page: pageD } = await newSeededPage({ cache, viewport: { width: 1024, height: 800 } });
+  await pageD.evaluate(() => navigate('admin_editor', { id: 'etc1' }));
+  await pageD.waitForTimeout(500);
+  const desktopState = await pageD.evaluate(() => {
+    const ths = [...document.querySelectorAll('#page-admin_editor .tableBox thead th')];
+    const tagTh = ths[5];
     const td = document.querySelector('#editorTbody tr:first-child td:nth-child(5)');
+    const sel = td.querySelector('select');
     return {
-      thText: th.textContent,
-      tdWidth: Math.round(td.getBoundingClientRect().width),
-      selectVisible: getComputedStyle(td.querySelector('select')).display !== 'none' && td.querySelector('select').offsetParent !== null,
-      tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
+      tagThDisplay: getComputedStyle(tagTh).display,
+      tagTdDisplay: getComputedStyle(td).display,
+      selectVisible: sel && getComputedStyle(sel).display !== 'none' && sel.offsetParent !== null,
     };
   });
-  check('editorTagCollapse: กดขยาย หัวคอลัมน์โชว์ "Tag ▾"', opened.thText.includes('Tag'), opened.thText);
-  check('editorTagCollapse: กดขยาย table มี class tagsOpen', opened.tableHasTagsOpen, JSON.stringify(opened));
-  check('editorTagCollapse: กดขยาย คอลัมน์ Tag กลับเป็น 74px', opened.tdWidth >= 70 && opened.tdWidth <= 78, opened.tdWidth);
-  check('editorTagCollapse: กดขยาย select เลือก tag ใช้งานได้จริง (มองเห็น)', opened.selectVisible, opened.selectVisible);
+  check('editorTagCollapse: Tablet/PC หัวคอลัมน์ Tag ไม่ถูกซ่อน', desktopState.tagThDisplay !== 'none', desktopState.tagThDisplay);
+  check('editorTagCollapse: Tablet/PC เซลล์ Tag ต่อแถวไม่ถูกซ่อน', desktopState.tagTdDisplay !== 'none', desktopState.tagTdDisplay);
+  check('editorTagCollapse: Tablet/PC select เลือก tag มองเห็น/ใช้งานได้ปกติ', desktopState.selectVisible, desktopState.selectVisible);
 
-  const tagApplied = await page.evaluate(() => {
+  const tagApplied = await pageD.evaluate(() => {
     const sel = document.querySelector('#editorTbody tr:first-child select.tagSel');
     const opt = [...sel.options].find(o => o.value === 'เรขาคณิต');
     if (!opt) return { found: false };
@@ -3090,66 +3088,40 @@ currentSection = 'editorTagCollapse';
     const q1 = (Store.load().questions.etc1 || []).find(q => q.no === 1);
     return { found: true, tags: q1 && q1.tags };
   });
-  check('editorTagCollapse: กดขยาย เลือก tag จาก dropdown ที่ขยายแล้ว บันทึกจริงลง store',
+  check('editorTagCollapse: Tablet/PC เลือก tag จาก dropdown บันทึกจริงลง store',
     tagApplied.found && Array.isArray(tagApplied.tags) && tagApplied.tags.includes('เรขาคณิต'), JSON.stringify(tagApplied));
+  await ctxD.close();
 
-  // 3) กดย่อกลับ → กลับสถานะเดิม
-  await page.click('#editorTagTh');
-  await page.waitForTimeout(200);
-  const closedAgain = await page.evaluate(() => ({
-    thText: document.getElementById('editorTagTh').textContent,
-    tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
-  }));
-  check('editorTagCollapse: กดย่อกลับ table ไม่มี class tagsOpen อีกครั้ง', !closedAgain.tableHasTagsOpen, JSON.stringify(closedAgain));
-  check('editorTagCollapse: กดย่อกลับ หัวคอลัมน์กลับเป็นไอคอน 🏷️', closedAgain.thText.includes('🏷️'), closedAgain.thText);
-
-  // 4) เข้าหน้าใหม่ (initEditor เรียกใหม่) → กลับไปย่อเสมอ ไม่จำสถานะเปิดค้าง
-  await page.click('#editorTagTh');
-  await page.waitForTimeout(200);
-  await page.evaluate(() => navigate('admin'));
-  await page.waitForTimeout(300);
-  await page.evaluate(() => navigate('admin_editor', { id: 'etc1' }));
-  await page.waitForTimeout(500);
-  const reentered = await page.evaluate(() => ({
-    tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
-    thText: document.getElementById('editorTagTh').textContent,
-  }));
-  check('editorTagCollapse: เข้าหน้าใหม่ ไม่จำสถานะเปิดค้างจากรอบก่อน (กลับไปย่อเสมอ)',
-    !reentered.tableHasTagsOpen && reentered.thText.includes('🏷️'), JSON.stringify(reentered));
-  await ctx.close();
-
-  // 5) โหมด weighted (เปิดระบบคะแนน, 6 คอลัมน์) — nth-child(6) แทน, th/td indices align ตรง
-  //    กันอยู่แล้ว (ไม่มีบั๊กแฝงแบบโหมดปกติ) แต่ toggle ต้องยังทำงานถูกต้องเหมือนกัน
-  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: baseCache({
+  // 3) โหมด weighted (เปิดระบบคะแนน, 6 คอลัมน์) — nth-child(6) คือ td ของ Tag แทน (มี td
+  //    คะแนนแทรกมาก่อน) ต้องซ่อนบนมือถือเหมือนกัน และยังใช้งานได้ปกติบน Tablet/PC
+  const weightedCache = baseCache({
     exams: [mkExam('etc2', 'ชุดคะแนนถ่วงน้ำหนัก', 'คณิตศาสตร์', { questionCount: 2, weighted: true })],
     questions: { etc2: [
       { id: 'q1', no: 1, number: 1, correct: 'A', points: 2, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
       { id: 'q2', no: 2, number: 2, correct: 'B', points: 3, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
     ] },
-  }), viewport: { width: 390, height: 844 } });
+  });
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: weightedCache, viewport: { width: 390, height: 844 } });
   await page2.evaluate(() => navigate('admin_editor', { id: 'etc2' }));
   await page2.waitForTimeout(500);
-  const weightedInitial = await page2.evaluate(() => {
+  const weightedMobile = await page2.evaluate(() => {
     const table = document.querySelector('#page-admin_editor .tableBox table');
     const td = document.querySelector('#editorTbody tr:first-child td:nth-child(6)');
-    return {
-      isWeighted: table.classList.contains('weighted'),
-      tagsOpen: table.classList.contains('tagsOpen'),
-      tdWidth: Math.round(td.getBoundingClientRect().width),
-    };
+    return { isWeighted: table.classList.contains('weighted'), tdDisplay: getComputedStyle(td).display };
   });
-  check('editorTagCollapse: weighted table มี class weighted (6 คอลัมน์)', weightedInitial.isWeighted, JSON.stringify(weightedInitial));
-  check('editorTagCollapse: weighted Tag column (nth-child 6) ย่อเป็นค่าเริ่มต้นเหมือนกัน',
-    !weightedInitial.tagsOpen && weightedInitial.tdWidth <= 40, JSON.stringify(weightedInitial));
-  await page2.click('#editorTagTh');
-  await page2.waitForTimeout(200);
-  const weightedOpened = await page2.evaluate(() => {
-    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(6)');
-    return { tdWidth: Math.round(td.getBoundingClientRect().width) };
-  });
-  check('editorTagCollapse: weighted กดขยาย Tag column (nth-child 6) กลับเป็น 70px',
-    weightedOpened.tdWidth >= 66 && weightedOpened.tdWidth <= 74, JSON.stringify(weightedOpened));
+  check('editorTagCollapse: weighted table มี class weighted (6 คอลัมน์)', weightedMobile.isWeighted, JSON.stringify(weightedMobile));
+  check('editorTagCollapse: weighted มือถือ เซลล์ Tag (nth-child 6) ถูกซ่อนเหมือนกัน', weightedMobile.tdDisplay === 'none', JSON.stringify(weightedMobile));
   await ctx2.close();
+
+  const { ctx: ctx3, page: page3 } = await newSeededPage({ cache: weightedCache, viewport: { width: 1024, height: 800 } });
+  await page3.evaluate(() => navigate('admin_editor', { id: 'etc2' }));
+  await page3.waitForTimeout(500);
+  const weightedDesktop = await page3.evaluate(() => {
+    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(6)');
+    return { tdDisplay: getComputedStyle(td).display };
+  });
+  check('editorTagCollapse: weighted Tablet/PC เซลล์ Tag (nth-child 6) ไม่ถูกซ่อน', weightedDesktop.tdDisplay !== 'none', JSON.stringify(weightedDesktop));
+  await ctx3.close();
 }
 
 // ─────────────────────────────────────────────────────────────────
