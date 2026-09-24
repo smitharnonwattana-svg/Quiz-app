@@ -3018,6 +3018,141 @@ currentSection = 'reviewPracticeShortcut';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Section: editorTagCollapse (v48.50) — ย่อคอลัมน์ Tag ในหน้ากรอกเฉลย (admin_editor,
+// มือถือ) เป็นค่าเริ่มต้นเสมอ ให้ปุ่ม ก/ข/ค/ง ได้พื้นที่มากขึ้น กดหัวคอลัมน์ 🏷️ เพื่อขยายกลับ
+// ได้ — ระหว่างทำเจอบั๊กแฝงเดิม: table-layout:fixed กำหนดความกว้างคอลัมน์จาก <th> แถวแรก
+// เท่านั้น (ไม่สนใจ width บน <td>) และ <th> ที่ display:none (คะแนน, ตอนไม่เปิด weighted)
+// ถูกตัดออกจากผังคอลัมน์ที่มองเห็นไปเลย ทำให้ตัวขับจริงของคอลัมน์ "Tag" คือ th:nth-child(6)
+// ไม่ใช่ th:nth-child(5) ตามที่โค้ดเดิมเข้าใจผิดมาตลอด — เทสนี้ครอบคลุมทั้งจุดที่ต้องแก้ตรงๆ
+// และกันบั๊กแฝงนี้กลับมาไม่ให้เนียนหายไปอีกครั้ง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'editorTagCollapse';
+{
+  const cache = baseCache({
+    exams: [mkExam('etc1', 'ชุดทดสอบ Tag ย่อ', 'คณิตศาสตร์', { questionCount: 3 })],
+    questions: { etc1: [
+      { id: 'q1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q2', no: 2, number: 2, correct: 'B', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q3', no: 3, number: 3, correct: 'C', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    ] },
+    subjectTopics: { 'คณิตศาสตร์': ['เรขาคณิต'] },
+  });
+  const { ctx, page } = await newSeededPage({ cache, viewport: { width: 390, height: 844 } });
+  await page.evaluate(() => navigate('admin_editor', { id: 'etc1' }));
+  await page.waitForTimeout(500);
+
+  // 1) ค่าเริ่มต้น: Tag column ย่อ (32px) + เนื้อหาข้างในซ่อน + ปุ่มเฉลยใหญ่ขึ้น
+  const initial = await page.evaluate(() => {
+    const th = document.getElementById('editorTagTh');
+    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(5)');
+    const btn = document.querySelector('#editorTbody tr:first-child .correctBtn');
+    const tdInnerDiv = td.querySelector('div');
+    return {
+      thText: th.textContent,
+      tdWidth: Math.round(td.getBoundingClientRect().width),
+      tdDivDisplay: tdInnerDiv ? getComputedStyle(tdInnerDiv).display : null,
+      btnHeight: Math.round(btn.getBoundingClientRect().height),
+      btnFontSize: getComputedStyle(btn).fontSize,
+      tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
+    };
+  });
+  check('editorTagCollapse: ค่าเริ่มต้น หัวคอลัมน์โชว์ไอคอน 🏷️ (ไม่ใช่ "Tag" เต็ม)', initial.thText.includes('🏷️'), initial.thText);
+  check('editorTagCollapse: ค่าเริ่มต้น table ไม่มี class tagsOpen', !initial.tableHasTagsOpen, JSON.stringify(initial));
+  check('editorTagCollapse: ค่าเริ่มต้น คอลัมน์ Tag ย่อเหลือ ~32px (ไม่ใช่ 100px เดิม)', initial.tdWidth <= 40, initial.tdWidth);
+  check('editorTagCollapse: ค่าเริ่มต้น เนื้อหา select/subTagBtn ใน Tag cell ถูกซ่อน', initial.tdDivDisplay === 'none', initial.tdDivDisplay);
+  check('editorTagCollapse: ค่าเริ่มต้น ปุ่มเฉลยสูงขึ้นกว่าของเดิม (>=38px, เดิม ~28px)', initial.btnHeight >= 38, initial.btnHeight);
+  check('editorTagCollapse: ค่าเริ่มต้น ปุ่มเฉลย font-size ใหญ่ขึ้น (17px)', initial.btnFontSize === '17px', initial.btnFontSize);
+
+  // 2) กดหัวคอลัมน์ Tag → ขยายกลับ 74px, เนื้อหาโชว์กลับมาใช้งานได้จริง (ไม่ใช่แค่ CSS เฉยๆ)
+  await page.click('#editorTagTh');
+  await page.waitForTimeout(200);
+  const opened = await page.evaluate(() => {
+    const th = document.getElementById('editorTagTh');
+    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(5)');
+    return {
+      thText: th.textContent,
+      tdWidth: Math.round(td.getBoundingClientRect().width),
+      selectVisible: getComputedStyle(td.querySelector('select')).display !== 'none' && td.querySelector('select').offsetParent !== null,
+      tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
+    };
+  });
+  check('editorTagCollapse: กดขยาย หัวคอลัมน์โชว์ "Tag ▾"', opened.thText.includes('Tag'), opened.thText);
+  check('editorTagCollapse: กดขยาย table มี class tagsOpen', opened.tableHasTagsOpen, JSON.stringify(opened));
+  check('editorTagCollapse: กดขยาย คอลัมน์ Tag กลับเป็น 74px', opened.tdWidth >= 70 && opened.tdWidth <= 78, opened.tdWidth);
+  check('editorTagCollapse: กดขยาย select เลือก tag ใช้งานได้จริง (มองเห็น)', opened.selectVisible, opened.selectVisible);
+
+  const tagApplied = await page.evaluate(() => {
+    const sel = document.querySelector('#editorTbody tr:first-child select.tagSel');
+    const opt = [...sel.options].find(o => o.value === 'เรขาคณิต');
+    if (!opt) return { found: false };
+    sel.value = 'เรขาคณิต';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const q1 = (Store.load().questions.etc1 || []).find(q => q.no === 1);
+    return { found: true, tags: q1 && q1.tags };
+  });
+  check('editorTagCollapse: กดขยาย เลือก tag จาก dropdown ที่ขยายแล้ว บันทึกจริงลง store',
+    tagApplied.found && Array.isArray(tagApplied.tags) && tagApplied.tags.includes('เรขาคณิต'), JSON.stringify(tagApplied));
+
+  // 3) กดย่อกลับ → กลับสถานะเดิม
+  await page.click('#editorTagTh');
+  await page.waitForTimeout(200);
+  const closedAgain = await page.evaluate(() => ({
+    thText: document.getElementById('editorTagTh').textContent,
+    tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
+  }));
+  check('editorTagCollapse: กดย่อกลับ table ไม่มี class tagsOpen อีกครั้ง', !closedAgain.tableHasTagsOpen, JSON.stringify(closedAgain));
+  check('editorTagCollapse: กดย่อกลับ หัวคอลัมน์กลับเป็นไอคอน 🏷️', closedAgain.thText.includes('🏷️'), closedAgain.thText);
+
+  // 4) เข้าหน้าใหม่ (initEditor เรียกใหม่) → กลับไปย่อเสมอ ไม่จำสถานะเปิดค้าง
+  await page.click('#editorTagTh');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => navigate('admin'));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => navigate('admin_editor', { id: 'etc1' }));
+  await page.waitForTimeout(500);
+  const reentered = await page.evaluate(() => ({
+    tableHasTagsOpen: document.querySelector('#page-admin_editor .tableBox table').classList.contains('tagsOpen'),
+    thText: document.getElementById('editorTagTh').textContent,
+  }));
+  check('editorTagCollapse: เข้าหน้าใหม่ ไม่จำสถานะเปิดค้างจากรอบก่อน (กลับไปย่อเสมอ)',
+    !reentered.tableHasTagsOpen && reentered.thText.includes('🏷️'), JSON.stringify(reentered));
+  await ctx.close();
+
+  // 5) โหมด weighted (เปิดระบบคะแนน, 6 คอลัมน์) — nth-child(6) แทน, th/td indices align ตรง
+  //    กันอยู่แล้ว (ไม่มีบั๊กแฝงแบบโหมดปกติ) แต่ toggle ต้องยังทำงานถูกต้องเหมือนกัน
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: baseCache({
+    exams: [mkExam('etc2', 'ชุดคะแนนถ่วงน้ำหนัก', 'คณิตศาสตร์', { questionCount: 2, weighted: true })],
+    questions: { etc2: [
+      { id: 'q1', no: 1, number: 1, correct: 'A', points: 2, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+      { id: 'q2', no: 2, number: 2, correct: 'B', points: 3, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } },
+    ] },
+  }), viewport: { width: 390, height: 844 } });
+  await page2.evaluate(() => navigate('admin_editor', { id: 'etc2' }));
+  await page2.waitForTimeout(500);
+  const weightedInitial = await page2.evaluate(() => {
+    const table = document.querySelector('#page-admin_editor .tableBox table');
+    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(6)');
+    return {
+      isWeighted: table.classList.contains('weighted'),
+      tagsOpen: table.classList.contains('tagsOpen'),
+      tdWidth: Math.round(td.getBoundingClientRect().width),
+    };
+  });
+  check('editorTagCollapse: weighted table มี class weighted (6 คอลัมน์)', weightedInitial.isWeighted, JSON.stringify(weightedInitial));
+  check('editorTagCollapse: weighted Tag column (nth-child 6) ย่อเป็นค่าเริ่มต้นเหมือนกัน',
+    !weightedInitial.tagsOpen && weightedInitial.tdWidth <= 40, JSON.stringify(weightedInitial));
+  await page2.click('#editorTagTh');
+  await page2.waitForTimeout(200);
+  const weightedOpened = await page2.evaluate(() => {
+    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(6)');
+    return { tdWidth: Math.round(td.getBoundingClientRect().width) };
+  });
+  check('editorTagCollapse: weighted กดขยาย Tag column (nth-child 6) กลับเป็น 70px',
+    weightedOpened.tdWidth >= 66 && weightedOpened.tdWidth <= 74, JSON.stringify(weightedOpened));
+  await ctx2.close();
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Section: practiceQuestionTime (v48.47) — โหมด "แก้จุดอ่อน" (initPractice) เดิมไม่เก็บ
 // elapsedMs ต่อข้อเลย ทำให้หน้าทบทวนของ attempt จากโหมดนี้ไม่เคยเห็น badge เวลา (ต่างจาก
 // attempt จากหน้า take ปกติ) — เพิ่ม accumulator เดียวกับ enterQuestion()/leaveQuestion()

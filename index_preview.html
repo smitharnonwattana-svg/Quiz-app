@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.61p -->
+  <!-- APP_VERSION: v48.62p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -737,15 +737,16 @@
       #page-admin_editor table td:nth-child(3) .correctBtns {
         display: grid !important;
         grid-template-columns: repeat(4, 1fr) !important;
-        gap: 3px !important;
+        gap: 5px !important;
         width: 100% !important;
         min-width: 0 !important;
       }
       #page-admin_editor table td:nth-child(3) .correctBtn {
         width: 100% !important;
         min-width: 0 !important;
-        padding: 6px 0 !important;
-        font-size: 13px !important;
+        height: auto !important;
+        padding: 11px 0 !important;
+        font-size: 17px !important;
         box-sizing: border-box !important;
       }
       #page-admin_editor table th:nth-child(4),
@@ -764,12 +765,32 @@
          แก้ด้วยการวางซ้อนแนวตั้ง (dropdown บน ปุ่ม tag ย่อยล่าง) แทนเรียงแนวนอน กว้างแค่ 74px พอ —
          ตัวหนังสือใน select ที่ตัดด้วย ellipsis ไม่กระทบการใช้งานจริง เพราะแตะแล้ว browser
          เปิด native picker แสดงตัวเลือกเต็มอยู่แล้วไม่ว่ากล่องจะแคบแค่ไหน */
-      #page-admin_editor table th:nth-child(5),
+      /* v48.50 (แก้บั๊กที่พบระหว่างทำ): table-layout:fixed กำหนดความกว้างคอลัมน์จาก <th> ของ
+         แถวแรกเท่านั้น (ความกว้างที่ตั้งบน <td> ถูกเบราว์เซอร์เพิกเฉยเสมอ) และ <th> ที่
+         display:none (คะแนน, ตอนไม่เปิดระบบคะแนน) จะถูกตัดออกจากผังคอลัมน์ที่มองเห็นไปเลย —
+         ผลคือตัวขับความกว้างจริงของคอลัมน์ "ฟรี" คือ th:nth-child(5) (ไม่ใช่ th:nth-child(4)
+         ที่โดนซ่อนอยู่ ใช้ไม่ได้ผล) และตัวขับจริงของคอลัมน์ "Tag" คือ th:nth-child(6) (ไม่ใช่
+         th:nth-child(5) ตามที่กฎเดิมด้านบนเข้าใจผิดมาตลอด) — เดิมเลยกลายเป็นคอลัมน์ "ฟรี" ได้
+         74px ไปเต็มๆ ส่วน "Tag" ได้แค่ค่า default จาก desktop 100px มาตลอด ไม่เคยเหลือ 74px
+         ตามที่ตั้งใจเลยสักครั้ง (ยืนยันด้วยการวัด getBoundingClientRect() จริงก่อนแก้) */
+      #page-admin_editor table th:nth-child(5) {
+        width: 40px !important;
+      }
+      #page-admin_editor table th:nth-child(6) {
+        width: 32px !important;
+        padding: 4px 2px !important;
+      }
       #page-admin_editor table td:nth-child(5) {
-        width: 74px !important;
         padding: 4px 2px !important;
       }
       #page-admin_editor table td:nth-child(5) > div {
+        display: none !important;
+      }
+      #page-admin_editor table.tagsOpen th:nth-child(6) {
+        width: 74px !important;
+      }
+      #page-admin_editor table.tagsOpen td:nth-child(5) > div {
+        display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 2px !important;
@@ -816,12 +837,23 @@
       }
       /* คอลัมน์ 6 = Tag — v48.28p: dropdown + ปุ่ม tag ย่อย วางซ้อนแนวตั้ง (เหมือนบล็อกไม่
          weighted — เหตุผลเดียวกัน: ขยายแนวนอนแล้วไปแย่งพื้นที่คอลัมน์เฉลย/คะแนนที่แคบอยู่แล้ว) */
+      /* v48.50: ย่อเป็นค่าเริ่มต้นเหมือนโหมดปกติ (32px) — ขยายด้วย table.tagsOpen เดียวกัน
+         (โหมด weighted นี้ th/td ตำแหน่งตรงกันอยู่แล้วเพราะคะแนน th ไม่ถูกซ่อน ไม่มีบั๊กแบบ
+         โหมดปกติ แต่ทำให้สอดคล้องกันเพื่อ toggle เดียวคุมได้ทั้งสองโหมด) */
       #page-admin_editor table.weighted th:nth-child(6),
       #page-admin_editor table.weighted td:nth-child(6) {
-        width: 70px !important;
+        width: 32px !important;
         padding: 4px 2px !important;
       }
       #page-admin_editor table.weighted td:nth-child(6) > div {
+        display: none !important;
+      }
+      #page-admin_editor table.weighted.tagsOpen th:nth-child(6),
+      #page-admin_editor table.weighted.tagsOpen td:nth-child(6) {
+        width: 70px !important;
+      }
+      #page-admin_editor table.weighted.tagsOpen td:nth-child(6) > div {
+        display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 2px !important;
@@ -843,8 +875,9 @@
       }
       /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
       #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
-        padding: 5px 0 !important;
-        font-size: 12px !important;
+        height: auto !important;
+        padding: 8px 0 !important;
+        font-size: 14px !important;
         min-width: 0 !important;
         width: 100% !important;
         box-sizing: border-box !important;
@@ -1331,7 +1364,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.61p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.62p</div>
     </div>
   </div>
 </div>
@@ -2457,7 +2490,7 @@
                 <th style="width:120px;">เฉลย</th>
                 <th style="width:80px;display:none;" class="editorPtsTh">คะแนน</th>
                 <th style="width:60px;">ฟรี</th>
-                <th style="width:100px;">Tag</th>
+                <th id="editorTagTh" style="width:100px;cursor:pointer;" title="แตะเพื่อขยาย/ย่อคอลัมน์ Tag">Tag</th>
               </tr>
             </thead>
             <tbody id="editorTbody"></tbody>
@@ -11282,6 +11315,19 @@ function initEditor(examId){
       }
     }
   }
+
+  // v48.50: ย่อคอลัมน์ Tag ในตารางเป็นค่าเริ่มต้นเสมอ (มือถือ) ให้ปุ่ม ก/ข/ค/ง ได้พื้นที่
+  // มากขึ้น — กดหัวคอลัมน์ Tag เพื่อขยายกลับชั่วคราว (ไม่ persist ข้าม session)
+  let _tagColOpen=false;
+  const _tagTh=document.getElementById('editorTagTh');
+  function _syncTagColUI(){
+    const _editorTbl=document.querySelector('#page-admin_editor .tableBox table');
+    if(_editorTbl) _editorTbl.classList.toggle('tagsOpen',_tagColOpen);
+    if(_tagTh) _tagTh.textContent=_tagColOpen?'Tag ▾':'🏷️';
+  }
+  if(_tagTh) _tagTh.onclick=()=>{ _tagColOpen=!_tagColOpen; _syncTagColUI(); };
+  _syncTagColUI();
+
   if(_weightedToggleBtn){
     _weightedToggleBtn.onclick=()=>{
       if(exam.weighted){
@@ -15241,7 +15287,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.61p';
+  const CURRENT_VERSION = 'v48.62p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
