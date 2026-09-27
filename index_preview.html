@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.64p -->
+  <!-- APP_VERSION: v48.65p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -408,6 +408,14 @@
     .subj-avg-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
     .subj-avg-chip{padding:5px 12px;border-radius:99px;background:#f3f4f6;font-size:12px;font-weight:700;color:#374151;border:1px solid #e5e7eb;}
     /* หน้าผลการฝึกซ้อม — ภาพรวมแบบ 1B (Duolingo): ไทล์ + ตารางคะแนนรายวิชา + ล่าสุด (renderStatsDuo) */
+    #page-stats .sd-studentbar{display:none;align-items:center;gap:12px;background:#fff;border:2px solid #E5E5E5;border-bottom-width:5px;border-radius:16px;padding:12px 16px;margin-top:14px;}
+    #page-stats .sd-studentbar .sd-ic{width:40px;height:40px;border-radius:50%;background:#1CB0F6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+    #page-stats .sd-studentbar label{font-size:13px;font-weight:700;color:#777;flex-shrink:0;}
+    #page-stats .sd-studentbar select{flex:1;max-width:280px;min-width:0;padding:9px 12px;border:2px solid #E5E5E5;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;color:#4B4B4B;background:#fff;}
+    #page-stats .sd-studentbar select:focus-visible{outline:2px solid #1CB0F6;outline-offset:1px;}
+    #page-stats .sd-cell{position:relative;}
+    #page-stats .sd-fixed{position:absolute;top:-6px;right:-6px;width:17px;height:17px;border-radius:50%;background:#58CC02;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:#fff;font-weight:800;}
+    #page-stats .sd-legend .sd-fixed{position:static;width:12px;height:12px;border-width:1px;font-size:8px;margin-right:4px;}
     #page-stats .sd-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:14px;}
     #page-stats .sd-tile,#page-stats .sd-card,#page-stats .sd-rc{background:#fff;border:2px solid #E5E5E5;border-bottom-width:5px;border-radius:16px;}
     #page-stats .sd-tile{display:flex;align-items:center;gap:12px;padding:14px 16px;min-width:0;}
@@ -1378,7 +1386,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.64p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.65p</div>
     </div>
   </div>
 </div>
@@ -1827,16 +1835,19 @@
       <button class="btn" id="statsPillAll" onclick="window.statsSetTime('all')" style="border-radius:99px;padding:6px 16px;font-size:13px;background:#111;color:#fff;border-color:#111;">ทั้งหมด</button>
     </div>
 
+    <!-- ครู: เลือกนักเรียน — ย้ายขึ้นมาบนสุด (ก่อนเห็นไทล์/ตารางของใคร ต้องเลือกก่อนว่าดูของใคร) -->
+    <span id="statsStudentFilterWrap" class="sd-studentbar">
+      <span class="sd-ic" aria-hidden="true">👤</span>
+      <label for="statsFilterStudent">นักเรียน</label>
+      <select id="statsFilterStudent"><option value="all">ทั้งหมด</option></select>
+    </span>
+
     <!-- ① ภาพรวม: ไทล์ + ตารางคะแนนรายวิชา + ล่าสุด (renderStatsDuo) -->
     <div id="statsDuo"></div>
 
-    <!-- ② filter วิชา (ย้ายขึ้นมาก่อน) -->
+    <!-- ② filter วิชา -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px;">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <span id="statsStudentFilterWrap" style="display:none;gap:6px;align-items:center;">
-          <span class="muted" style="font-size:13px;">นักเรียน</span>
-          <select id="statsFilterStudent" class="btn" style="padding:7px 10px;font-size:13px;"><option value="all">ทั้งหมด</option></select>
-        </span>
         <span class="muted" style="font-size:13px;">วิชา</span>
         <select id="statsFilterSubject" class="btn" style="padding:7px 10px;font-size:13px;"><option value="all">ทั้งหมด</option></select>
         <select id="statsFilterExam" class="btn" style="padding:7px 10px;font-size:13px;min-width:160px;"><option value="all">ทุกชุด</option></select>
@@ -7929,7 +7940,7 @@ function initStats(){
   const subjectEl=document.getElementById('statsFilterSubject');
   const studentWrap=document.getElementById('statsStudentFilterWrap');
   const studentEl=document.getElementById('statsFilterStudent');
-  if(studentWrap) studentWrap.style.display=Auth.isTeacher()?'inline-flex':'none';
+  if(studentWrap) studentWrap.style.display=Auth.isTeacher()?'flex':'none';
 
   // ── time filter ──
   function setTimePills(t){
@@ -8063,6 +8074,15 @@ function initStats(){
     const fp=v=>typeof fmtPts==='function'?fmtPts(v):v;
     const subjOf=a=>a.examSubject||getExamSubjectById(s,a.examId);
     const sorted=list.slice().sort((a,b)=>ts(b)-ts(a));
+    // ชุดที่เคย "แก้จุดอ่อน" ทีหลัง (mode==='weakness_practice' อ้างอิงแค่ examId ไม่มี id
+    // attempt ต้นทาง) — เก็บเวลาแก้ล่าสุดต่อ examId แล้วผูกกับ "ครั้งล่าสุด" ของ examId นั้นใน
+    // ตาราง (กรณีปกติมีแค่ 1 ครั้งต่อ examId อยู่แล้วจึงไม่กำกวม) เพื่อโชว์ ✓ มุมช่อง
+    const wpByExam=new Map();
+    streakSource.forEach(a=>{
+      if(a.mode!=='weakness_practice') return;
+      const t=ts(a); if(!t) return;
+      if(!wpByExam.has(a.examId)||t>wpByExam.get(a.examId)) wpByExam.set(a.examId,t);
+    });
 
     // ── ไทล์ ──
     const latest=sorted[0];
@@ -8101,10 +8121,17 @@ function initStats(){
       const all=bySubj[sj].slice().sort((a,b)=>ts(a)-ts(b));
       const sAvg=Math.round(all.reduce((t,a)=>t+pctOf(a),0)/all.length);
       const last=all.slice(-SLOTS);
+      // "ครั้งล่าสุด" ต่อ examId ในรายการของวิชานี้ — examId ซ้ำมักมีแค่ครั้งเดียวอยู่แล้ว
+      // (loop ตามลำดับเก่า→ใหม่ ตัวสุดท้ายที่เขียนทับจึงเป็นครั้งล่าสุดของ examId นั้น)
+      const latestByExam=new Map(); all.forEach(a=>latestByExam.set(a.examId,a));
       const empties=Array.from({length:SLOTS-last.length},()=>`<span class="sd-cell sd-emptycell" aria-hidden="true">—</span>`).join('');
       const cells=last.map((a,i)=>{
         const p=pctOf(a), isLast=i===last.length-1;
-        return `<button type="button" class="sd-cell sd-${band(p)}${isLast?' sd-last':''}"${isLast?` style="border-color:${col}"`:''} data-sdreview="${esc(a.id)}" aria-label="${esc(sj)} ${fmtD(a)} ${p}%"><b>${p}%</b><small>${fmtD(a)}</small></button>`;
+        const fixedAt=wpByExam.get(a.examId);
+        const isFixed=fixedAt!=null&&fixedAt>ts(a)&&latestByExam.get(a.examId)===a;
+        const badge=isFixed?'<span class="sd-fixed" aria-hidden="true">✓</span>':'';
+        const label=`${esc(sj)} ${fmtD(a)} ${p}%${isFixed?' · แก้จุดอ่อนแล้ว':''}`;
+        return `<button type="button" class="sd-cell sd-${band(p)}${isLast?' sd-last':''}"${isLast?` style="border-color:${col}"`:''} data-sdreview="${esc(a.id)}" aria-label="${label}">${badge}<b>${p}%</b><small>${fmtD(a)}</small></button>`;
       }).join('');
       return `<div class="sd-row">
         <span class="sd-sq" style="background:${col}" aria-hidden="true">${esc(letter)}</span>
@@ -8116,7 +8143,7 @@ function initStats(){
       <div class="sd-ct"><h3>คะแนนล่าสุดแต่ละวิชา</h3><span class="sd-muted">${multiStudent?'รวมนักเรียนทุกคน — เลือกนักเรียนในตัวกรองด้านล่างเพื่อดูรายคน':'ครั้งล่าสุดของแต่ละวิชา เรียงจากเก่าไปใหม่'}</span></div>
       <div class="sd-ghead"><span class="sd-ghl">วิชา</span><div class="sd-garrow"><span>← เก่ากว่า</span><span class="sd-now">ล่าสุด →</span></div></div>
       ${rowsHtml}
-      <div class="sd-legend"><span><i class="sd-hi"></i>80% ขึ้นไป</span><span><i class="sd-mid"></i>50–79%</span><span><i class="sd-lo"></i>ต่ำกว่า 50%</span><span>กรอบหนา = ครั้งล่าสุด · แตะช่องเพื่อดูเฉลย</span></div>
+      <div class="sd-legend"><span><i class="sd-hi"></i>80% ขึ้นไป</span><span><i class="sd-mid"></i>50–79%</span><span><i class="sd-lo"></i>ต่ำกว่า 50%</span><span><span class="sd-fixed" aria-hidden="true">✓</span>แก้จุดอ่อนแล้ว</span><span>กรอบหนา = ครั้งล่าสุด · แตะช่องเพื่อดูเฉลย</span></div>
     </div>`;
 
     // ── ล่าสุด ──
@@ -15293,7 +15320,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.64p';
+  const CURRENT_VERSION = 'v48.65p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

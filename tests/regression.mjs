@@ -3318,6 +3318,8 @@ currentSection = 'statsDuo';
     // ครึ่งหลังเริ่มหลังครึ่งแรกเสมอในข้อมูลจริง — mergeHalfModePairs พึ่งลำดับนี้ (เรียงใหม่→เก่า)
     attempts.push({ id: 'att_t1b', examId: 't1', examTitle: 'ภาษาไทย ชุดที่ 1', examSubject: 'ภาษาไทย', takerName: 'นนท์', halfMode: true, halfPart: 2, parentAttemptId: 'att_t1a', startedAt: new Date(now - 3 * DAY + 3600000).toISOString(), score: 7, total: 10, perQuestion: [] });
     attempts.push({ id: 'att_wp', examId: 'm1', examTitle: 'แก้จุดอ่อน', examSubject: 'คณิตศาสตร์', takerName: 'นนท์', mode: 'weakness_practice', startedAt: t3, score: 3, total: 5, perQuestion: [] });
+    // m6 (55%, 11 วันก่อน) ถูกแก้จุดอ่อนทีหลัง (2 วันก่อน, อยู่หลัง m6 เอง) → ต้องขึ้น ✓ ที่ช่อง m6
+    attempts.push({ id: 'att_wp_m6', examId: 'm6', examTitle: 'แก้จุดอ่อน', examSubject: 'คณิตศาสตร์', takerName: 'นนท์', mode: 'weakness_practice', startedAt: new Date(now - 2 * DAY).toISOString(), score: 4, total: 5, perQuestion: [] });
     return baseCache({ exams, attempts: attempts.concat(extraAttempts) });
   }
 
@@ -3354,6 +3356,35 @@ currentSection = 'statsDuo';
     subjStillRenders: document.getElementById('statsSubjAvg').children.length > 0,
   }));
   check('statsDuo: การ์ดรายวิชาเดิม (#statsSubjAvg) ย้ายไปอยู่หลังรายการ และยังเรนเดอร์อยู่', layout.subjAfterRows && layout.subjStillRenders, JSON.stringify(layout));
+
+  // ✓ badge "แก้จุดอ่อนแล้ว" — m6 (55%, 16 ก.ย.) มี weakness_practice ทีหลัง ต้องขึ้น ✓ เฉพาะช่องนั้น
+  // ช่องเดียว ไม่ใช่ทุกช่อง, ไม่กระทบตัวเลข % เดิม, และมี legend อธิบายไว้ด้วย
+  const badgeInfo = await page.evaluate(() => {
+    const mathCells = [...document.querySelectorAll('#statsDuo .sd-row')[0].querySelectorAll('button.sd-cell')];
+    return {
+      totalFixedBadges: document.querySelectorAll('#statsDuo .sd-card .sd-fixed').length - 1, // -1 กัน badge ตัวอย่างใน legend
+      m6HasBadge: mathCells.some(c => c.textContent.includes('55%') && c.textContent.includes('16 ก.ย.') && c.querySelector('.sd-fixed')),
+      m6Label: mathCells.find(c => c.textContent.includes('55%') && c.textContent.includes('16 ก.ย.'))?.getAttribute('aria-label') || '',
+      othersClean: mathCells.filter(c => !(c.textContent.includes('55%') && c.textContent.includes('16 ก.ย.'))).every(c => !c.querySelector('.sd-fixed')),
+      legendHasNote: document.querySelector('#statsDuo .sd-legend')?.textContent.includes('แก้จุดอ่อนแล้ว'),
+    };
+  });
+  check('statsDuo: ✓ ขึ้นเฉพาะช่อง m6 ที่ถูกแก้จุดอ่อนทีหลังจริง (1 ช่องเดียวในทั้งตาราง)', badgeInfo.totalFixedBadges === 1 && badgeInfo.m6HasBadge, JSON.stringify(badgeInfo));
+  check('statsDuo: aria-label ของช่อง m6 มีคำว่า "แก้จุดอ่อนแล้ว" ต่อท้าย', badgeInfo.m6Label.includes('แก้จุดอ่อนแล้ว'), badgeInfo.m6Label);
+  check('statsDuo: ช่องอื่นๆ ในแถวคณิตไม่มี ✓ ติดมาด้วย (m1 ที่มี weakness_practice ก็ถูกตัดพ้นจอไปแล้ว)', badgeInfo.othersClean, JSON.stringify(badgeInfo));
+  check('statsDuo: legend อธิบายความหมาย ✓ ไว้ด้วย', badgeInfo.legendHasNote, badgeInfo.legendHasNote);
+
+  // ตัวเลือกนักเรียน (ครู) ย้ายขึ้นมาอยู่เหนือ #statsDuo และปรับสไตล์ตาม theme (.sd-studentbar)
+  const studentBar = await page.evaluate(() => {
+    const wrap = document.getElementById('statsStudentFilterWrap');
+    return {
+      hasClass: wrap.classList.contains('sd-studentbar'),
+      aboveDuo: !!(wrap.compareDocumentPosition(document.getElementById('statsDuo')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      visible: getComputedStyle(wrap).display !== 'none',
+      hasSelect: !!wrap.querySelector('#statsFilterStudent'),
+    };
+  });
+  check('statsDuo: กล่องเลือกนักเรียน (.sd-studentbar) อยู่เหนือ #statsDuo และโชว์ให้ครูเห็น', studentBar.hasClass && studentBar.aboveDuo && studentBar.visible && studentBar.hasSelect, JSON.stringify(studentBar));
 
   // กรอง 7 วัน → เหลือเฉพาะครั้งใน 7 วัน, และต้องรอด re-render จาก Firestore listener
   await page.click('#statsPillWeek');
@@ -3395,6 +3426,14 @@ currentSection = 'statsDuo';
   const empty = await page3.evaluate(() => document.getElementById('statsDuo').textContent);
   check('statsDuo: ไม่มีข้อมูล → การ์ด "ยังไม่มีผลการฝึกในช่วงนี้"', empty.includes('ยังไม่มีผลการฝึกในช่วงนี้'), empty.slice(0, 80));
   await ctx3.close();
+
+  // นักเรียน (ไม่ใช่ครู) ต้องไม่เห็นกล่องเลือกนักเรียนเลย
+  const { ctx: ctx4, page: page4 } = await newSeededPage({ role: 'student', name: 'นนท์', cache: duoCache(Date.now()), viewport: { width: 1180, height: 820 }, file: 'index_preview.html' });
+  await page4.evaluate(() => navigate('stats'));
+  await page4.waitForTimeout(500);
+  const studentHidden = await page4.evaluate(() => getComputedStyle(document.getElementById('statsStudentFilterWrap')).display);
+  check('statsDuo: นักเรียน (ไม่ใช่ครู) ไม่เห็นกล่องเลือกนักเรียน', studentHidden === 'none', studentHidden);
+  await ctx4.close();
 }
 
 // ─────────────────────────────────────────────────────────────────
