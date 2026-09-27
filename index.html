@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.51 -->
+  <!-- APP_VERSION: v48.52 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -407,6 +407,85 @@
     .attempt-card .ac-btns{display:flex;gap:8px;margin-top:2px;}
     .subj-avg-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
     .subj-avg-chip{padding:5px 12px;border-radius:99px;background:#f3f4f6;font-size:12px;font-weight:700;color:#374151;border:1px solid #e5e7eb;}
+    /* หน้าผลการฝึกซ้อม — ภาพรวมแบบ 1B (Duolingo): ไทล์ + ตารางคะแนนรายวิชา + ล่าสุด (renderStatsDuo) */
+    #page-stats .sd-studentbar{display:none;align-items:center;gap:12px;background:#fff;border:2px solid #E5E5E5;border-bottom-width:5px;border-radius:16px;padding:12px 16px;margin-top:14px;}
+    #page-stats .sd-studentbar .sd-ic{width:40px;height:40px;border-radius:50%;background:#1CB0F6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+    #page-stats .sd-studentbar label{font-size:13px;font-weight:700;color:#777;flex-shrink:0;}
+    #page-stats .sd-studentbar select{flex:1;max-width:280px;min-width:0;padding:9px 12px;border:2px solid #E5E5E5;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;color:#4B4B4B;background:#fff;}
+    #page-stats .sd-studentbar select:focus-visible{outline:2px solid #1CB0F6;outline-offset:1px;}
+    #page-stats .sd-cell{position:relative;}
+    #page-stats .sd-fixed{position:absolute;top:-6px;right:-6px;width:17px;height:17px;border-radius:50%;background:#58CC02;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:#fff;font-weight:800;}
+    #page-stats .sd-legend .sd-fixed{position:static;width:12px;height:12px;border-width:1px;font-size:8px;margin-right:4px;}
+    #page-stats .sd-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:14px;}
+    #page-stats .sd-tile,#page-stats .sd-card,#page-stats .sd-rc{background:#fff;border:2px solid #E5E5E5;border-bottom-width:5px;border-radius:16px;}
+    #page-stats .sd-tile{display:flex;align-items:center;gap:12px;padding:14px 16px;min-width:0;}
+    #page-stats .sd-tx{min-width:0;}
+    #page-stats .sd-ic{width:40px;height:40px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;}
+    #page-stats .sd-tv{font-size:22px;font-weight:800;color:#4B4B4B;line-height:1.25;white-space:nowrap;}
+    #page-stats .sd-tl{font-size:13px;font-weight:600;color:#777;overflow-wrap:anywhere;}
+    #page-stats .sd-card{padding:18px 20px;margin-top:16px;}
+    #page-stats .sd-ct{display:flex;justify-content:space-between;align-items:baseline;gap:6px 12px;flex-wrap:wrap;margin-bottom:12px;}
+    #page-stats .sd-ct h3{margin:0;font-size:18px;font-weight:800;color:#4B4B4B;}
+    #page-stats .sd-muted{font-size:13px;color:#777;}
+    #page-stats .sd-ghead,#page-stats .sd-row{display:grid;grid-template-columns:46px 190px minmax(0,1fr);column-gap:14px;align-items:center;}
+    #page-stats .sd-row{margin-top:12px;}
+    #page-stats .sd-ghl{grid-column:1 / 3;font-size:12px;font-weight:700;color:#AFAFAF;}
+    #page-stats .sd-garrow{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#AFAFAF;}
+    #page-stats .sd-now{color:#4B4B4B;}
+    #page-stats .sd-sq{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:19px;}
+    #page-stats .sd-name{min-width:0;}
+    #page-stats .sd-sn{font-size:16px;font-weight:800;color:#4B4B4B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #page-stats .sd-bar{height:10px;border-radius:99px;background:#E5E5E5;overflow:hidden;margin:5px 0;}
+    #page-stats .sd-bar i{display:block;height:100%;border-radius:99px;}
+    #page-stats .sd-avg{font-size:12px;font-weight:700;}
+    #page-stats .sd-cells{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;}
+    #page-stats .sd-cell{height:58px;border-radius:12px;border:3px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;font-family:inherit;min-width:0;cursor:pointer;}
+    #page-stats .sd-cell b{font-size:16px;font-weight:800;}
+    #page-stats .sd-cell small{font-size:11px;font-weight:600;white-space:nowrap;}
+    #page-stats .sd-hi{background:#D7FFB8;color:#3E8E00;}
+    #page-stats .sd-mid{background:#FFF1C2;color:#9A6400;}
+    #page-stats .sd-lo{background:#FFDFE0;color:#D52C2C;}
+    #page-stats .sd-hit{color:#3E8E00;} #page-stats .sd-midt{color:#9A6400;} #page-stats .sd-lot{color:#D52C2C;}
+    #page-stats .sd-emptycell{border:2px dashed #E5E5E5;background:none;color:#C8C8C8;cursor:default;font-weight:600;}
+    #page-stats .sd-legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:14px;font-size:12px;color:#777;}
+    #page-stats .sd-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:5px;vertical-align:-2px;}
+    #page-stats .sd-rh{font-size:18px;font-weight:800;color:#4B4B4B;margin:18px 0 10px;}
+    #page-stats .sd-recent{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;}
+    #page-stats .sd-rc{text-align:left;padding:12px 14px;font-family:inherit;cursor:pointer;min-width:0;}
+    #page-stats .sd-rd{font-size:12px;font-weight:600;color:#AFAFAF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #page-stats .sd-rt{font-size:14px;font-weight:800;color:#4B4B4B;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #page-stats .sd-rs b{font-size:22px;font-weight:800;}
+    #page-stats .sd-rs span{font-size:13px;font-weight:700;color:#AFAFAF;}
+    #page-stats .sd-cell:focus-visible,#page-stats .sd-rc:focus-visible{outline:3px solid #1CB0F6;outline-offset:2px;}
+    #page-stats .sd-empty{text-align:center;padding:28px;}
+    #page-stats .sd-empty-t{font-size:17px;font-weight:800;color:#4B4B4B;margin-bottom:4px;}
+    @media (max-width:900px){
+      #page-stats .sd-tiles{grid-template-columns:repeat(2,minmax(0,1fr));}
+      #page-stats .sd-ghead,#page-stats .sd-row{grid-template-columns:40px 140px minmax(0,1fr);column-gap:10px;}
+      #page-stats .sd-sq{width:40px;height:40px;font-size:17px;}
+      #page-stats .sd-cells{gap:6px;}
+      #page-stats .sd-cell b{font-size:14px;}
+      #page-stats .sd-cell small{font-size:10px;}
+    }
+    @media (max-width:600px){
+      #page-stats .sd-tiles{gap:10px;}
+      #page-stats .sd-tile{padding:12px;gap:10px;}
+      #page-stats .sd-ic{width:34px;height:34px;font-size:15px;}
+      #page-stats .sd-tv{font-size:19px;}
+      #page-stats .sd-card{padding:14px;}
+      /* มือถือ: ชื่อวิชาอยู่บรรทัดบน ช่องคะแนน 4 ครั้งล่าสุดเต็มความกว้างบรรทัดล่าง (วางข้างกันแล้วช่องแคบจนวันที่ล้น) */
+      #page-stats .sd-row{grid-template-columns:34px minmax(0,1fr);row-gap:8px;margin-top:16px;}
+      #page-stats .sd-ghead{grid-template-columns:minmax(0,1fr);}
+      #page-stats .sd-ghl{display:none;}
+      #page-stats .sd-sq{width:34px;height:34px;font-size:15px;border-radius:10px;}
+      #page-stats .sd-sn{font-size:14px;}
+      #page-stats .sd-cells{grid-column:1 / -1;grid-template-columns:repeat(4,minmax(0,1fr));}
+      #page-stats .sd-cell b{font-size:15px;}
+      #page-stats .sd-cell small{font-size:11px;}
+      #page-stats .sd-cells > :nth-child(-n+4){display:none;}
+      #page-stats .sd-recent{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;}
+      #page-stats .sd-rc{flex:0 0 150px;scroll-snap-align:start;}
+    }
     /* admin editor */
     textarea{width:100%;min-height:64px;resize:vertical;font-family:inherit;}
     input[type="number"]{width:72px;}
@@ -1277,7 +1356,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.51</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.52</div>
     </div>
   </div>
 </div>
@@ -1726,17 +1805,19 @@
       <button class="btn" id="statsPillAll" onclick="window.statsSetTime('all')" style="border-radius:99px;padding:6px 16px;font-size:13px;background:#111;color:#fff;border-color:#111;">ทั้งหมด</button>
     </div>
 
-    <!-- ① Summary cards -->
-    <div id="statsSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px;"></div>
-    <div id="statsDifficultyCards" style="display:none;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;"></div>
+    <!-- ครู: เลือกนักเรียน — ย้ายขึ้นมาบนสุด (ก่อนเห็นไทล์/ตารางของใคร ต้องเลือกก่อนว่าดูของใคร) -->
+    <span id="statsStudentFilterWrap" class="sd-studentbar">
+      <span class="sd-ic" aria-hidden="true">👤</span>
+      <label for="statsFilterStudent">นักเรียน</label>
+      <select id="statsFilterStudent"><option value="all">ทั้งหมด</option></select>
+    </span>
 
-    <!-- ② filter วิชา (ย้ายขึ้นมาก่อน) -->
+    <!-- ① ภาพรวม: ไทล์ + ตารางคะแนนรายวิชา + ล่าสุด (renderStatsDuo) -->
+    <div id="statsDuo"></div>
+
+    <!-- ② filter วิชา -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px;">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <span id="statsStudentFilterWrap" style="display:none;gap:6px;align-items:center;">
-          <span class="muted" style="font-size:13px;">นักเรียน</span>
-          <select id="statsFilterStudent" class="btn" style="padding:7px 10px;font-size:13px;"><option value="all">ทั้งหมด</option></select>
-        </span>
         <span class="muted" style="font-size:13px;">วิชา</span>
         <select id="statsFilterSubject" class="btn" style="padding:7px 10px;font-size:13px;"><option value="all">ทั้งหมด</option></select>
         <select id="statsFilterExam" class="btn" style="padding:7px 10px;font-size:13px;min-width:160px;"><option value="all">ทุกชุด</option></select>
@@ -1750,13 +1831,14 @@
       </div>
     </div>
 
-    <!-- ③ box รายวิชา -->
-    <div id="statsSubjAvg" style="margin-top:12px;"></div>
-    <div id="statsRadarWrap"></div>
-
     <!-- ④ รายการชุดข้อสอบ -->
     <div id="statsTabBar" style="display:flex;gap:0;margin-top:16px;border-bottom:2px solid var(--border);"></div>
     <div id="statsRows" style="margin-top:12px;margin-bottom:8px;"></div>
+
+    <!-- ③ box รายวิชา (tag) — ย้ายมาท้ายหน้า เพราะตารางคะแนนด้านบนแสดงค่าเฉลี่ยรายวิชาแล้ว -->
+    <h2 style="font-size:16px;font-weight:800;color:#374151;margin:20px 0 0;">เนื้อหารายวิชา (จาก tag)</h2>
+    <div id="statsSubjAvg" style="margin-top:12px;"></div>
+    <div id="statsRadarWrap"></div>
 
     <!-- ⑤ สถิติการแก้จุดอ่อน -->
     <div id="statsPracticeSection" style="margin-top:16px;margin-bottom:8px;display:none;">
@@ -7817,7 +7899,7 @@ function initStats(){
   const subjectEl=document.getElementById('statsFilterSubject');
   const studentWrap=document.getElementById('statsStudentFilterWrap');
   const studentEl=document.getElementById('statsFilterStudent');
-  if(studentWrap) studentWrap.style.display=Auth.isTeacher()?'inline-flex':'none';
+  if(studentWrap) studentWrap.style.display=Auth.isTeacher()?'flex':'none';
 
   // ── time filter ──
   function setTimePills(t){
@@ -7934,85 +8016,105 @@ function initStats(){
   }
 
   // ── ① Summary cards ──
-  function renderSummaryCards(attempts){
-    const el=document.getElementById('statsSummaryCards');
+  // ── ① ภาพรวม (แบบ 1B): ไทล์ 4 ใบ + ตารางคะแนนรายวิชา + ล่าสุด ──
+  // ตาราง: คอลัมน์ = ลำดับครั้งของแต่ละวิชาเอง ชิดขวา (ช่องขวาสุด = ครั้งล่าสุดของวิชานั้น) และวันที่อยู่
+  // ในช่อง ไม่ใช่หัวคอลัมน์ — เพราะแต่ละวิชาทำไม่ตรงวันกัน หัวคอลัมน์วันที่ร่วมกันจะผิดความจริง
+  function renderStatsDuo(s, list, streakSource, multiStudent){
+    const el=document.getElementById('statsDuo');
     if(!el) return;
-    if(!attempts.length){el.innerHTML='';return;}
-    const total=attempts.length;
-    const avgPct=Math.round(attempts.reduce((s,a)=>s+(a.total?((a.score||0)/a.total)*100:0),0)/total);
-    const totalSec=attempts.reduce((s,a)=>s+(a.usedSeconds||0),0);
-    const _th=Math.floor(totalSec/3600),_tm=Math.floor((totalSec%3600)/60);
-    const totalTimeStr=_th>0?`${_th} ชม. ${_tm} นาที`:`${_tm} นาที`;
-
-    // ── หาวิชาที่ % ต่ำสุด (จุดอ่อน) ──
-    const _subjStats={};
-    attempts.forEach(a=>{
-      const subj=a.examSubject||'ไม่ระบุ';
-      if(!_subjStats[subj]) _subjStats[subj]={sum:0,total:0};
-      _subjStats[subj].sum+=(a.score||0);
-      _subjStats[subj].total+=(a.total||0);
-    });
-    const _subjPcts=Object.entries(_subjStats)
-      .filter(([,v])=>v.total>0)
-      .map(([s,v])=>({subj:s,pct:Math.round(v.sum/v.total*100)}))
-      .sort((a,b)=>a.pct-b.pct);
-    const _weakest=_subjPcts[0];
-
-    // นับ "ข้อรอแก้" ของวิชานี้จาก WeaknessTracker
-    let _weakCount=0;
-    const _curName=Auth.isTeacher()?currentStudentFilter:(Auth.getName()||'');
-    if(_weakest && _curName && _curName!=='all' && typeof WeaknessTracker!=='undefined'){
-      const _store=Store.load();
-      const _aw=WeaknessTracker.getActiveWeaknessesForUser(_curName)||[];
-      _weakCount=_aw.filter(w=>{
-        const ex=(_store.exams||[]).find(e=>e.id===w.examId);
-        return ex && (ex.subject||'ไม่ระบุ')===_weakest.subj;
-      }).length;
+    if(!list.length){
+      el.innerHTML=`<div class="sd-card sd-empty"><div class="sd-empty-t">ยังไม่มีผลการฝึกในช่วงนี้</div><div class="sd-muted">ลองเปลี่ยนช่วงเวลาด้านบน หรือไปทำข้อสอบชุดใหม่</div></div>`;
+      return;
     }
-
-    const cards=[
-      {label:'ทำทั้งหมด',value:total+' ครั้ง',sub:'ทุกชุดรวมกัน',accent:false},
-      {label:'คะแนนเฉลี่ย',value:avgPct+'%',sub:`${attempts.reduce((s,a)=>s+(a.score||0),0)} / ${attempts.reduce((s,a)=>s+(a.total||0),0)} คะแนน`,accent:false},
-      {label:'🎯 ต้องเน้น',value:_weakest?esc(_weakest.subj):'—',sub:_weakest?`${_weakest.pct}%${_weakCount?` • ${_weakCount} ข้อรอแก้`:''}`:'',accent:false},
-      {label:'เวลาฝึกรวม',value:totalTimeStr,sub:'ทุกชุดรวมกัน',accent:false},
-    ];
-    el.innerHTML=cards.map(c=>`
-      <div class="stat-card">
-        <div class="sc-label">${c.label}</div>
-        <div class="sc-value">${c.value}</div>
-        <div class="sc-sub">${c.sub}</div>
-      </div>`).join('');
-  }
-
-  function renderDifficultyCards(attempts){
-    const el=document.getElementById('statsDifficultyCards');
-    if(!el) return;
-    const tiers=[
-      {key:'review', label:'🔵 ทบทวน', color:'#2563eb', bg:'#eff6ff', border:'#bfdbfe'},
-      {key:'develop',label:'🟡 พัฒนา', color:'#ca8a04', bg:'#fefce8', border:'#fde047'},
-      {key:'hard',   label:'🔴 ยาก',   color:'#dc2626', bg:'#fff1f2', border:'#fecaca'},
-    ];
-    const byTier={review:[], develop:[], hard:[]};
-    attempts.forEach(a=>{
-      const d=a.difficulty||'develop';
-      if(byTier[d]) byTier[d].push(a);
+    const ts=a=>a.startedAt?new Date(a.startedAt).getTime():0;
+    const pctOf=a=>a.total?Math.round((a.score||0)/a.total*100):0;
+    const band=p=>p>=80?'hi':p>=50?'mid':'lo';
+    const fmtD=a=>{const t=ts(a);return t?new Date(t).toLocaleDateString('th-TH',{day:'numeric',month:'short'}):'—';};
+    const fp=v=>typeof fmtPts==='function'?fmtPts(v):v;
+    const subjOf=a=>a.examSubject||getExamSubjectById(s,a.examId);
+    const sorted=list.slice().sort((a,b)=>ts(b)-ts(a));
+    // ชุดที่เคย "แก้จุดอ่อน" ทีหลัง (mode==='weakness_practice' อ้างอิงแค่ examId ไม่มี id
+    // attempt ต้นทาง) — เก็บเวลาแก้ล่าสุดต่อ examId แล้วผูกกับ "ครั้งล่าสุด" ของ examId นั้นใน
+    // ตาราง (กรณีปกติมีแค่ 1 ครั้งต่อ examId อยู่แล้วจึงไม่กำกวม) เพื่อโชว์ ✓ มุมช่อง
+    const wpByExam=new Map();
+    streakSource.forEach(a=>{
+      if(a.mode!=='weakness_practice') return;
+      const t=ts(a); if(!t) return;
+      if(!wpByExam.has(a.examId)||t>wpByExam.get(a.examId)) wpByExam.set(a.examId,t);
     });
-    const anyData=tiers.some(t=>byTier[t.key].length>0);
-    if(!anyData){el.style.display='none';el.innerHTML='';return;}
-    el.style.display='grid';
-    el.innerHTML=tiers.map(t=>{
-      const list=byTier[t.key];
-      const n=list.length;
-      const avg=n?Math.round(list.reduce((s,a)=>s+(a.total?((a.score||0)/a.total)*100:0),0)/n):null;
-      const valStr=avg!=null?avg+'%':'—';
-      const subStr=n?`${n} ครั้ง`:'ยังไม่มีข้อมูล';
-      const dim=n?'':'opacity:.45;';
-      return `<div style="background:${t.bg};border:1px solid ${t.border};border-radius:14px;padding:12px;${dim}">
-        <div style="font-size:12px;font-weight:800;color:${t.color};margin-bottom:4px;">${t.label}</div>
-        <div style="font-size:22px;font-weight:900;color:${t.color};line-height:1.1;">${valStr}</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${subStr}</div>
+
+    // ── ไทล์ ──
+    const latest=sorted[0];
+    const avg=Math.round(list.reduce((t,a)=>t+pctOf(a),0)/list.length);
+    const totalSec=list.reduce((t,a)=>t+(a.usedSeconds||0),0);
+    const th=Math.floor(totalSec/3600), tm=Math.floor((totalSec%3600)/60);
+    const period={week:'7 วันล่าสุด',month:'30 วันล่าสุด',all:'ทั้งหมด'}[currentTimeFilter]||'ทั้งหมด';
+    const dayKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();};
+    const days=new Set(streakSource.map(ts).filter(Boolean).map(dayKey));
+    let streak=0; const cur=new Date(); cur.setHours(12,0,0,0);
+    if(!days.has(dayKey(cur.getTime()))) cur.setDate(cur.getDate()-1);
+    while(days.has(dayKey(cur.getTime()))){ streak++; cur.setDate(cur.getDate()-1); }
+    const tiles=[
+      ['#1CB0F6','ล',`${fp(latest.score||0)}/${fp(latest.total||0)}`,`ชุดล่าสุด · ${esc(subjOf(latest))}`],
+      ['#58CC02','%',avg+'%',`เฉลี่ย · ${period}`],
+      ['#CE82FF','#',list.length+' ชุด',`รวม ${th>0?th+' ชม. ':''}${tm} น.`],
+      ['#FF9600','ว',multiStudent?'—':streak+' วัน','ทำติดต่อกัน'],
+    ];
+    const tilesHtml=`<div class="sd-tiles">${tiles.map(([c,ic,v,l])=>`<div class="sd-tile"><span class="sd-ic" style="background:${c}" aria-hidden="true">${ic}</span><div class="sd-tx"><div class="sd-tv">${v}</div><div class="sd-tl">${l}</div></div></div>`).join('')}</div>`;
+
+    // ── ตารางคะแนนรายวิชา ──
+    const bySubj={};
+    list.forEach(a=>{const sj=subjOf(a);(bySubj[sj]=bySubj[sj]||[]).push(a);});
+    const order=Object.keys(SUBJ_COLOR);
+    const subjects=Object.keys(bySubj).sort((a,b)=>{
+      const ia=order.indexOf(a), ib=order.indexOf(b);
+      if(ia<0&&ib<0) return a.localeCompare(b,'th');
+      if(ia<0) return 1; if(ib<0) return -1; return ia-ib;
+    });
+    const extra=['#5856D6','#A24DCB','#BF5B00','#0E7C8C','#1F7A37'];
+    let extraIdx=0;
+    const SLOTS=8;
+    const rowsHtml=subjects.map(sj=>{
+      const col=SUBJ_COLOR[sj]||extra[(extraIdx++)%extra.length];
+      const letter=(sj.replace(/^ภาษา/,'').trim().charAt(0))||'?';
+      const all=bySubj[sj].slice().sort((a,b)=>ts(a)-ts(b));
+      const sAvg=Math.round(all.reduce((t,a)=>t+pctOf(a),0)/all.length);
+      const last=all.slice(-SLOTS);
+      // "ครั้งล่าสุด" ต่อ examId ในรายการของวิชานี้ — examId ซ้ำมักมีแค่ครั้งเดียวอยู่แล้ว
+      // (loop ตามลำดับเก่า→ใหม่ ตัวสุดท้ายที่เขียนทับจึงเป็นครั้งล่าสุดของ examId นั้น)
+      const latestByExam=new Map(); all.forEach(a=>latestByExam.set(a.examId,a));
+      const empties=Array.from({length:SLOTS-last.length},()=>`<span class="sd-cell sd-emptycell" aria-hidden="true">—</span>`).join('');
+      const cells=last.map((a,i)=>{
+        const p=pctOf(a), isLast=i===last.length-1;
+        const fixedAt=wpByExam.get(a.examId);
+        const isFixed=fixedAt!=null&&fixedAt>ts(a)&&latestByExam.get(a.examId)===a;
+        const badge=isFixed?'<span class="sd-fixed" aria-hidden="true">✓</span>':'';
+        const label=`${esc(sj)} ${fmtD(a)} ${p}%${isFixed?' · แก้จุดอ่อนแล้ว':''}`;
+        return `<button type="button" class="sd-cell sd-${band(p)}${isLast?' sd-last':''}"${isLast?` style="border-color:${col}"`:''} data-sdreview="${esc(a.id)}" aria-label="${label}">${badge}<b>${p}%</b><small>${fmtD(a)}</small></button>`;
+      }).join('');
+      return `<div class="sd-row">
+        <span class="sd-sq" style="background:${col}" aria-hidden="true">${esc(letter)}</span>
+        <div class="sd-name"><div class="sd-sn">${esc(sj)}</div><div class="sd-bar"><i style="width:${sAvg}%;background:${col}"></i></div><div class="sd-avg sd-${band(sAvg)}t">เฉลี่ย ${sAvg}% · ${all.length} ครั้ง</div></div>
+        <div class="sd-cells">${empties}${cells}</div>
       </div>`;
     }).join('');
+    const gridHtml=`<div class="sd-card">
+      <div class="sd-ct"><h3>คะแนนล่าสุดแต่ละวิชา</h3><span class="sd-muted">${multiStudent?'รวมนักเรียนทุกคน — เลือกนักเรียนในตัวกรองด้านล่างเพื่อดูรายคน':'ครั้งล่าสุดของแต่ละวิชา เรียงจากเก่าไปใหม่'}</span></div>
+      <div class="sd-ghead"><span class="sd-ghl">วิชา</span><div class="sd-garrow"><span>← เก่ากว่า</span><span class="sd-now">ล่าสุด →</span></div></div>
+      ${rowsHtml}
+      <div class="sd-legend"><span><i class="sd-hi"></i>80% ขึ้นไป</span><span><i class="sd-mid"></i>50–79%</span><span><i class="sd-lo"></i>ต่ำกว่า 50%</span><span><span class="sd-fixed" aria-hidden="true">✓</span>แก้จุดอ่อนแล้ว</span><span>กรอบหนา = ครั้งล่าสุด · แตะช่องเพื่อดูเฉลย</span></div>
+    </div>`;
+
+    // ── ล่าสุด ──
+    const recentHtml=`<div class="sd-rh">ล่าสุด</div><div class="sd-recent">${sorted.slice(0,5).map(a=>{
+      const p=pctOf(a);
+      const mode=a.halfMode?'คนละครึ่ง':a.practiceMode?'ฝึกซ้อม':'จริง';
+      const title=a.examTitle||getExamTitleById(s,a.examId);
+      return `<button type="button" class="sd-rc" data-sdreview="${esc(a.id)}"><div class="sd-rd">${fmtD(a)} · ${mode}</div><div class="sd-rt">${esc(title)}</div><div class="sd-rs"><b class="sd-${band(p)}t">${fp(a.score||0)}</b><span>/${fp(a.total||0)}</span></div></button>`;
+    }).join('')}</div>`;
+
+    el.innerHTML=tilesHtml+gridHtml+recentHtml;
+    el.querySelectorAll('[data-sdreview]').forEach(b=>b.addEventListener('click',()=>navigate('review',{attemptId:b.getAttribute('data-sdreview')})));
   }
 
   // ── ② กราฟพัฒนาการ (Canvas) ──
@@ -8179,8 +8281,8 @@ function initStats(){
     const attempts=currentExamFilter==='all'?bySubject:bySubject.filter(a=>a.examId===currentExamFilter);
 
     // summary ใช้ timeFiltered (ทุกวิชา ช่วงเวลานั้น — normal only)
-    renderSummaryCards(timeFiltered);
-    renderDifficultyCards(timeFiltered);
+    const _multiStudent=Auth.isTeacher()&&currentStudentFilter==='all'&&new Set(allAttempts.map(a=>a.takerName||'')).size>1;
+    renderStatsDuo(s, timeFiltered, allAttempts, _multiStudent);
 
     // ── Subject + Tag Dashboard (unified) ──
     const subjAvgEl = document.getElementById('statsSubjAvg');
@@ -15218,7 +15320,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.51';
+  const CURRENT_VERSION = 'v48.52';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

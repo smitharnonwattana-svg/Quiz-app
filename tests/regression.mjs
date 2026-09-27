@@ -3325,7 +3325,7 @@ currentSection = 'statsDuo';
 
   // ── iPad แนวนอน ──
   const now = Date.now();
-  const { ctx, page } = await newSeededPage({ cache: duoCache(now), viewport: { width: 1180, height: 820 }, file: 'index_preview.html' });
+  const { ctx, page } = await newSeededPage({ cache: duoCache(now), viewport: { width: 1180, height: 820 }, file: 'index.html' });
   await page.evaluate(() => navigate('stats'));
   await page.waitForTimeout(500);
   const d = await page.evaluate(() => {
@@ -3403,7 +3403,7 @@ currentSection = 'statsDuo';
   await ctx.close();
 
   // ── มือถือ 390px: เหลือ 4 ช่องล่าสุดต่อวิชา ไม่ล้นแนวนอน ──
-  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: duoCache(Date.now()), viewport: { width: 390, height: 844 }, file: 'index_preview.html' });
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: duoCache(Date.now()), viewport: { width: 390, height: 844 }, file: 'index.html' });
   await page2.evaluate(() => navigate('stats'));
   await page2.waitForTimeout(500);
   const mob = await page2.evaluate(() => {
@@ -3416,7 +3416,7 @@ currentSection = 'statsDuo';
 
   // ── ครูดู "ทั้งหมด" + มีนักเรียน 2 คน → streak "—" + โน้ตรวมทุกคน; ไม่มีข้อมูล → การ์ดว่าง ──
   const other = { id: 'att_x', examId: 'm1', examTitle: 'คณิตศาสตร์ ชุดที่ 1', examSubject: 'คณิตศาสตร์', takerName: 'เด็กอีกคน', startedAt: new Date(Date.now() - DAY).toISOString(), score: 10, total: 20, perQuestion: [] };
-  const { ctx: ctx3, page: page3 } = await newSeededPage({ cache: duoCache(Date.now(), [other]), viewport: { width: 1180, height: 820 }, file: 'index_preview.html' });
+  const { ctx: ctx3, page: page3 } = await newSeededPage({ cache: duoCache(Date.now(), [other]), viewport: { width: 1180, height: 820 }, file: 'index.html' });
   await page3.evaluate(() => navigate('stats'));
   await page3.waitForTimeout(500);
   const multi = await page3.evaluate(() => ({ streak: document.querySelectorAll('#statsDuo .sd-tile')[3]?.textContent || '', note: document.querySelector('#statsDuo .sd-ct')?.textContent || '' }));
@@ -3428,7 +3428,7 @@ currentSection = 'statsDuo';
   await ctx3.close();
 
   // นักเรียน (ไม่ใช่ครู) ต้องไม่เห็นกล่องเลือกนักเรียนเลย
-  const { ctx: ctx4, page: page4 } = await newSeededPage({ role: 'student', name: 'นนท์', cache: duoCache(Date.now()), viewport: { width: 1180, height: 820 }, file: 'index_preview.html' });
+  const { ctx: ctx4, page: page4 } = await newSeededPage({ role: 'student', name: 'นนท์', cache: duoCache(Date.now()), viewport: { width: 1180, height: 820 }, file: 'index.html' });
   await page4.evaluate(() => navigate('stats'));
   await page4.waitForTimeout(500);
   const studentHidden = await page4.evaluate(() => getComputedStyle(document.getElementById('statsStudentFilterWrap')).display);
