@@ -29,11 +29,12 @@ function check(name, cond, detail = '') {
 const browser = await chromium.launch(launchOpts);
 
 // เปิดหน้าใหม่ + seed session/ข้อมูลพื้นฐาน — ทุก section เริ่มจาก state สะอาด
-async function newSeededPage({ role = 'teacher', name = 'Admin', cache, viewport }) {
+// file: หน้าที่จะเปิด — ใช้ 'index_preview.html' กับฟีเจอร์ที่ยังอยู่ใน preview เท่านั้น
+async function newSeededPage({ role = 'teacher', name = 'Admin', cache, viewport, file = 'index.html' }) {
   const ctx = await browser.newContext(viewport ? { viewport } : {});
   const page = await ctx.newPage();
   page.on('dialog', d => d.accept());
-  await page.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+  await page.goto(BASE + '/' + file, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1800); // ให้ Firebase SDK ล้มเหลวเงียบๆ (ถูก proxy บล็อก) ก่อน seed
   await page.evaluate(({ role, name, cache }) => {
     sessionStorage.setItem('appSession', JSON.stringify({ role, name, ts: Date.now() }));
@@ -3286,6 +3287,114 @@ currentSection = 'statsPage';
       after === 'half', JSON.stringify({ picked, after }));
     await ctx.close();
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section: statsDuo (v48.64p, preview) — หน้าผลการฝึกซ้อมส่วนบนใหม่ (แบบ 1B): ไทล์ 4 ใบ +
+// ตารางคะแนนรายวิชา + ล่าสุด — ตาราง: คอลัมน์ = ลำดับครั้งของแต่ละวิชาเอง ชิดขวา (ช่องขวาสุด =
+// ครั้งล่าสุด) วันที่อยู่ในช่อง เพราะแต่ละวิชาทำคนละวัน; ไม่รวมแก้จุดอ่อน, คนละครึ่งนับเป็น 1 ครั้ง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'statsDuo';
+{
+  const DAY = 86400000;
+  function duoCache(now, extraAttempts = []) {
+    const exams = [], attempts = [];
+    const plan = [
+      ['คณิตศาสตร์', 'm', [45, 55, 40, 60, 65, 55, 70, 80, 75], [26, 23, 20, 17, 14, 11, 8, 5, 2]],
+      ['วิทยาศาสตร์', 's', [70, 65, 80, 85, 75, 80], [22, 18, 15, 10, 6, 1]],
+      ['ภาษาอังกฤษ', 'e', [80, 85, 90, 85, 90, 95, 85, 95], [25, 21, 19, 16, 12, 9, 4, 0]],
+    ];
+    for (const [subj, k, pcts, ago] of plan) pcts.forEach((p, i) => {
+      const id = `${k}${i + 1}`;
+      exams.push(mkExam(id, `${subj} ชุดที่ ${i + 1}`, subj, { questionCount: 20 }));
+      attempts.push({ id: 'att_' + id, examId: id, examTitle: `${subj} ชุดที่ ${i + 1}`, examSubject: subj, takerName: 'นนท์',
+        startedAt: new Date(now - ago[i] * DAY).toISOString(), submittedAt: new Date(now - ago[i] * DAY).toISOString(),
+        usedSeconds: 1500, score: p / 5, total: 20, perQuestion: [], practiceMode: false });
+    });
+    // คนละครึ่ง 1 คู่ (ต้องรวมเป็น 1 ช่อง 75%) + แก้จุดอ่อน 1 ครั้ง (ต้องไม่ขึ้นในตาราง)
+    exams.push(mkExam('t1', 'ภาษาไทย ชุดที่ 1', 'ภาษาไทย', { questionCount: 20 }));
+    const t3 = new Date(now - 3 * DAY).toISOString();
+    attempts.push({ id: 'att_t1a', examId: 't1', examTitle: 'ภาษาไทย ชุดที่ 1', examSubject: 'ภาษาไทย', takerName: 'นนท์', halfMode: true, halfPart: 1, startedAt: t3, score: 8, total: 10, perQuestion: [] });
+    // ครึ่งหลังเริ่มหลังครึ่งแรกเสมอในข้อมูลจริง — mergeHalfModePairs พึ่งลำดับนี้ (เรียงใหม่→เก่า)
+    attempts.push({ id: 'att_t1b', examId: 't1', examTitle: 'ภาษาไทย ชุดที่ 1', examSubject: 'ภาษาไทย', takerName: 'นนท์', halfMode: true, halfPart: 2, parentAttemptId: 'att_t1a', startedAt: new Date(now - 3 * DAY + 3600000).toISOString(), score: 7, total: 10, perQuestion: [] });
+    attempts.push({ id: 'att_wp', examId: 'm1', examTitle: 'แก้จุดอ่อน', examSubject: 'คณิตศาสตร์', takerName: 'นนท์', mode: 'weakness_practice', startedAt: t3, score: 3, total: 5, perQuestion: [] });
+    return baseCache({ exams, attempts: attempts.concat(extraAttempts) });
+  }
+
+  // ── iPad แนวนอน ──
+  const now = Date.now();
+  const { ctx, page } = await newSeededPage({ cache: duoCache(now), viewport: { width: 1180, height: 820 }, file: 'index_preview.html' });
+  await page.evaluate(() => navigate('stats'));
+  await page.waitForTimeout(500);
+  const d = await page.evaluate(() => {
+    const tiles = [...document.querySelectorAll('#statsDuo .sd-tile')].map(t => t.textContent.replace(/\s+/g, ' ').trim());
+    const rows = [...document.querySelectorAll('#statsDuo .sd-row')].map(r => ({
+      name: r.querySelector('.sd-sn').textContent,
+      empties: r.querySelectorAll('.sd-emptycell').length,
+      cells: [...r.querySelectorAll('button.sd-cell')].map(b => b.textContent.replace(/\s+/g, ' ').trim()),
+      lastIsLatest: r.querySelector('.sd-cells').lastElementChild.classList.contains('sd-last'),
+    }));
+    return { tiles, rows, recent: document.querySelectorAll('#statsDuo .sd-rc').length };
+  });
+  const allPcts = [45, 55, 40, 60, 65, 55, 70, 80, 75, 70, 65, 80, 85, 75, 80, 80, 85, 90, 85, 90, 95, 85, 95, 75];
+  const expAvg = Math.round(allPcts.reduce((a, b) => a + b, 0) / allPcts.length);
+  check('statsDuo: ไทล์ชุดล่าสุด = 19/20 ภาษาอังกฤษ', d.tiles[0] && d.tiles[0].includes('19/20') && d.tiles[0].includes('ภาษาอังกฤษ'), d.tiles[0]);
+  check(`statsDuo: ไทล์เฉลี่ย = ${expAvg}% (คนละครึ่งรวมเป็น 1 ครั้ง, ไม่รวมแก้จุดอ่อน)`, d.tiles[1] && d.tiles[1].includes(expAvg + '%'), d.tiles[1]);
+  check('statsDuo: ไทล์จำนวน = 24 ชุด', d.tiles[2] && d.tiles[2].includes('24 ชุด'), d.tiles[2]);
+  check('statsDuo: ไทล์ทำติดต่อกัน = 7 วัน (นับวันที่ทำแก้จุดอ่อนด้วย)', d.tiles[3] && d.tiles[3].includes('7 วัน'), d.tiles[3]);
+  check('statsDuo: เรียงวิชาตามลำดับ SUBJ_COLOR (คณิต/วิทย์/ไทย/อังกฤษ)', JSON.stringify(d.rows.map(r => r.name)) === JSON.stringify(['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ']), JSON.stringify(d.rows.map(r => r.name)));
+  const math = d.rows[0], sci = d.rows[1], thai = d.rows[2];
+  check('statsDuo: คณิต 9 ครั้ง → โชว์ 8 ครั้งล่าสุด (ครั้งแรก 45% ถูกตัด)', math.cells.length === 8 && math.cells[0].startsWith('55%'), JSON.stringify(math.cells));
+  check('statsDuo: วิทย์ 6 ครั้ง → ชิดขวา มีช่องเส้นประ 2 ช่องด้านซ้าย', sci.empties === 2 && sci.cells.length === 6, JSON.stringify(sci));
+  check('statsDuo: คนละครึ่งรวมเป็นช่องเดียว 75%', thai.cells.length === 1 && thai.cells[0].startsWith('75%'), JSON.stringify(thai));
+  check('statsDuo: ช่องขวาสุดของทุกแถว = ครั้งล่าสุด (กรอบหนา)', d.rows.every(r => r.lastIsLatest), JSON.stringify(d.rows.map(r => r.lastIsLatest)));
+  check('statsDuo: การ์ด "ล่าสุด" 5 ใบ', d.recent === 5, d.recent);
+  const layout = await page.evaluate(() => ({
+    subjAfterRows: !!(document.getElementById('statsRows').compareDocumentPosition(document.getElementById('statsSubjAvg')) & Node.DOCUMENT_POSITION_FOLLOWING),
+    subjStillRenders: document.getElementById('statsSubjAvg').children.length > 0,
+  }));
+  check('statsDuo: การ์ดรายวิชาเดิม (#statsSubjAvg) ย้ายไปอยู่หลังรายการ และยังเรนเดอร์อยู่', layout.subjAfterRows && layout.subjStillRenders, JSON.stringify(layout));
+
+  // กรอง 7 วัน → เหลือเฉพาะครั้งใน 7 วัน, และต้องรอด re-render จาก Firestore listener
+  await page.click('#statsPillWeek');
+  await page.waitForTimeout(300);
+  const weekCells = await page.evaluate(() => document.querySelectorAll('#statsDuo button.sd-cell').length);
+  await page.evaluate(() => navigate('stats'));
+  await page.waitForTimeout(400);
+  const weekCellsAfter = await page.evaluate(() => document.querySelectorAll('#statsDuo button.sd-cell').length);
+  check('statsDuo: ปุ่ม "7 วันล่าสุด" เหลือ 7 ช่อง และรอด navigate(stats) ซ้ำ', weekCells === 7 && weekCellsAfter === 7, JSON.stringify({ weekCells, weekCellsAfter }));
+
+  // แตะช่องล่าสุดของวิทย์ → หน้าทบทวนของชุดนั้น
+  await page.evaluate(() => document.querySelectorAll('#statsDuo .sd-row')[1].querySelector('.sd-last').click());
+  await page.waitForTimeout(500);
+  const rv = await page.evaluate(() => ({ active: document.querySelector('.page.active')?.id, title: document.getElementById('reviewTitle')?.textContent || '' }));
+  check('statsDuo: แตะช่องล่าสุดวิทย์ → เปิดหน้าทบทวนชุดที่ 6', rv.active === 'page-review' && rv.title.includes('วิทยาศาสตร์ ชุดที่ 6'), JSON.stringify(rv));
+  await ctx.close();
+
+  // ── มือถือ 390px: เหลือ 4 ช่องล่าสุดต่อวิชา ไม่ล้นแนวนอน ──
+  const { ctx: ctx2, page: page2 } = await newSeededPage({ cache: duoCache(Date.now()), viewport: { width: 390, height: 844 }, file: 'index_preview.html' });
+  await page2.evaluate(() => navigate('stats'));
+  await page2.waitForTimeout(500);
+  const mob = await page2.evaluate(() => {
+    const r = document.querySelector('#statsDuo .sd-row');
+    const vis = [...r.querySelectorAll('.sd-cells > *')].filter(c => c.offsetParent !== null);
+    return { visible: vis.length, lastVisibleIsLatest: vis[vis.length - 1].classList.contains('sd-last'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
+  });
+  check('statsDuo: มือถือโชว์ 4 ช่องล่าสุด (ช่องสุดท้าย = ล่าสุด) และไม่ล้นแนวนอน', mob.visible === 4 && mob.lastVisibleIsLatest && mob.sw <= mob.cw, JSON.stringify(mob));
+  await ctx2.close();
+
+  // ── ครูดู "ทั้งหมด" + มีนักเรียน 2 คน → streak "—" + โน้ตรวมทุกคน; ไม่มีข้อมูล → การ์ดว่าง ──
+  const other = { id: 'att_x', examId: 'm1', examTitle: 'คณิตศาสตร์ ชุดที่ 1', examSubject: 'คณิตศาสตร์', takerName: 'เด็กอีกคน', startedAt: new Date(Date.now() - DAY).toISOString(), score: 10, total: 20, perQuestion: [] };
+  const { ctx: ctx3, page: page3 } = await newSeededPage({ cache: duoCache(Date.now(), [other]), viewport: { width: 1180, height: 820 }, file: 'index_preview.html' });
+  await page3.evaluate(() => navigate('stats'));
+  await page3.waitForTimeout(500);
+  const multi = await page3.evaluate(() => ({ streak: document.querySelectorAll('#statsDuo .sd-tile')[3]?.textContent || '', note: document.querySelector('#statsDuo .sd-ct')?.textContent || '' }));
+  check('statsDuo: ครูดูทั้งหมด (2 คน) → streak "—" + โน้ต "รวมนักเรียนทุกคน"', multi.streak.includes('—') && multi.note.includes('รวมนักเรียนทุกคน'), JSON.stringify(multi));
+  await page3.evaluate(() => { Store._cache.attempts = []; navigate('stats'); });
+  await page3.waitForTimeout(400);
+  const empty = await page3.evaluate(() => document.getElementById('statsDuo').textContent);
+  check('statsDuo: ไม่มีข้อมูล → การ์ด "ยังไม่มีผลการฝึกในช่วงนี้"', empty.includes('ยังไม่มีผลการฝึกในช่วงนี้'), empty.slice(0, 80));
+  await ctx3.close();
 }
 
 // ─────────────────────────────────────────────────────────────────
