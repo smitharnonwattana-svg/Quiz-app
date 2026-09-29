@@ -73,6 +73,14 @@ git remote set-url origin https://github.com/smitharnonwattana-svg/Quiz-app.git
 - Firebase project nanont-exam: ใช้สำหรับ Cloud Functions เท่านั้น (ไม่ใช้ Firebase Hosting)
 - _headers: deprecated ไม่ได้ใช้แล้ว
 
+### ⚠️ ค้างไว้เตือน: Cloud Build worker VM release channel (deadline 28 มี.ค. 2027)
+Google Cloud ส่งอีเมลแจ้ง (ก.ย. 2026) ว่าโปรเจกต์ `nanont-exam` อยู่ในลิสต์ที่ได้รับผลกระทบ —
+Cloud Build (ระบบเบื้องหลังตอน `firebase deploy --only functions`) จะเปลี่ยน default worker VM
+เป็นช่องทาง `regular` (อัปเดต Docker/Debian ของเครื่อง build เร็วขึ้น) ตั้งแต่ **28 มี.ค. 2027**
+ไม่กระทบ dependency ใน `functions/package.json` ที่คุมเองอยู่แล้ว ความเสี่ยงต่ำ — แค่เผื่อไว้:
+ถ้าใกล้ช่วงต้นปี 2027 แล้วจะแก้ `functions/index.js` อีกครั้ง ให้ลอง deploy ทดสอบผ่าน Cloud
+Shell ตามขั้นตอนปกติก่อน เพื่อเช็คว่ายังผ่านปกติก่อน deadline (ลบโน้ตนี้ได้หลังผ่านช่วงนั้นไปแล้ว)
+
 ## PWA Rules
 - App ติดตั้งได้บน iPad/iPhone ผ่าน Safari → Add to Home Screen
 - manifest.json และ icon.svg อยู่ที่ repo root
