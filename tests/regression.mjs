@@ -3357,15 +3357,17 @@ currentSection = 'statsDuo';
   }));
   check('statsDuo: การ์ดรายวิชาเดิม (#statsSubjAvg) ย้ายไปอยู่หลังรายการ และยังเรนเดอร์อยู่', layout.subjAfterRows && layout.subjStillRenders, JSON.stringify(layout));
 
-  // ✓ badge "แก้จุดอ่อนแล้ว" — m6 (55%, 16 ก.ย.) มี weakness_practice ทีหลัง ต้องขึ้น ✓ เฉพาะช่องนั้น
+  // ✓ badge "แก้จุดอ่อนแล้ว" — m6 (55%, 11 วันก่อน) มี weakness_practice ทีหลัง ต้องขึ้น ✓ เฉพาะช่องนั้น
   // ช่องเดียว ไม่ใช่ทุกช่อง, ไม่กระทบตัวเลข % เดิม, และมี legend อธิบายไว้ด้วย
   const badgeInfo = await page.evaluate(() => {
+    // m6 = 11 วันก่อน — คำนวณวันที่จากเวลาปัจจุบัน (ห้ามฮาร์ดโค้ดเดือน ไม่งั้นพังข้ามเดือน)
+    const m6d = new Date(Date.now() - 11 * 86400000).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
     const mathCells = [...document.querySelectorAll('#statsDuo .sd-row')[0].querySelectorAll('button.sd-cell')];
     return {
       totalFixedBadges: document.querySelectorAll('#statsDuo .sd-card .sd-fixed').length - 1, // -1 กัน badge ตัวอย่างใน legend
-      m6HasBadge: mathCells.some(c => c.textContent.includes('55%') && c.textContent.includes('16 ก.ย.') && c.querySelector('.sd-fixed')),
-      m6Label: mathCells.find(c => c.textContent.includes('55%') && c.textContent.includes('16 ก.ย.'))?.getAttribute('aria-label') || '',
-      othersClean: mathCells.filter(c => !(c.textContent.includes('55%') && c.textContent.includes('16 ก.ย.'))).every(c => !c.querySelector('.sd-fixed')),
+      m6HasBadge: mathCells.some(c => c.textContent.includes('55%') && c.textContent.includes(m6d) && c.querySelector('.sd-fixed')),
+      m6Label: mathCells.find(c => c.textContent.includes('55%') && c.textContent.includes(m6d))?.getAttribute('aria-label') || '',
+      othersClean: mathCells.filter(c => !(c.textContent.includes('55%') && c.textContent.includes(m6d))).every(c => !c.querySelector('.sd-fixed')),
       legendHasNote: document.querySelector('#statsDuo .sd-legend')?.textContent.includes('แก้จุดอ่อนแล้ว'),
     };
   });
@@ -3628,6 +3630,229 @@ currentSection = 'examCardIcons';
 }
 
 // ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// Section: ตัวเลือกที่ 5 "จ" (ต่อข้อ) — ปุ่ม + ในหน้ากรอกเฉลย กดค้าง 2 วิ สลับ + ⇄ จ
+// เก็บเป็น 'E' + q.optCount===5 ; ข้อเก่าไม่มีฟิลด์ = 4 ตัวเหมือนเดิม
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'choiceE';
+{
+  const CE_FILE = 'index_preview.html';
+  const mkQE = () => [
+    { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: '', B: '', C: '', D: '' } },
+    { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: { A: '', B: '', C: '', D: '' } },
+    { id: 'q3', no: 3, number: 3, page: 1, correct: 'C', choices: { A: '', B: '', C: '', D: '' } },
+  ];
+
+  // ── editor: กดค้างสลับ + ⇄ จ ──
+  {
+    const { ctx, page } = await newSeededPage({
+      file: CE_FILE, viewport: { width: 1280, height: 900 },
+      cache: baseCache({ exams: [mkExam('ce1', 'ทดสอบ 5 ตัวเลือก', 'วิทยาศาสตร์', { questionCount: 3 })], questions: { ce1: mkQE() } }),
+    });
+    await page.evaluate(() => navigate('admin_editor', { id: 'ce1' }));
+    await page.waitForTimeout(500);
+    const cnt = await page.evaluate(() => ({
+      plus: document.querySelectorAll('#editorTbody .optToggle').length,
+      btns: document.querySelectorAll('#editorTbody .correctBtn').length,
+    }));
+    check('choiceE editor: ทุกแถวมีปุ่ม + (3) และปุ่ม ก-ง ยังมี 4 ปุ่มต่อแถว (12)', cnt.plus === 3 && cnt.btns === 12, JSON.stringify(cnt));
+
+    const box = async (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, sel);
+    const rowSel = (n, cls) => `#editorTbody tr:nth-child(${n}) ${cls}`;
+    const saved = async () => { await page.evaluate(() => document.getElementById('editorSave').click()); await page.waitForTimeout(200); return page.evaluate(() => Store.load().questions['ce1'].map(q => ({ c: q.correct, o: q.optCount }))); };
+
+    // แตะสั้น → ไม่สลับ
+    await page.evaluate((s) => document.querySelector(s).click(), rowSel(1, '.optToggle'));
+    check('choiceE editor: แตะ + สั้นๆ ไม่เพิ่ม จ', (await page.evaluate(() => document.querySelectorAll('#editorTbody .optE').length)) === 0);
+
+    // ปล่อยก่อน 2 วิ → ไม่สลับ
+    let p = await box(rowSel(1, '.optToggle'));
+    await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.waitForTimeout(1400); await page.mouse.up(); await page.waitForTimeout(200);
+    check('choiceE editor: กดค้างแค่ 1.4 วิ แล้วปล่อย → ยังเป็น +', (await page.evaluate(() => document.querySelectorAll('#editorTbody .optE').length)) === 0);
+
+    // ขยับนิ้ว/เมาส์ระหว่างกด (เช่นเลื่อนตาราง) → ยกเลิก
+    p = await box(rowSel(1, '.optToggle'));
+    await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.waitForTimeout(400); await page.mouse.move(p.x + 3, p.y + 30); await page.waitForTimeout(1900); await page.mouse.up(); await page.waitForTimeout(200);
+    check('choiceE editor: ขยับ >8px ระหว่างกดค้าง → ไม่สลับ', (await page.evaluate(() => document.querySelectorAll('#editorTbody .optE').length)) === 0);
+
+    // กดค้าง 2.1 วิ → เป็น จ (เฉพาะข้อ 1)
+    p = await box(rowSel(1, '.optToggle'));
+    await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.waitForTimeout(2150); await page.mouse.up(); await page.waitForTimeout(250);
+    const after1 = await page.evaluate(() => ({
+      e: document.querySelectorAll('#editorTbody .optE').length,
+      row1: document.querySelector('#editorTbody tr:nth-child(1) .optE')?.textContent,
+      plus: document.querySelectorAll('#editorTbody .optToggle').length,
+      sel: document.querySelector('#editorTbody tr:nth-child(1) .optE')?.classList.contains('selected'),
+    }));
+    check('choiceE editor: กดค้าง 2 วิ → ข้อ 1 เป็นปุ่ม จ, ข้ออื่นยังเป็น +', after1.e === 1 && after1.row1 === 'จ' && after1.plus === 2, JSON.stringify(after1));
+    check('choiceE editor: ปล่อยนิ้วหลังสลับ ไม่เลือก จ เป็นเฉลยทันที (กลืน click)', after1.sel === false, JSON.stringify(after1));
+    let s = await saved();
+    check('choiceE editor: บันทึกแล้ว q1.optCount=5, ข้ออื่นไม่มี optCount, เฉลยเดิมไม่เปลี่ยน', s[0].o === 5 && s[1].o === undefined && s[2].o === undefined && s[0].c === 'A', JSON.stringify(s));
+
+    // แตะ จ → เป็นเฉลย E
+    await page.evaluate((s) => document.querySelector(s).click(), rowSel(1, '.optE'));
+    s = await saved();
+    check('choiceE editor: แตะ จ → q.correct==="E"', s[0].c === 'E', JSON.stringify(s));
+
+    // กดค้าง จ → กลับเป็น + และล้างเฉลย E
+    p = await box(rowSel(1, '.optE'));
+    await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.waitForTimeout(2150); await page.mouse.up(); await page.waitForTimeout(250);
+    s = await saved();
+    const back = await page.evaluate(() => ({ e: document.querySelectorAll('#editorTbody .optE').length, plus: document.querySelectorAll('#editorTbody .optToggle').length }));
+    check('choiceE editor: กดค้าง จ 2 วิ → กลับเป็น + และล้างเฉลย E (optCount หาย)', back.e === 0 && back.plus === 3 && s[0].o === undefined && s[0].c === '', JSON.stringify({ back, s }));
+    await ctx.close();
+  }
+
+  // มือถือ: 5 ปุ่มในแถวเดียวไม่ล้น
+  {
+    const { ctx, page } = await newSeededPage({
+      file: CE_FILE, viewport: { width: 375, height: 800 },
+      cache: baseCache({ exams: [mkExam('ce1', 'ทดสอบ 5 ตัวเลือก', 'วิทยาศาสตร์', { questionCount: 3 })], questions: { ce1: mkQE().map((q, i) => i === 0 ? { ...q, optCount: 5 } : q) } }),
+    });
+    await page.evaluate(() => navigate('admin_editor', { id: 'ce1' }));
+    await page.waitForTimeout(500);
+    const m = await page.evaluate(() => {
+      const cell = document.querySelector('#editorTbody tr:nth-child(1) .correctBtns');
+      const bs = [...cell.children].map(b => b.getBoundingClientRect());
+      const wrap = document.querySelector('#page-admin_editor .tableBox');
+      return { n: bs.length, minW: Math.min(...bs.map(b => b.width)), sameRow: new Set(bs.map(b => Math.round(b.y))).size, overflow: wrap.scrollWidth > wrap.clientWidth + 1 };
+    });
+    check('choiceE editor มือถือ 375px: 5 ปุ่มอยู่แถวเดียว กว้าง ≥30px ไม่ล้นแนวนอน', m.n === 5 && m.sameRow === 1 && m.minW >= 30 && !m.overflow, JSON.stringify(m));
+    await ctx.close();
+  }
+
+  // ── หน้าทำข้อสอบ: ข้อ 5 ตัวเลือก + ให้คะแนน ──
+  {
+    const cache = baseCache({
+      exams: [mkExam('ce2', 'ชุด 5 ตัวเลือก', 'วิทยาศาสตร์', { questionCount: 2 })],
+      questions: { ce2: [
+        { id: 'q1', no: 1, number: 1, page: 1, correct: 'E', optCount: 5, choices: { A: '', B: '', C: '', D: '' } },
+        { id: 'q2', no: 2, number: 2, page: 1, correct: 'A', choices: { A: '', B: '', C: '', D: '' } },
+      ] },
+    });
+    const { ctx, page } = await newSeededPage({ file: CE_FILE, cache, viewport: { width: 390, height: 844 } });
+    await page.evaluate(() => navigate('take', { id: 'ce2', takerName: 'เด็กจ' }));
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { const b = document.getElementById('takeStartBtn') || [...document.querySelectorAll('button')].find(x => /เริ่ม/.test(x.textContent)); if (b && !window._takeState?.started) b.click(); });
+    await page.waitForTimeout(500);
+    const labels = () => page.evaluate(() => [...document.querySelectorAll('#takeChoices .choice')].map(e => e.textContent.trim()));
+    check('choiceE take: ข้อ 1 (optCount=5) มีตัวเลือก ก ข ค ง จ', JSON.stringify(await labels()) === JSON.stringify(['ก', 'ข', 'ค', 'ง', 'จ']), JSON.stringify(await labels()));
+    const lay = await page.evaluate(() => {
+      const cs = [...document.querySelectorAll('#takeChoices .choice')].map(e => e.getBoundingClientRect());
+      const wrap = document.getElementById('takeChoices').getBoundingClientRect();
+      const last = cs[4];
+      return { n: cs.length, lastFull: Math.abs(last.width - wrap.width) < 3, rows: new Set(cs.map(c => Math.round(c.y))).size, tall: Math.min(...cs.map(c => c.height)) };
+    });
+    check('choiceE take มือถือ: จ เต็มแถวล่าง (2+2+1 = 3 แถว) และกดได้สูง ≥28px', lay.n === 5 && lay.lastFull && lay.rows === 3 && lay.tall >= 28, JSON.stringify(lay));
+    await page.evaluate(() => [...document.querySelectorAll('#takeChoices .choice')].find(e => e.textContent.trim() === 'จ').click());
+    await page.waitForTimeout(150);
+    check('choiceE take: เลือก จ แล้วเก็บเป็น E', (await page.evaluate(() => _takeState.answers['q1'])) === 'E');
+    await page.evaluate(() => document.querySelectorAll('#takeNums .numBtn')[1].click());
+    await page.waitForTimeout(150);
+    check('choiceE take: ข้อ 2 (ไม่มี optCount) ยังมี 4 ตัวเลือก', (await labels()).length === 4, JSON.stringify(await labels()));
+    await page.evaluate(() => [...document.querySelectorAll('#takeChoices .choice')].find(e => e.textContent.trim() === 'ก').click());
+    await page.waitForTimeout(150);
+    await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+    await page.waitForTimeout(500);
+    const att = await page.evaluate(() => Store.load().attempts[0]);
+    check('choiceE take: ส่งแล้ว chosen=E ถูก (เฉลย E) คะแนน 2/2', att && att.score === 2 && att.total === 2 && att.perQuestion[0].chosen === 'E' && att.perQuestion[0].isCorrect === true, JSON.stringify(att && { s: att.score, t: att.total, p0: att.perQuestion[0] }));
+
+    // ── หน้าทบทวน ──
+    await page.evaluate((id) => navigate('review', { attemptId: id }), att.id);
+    await page.waitForTimeout(500);
+    const pills = await page.evaluate(() => ({
+      q1: [...document.querySelectorAll('#rq-1 .qPill')].map(e => e.textContent.trim() + ':' + e.className.replace('qPill', '').trim()),
+      q2: [...document.querySelectorAll('#rq-2 .qPill')].map(e => e.textContent.trim()),
+    }));
+    check('choiceE review: ข้อ 5 ตัวมี pill จ (ถูกที่เลือก), ข้อ 4 ตัวไม่มี pill จ',
+      pills.q1.length === 5 && pills.q1[4] === 'จ:chosen-correct' && pills.q2.length === 4, JSON.stringify(pills));
+    await ctx.close();
+  }
+
+  // review ของ attempt เก่าที่เคยเลือก E แต่ข้อถูกสลับกลับเป็น 4 ตัวแล้ว → ยังเห็น pill จ
+  {
+    const cache = baseCache({
+      exams: [mkExam('ce3', 'ชุดเก่า', 'วิทยาศาสตร์', { questionCount: 1 })],
+      questions: { ce3: [{ id: 'q1', no: 1, number: 1, page: 1, correct: 'E', choices: {} }] },
+      attempts: [{ id: 'att_ce3', examId: 'ce3', examTitle: 'ชุดเก่า', examSubject: 'วิทยาศาสตร์', takerName: 'ครู', startedAt: new Date().toISOString(), submittedAt: new Date().toISOString(), usedSeconds: 60, score: 0, total: 1,
+        answers: { q1: 'A' }, perQuestion: [{ qid: 'q1', no: 1, chosen: 'A', correct: 'E', isCorrect: false }] }],
+    });
+    const { ctx, page } = await newSeededPage({ file: CE_FILE, cache });
+    await page.evaluate(() => navigate('review', { attemptId: 'att_ce3' }));
+    await page.waitForTimeout(500);
+    const n = await page.evaluate(() => document.querySelectorAll('#rq-1 .qPill').length);
+    check('choiceE review: เฉลยเป็น E แต่ข้อไม่มี optCount → ยังโชว์ pill จ (5)', n === 5, String(n));
+    await ctx.close();
+  }
+
+  // ── แก้จุดอ่อน (practice) ──
+  {
+    const cache = baseCache({
+      exams: [mkExam('ce4', 'ชุดฝึก 5 ตัวเลือก', 'วิทยาศาสตร์', { questionCount: 1, pdfUrl: 'about:blank' })],
+      questions: { ce4: [{ id: 'q1', no: 1, number: 1, page: 1, correct: 'E', optCount: 5, choices: {} }] },
+    });
+    const { ctx, page } = await newSeededPage({ file: CE_FILE, cache, role: 'student', name: 'เด็กฝึก' });
+    await page.evaluate(() => {
+      WeaknessTracker.updateWeaknessAfterSubmit({
+        takerName: 'เด็กฝึก', examId: 'ce4', examTitle: 'ชุดฝึก 5 ตัวเลือก', examSubject: 'วิทยาศาสตร์',
+        submittedAt: new Date().toISOString(), perQuestion: [{ no: 1, isCorrect: false }],
+      });
+      navigate('practice', { examId: 'ce4' });
+    });
+    await page.waitForTimeout(600);
+    const pl = await page.evaluate(() => [...document.querySelectorAll('#pracChoices .choice')].map(e => e.textContent.trim()));
+    check('choiceE practice: ข้อ 5 ตัวมีปุ่ม ก ข ค ง จ', JSON.stringify(pl) === JSON.stringify(['ก', 'ข', 'ค', 'ง', 'จ']), JSON.stringify(pl));
+    await page.evaluate(() => [...document.querySelectorAll('#pracChoices .choice')].find(e => e.textContent.trim() === 'จ').click());
+    await page.evaluate(() => document.getElementById('pracConfirmBtn').click());
+    await page.waitForTimeout(300);
+    const res = await page.evaluate(() => _pracState && _pracState.answers[0]);
+    check('choiceE practice: ยืนยัน จ ถูกต้อง (chosen=E, isCorrect)', res && res.chosen === 'E' && res.isCorrect === true, JSON.stringify(res));
+    await ctx.close();
+  }
+
+  // ── ทำย้อนหลัง (backfill) ──
+  {
+    const cache = baseCache({
+      exams: [mkExam('ce5', 'ชุดย้อนหลัง 5 ตัวเลือก', 'วิทยาศาสตร์', { questionCount: 2 })],
+      questions: { ce5: [
+        { id: 'q1', no: 1, number: 1, page: 1, correct: 'E', optCount: 5, choices: {} },
+        { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: {} },
+      ] },
+      members: [{ pin: '311257', name: 'เด็กย้อนหลัง' }],
+    });
+    const { ctx, page } = await newSeededPage({ file: CE_FILE, cache });
+    await page.evaluate(() => navigate('admin_exams', {}));
+    await page.waitForTimeout(400);
+    await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+    await page.evaluate(() => document.querySelector('[data-backfill="ce5"]').click());
+    await page.waitForTimeout(300);
+    const bf = await page.evaluate(() => ({
+      q1: document.querySelectorAll('.correctBtns[data-qid="q1"] .correctBtn').length,
+      q2: document.querySelectorAll('.correctBtns[data-qid="q2"] .correctBtn').length,
+      hint: document.querySelector('#backfillRows')?.textContent.includes('จ'),
+    }));
+    check('choiceE backfill: ข้อ optCount=5 มี 5 ปุ่ม, ข้อปกติ 4 ปุ่ม', bf.q1 === 5 && bf.q2 === 4, JSON.stringify(bf));
+    await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="E"]').click());
+    await page.evaluate(() => document.querySelector('.correctBtns[data-qid="q2"] .correctBtn[data-val="B"]').click());
+    const saveBtn = await page.evaluate(() => { const b = document.getElementById('backfillSaveBtn') || [...document.querySelectorAll('#backfillModal button')].find(x => /บันทึก/.test(x.textContent)); if (b) b.click(); return !!b; });
+    await page.waitForTimeout(500);
+    const at = await page.evaluate(() => Store.load().attempts[0]);
+    check('choiceE backfill: บันทึก chosen=E ถูก คะแนน 2/2', saveBtn && at && at.score === 2 && at.perQuestion[0].chosen === 'E', JSON.stringify(at && { s: at.score, p0: at.perQuestion && at.perQuestion[0] }));
+    await ctx.close();
+  }
+
+  // ── นำเข้าเฉลย: normalizeAnswer ──
+  {
+    const { ctx, page } = await newSeededPage({ file: CE_FILE, cache: baseCache() });
+    const n = await page.evaluate(() => ['5', 'จ', 'E', 'e', '4', 'ง', 'D', '6', 'ฉ', ''].map(v => normalizeAnswer(v)));
+    check('choiceE import: normalizeAnswer รับ 5/จ/E→E, 1-4/ก-ง/A-D เดิมยังถูก, ค่าอื่นเป็น null',
+      JSON.stringify(n) === JSON.stringify(['E', 'E', 'E', 'E', 'D', 'D', 'D', null, null, null]), JSON.stringify(n));
+    const lt = await page.evaluate(() => ({ a: getQLetters({}).length, b: getQLetters({ optCount: 5 }).length, c: getQLetters(null).length, d: getQLetters({ optCount: 4 }).length }));
+    check('choiceE legacy: getQLetters ข้อไม่มี optCount = 4 ตัว, optCount=5 = 5 ตัว', lt.a === 4 && lt.b === 5 && lt.c === 4 && lt.d === 4, JSON.stringify(lt));
+    await ctx.close();
+  }
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

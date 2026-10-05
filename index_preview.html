@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.65p -->
+  <!-- APP_VERSION: v48.66p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -86,6 +86,7 @@
     .takeRight{overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
     .stickyBar{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border);padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;}
     .choice{display:flex;align-items:center;justify-content:center;gap:0;border:2px solid var(--border);border-radius:12px;padding:14px 0;cursor:pointer;transition:all .15s;background:#fff;font-weight:900;font-size:18px;min-width:0;}
+    #pracChoices .choice:last-child:nth-child(odd){grid-column:1 / -1;}
     .choice:hover{border-color:#9ca3af;background:#f9fafb;}
     .choice.active{border-color:var(--black);background:var(--black);color:#fff;}
     .gridNums{display:flex;flex-wrap:wrap;gap:6px;}
@@ -111,7 +112,7 @@
       .takeRight > .takeChoicesBlock{flex-shrink:0;border-bottom:1px solid var(--border);}
       .takeRight > .takeNumsWrap{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;}
       /* ก ข ค ง แนวนอน desktop/iPad */
-      #takeChoices{display:grid;grid-template-columns:repeat(4,1fr) !important;gap:8px !important;}
+      #takeChoices{display:grid;grid-template-columns:repeat(var(--n,4),1fr) !important;gap:8px !important;}
       .choice{padding:16px 0 !important;font-size:18px !important;border-radius:12px !important;text-align:center !important;}
       /* nav buttons — grid 3 คอลัมน์ ความกว้างคงที่ ไม่ shift เวลา text เปลี่ยน */
       #takePrevBtn,#takeUnsureBtn,#takeNextBtn{padding:12px 10px !important;font-size:14px !important;white-space:nowrap !important;min-width:0 !important;overflow:hidden !important;}
@@ -176,6 +177,10 @@
         border-top:1px solid var(--border);
       }
 
+      /* ชุดที่มีข้อ 5 ตัวเลือก (ก ข / ค ง / จ = 3 แถว) → โซนปุ่มตอบสูงขึ้น */
+      .takeRoot.has5 .takeLeft{ flex:0 0 76vh; height:76vh; }
+      .takeRoot.has5 .takeRight{ flex:0 0 24vh; height:24vh; }
+
       /* ROW 1 — Header bar (stickyBar) */
       .takeRight .stickyBar {
         display: flex !important;
@@ -231,12 +236,14 @@
       #takeChoices{
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        grid-template-rows: 1fr 1fr !important;
+        grid-template-rows: repeat(var(--rows,2), 1fr) !important;
         gap: 5px !important;
         flex: 1 !important;
         min-width: 0 !important;
         align-self: stretch !important;
       }
+      /* ข้อ 5 ตัวเลือก: จ เต็มแถวล่าง (2+2+1) */
+      #takeChoices .choice:last-child:nth-child(odd){ grid-column: 1 / -1; }
       .choice{
         padding:0 8px !important;
         font-size:17px !important;
@@ -507,6 +514,12 @@
     .iPadBtnGhost{background:#f9fafb;font-size:15px;font-weight:600;color:#374151;border-color:#e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,.05);}
     .correctBtn:hover{border-color:#9ca3af;background:#f3f4f6;}
     .correctBtn.selected{background:var(--black);border-color:var(--black);color:#fff;}
+    /* ปุ่ม + / จ (ตัวเลือกที่ 5 ต่อข้อ) — กดค้าง 2 วิเพื่อสลับ มีแถบเติมสีบอกความคืบหน้า */
+    .optToggle,.correctBtn.optE{position:relative;overflow:hidden;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
+    .optToggle{width:34px;height:30px;border:1px dashed #9ca3af;border-radius:8px;background:#fff;color:#6b7280;cursor:pointer;font-weight:700;font-size:16px;font-family:inherit;transition:all .12s;}
+    .optToggle:hover{border-color:#6b7280;background:#f3f4f6;}
+    .optToggle.holding,.correctBtn.optE.holding{background-image:linear-gradient(#f59e0b,#f59e0b);background-repeat:no-repeat;background-position:left bottom;animation:optHold 2s linear forwards;}
+    @keyframes optHold{from{background-size:100% 0%}to{background-size:100% 100%}}
     .freeBtn{min-width:38px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;transition:all .12s;padding:0 8px;}
     .freeBtn:hover{border-color:#f59e0b;background:#fffbeb;}
     .freeBtn.active{background:#f59e0b;border-color:#f59e0b;color:#fff;}
@@ -815,12 +828,13 @@
       }
       #page-admin_editor table td:nth-child(3) .correctBtns {
         display: grid !important;
-        grid-template-columns: repeat(4, 1fr) !important;
+        grid-template-columns: repeat(5, 1fr) !important; /* ช่องที่ 5 = ปุ่ม + / จ (ตัวเลือกที่ 5 ต่อข้อ) */
         gap: 5px !important;
         width: 100% !important;
         min-width: 0 !important;
       }
-      #page-admin_editor table td:nth-child(3) .correctBtn {
+      #page-admin_editor table td:nth-child(3) .correctBtn,
+      #page-admin_editor table td:nth-child(3) .optToggle {
         width: 100% !important;
         min-width: 0 !important;
         height: auto !important;
@@ -896,7 +910,8 @@
          table.weighted td:nth-child(6) ที่ display:none อยู่ด้านบนแล้ว ครอบคลุมโหมดนี้ไว้แล้ว
          ไม่ต้องเพิ่มกฎซ้ำ) */
       /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
-      #page-admin_editor table.weighted td:nth-child(3) .correctBtn {
+      #page-admin_editor table.weighted td:nth-child(3) .correctBtn,
+      #page-admin_editor table.weighted td:nth-child(3) .optToggle {
         height: auto !important;
         padding: 8px 0 !important;
         font-size: 14px !important;
@@ -1386,7 +1401,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.65p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.66p</div>
     </div>
   </div>
 </div>
@@ -5932,6 +5947,8 @@ function initTake(id){
   const qsList=(s.questions[id]||[]).map(q=>({...q, no: q.no??q.number??0}))
     .filter(q=>!_qidSubset || _qidSubset.has(q.id));
   const total=qsList.length;
+  // ชุดที่มีข้อ 5 ตัวเลือก: มือถือเพิ่มความสูงโซนปุ่มตอบทั้งชุด (กัน PDF กระโดดตอนสลับข้อ) — ดู .takeRoot.has5 ใน CSS
+  { const _tr=document.querySelector('#page-take .takeRoot'); if(_tr) _tr.classList.toggle('has5', qsList.some(q=>q.optCount===5)); }
   const attemptId='att_'+Math.random().toString(16).slice(2);
   const LAST_TAKER_KEY='nanont:lastTakerName';
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
@@ -6111,7 +6128,7 @@ function initTake(id){
     });
   }
 
-  const labelMap={A:'ก',B:'ข',C:'ค',D:'ง'};
+  const labelMap=CHOICE_LABELS;
 
   function render(){
     const q=qsList[st.currentIndex];
@@ -6216,7 +6233,10 @@ function initTake(id){
       wrap.style.removeProperty('grid-template-columns');
       wrap.style.removeProperty('grid-template-rows');
       wrap.style.removeProperty('align-content');
-      ['A','B','C','D'].forEach(lab=>{
+      const _letters=getQLetters(q);
+      wrap.style.setProperty('--n',String(_letters.length));
+      wrap.style.setProperty('--rows',_letters.length>4?'3':'2');
+      _letters.forEach(lab=>{
         const div=document.createElement('label');
         div.className='choice'+((st.answers[q.id]===lab)?' active':'');
         if(!st.started){div.style.opacity='0.6';div.style.pointerEvents='none';}
@@ -7009,8 +7029,8 @@ function initReview(attemptId){
   // ที่มีอยู่แล้วใน initTake/initStats แต่ตัวนั้น local scope ในฟังก์ชันตัวเอง เรียกจาก
   // initReview ไม่ได้ เลยต้องมีสำเนาเล็กๆ ในนี้อีกชุด (ตาม pattern เดิมของไฟล์นี้)
   function _fmtQTime(sec){sec=Math.max(0,Math.floor(sec||0));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');}
-  const KEYS=['ก','ข','ค','ง'];
-  const KEY_TO_LETTER={ก:'A',ข:'B',ค:'C',ง:'D'};
+  const KEYS=['ก','ข','ค','ง','จ'];
+  const KEY_TO_LETTER={ก:'A',ข:'B',ค:'C',ง:'D',จ:'E'};
   qs.forEach((q)=>{
     // weakness_practice ไม่มี att.answers เลย (savePracticeSession เก็บแค่ perQuestion) —
     // fallback ไปหา perQuestion.chosen โดย match เลขข้อ เหมือน pattern ของ isCorrectQ()/
@@ -7067,7 +7087,9 @@ function initReview(attemptId){
         </div>`;
       }
     } else {
-      pillsHtml=KEYS.map(key=>{
+      // จ (E) โชว์เฉพาะข้อที่มี 5 ตัวเลือก หรือมีคนเลือก/เฉลยเป็น จ อยู่แล้ว (กัน attempt เก่าหายถ้าข้อถูกสลับกลับเป็น 4 ตัว)
+      const _showE=q.optCount===5||correct==='E'||correct==='จ'||chosen==='E'||chosen==='จ';
+      pillsHtml=KEYS.filter(key=>key!=='จ'||_showE).map(key=>{
         const letter=KEY_TO_LETTER[key];
         const isCorr=correct===letter||correct===key;
         const isChosen=chosen===letter||chosen===key;
@@ -8991,7 +9013,7 @@ function initPractice(params){
   const st=_pracState;
   _pracEnterQuestion();
 
-  const labelMap={A:'ก',B:'ข',C:'ค',D:'ง'};
+  const labelMap=CHOICE_LABELS;
   const isGDrive=!!(exam.pdfUrl||'').match(/drive\.google\.com/);
 
   document.getElementById('pracPdfViewer').innerHTML='';
@@ -9118,7 +9140,7 @@ function initPractice(params){
           wrap.appendChild(box);
         } else {
           wrap.style.gridTemplateColumns='';
-          ['A','B','C','D'].forEach(lab=>{
+          getQLetters(q).forEach(lab=>{
             const div=document.createElement('label');
             div.className='choice';
             if(lab===prevAnswer.chosen) div.classList.add('active');
@@ -9196,7 +9218,7 @@ function initPractice(params){
       wrap.style.removeProperty('grid-template-columns');
       wrap.style.removeProperty('grid-template-rows');
       wrap.style.removeProperty('align-content');
-      ['A','B','C','D'].forEach(lab=>{
+      getQLetters(q).forEach(lab=>{
         const div=document.createElement('label');
         div.className='choice';
         div.innerHTML=`<span style="font-weight:900;font-size:15px;">${labelMap[lab]}</span>`;
@@ -9666,7 +9688,7 @@ function openBackfillModal(examId) {
   const dateInput = document.getElementById('backfillDate');
   dateInput.value = new Date().toISOString().slice(0, 10);
 
-  const labelMap = { A: 'ก', B: 'ข', C: 'ค', D: 'ง' };
+  const labelMap = CHOICE_LABELS;
   const isFillNum = exam.examType === 'fillblank-num';
   const numDigits = exam.numDigits || 3;
   const rowsEl = document.getElementById('backfillRows');
@@ -9674,7 +9696,7 @@ function openBackfillModal(examId) {
     const correctHint = q.isFree ? '★ ข้อฟรี' : (isFillNum ? esc(q.correct || '-') : (labelMap[q.correct] || '-'));
     const inputHtml = isFillNum
       ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${numDigits}}" maxlength="${numDigits}" data-qid="${esc(q.id)}" placeholder="ตอบ" style="width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;" />`
-      : `<div class="correctBtns" data-qid="${esc(q.id)}">${['A', 'B', 'C', 'D'].map(v => `<button type="button" class="correctBtn" data-val="${v}">${labelMap[v]}</button>`).join('')}</div>`;
+      : `<div class="correctBtns" data-qid="${esc(q.id)}">${getQLetters(q).map(v => `<button type="button" class="correctBtn" data-val="${v}">${labelMap[v]}</button>`).join('')}</div>`;
     // v48.33p: ปุ่ม "ไม่แน่ใจ" ต่อข้อ — สไตล์เดียวกับ #takeUnsureBtn ในหน้าทำข้อสอบจริง
     // (toggle inline style สี var(--warn) ไม่ใช่ CSS class) ให้ "🧠 Anxiety Markers" ที่
     // หน้ารีวิวมีข้อมูลใช้งานได้เหมือนทำสดจริง
@@ -11287,7 +11309,7 @@ function initAdminNew(){
     if(window._newExcelData && window._newExcelData.length > 0){
       window._newExcelData.forEach(row=>{
         const q=s.questions[id].find(q=>(q.number||q.no)===row.no);
-        if(q){ q.page=row.page; q.correct=row.correct; if(row.topic) q.topic=row.topic; }
+        if(q){ q.page=row.page; q.correct=row.correct; if(row.correct==='E') q.optCount=5; if(row.topic) q.topic=row.topic; }
       });
       window._newExcelData=null;
     }
@@ -11472,7 +11494,7 @@ function initEditor(examId){
         ? 'เปลี่ยนประเภทข้อสอบ? เฉลยที่กรอกไว้ทั้งหมดจะถูกล้าง (รูปแบบคำตอบข้ามประเภทกันไม่ได้)'
         : 'เปลี่ยนประเภทข้อสอบ?')) return;
       exam.examType=newType;
-      list.forEach(q=>{ q.correct=''; });
+      list.forEach(q=>{ q.correct=''; if(newType==='fillblank-num') delete q.optCount; });
       s.questions[examId]=list;
       Store.save(s);
       toast('เปลี่ยนประเภทข้อสอบแล้ว');
@@ -11641,7 +11663,7 @@ function initEditor(examId){
       const _tagOptsHtml='<option value="">— ไม่มี —</option>'+_tagOptsList.map(t=>`<option value="${esc(t)}"${t===_curTag?' selected':''}>${esc(t)}</option>`).join('');
       const _correctCellHtml=_isFillNum
         ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${_numDigits}}" maxlength="${_numDigits}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
-        : `<div class="correctBtns" data-field="correct"><button type="button" class="correctBtn" data-val="A">ก</button><button type="button" class="correctBtn" data-val="B">ข</button><button type="button" class="correctBtn" data-val="C">ค</button><button type="button" class="correctBtn" data-val="D">ง</button></div>`;
+        : `<div class="correctBtns" data-field="correct"></div>`;
       const _ptsCellHtml=exam.weighted
         ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
         : '';
@@ -11673,17 +11695,52 @@ function initEditor(examId){
           });
         }
       } else {
-        const correctVal = q.correct||'';
-        tr.querySelectorAll('.correctBtn').forEach(btn=>{
-          btn.classList.toggle('selected', !!correctVal && btn.getAttribute('data-val')===correctVal);
-          btn.addEventListener('click',(e)=>{
-            e.stopPropagation();
-            select(idx);
-            tr.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
-            btn.classList.add('selected');
-            q.correct=btn.getAttribute('data-val');
+        // ปุ่มเฉลย ก-ง + ช่องที่ 5: "+" (กดค้าง 2 วิ → เป็น จ) / "จ" (กดค้าง 2 วิ → กลับเป็น +)
+        const _cell=tr.querySelector('.correctBtns');
+        let _swallowClick=false;
+        // กลืน click ที่ตามหลังการกดค้างสำเร็จ (ไม่ให้เลือก จ เป็นเฉลยทันทีที่ปล่อยนิ้ว — จะปล่อยช้ากว่า 2 วิแค่ไหนก็ตาม)
+        _cell.addEventListener('click',(e)=>{
+          if(_swallowClick){ e.stopPropagation(); e.preventDefault(); }
+        },true);
+        const _paintCorrectCell=()=>{
+          const _has5=q.optCount===5;
+          _cell.innerHTML=['A','B','C','D'].map(v=>`<button type="button" class="correctBtn" data-val="${v}">${CHOICE_LABELS[v]}</button>`).join('')
+            +(_has5
+              ? `<button type="button" class="correctBtn optE" data-val="E" title="กดค้าง 2 วิ เพื่อลบตัวเลือก จ">จ</button>`
+              : `<button type="button" class="optToggle" title="กดค้าง 2 วิ เพื่อเพิ่มตัวเลือก จ">+</button>`);
+          const correctVal = q.correct||'';
+          _cell.querySelectorAll('.correctBtn').forEach(btn=>{
+            btn.classList.toggle('selected', !!correctVal && btn.getAttribute('data-val')===correctVal);
+            btn.addEventListener('click',(e)=>{
+              e.stopPropagation();
+              select(idx);
+              _cell.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
+              btn.classList.add('selected');
+              q.correct=btn.getAttribute('data-val');
+            });
           });
-        });
+          const _slot=_cell.querySelector(_has5?'.optE':'.optToggle');
+          if(!_has5){
+            _slot.addEventListener('click',(e)=>{ e.stopPropagation(); select(idx); toast('กดค้าง 2 วิ เพื่อเพิ่มตัวเลือก จ'); });
+          }
+          bindOptHold(_slot,()=>{
+            _swallowClick=true;
+            const _release=()=>setTimeout(()=>{ _swallowClick=false; },80);
+            document.addEventListener('pointerup',_release,{once:true,capture:true});
+            document.addEventListener('pointercancel',_release,{once:true,capture:true});
+            if(q.optCount===5){
+              delete q.optCount;
+              if(q.correct==='E'){ q.correct=''; toast('ลบตัวเลือก จ แล้ว (เฉลยข้อนี้ถูกล้าง)'); }
+              else toast('ลบตัวเลือก จ แล้ว');
+            } else {
+              q.optCount=5;
+              toast('เพิ่มตัวเลือก จ แล้ว');
+            }
+            select(idx);
+            _paintCorrectCell();
+          });
+        };
+        _paintCorrectCell();
       }
       const pageInput = tr.querySelector('input[data-field="page"]');
       refs[`${idx}:page`]=pageInput;
@@ -11981,7 +12038,7 @@ function downloadExcelTemplate(qCount, filename, topics, examType, weighted, num
   const _isFillNum=examType==='fillblank-num';
   const _isWeighted=!!weighted;
   const _numDigits=numDigits||3;
-  const _correctHeader=_isFillNum?`เฉลย (ตัวเลข 0-${'9'.repeat(_numDigits)})`:'เฉลย (1/2/3/4)';
+  const _correctHeader=_isFillNum?`เฉลย (ตัวเลข 0-${'9'.repeat(_numDigits)})`:'เฉลย (1/2/3/4 หรือ 5=จ)';
   const _correctSample=_isFillNum?(_numDigits<=3?42:Number('4'.repeat(_numDigits))):1;
   const _header=['ข้อที่', 'หน้า PDF', _correctHeader, 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)'];
   if(_isWeighted) _header.push('คะแนน (ค่าเริ่มต้น 1)');
@@ -12046,15 +12103,34 @@ function downloadExcelTemplate(qCount, filename, topics, examType, weighted, num
 
 // ===================== EXCEL IMPORT =====================
 
-// แปลง 1/2/3/4 หรือ ก/ข/ค/ง หรือ A/B/C/D → A/B/C/D
+// ตัวเลือกคำตอบ: เก็บเป็น A-E (E = "จ" ตัวเลือกที่ 5 เฉพาะข้อที่ q.optCount===5) ตัวไทยมีแค่ตอนแสดงผล
+const CHOICE_LABELS = {A:'ก',B:'ข',C:'ค',D:'ง',E:'จ'};
+function getQLetters(q){ return (q && q.optCount===5) ? ['A','B','C','D','E'] : ['A','B','C','D']; }
+// กดค้าง ms มิลลิวินาทีแล้วเรียก onFire (ยกเลิกถ้าปล่อยก่อน/ขยับ >8px เช่นกำลังเลื่อนตาราง)
+function bindOptHold(btn, onFire, ms){
+  ms=ms||2000;
+  let timer=null, sx=0, sy=0;
+  const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } btn.classList.remove('holding'); };
+  btn.addEventListener('pointerdown',(e)=>{
+    if(e.button!==undefined && e.button!==0) return;
+    cancel(); sx=e.clientX; sy=e.clientY;
+    btn.classList.add('holding');
+    timer=setTimeout(()=>{ timer=null; btn.classList.remove('holding'); onFire(); },ms);
+  });
+  btn.addEventListener('pointermove',(e)=>{ if(timer && Math.hypot(e.clientX-sx,e.clientY-sy)>8) cancel(); });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>btn.addEventListener(t,cancel));
+  btn.addEventListener('contextmenu',(e)=>e.preventDefault());
+}
+
+// แปลง 1/2/3/4/5 หรือ ก/ข/ค/ง/จ หรือ A/B/C/D/E → A/B/C/D/E
 function normalizeAnswer(v) {
   if (!v) return null;
   const s = String(v).trim().toUpperCase();
-  const numMap = {'1':'A','2':'B','3':'C','4':'D'};
+  const numMap = {'1':'A','2':'B','3':'C','4':'D','5':'E'};
   if (numMap[String(v).trim()]) return numMap[String(v).trim()];
-  const thaiMap = {'ก':'A','ข':'B','ค':'C','ง':'D'};
+  const thaiMap = {'ก':'A','ข':'B','ค':'C','ง':'D','จ':'E'};
   if (thaiMap[String(v).trim()]) return thaiMap[String(v).trim()];
-  if (['A','B','C','D'].includes(s)) return s;
+  if (['A','B','C','D','E'].includes(s)) return s;
   return null;
 }
 // parse คำตอบกรอกตัวเลข — รับ string/number → คืน digit string ('042', '7', '') หรือ null ถ้าไม่ใช่ตัวเลข
@@ -12306,6 +12382,7 @@ function bindEditorExcel(examId, list, renderFn, examType, getWeighted, subject,
         if (q) {
           q.page = row.page;
           q.correct = row.correct;
+          if (row.correct === 'E') q.optCount = 5;
           q.isFree = !!row.isFree;
           if(row.topic) q.topic = row.topic;
           if(row.points!=null) q.points = row.points;
@@ -15320,7 +15397,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.65p';
+  const CURRENT_VERSION = 'v48.66p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
