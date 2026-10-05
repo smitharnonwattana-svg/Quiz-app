@@ -3636,7 +3636,7 @@ currentSection = 'examCardIcons';
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'choiceE';
 {
-  const CE_FILE = 'index_preview.html';
+  const CE_FILE = 'index.html';
   const mkQE = () => [
     { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: '', B: '', C: '', D: '' } },
     { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: { A: '', B: '', C: '', D: '' } },
