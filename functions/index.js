@@ -252,16 +252,24 @@ exports.autoBackupMainStore = onSchedule(
   async (event) => {
     const db = admin.firestore();
     const snapshot = await db.collection('app').get();
-    // เลือก mainStore ของเว็บจริงก่อน (local_mainStore = เปิดจาก file:// ตอนพัฒนา)
-    const mainStoreDoc = snapshot.docs.find((doc) => doc.id.endsWith('_mainStore') && !doc.id.startsWith('local_'))
-      || snapshot.docs.find((doc) => doc.id.endsWith('_mainStore'));
-    if (!mainStoreDoc) {
+    // v48.56: ในฐานข้อมูลมี mainStore หลายชุด (origin ละชุด) — มีชุดขยะจากการเปิดแอปผ่านทางอื่น เช่น
+    // com_google_android_apps_nbu_files_provider (ข้อสอบ 0 ชุด) ที่เคยถูกเลือกแทนข้อมูลจริง (find ตัวแรก = เรียงตามตัวอักษร)
+    // จึงสำรองทุกชุดที่ "มีข้อมูลจริง" (มีข้อสอบ/ผลสอบ) แยกตาม origin และข้ามชุด local_ (file:// ตอนพัฒนา)
+    const mainStoreDocs = snapshot.docs.filter((doc) => doc.id.endsWith('_mainStore') && !doc.id.startsWith('local_'));
+    if (!mainStoreDocs.length) {
       console.warn('autoBackupMainStore: mainStore doc not found');
       return;
     }
+    for (const mainStoreDoc of mainStoreDocs) {
+      await backupOneOrigin(db, snapshot, mainStoreDoc);
+    }
+  }
+);
+
+async function backupOneOrigin(db, snapshot, mainStoreDoc) {
     const raw = mainStoreDoc.data()._d;
     if (!raw) {
-      console.warn('autoBackupMainStore: mainStore doc has no data');
+      console.warn('autoBackupMainStore: mainStore doc has no data', mainStoreDoc.id);
       return;
     }
 
@@ -271,11 +279,17 @@ exports.autoBackupMainStore = onSchedule(
     const backupId = `${origin}_backup_auto_${todayKey}`;
 
     // รวม record แยกเข้ากับ mainStore (rec อยู่หน้าสุด ใหม่→เก่า เหมือนในแอป)
-    const store = JSON.parse(raw);
+    let store;
+    try { store = JSON.parse(raw); } catch (e) { console.warn('autoBackupMainStore: bad JSON', mainStoreDoc.id); return; }
     const parseRec = (doc) => { try { return JSON.parse(doc.data()._d || 'null'); } catch (e) { return null; } };
     const byTs = (a, b) => (b._recTs || 0) - (a._recTs || 0);
     const recAtt = snapshot.docs.filter((doc) => doc.id.startsWith(`${origin}_rec_att_`)).map(parseRec).filter((a) => a && a.id);
     const recExam = snapshot.docs.filter((doc) => doc.id.startsWith(`${origin}_rec_exam_`)).map(parseRec).filter((r) => r && r.exam && r.exam.id);
+    // ไม่มีอะไรให้สำรอง (ไม่มีข้อสอบ/ผลสอบ ทั้งในกล่องหลักและ doc แยก) = ชุดขยะ → ข้าม
+    if (!(store.exams || []).length && !(store.attempts || []).length && !recAtt.length && !recExam.length) {
+      console.log('autoBackupMainStore: skip empty origin', origin);
+      return;
+    }
     if (recAtt.length || recExam.length) {
       const attIds = new Set(recAtt.map((a) => a.id));
       const examIds = new Set(recExam.map((r) => r.exam.id));
@@ -315,8 +329,7 @@ exports.autoBackupMainStore = onSchedule(
     });
 
     console.log('autoBackupMainStore: saved', backupId, 'parts:', parts.length, 'rec attempts:', recAtt.length, 'rec exams:', recExam.length);
-  }
-);
+}
 
 // TTL Cleanup — ลบ auto backup ที่เก่ากว่า 14 วัน ที่ 02:30 Bangkok (backup manual ไม่ถูกแตะ)
 exports.cleanupOldAutoBackups = onSchedule(
