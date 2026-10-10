@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.55 -->
+  <!-- APP_VERSION: v48.56 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1371,7 +1371,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.55</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.56</div>
     </div>
   </div>
 </div>
@@ -3435,7 +3435,8 @@ const Store = {
   key:"quizSciDemoStoreV1",   // kept for migration cleanup only
   _cache:null,                 // in-memory store — Firebase is source of truth
   // ── v48.55: แยกที่เก็บ — ผลสอบใหม่/ชุดข้อสอบใหม่ (ติดธง _rec:1 ตอนสร้าง) เก็บ 1 รายการต่อ 1 doc ──
-  // app/<origin>_rec_att_<id> = attempt, app/<origin>_rec_exam_<id> = {exam, questions}
+  // app/<origin>_rec_att_<ปี>_<เดือน>_<id> = attempt, app/<origin>_rec_exam_<id> = {exam, questions}
+  // v48.56: ชื่อ doc ผลสอบขึ้นต้นด้วยปี-เดือนที่บันทึก (เวลาไทย) → วันหลังโหลดเฉพาะเดือนล่าสุดด้วย prefix range ได้โดยไม่ต้องย้ายข้อมูล
   // ข้อมูลเก่าอยู่ใน mainStore เหมือนเดิม (ไม่ย้าย/ไม่แตะ) — ในหน่วยความจำรวมกันเป็นรูปแบบเดิม หน้าอื่นไม่ต้องรู้
   // map ด้านล่างเป็น "เจ้าของ" record แยก: ทุกจุดที่แทนที่ _cache ต้องเรียก _attachRecs ใส่กลับเข้าไป
   _recAtt:new Map(),           // attemptId → attempt
@@ -3445,7 +3446,16 @@ const Store = {
   _allowDrop:new Set(),        // record เก่าใน mainStore ที่ผู้ใช้สั่งลบจริง (ผ่าน deleteRecords) — ด่านกันหายหมู่ปล่อยผ่าน
   _mainIds:null,               // id ผลสอบ/ข้อสอบใน mainStore ล่าสุดที่รู้จาก cloud — ใช้กับด่านกันหายหมู่
   _recSafe(id){ return String(id).replace(/[^A-Za-z0-9_-]/g,'_'); },
-  _recDocId(k,id){ return (k==='exam'?'rec_exam_':'rec_att_')+this._recSafe(id); },
+  // เดือนของผลสอบ (เวลาไทย) จาก _recTs — คงที่ตลอดอายุ record (ไม่มีใครแก้ _recTs) ชื่อ doc จึงไม่เปลี่ยน
+  _recMonth(a){
+    const ts=(a&&a._recTs)||Date.parse(a&&a.submittedAt)||0;
+    return new Date(ts+7*3600e3).toISOString().slice(0,7).replace('-','_');
+  },
+  // v = attempt (ผลสอบต้องรู้เดือน) — ไม่ส่งมาจะหาใน map
+  _recDocId(k,id,v){
+    if(k==='exam') return 'rec_exam_'+this._recSafe(id);
+    return 'rec_att_'+this._recMonth(v||this._recAtt.get(id))+'_'+this._recSafe(id);
+  },
   _recHash(v){
     const str=JSON.stringify(v)||'';
     let h1=0xdeadbeef, h2=0x41c6ce57;
@@ -3471,7 +3481,7 @@ const Store = {
     FirebaseSync.saveDoc(docId,v).then(ok=>{ if(ok) this._recPendingClear(docId); else this._recPending(docId,'save'); });
   },
   _recValueByDocId(docId){
-    if(docId.startsWith('rec_att_')){ for(const [id,a] of this._recAtt) if(this._recDocId('att',id)===docId) return a; }
+    if(docId.startsWith('rec_att_')){ for(const [id,a] of this._recAtt) if(this._recDocId('att',id,a)===docId) return a; }
     else if(docId.startsWith('rec_exam_')){ for(const [id,r] of this._recExam) if(this._recDocId('exam',id)===docId) return r; }
     return null;
   },
@@ -3492,7 +3502,7 @@ const Store = {
     const writes=[];
     if(Array.isArray(data.attempts)) data.attempts.forEach((a,i)=>{
       if(!a||!a._rec||!a.id||this._recDeleted.has('att:'+a.id)) return;
-      const docId=this._recDocId('att',a.id), cur=this._recAtt.get(a.id), sd=this._recSeen.get(docId), h=this._recHash(a);
+      const docId=this._recDocId('att',a.id,a), cur=this._recAtt.get(a.id), sd=this._recSeen.get(docId), h=this._recHash(a);
       if(sd&&h===sd.latest){ if(cur&&cur!==a) data.attempts[i]=cur; return; }
       if(cur&&cur!==a&&sd&&sd.hist.includes(h)){ data.attempts[i]=cur; return; }
       this._recAtt.set(a.id,a); this._recMark(docId,h); writes.push([docId,a]);
@@ -3584,7 +3594,7 @@ const Store = {
       if(!id) return;
       const isRec=map.has(id)||(Array.isArray(arr)&&arr.some(x=>x&&x.id===id&&x._rec));
       if(!isRec){ this._allowDrop.add(k+':'+id); return; }
-      const docId=this._recDocId(k,id);
+      const docId=this._recDocId(k,id,map.get(id)||(Array.isArray(arr)&&arr.find(x=>x&&x.id===id)));
       map.delete(id); this._recSeen.delete(docId); this._recDeleted.add(k+':'+id);
       if(!FirebaseSync.ready()){ this._recPending(docId,'del'); return; }
       FirebaseSync.deleteDoc(docId).then(ok=>{ if(ok) this._recPendingClear(docId); else this._recPending(docId,'del'); });
@@ -3599,7 +3609,7 @@ const Store = {
       const docId=c.id.startsWith(pre)?c.id.slice(pre.length):c.id;
       if(c.type==='removed'){
         let id=idOf(c.data);
-        if(!id) for(const key of map.keys()) if(this._recDocId(k,key)===docId){ id=key; break; }
+        if(!id) for(const [key,val] of map) if(this._recDocId(k,key,k==='exam'?null:val)===docId){ id=key; break; }
         if(!id) return;
         if(map.delete(id)) changed=true;
         this._recSeen.delete(docId); this._recDeleted.add(k+':'+id);
@@ -11378,7 +11388,7 @@ function initAdminBackup(){
   async function restoreRecDocs(bk, curAtt, curExam){
     const pre = FirebaseSync.ns(''), want = new Map(), curHash = new Map();
     [...curAtt, ...curExam].forEach(d => curHash.set(d.id.slice(pre.length), Store._recHash(d.data)));
-    (bk.attempts || []).forEach(a => { if (a && a._rec && a.id) want.set(Store._recDocId('att', a.id), a); });
+    (bk.attempts || []).forEach(a => { if (a && a._rec && a.id) want.set(Store._recDocId('att', a.id, a), a); });
     (bk.exams || []).forEach(e => { if (e && e._rec && e.id) want.set(Store._recDocId('exam', e.id), { exam: e, questions: (bk.questions || {})[e.id] || [] }); });
     const jobs = [];
     want.forEach((v, docId) => { if (curHash.get(docId) !== Store._recHash(v)) jobs.push(FirebaseSync.saveDoc(docId, v)); });
@@ -15772,7 +15782,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.55';
+  const CURRENT_VERSION = 'v48.56';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

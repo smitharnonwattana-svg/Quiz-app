@@ -4113,6 +4113,7 @@ currentSection = 'recDocs';
   const fsRecs = (page, kind) => page.evaluate(({ p }) => Object.entries(__fakeFS.all()).filter(([id]) => id.startsWith(p))
     .map(([id, v]) => ({ id, d: JSON.parse(v._d) })), { p: NS + 'rec_' + kind + '_' });
   const seedJSON = JSON.stringify(oldStore().attempts);
+  const bkkMonth = (ts) => new Date(ts + 7 * 3600e3).toISOString().slice(0, 7).replace('-', '_'); // เดือนตามเวลาไทย (ชื่อ doc ผลสอบ)
 
   const ctx = await newFakeFsContext(oldStore());
   const page = await openFakeFsPage(ctx);
@@ -4133,7 +4134,7 @@ currentSection = 'recDocs';
   let recAtt = await fsRecs(page, 'att');
   let main = await fsMain(page);
   const newAttId = recAtt[0] && recAtt[0].d.id;
-  check('take: ส่งผลสอบ → เกิด doc rec_att_* 1 ตัว (มี _rec และ examId ถูก)', recAtt.length === 1 && recAtt[0].d._rec === 1 && recAtt[0].d.examId === 'old1' && recAtt[0].id === NS + 'rec_att_' + newAttId.replace(/[^A-Za-z0-9_-]/g, '_'), JSON.stringify(recAtt.map(r => r.id)));
+  check('take: ส่งผลสอบ → เกิด doc rec_att_* 1 ตัว (มี _rec และ examId ถูก)', recAtt.length === 1 && recAtt[0].d._rec === 1 && recAtt[0].d.examId === 'old1' && recAtt[0].id === NS + 'rec_att_' + bkkMonth(recAtt[0].d._recTs) + '_' + newAttId.replace(/[^A-Za-z0-9_-]/g, '_'), JSON.stringify(recAtt.map(r => r.id)));
   check('take: mainStore ไม่มีผลสอบใหม่ + ผลสอบเก่าเหมือนเดิมทุกตัวอักษร', JSON.stringify(main.attempts) === seedJSON && !main.attempts.some(a => a._rec), JSON.stringify(main.attempts.map(a => a.id)));
   check('take: ในแอปผลสอบใหม่อยู่บนสุด (เหมือน unshift เดิม)', (await page.evaluate(() => Store.load().attempts.map(a => a.id))).join() === [newAttId, 'attOld1', 'attOld2'].join());
 
@@ -4291,9 +4292,28 @@ currentSection = 'recDocs';
     localStorage.removeItem('nanont:syncPending');
     await Store.flushPendingSync();
     await new Promise(r => setTimeout(r, 300));
-    return { flagged, after: localStorage.getItem('nanont:recPending'), doc: !!__fakeFS.get('127_0_0_1_rec_att_attPend') };
+    const id = Store._recDocId('att', 'attPend');
+    return { id, flagged, after: localStorage.getItem('nanont:recPending'), doc: !!__fakeFS.get('127_0_0_1_' + id) };
   });
-  check('pending: เขียนล้ม → ติดธง recPending; flush → เขียนสำเร็จ + ล้างธง', pend.flagged['rec_att_attPend'] === 'save' && pend.after === null && pend.doc, JSON.stringify(pend));
+  check('pending: เขียนล้ม → ติดธง recPending; flush → เขียนสำเร็จ + ล้างธง', pend.id === 'rec_att_' + bkkMonth(Date.now()) + '_attPend' && pend.flagged[pend.id] === 'save' && pend.after === null && pend.doc, JSON.stringify(pend));
+
+  // ── 9b) ชื่อ doc ผลสอบมีปี-เดือน (เวลาไทย) → โหลดเฉพาะเดือนได้ด้วย prefix (เตรียมไว้สำหรับโหลดแค่เดือนล่าสุดในอนาคต) ──
+  const mon = await page.evaluate(async () => {
+    const s = Store.load();
+    const mk = (id, ts) => ({ id, examId: 'old1', examTitle: 'ชุดเก่า 1', takerName: 'นนท์', score: 1, total: 2, submittedAt: new Date(ts).toISOString(), perQuestion: [], _rec: 1, _recTs: ts });
+    s.attempts.unshift(mk('attOct', Date.UTC(2026, 9, 15, 3, 0)), mk('attNovBkk', Date.UTC(2026, 9, 31, 18, 0))); // 31 ต.ค. 18:00 UTC = 1 พ.ย. 01:00 เวลาไทย
+    Store.save(s);
+    await new Promise(r => setTimeout(r, 300));
+    const ids = Object.keys(__fakeFS.all()).filter(k => /_rec_att_2026_1[01]_att(Oct|NovBkk)$/.test(k));
+    const nov = await FirebaseSync.loadPrefix('rec_att_2026_11_');
+    const inApp = ['attOct', 'attNovBkk'].every(id => Store.load().attempts.some(a => a.id === id));
+    return { ids, nov: nov.map(d => d.data.id), inApp };
+  });
+  check('month: doc ชื่อตามเดือนเวลาไทย (31 ต.ค. 18:00 UTC → 2026_11) และ query เฉพาะเดือนได้ / แอปยังโหลดครบ',
+    mon.ids.includes(NS + 'rec_att_2026_10_attOct') && mon.ids.includes(NS + 'rec_att_2026_11_attNovBkk') && mon.nov.join() === 'attNovBkk' && mon.inApp, JSON.stringify(mon));
+  await page.evaluate(() => { Store.deleteRecords('attempts', ['attOct']); const s = Store.load(); s.attempts = s.attempts.filter(a => a.id !== 'attOct'); Store.save(s); });
+  await page.waitForTimeout(300);
+  check('month: ลบผลสอบเดือนเก่า → ลบ doc ถูกชื่อ (เดือนของมัน)', !(await page.evaluate(() => !!__fakeFS.get('127_0_0_1_rec_att_2026_10_attOct'))) && (await page.evaluate(() => !!__fakeFS.get('127_0_0_1_rec_att_2026_11_attNovBkk'))));
 
   // ── 10) backup แบ่งส่วน + กู้คืน ──
   const bk = await page.evaluate(async () => {
