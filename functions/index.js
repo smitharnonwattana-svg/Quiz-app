@@ -156,18 +156,27 @@ exports.dailySummaryNotify = onSchedule(
 
     // อ่านค่า lineNotify ต่อสมาชิกจาก mainStore doc (อยู่ใน snapshot เดียวกัน ไม่เพิ่ม read)
     // กัน daily summary ส่งทับ toggle "ปิด LINE" ที่ตั้งไว้ในแอป
-    let disabledNames = new Set();
-    try {
-      const mainStoreDoc = snapshot.docs.find((doc) => doc.id.endsWith('_mainStore'));
-      const raw = mainStoreDoc && mainStoreDoc.data()._d;
-      const mainStore = raw ? JSON.parse(raw) : null;
-      const members = (mainStore && Array.isArray(mainStore.members)) ? mainStore.members : [];
-      disabledNames = new Set(
-        members.filter((m) => m && m.lineNotify === false).map((m) => m.name)
-      );
-    } catch (e) {
-      console.warn('dailySummaryNotify: failed to read mainStore for lineNotify prefs', e.message);
-    }
+    // v48.56: อ่านจาก mainStore ของ origin เดียวกับ summary doc นั้น (<origin>_dailySummary_...) —
+    // เดิมหยิบ _mainStore ตัวแรกที่เจอ ซึ่งเป็นชุดขยะ (com_google_android_apps_nbu_files_provider, ไม่มีสมาชิก)
+    // ทำให้ toggle "ปิด LINE" ไม่ถูกเคารพ
+    const mainStoreById = new Map();
+    snapshot.docs.forEach((doc) => { if (doc.id.endsWith('_mainStore')) mainStoreById.set(doc.id, doc); });
+    const disabledByOrigin = new Map();
+    const getDisabledNames = (origin) => {
+      if (disabledByOrigin.has(origin)) return disabledByOrigin.get(origin);
+      let names = new Set();
+      try {
+        const msDoc = mainStoreById.get(origin + '_mainStore');
+        const raw = msDoc && msDoc.data()._d;
+        const mainStore = raw ? JSON.parse(raw) : null;
+        const members = (mainStore && Array.isArray(mainStore.members)) ? mainStore.members : [];
+        names = new Set(members.filter((m) => m && m.lineNotify === false).map((m) => m.name));
+      } catch (e) {
+        console.warn('dailySummaryNotify: failed to read mainStore for lineNotify prefs', origin, e.message);
+      }
+      disabledByOrigin.set(origin, names);
+      return names;
+    };
 
     const todayDocs = snapshot.docs.filter(
       (doc) => doc.id.includes('_dailySummary_') && doc.id.endsWith('_' + todayKey)
@@ -179,7 +188,8 @@ exports.dailySummaryNotify = onSchedule(
         if (!raw) continue;
         const d = JSON.parse(raw);
         if (!d || !d.userId) continue;
-        if (disabledNames.has(d.userId)) continue; // สมาชิกปิด LINE notify ไว้
+        const origin = doc.id.slice(0, doc.id.indexOf('_dailySummary_'));
+        if (getDisabledNames(origin).has(d.userId)) continue; // สมาชิกปิด LINE notify ไว้
 
         const qDone = Array.isArray(d.questsCompleted) ? d.questsCompleted.length : 0;
         const message =
