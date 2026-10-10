@@ -3853,6 +3853,217 @@ currentSection = 'choiceE';
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: รอบ review (v48.67p) — แบนเนอร์เตือนพื้นที่เต็ม (เฉพาะ Admin) + บั๊กเล็ก
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'reviewFixes';
+{
+  const RF_FILE = 'index_preview.html';
+  const mkQ2 = () => [
+    { id: 'q1', no: 1, number: 1, page: 1, correct: 'A', choices: { A: '', B: '', C: '', D: '' } },
+    { id: 'q2', no: 2, number: 2, page: 1, correct: 'B', choices: { A: '', B: '', C: '', D: '' } },
+  ];
+
+  // ── 1) แบนเนอร์พื้นที่ ──
+  {
+    const { ctx, page } = await newSeededPage({
+      file: RF_FILE, viewport: { width: 1180, height: 820 },
+      cache: baseCache({ exams: [mkExam('rf1', 'ชุดทดสอบ', 'วิทยาศาสตร์', { questionCount: 2 })], questions: { rf1: mkQ2() } }),
+    });
+    await page.evaluate(() => document.getElementById('offlineBanner')?.remove());
+    const setPct = (target) => page.evaluate((t) => {
+      delete Store._cache.zz_pad;
+      const base = getStoreUsage().bytes;
+      Store._cache.zz_pad = 'x'.repeat(Math.max(0, Math.round(t * FS_DOC_LIMIT / 100) - base - 14));
+      navigate('admin');
+    }, target);
+    const state = () => page.evaluate(() => {
+      const b = document.getElementById('adminStorageBanner');
+      return { shown: getComputedStyle(b).display !== 'none', text: document.getElementById('adminStorageBannerText').textContent,
+        bg: b.style.background, info: document.getElementById('adminStorageInfo').textContent, pct: getStoreUsage().pct };
+    });
+
+    await page.evaluate(() => navigate('admin')); await page.waitForTimeout(200);
+    let s = await state();
+    check('banner: ข้อมูลน้อย (<80%) ไม่โชว์แบนเนอร์ แต่มีบรรทัดบอกเปอร์เซ็นต์ให้ครู', !s.shown && /พื้นที่เก็บข้อมูล \d+%/.test(s.info), JSON.stringify(s));
+
+    await setPct(65); await page.waitForTimeout(200); s = await state();
+    check('banner: 65% → ซ่อน', !s.shown && s.pct > 64 && s.pct < 66, JSON.stringify(s));
+    await setPct(85.5); await page.waitForTimeout(200); s = await state();
+    check('banner: 85% → แบนเนอร์เหลือง (เตือน) พร้อมตัวเลข', s.shown && s.bg.includes('255, 251, 235') && s.text.includes('85%') && s.pct > 85 && s.pct < 86, JSON.stringify(s));
+    await setPct(97.5); await page.waitForTimeout(200); s = await state();
+    check('banner: 97% → แบนเนอร์แดง (ใกล้เต็มมาก)', s.shown && s.bg.includes('254, 242, 242') && s.text.includes('ใกล้เต็มมาก') && s.pct > 97 && s.pct < 98, JSON.stringify(s));
+
+    await setPct(79.5); await page.waitForTimeout(150); s = await state();
+    check('banner: 79.5% → ยังไม่โชว์ (เกณฑ์เตือนเริ่มที่ 80%)', !s.shown, JSON.stringify(s));
+    await setPct(80.5); await page.waitForTimeout(150); s = await state();
+    check('banner: 80.5% → เริ่มเตือน (เหลือง)', s.shown && s.bg.includes('255, 251, 235'), JSON.stringify(s));
+    await setPct(94.5); await page.waitForTimeout(150); s = await state();
+    check('banner: 94.5% → ยังเป็นเหลือง ไม่ใช่แดง', s.shown && s.bg.includes('255, 251, 235'), JSON.stringify(s));
+    await setPct(95.5); await page.waitForTimeout(150); s = await state();
+    check('banner: 95.5% → เปลี่ยนเป็นแดง', s.shown && s.bg.includes('254, 242, 242'), JSON.stringify(s));
+
+    const usage = await page.evaluate(() => ({ u: getStoreUsage().bytes, b: new Blob([JSON.stringify(Store.load())]).size }));
+    check('banner: getStoreUsage ตรงกับขนาด JSON ที่ saveDoc เขียนจริง (UTF-8)', usage.u === usage.b, JSON.stringify(usage));
+
+    await page.evaluate(() => document.querySelector('#adminStorageBanner button').click()); await page.waitForTimeout(300);
+    check('banner: ปุ่ม "ไปหน้าสำรองข้อมูล" พาไป admin_backup', (await page.evaluate(() => window._currentPage)) === 'admin_backup');
+
+    // นักเรียนต้องไม่เห็น: เรียก render ตรงๆ ตอน role เป็น student → ซ่อน + ไม่โชว์ตัวเลข
+    await page.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'student', name: 'เด็ก', ts: Date.now() })); localStorage.removeItem('appSession'); });
+    const stu = await page.evaluate(() => { renderAdminStorageUsage(); const b = document.getElementById('adminStorageBanner'); return { role: Auth.getRole(), disp: b.style.display, info: document.getElementById('adminStorageInfo').textContent }; });
+    check('banner: role นักเรียนไม่เห็นแบนเนอร์/ตัวเลข', stu.role === 'student' && stu.disp === 'none' && stu.info === '', JSON.stringify(stu));
+    await ctx.close();
+  }
+  // หน้านักเรียน (home/stats) ไม่มีแบนเนอร์ในหน้าที่มองเห็น
+  {
+    const { ctx, page } = await newSeededPage({
+      file: RF_FILE, role: 'student', name: 'เด็กดู',
+      cache: baseCache({ exams: [mkExam('rf1', 'ชุดทดสอบ', 'วิทยาศาสตร์', { questionCount: 2 })], questions: { rf1: mkQ2() } }),
+    });
+    await page.evaluate(() => { Store._cache.zz_pad = 'x'.repeat(1000000); navigate('home'); });
+    await page.waitForTimeout(300);
+    const vis = await page.evaluate(() => { const b = document.getElementById('adminStorageBanner'); return b.offsetParent !== null; });
+    check('banner: หน้า home ของนักเรียนไม่เห็นแบนเนอร์แม้ข้อมูลเกือบเต็ม', vis === false);
+    await ctx.close();
+  }
+
+  // ── 2) syncFromCloud ไม่รีสตาร์ทข้อสอบกลางคัน ──
+  {
+    const cache = baseCache({ exams: [mkExam('rf2', 'ชุด sync', 'วิทยาศาสตร์', { questionCount: 2 })], questions: { rf2: mkQ2() } });
+    const { ctx, page } = await newSeededPage({ file: RF_FILE, cache });
+    await page.evaluate(() => {
+      window.__navs = [];
+      const orig = window.navigate;
+      window.navigate = function (p, a) { window.__navs.push(p); return orig.apply(this, arguments); };
+      navigate = window.navigate;
+      FirebaseSync.loadDoc = async () => JSON.parse(JSON.stringify(Store._cache));
+    });
+    await page.evaluate(() => navigate('take', { id: 'rf2', takerName: 'ครู' }));
+    await page.waitForTimeout(700);
+    const before = await page.evaluate(() => ({ att: _takeState && _takeState.attemptId, started: _takeState && _takeState.started, st: !!_takeState }));
+    await page.evaluate(() => { window.__navs.length = 0; return Store.syncFromCloud(); });
+    await page.waitForTimeout(200);
+    const after = await page.evaluate(() => ({ att: _takeState && _takeState.attemptId, started: _takeState && _takeState.started, navs: window.__navs.slice(), pg: window._currentPage }));
+    check('syncFromCloud ขณะอยู่หน้า take: ข้อสอบไม่ถูกเริ่มใหม่ (attemptId เดิม, ไม่เรียก navigate)',
+      before.st && before.started && after.att === before.att && after.started === true && after.navs.length === 0 && after.pg === 'take', JSON.stringify({ before, after }));
+
+    await page.evaluate(() => { cleanupTake(); navigate('exams'); });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { window.__navs.length = 0; return Store.syncFromCloud(); });
+    await page.waitForTimeout(200);
+    const navs2 = await page.evaluate(() => window.__navs.slice());
+    check('syncFromCloud ขณะอยู่หน้า exams: ยัง re-navigate 1 ครั้งเหมือนเดิม', navs2.length === 1 && navs2[0] === 'exams', JSON.stringify(navs2));
+    await ctx.close();
+  }
+
+  // ── 3) overlay/timer ของรอบที่ทิ้งไปแล้วต้องไม่ค้าง ──
+  {
+    const cache = baseCache({ exams: [mkExam('rf3', 'ชุด overlay', 'วิทยาศาสตร์', { questionCount: 2 })], questions: { rf3: mkQ2() } });
+    const { ctx, page } = await newSeededPage({ file: RF_FILE, cache, role: 'student', name: 'เด็กผี' });
+    await page.evaluate(() => navigate('take', { id: 'rf3', takerName: 'เด็กผี' }));
+    await page.waitForTimeout(600);
+    check('overlay: เข้าข้อสอบ (นักเรียน) → โผล่ overlay เลือกอารมณ์ 1 อัน', (await page.evaluate(() => document.querySelectorAll('.takeOverlay').length)) === 1);
+
+    // เปิดข้อสอบซ้ำทันที 2 รอบ (เหมือน syncFromCloud เดิมที่ re-navigate) → ต้องเหลือ overlay อันเดียว
+    await page.evaluate(() => { navigate('take', { id: 'rf3', takerName: 'เด็กผี' }); navigate('take', { id: 'rf3', takerName: 'เด็กผี' }); });
+    await page.waitForTimeout(700);
+    check('overlay: initTake ซ้ำหลายรอบ → ยังเหลือ overlay เดียว (ไม่ซ้อนกัน)', (await page.evaluate(() => document.querySelectorAll('.takeOverlay').length)) === 1);
+
+    // callback ของ overlay เก่า (ถือ reference ไว้) หลัง cleanupTake ต้องไม่เริ่มข้อสอบผี
+    const ghost = await page.evaluate(() => {
+      const btn = document.querySelector('.takeOverlay button[data-val]');
+      cleanupTake();
+      const gone = document.querySelectorAll('.takeOverlay').length === 0;
+      btn.click();
+      return { gone, state: _takeState, interval: _takeInterval, timer: _takeStartTimer };
+    });
+    check('overlay: cleanupTake ลบ overlay และกด callback เก่าแล้วไม่เริ่มข้อสอบผี (_takeState/_takeInterval ว่าง)',
+      ghost.gone && ghost.state === null && ghost.interval === null && ghost.timer === null, JSON.stringify(ghost));
+
+    // timer เริ่มข้อสอบที่ยังไม่ทำงานต้องถูกยกเลิกเมื่อออกจากหน้า
+    await page.evaluate(() => { navigate('take', { id: 'rf3', takerName: 'เด็กผี' }); cleanupTake(); });
+    await page.waitForTimeout(700);
+    const late = await page.evaluate(() => ({ ov: document.querySelectorAll('.takeOverlay').length, st: _takeState }));
+    check('overlay: ออกจากหน้าก่อนครบ 300ms → ไม่มี overlay โผล่ตามหลัง', late.ov === 0 && late.st === null, JSON.stringify(late));
+    await ctx.close();
+  }
+
+  // ── 4) กดส่งซ้ำหลังบันทึกล้ม → ไม่ได้ผลสอบซ้ำ ──
+  {
+    const cache = baseCache({ exams: [mkExam('rf4', 'ชุดส่งซ้ำ', 'วิทยาศาสตร์', { questionCount: 2 })], questions: { rf4: mkQ2() } });
+    const { ctx, page } = await newSeededPage({ file: RF_FILE, cache });
+    await page.evaluate(() => navigate('take', { id: 'rf4', takerName: 'ครู' }));
+    await page.waitForTimeout(700);
+    const attId = await page.evaluate(() => {
+      const orig = Store.save.bind(Store); let n = 0;
+      Store.save = function (d) { n++; if (n === 1) { this._cache = d; return false; } return orig(d); }; // จำลองบันทึกล้ม 1 ครั้งแล้วสำเร็จ
+      [...document.querySelectorAll('#takeChoices .choice')][0].click();
+      return _takeState.attemptId;
+    });
+    await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+    await page.waitForTimeout(400);
+    const mid = await page.evaluate((id) => Store.load().attempts.filter(a => a.id === id).length, attId);
+    check('ส่งซ้ำ: บันทึกล้มรอบแรก attempt ค้างใน cache 1 รายการ (ยังไม่ซ้ำ)', mid === 1, String(mid));
+    await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+    await page.waitForTimeout(600);
+    const cnt = await page.evaluate((id) => Store.load().attempts.filter(a => a.id === id).length, attId);
+    check('ส่งซ้ำ: กดส่งอีกครั้งจนสำเร็จ → ผลสอบ id เดียวกันมีรายการเดียว (ไม่ซ้ำ 2)', cnt === 1, String(cnt));
+    await ctx.close();
+  }
+
+  // ── 5) sync จุดอ่อนไม่ลองใหม่ ──
+  {
+    const { ctx, page } = await newSeededPage({ file: RF_FILE, cache: baseCache({ exams: [mkExam('rf5', 'ชุดจุดอ่อน', 'วิทยาศาสตร์', { questionCount: 1 })], questions: { rf5: mkQ2().slice(0, 1) } }), role: 'student', name: 'เด็กจุดอ่อน' });
+    const flagKeys = () => page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('nanont:weaknessSyncPending_') && localStorage.getItem(k) === '1'));
+    await page.evaluate(() => {
+      FirebaseSync.ready = () => true;
+      FirebaseSync.saveDoc = async () => false; // จำลอง Firestore ปฏิเสธ/ล้ม
+      WeaknessTracker.updateWeaknessAfterSubmit({ takerName: 'เด็กจุดอ่อน', examId: 'rf5', examTitle: 'ชุดจุดอ่อน', examSubject: 'วิทยาศาสตร์', submittedAt: new Date().toISOString(), perQuestion: [{ no: 1, isCorrect: false }] });
+    });
+    await page.waitForTimeout(300);
+    check('จุดอ่อน: saveDoc ล้ม (คืน false) → flag pending ยังอยู่ (เดิมถูกลบทิ้งทันที)', (await flagKeys()).length === 1, JSON.stringify(await flagKeys()));
+
+    // มี flag pending → fetchWeaknessFromCloud ต้องไม่เอาข้อมูล cloud มาทับของในเครื่อง
+    const localBefore = await page.evaluate(() => localStorage.getItem('nanont:weaknesses_' + 'เด็กจุดอ่อน'));
+    const kept = await page.evaluate(async () => {
+      FirebaseSync.loadDoc = async () => ({ 'zzz__9': { examId: 'zzz', questionNo: 9, status: 'weak', wrongCount: 9 } });
+      const k = 'nanont:weaknesses_' + 'เด็กจุดอ่อน';
+      const before = localStorage.getItem(k);
+      await fetchWeaknessFromCloud('เด็กจุดอ่อน');
+      return { same: localStorage.getItem(k) === before, hasBefore: !!before };
+    });
+    check('จุดอ่อน: มี flag pending → fetchWeaknessFromCloud ไม่เขียนทับข้อมูลในเครื่อง', kept.hasBefore && kept.same, JSON.stringify(kept));
+
+    await page.evaluate(() => { FirebaseSync.saveDoc = async () => true; });
+    await page.evaluate(() => WeaknessTracker.flushPendingWeaknesses());
+    await page.waitForTimeout(200);
+    check('จุดอ่อน: flush ซ้ำเมื่อ saveDoc สำเร็จ → flag หาย', (await flagKeys()).length === 0, JSON.stringify(await flagKeys()));
+    await ctx.close();
+  }
+
+  // ── 6) XSS: ชื่อชุดข้อสอบในตัวกรองหน้าสถิติ ──
+  {
+    const evil = '<img src=x onerror="window.__xss=1">ชุดอันตราย';
+    const cache = baseCache({
+      exams: [mkExam('rf6', evil, 'วิทยาศาสตร์', { questionCount: 1 })], questions: { rf6: mkQ2().slice(0, 1) },
+      attempts: [{ id: 'att_rf6', examId: 'rf6', examTitle: evil, examSubject: 'วิทยาศาสตร์', takerName: 'เด็กสถิติ', startedAt: new Date().toISOString(), submittedAt: new Date().toISOString(), usedSeconds: 60, score: 1, total: 1, perQuestion: [], practiceMode: false }],
+    });
+    const { ctx, page } = await newSeededPage({ file: RF_FILE, cache, role: 'student', name: 'เด็กสถิติ' });
+    await page.evaluate(() => navigate('stats'));
+    await page.waitForTimeout(800);
+    const x = await page.evaluate(() => ({ fired: window.__xss === 1, opt: [...document.querySelectorAll('#statsFilterExam option')].map(o => o.textContent) }));
+    check('XSS: ชื่อชุดมี HTML ในตัวกรองหน้าสถิติ → ไม่ทำงานเป็นโค้ด และแสดงข้อความดิบ', !x.fired && x.opt.some(t => t.includes('<img src=x') && t.includes('ชุดอันตราย')), JSON.stringify(x));
+    await ctx.close();
+  }
+
+  // ── 7) pdf.js: ปิด eval (CVE-2024-4367) ──
+  {
+    const src = fs.readFileSync(new URL('../' + RF_FILE, import.meta.url), 'utf8');
+    check('pdf.js: getDocument ตั้ง isEvalSupported:false', /getDocument\(\{[^}]*isEvalSupported:\s*false/s.test(src));
+  }
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

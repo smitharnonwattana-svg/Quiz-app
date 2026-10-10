@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.66p -->
+  <!-- APP_VERSION: v48.67p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1401,7 +1401,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.66p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.67p</div>
     </div>
   </div>
 </div>
@@ -1917,6 +1917,7 @@
       <div>
         <h1 class="h1">Admin</h1>
         <div id="fbSyncStatus" class="muted" style="font-size:12px;margin-top:4px;"></div>
+        <div id="adminStorageInfo" class="muted" style="font-size:12px;margin-top:2px;"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
@@ -1925,6 +1926,10 @@
     </div>
     <div id="adminGate" style="margin-top:16px;"></div>
     <div id="adminContent" style="display:none;">
+      <div id="adminStorageBanner" role="alert" style="display:none;margin-bottom:12px;padding:12px 14px;border-radius:12px;border:1px solid;font-size:13px;line-height:1.5;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <span id="adminStorageBannerText"></span>
+        <button type="button" class="btn" onclick="navigate('admin_backup')" style="font-size:12px;padding:6px 10px;white-space:nowrap;">ไปหน้าสำรองข้อมูล</button>
+      </div>
       <div class="list" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="linkCard" onclick="navigate('admin_new')">
           <div style="font-weight:900;">➕ สร้างชุดข้อสอบใหม่</div>
@@ -2822,6 +2827,7 @@ const PdfViewer = (() => {
         statusDiv.textContent = 'กำลัง render PDF...';
         pdfDoc = await pdfjsLib.getDocument({
           url: absUrl,
+          isEvalSupported: false, // บรรเทา CVE-2024-4367 (PDF อันตรายรัน JS ใน pdf.js < 4.2.67) โดยไม่ต้องอัปเกรดไลบรารี
           cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
           cMapPacked: true,
         }).promise;
@@ -3163,8 +3169,8 @@ async function _flushTakeDiag(force){
     try{ localStorage.setItem(flagKey, '1'); }catch(e){}
     if(typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) return; // ค้าง flag ไว้ flush ทีหลัง
     const arr = JSON.parse(localStorage.getItem(_TAKE_DIAG_KEY) || '[]');
-    await FirebaseSync.saveDoc('takeDiag_' + _sanitizeDiagName(u), {entries:arr, updatedAt:new Date().toISOString()});
-    try{ localStorage.removeItem(flagKey); }catch(e){}
+    const _ok = await FirebaseSync.saveDoc('takeDiag_' + _sanitizeDiagName(u), {entries:arr, updatedAt:new Date().toISOString()});
+    if(_ok === true){ try{ localStorage.removeItem(flagKey); }catch(e){} } // ล้มเหลว = คง flag ไว้ให้ลองใหม่
   }catch(e){ /* ห้ามทำข้อสอบพัง */ }
 }
 
@@ -3565,10 +3571,12 @@ const Store = {
     if(_lb) _lb.remove();
     console.log('[Store] synced from cloud — exams:', (cloud.exams||[]).length, 'attempts:', (cloud.attempts||[]).length);
     // Always refresh current page so stale empty-state render is replaced with real data
-    if(typeof navigate==='function' && window._currentPage){
-      // v48.18 diag: ถ้า page เป็น 'take' = ข้อสอบกำลังจะถูกรีสตาร์ทกลางคัน (ผู้ต้องสงสัย #2)
+    // v48.67p: ห้าม re-navigate หน้าที่มีงานค้างในหน้าจอ (ทำข้อสอบ/ฝึก/แก้เฉลยที่ยังไม่บันทึก) — เหมือน allowlist ของ listenDoc soft refresh
+    if(typeof navigate==='function' && window._currentPage && !['take','practice','admin_editor'].includes(window._currentPage)){
       _takeDiag('syncFromCloud.renav', {page:window._currentPage});
       navigate(window._currentPage, window._currentParams||{});
+    } else if(window._currentPage){
+      _takeDiag('syncFromCloud.renav.skipped', {page:window._currentPage});
     }
   },
   // Force pull cloud data — bypass timestamp guard. Union-merges any
@@ -4158,6 +4166,11 @@ async function fetchWeaknessFromCloud(userId) {
   const docId = 'weaknesses_' + sanitized;
 
   // 1) Try Firestore first
+  // v48.67p: ถ้าเครื่องนี้มีจุดอ่อนที่ยังไม่ขึ้น cloud (flag pending) ห้ามเอาข้อมูล cloud ที่เก่ากว่ามาทับ
+  // (ไม่งั้นรอบ flush ถัดไปจะดันข้อมูลเก่ากลับขึ้นไปแทน) — เหมือน subscribeMyWeakness
+  let _hasPending = false;
+  try { _hasPending = localStorage.getItem('nanont:weaknessSyncPending_' + sanitized) === '1'; } catch (e) {}
+  if (_hasPending) return; // ข้ามทั้งขั้น 1 (cloud) และขั้น 2 (rebuild จาก attempts) — ข้อมูลในเครื่องใหม่กว่า
   if (FirebaseSync.ready()) {
     try {
       const data = await FirebaseSync.loadDoc(docId);
@@ -5829,7 +5842,7 @@ function initExams(){
         errCard.style.cssText = 'border:2px dashed #fca5a5;background:#fef2f2;';
         const _msg = (_err && _err.message) ? _err.message : String(_err);
         const _stack = (_err && _err.stack) ? String(_err.stack).split('\n').slice(0,3).join('\n') : '';
-        errCard.innerHTML = '<div class="title" style="color:#b91c1c;">⚠️ ' + (e.title||'?') + '</div>'
+        errCard.innerHTML = '<div class="title" style="color:#b91c1c;">⚠️ ' + esc(e.title||'?') + '</div>'
           + '<div class="meta" style="color:#b91c1c;">render error</div>'
           + '<div style="font-size:11px;color:#7f1d1d;background:#fff;padding:6px 8px;margin-top:6px;border-radius:6px;font-family:monospace;word-break:break-word;white-space:pre-wrap;">'
           + 'examId: ' + (e.id||'?') + '\n\n'
@@ -5917,9 +5930,13 @@ function initExamDetail(id){
 // ===================== TAKE PAGE =====================
 let _takeInterval=null;
 let _takeState=null;
+let _takeStartTimer=null; // setTimeout ที่จะเริ่มข้อสอบ/เปิด overlay อารมณ์ (เก็บไว้ยกเลิกตอน cleanup)
 
 function cleanupTake(){
   if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
+  if(_takeStartTimer){clearTimeout(_takeStartTimer);_takeStartTimer=null;}
+  // overlay ของรอบที่ทิ้งไปแล้วต้องไม่ค้างบนจอ (ไม่งั้นกดแล้วไปเริ่ม/ส่งข้อสอบ "ผี" ของ state เก่า)
+  document.querySelectorAll('.takeOverlay,#_resumeOverlay').forEach(el=>el.remove());
   _takeState=null;
 }
 
@@ -6275,6 +6292,7 @@ function initTake(id){
   // ── Pre check-in: mood ──
   function showMoodCheckIn(onConfirm){
     const ov=document.createElement('div');
+    ov.className='takeOverlay';
     ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
     const box=document.createElement('div');
     box.style.cssText='background:#fff;border-radius:20px;padding:28px 20px;width:min(340px,92vw);box-shadow:0 20px 40px rgba(0,0,0,.2);';
@@ -6425,6 +6443,12 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       // ไม่กระทบ gamification (ตัวแปร score/total/usedSeconds/takerName ข้างล่างยังเป็นของ
       // "รอบนี้" เท่านั้นเหมือนเดิมทุกอย่าง) เปลี่ยนแค่ขั้นตอนบันทึก/นับจุดอ่อน
       let _mergedParent = null;
+      // v48.67p: ถ้า Store.save ล้มแล้วผู้ใช้กดส่งซ้ำ attempt รอบแรกยังค้างอยู่ใน cache (Store.load() คืน object ตัวจริง)
+      // → แทนที่รายการเดิม (id เดียวกัน) แทนที่จะ unshift ซ้ำจนได้ผลสอบซ้ำ 2 รายการ
+      const _putAttempt = () => {
+        const _i = savedS.attempts.findIndex(a => a && a.id === _newAttempt.id);
+        if (_i >= 0) savedS.attempts[_i] = _newAttempt; else savedS.attempts.unshift(_newAttempt);
+      };
       if (st.half2Mode) {
         const _parent = (savedS.attempts||[]).find(a => a.id === st.parentAttemptId);
         if (_parent) {
@@ -6459,11 +6483,11 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           // (บันทึกเป็นรายการแยก) กันคำตอบหาย
           _newAttempt.halfPart = 2;
           _newAttempt.parentAttemptId = st.parentAttemptId||null;
-          savedS.attempts.unshift(_newAttempt);
+          _putAttempt();
           toast('⚠️ ไม่พบข้อมูลครึ่งแรก — บันทึกเป็นรายการแยกแทน');
         }
       } else {
-        savedS.attempts.unshift(_newAttempt);
+        _putAttempt();
       }
       const ok=Store.save(savedS);
       if (!ok) {
@@ -6574,6 +6598,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
 
   function doStart(restoredStartedAt, restoredOffset){
     if(st.started) return;
+    if(_takeState!==st) return; // callback ของรอบที่ถูก cleanupTake/initTake ใหม่ทิ้งไปแล้ว — ห้ามเริ่มข้อสอบ "ผี"
     st.started=true;
     st.startedAt = restoredStartedAt || Date.now();
     if(restoredOffset) _pauseOffset = restoredOffset;
@@ -6683,8 +6708,8 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       clearTakeResume(_takerName);
     }
     // No resume — auto-start normally
-    if(Auth.isTeacher()){setTimeout(doStart,300);}
-    else{setTimeout(()=>showMoodCheckIn(mood=>{st.mood=mood;doStart();}),300);}
+    if(Auth.isTeacher()){_takeStartTimer=setTimeout(()=>{_takeStartTimer=null;doStart();},300);}
+    else{_takeStartTimer=setTimeout(()=>{_takeStartTimer=null;showMoodCheckIn(mood=>{st.mood=mood;doStart();});},300);}
   }
 
   document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะยังถูกบันทึกไว้')){cleanupTake();navigate('exams');}};
@@ -8013,7 +8038,7 @@ function initStats(){
     if(currentSubjectFilter!=='all') ids=ids.filter(id=>getExamSubjectById(s,id)===currentSubjectFilter);
     const options=[{value:'all',label:'ทั้งหมด'}].concat(ids.sort((a,b)=>String(getExamTitleById(s,a)).localeCompare(String(getExamTitleById(s,b)),'th')).map(id=>({value:id,label:getExamTitleById(s,id)})));
     const prev=currentExamFilter;
-    filterEl.innerHTML=options.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+    filterEl.innerHTML=options.map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
     if(options.some(o=>o.value===prev)) filterEl.value=prev;
     else{currentExamFilter=_statsState.examFilter='all';filterEl.value='all';}
   }
@@ -9395,11 +9420,38 @@ function initPractice(params){
 }
 
 // ===================== ADMIN PAGE =====================
+// ขนาดข้อมูลทั้งแอปเทียบเพดาน 1 MiB ของ Firestore document (mainStore ถูกเขียนเป็น JSON.stringify ก้อนเดียว — ดู FirebaseSync.saveDoc)
+// เต็มแล้วทุกการบันทึกจะล้มเหลว จึงเตือนครูล่วงหน้า — คำนวณเฉพาะตอนเปิดหน้า Admin (ห้ามใส่ใน Store.save กัน stringify ทุกครั้งที่บันทึก)
+const FS_DOC_LIMIT = 1048576;
+function getStoreUsage(){
+  const bytes = new TextEncoder().encode(JSON.stringify(Store.load())).length;
+  return { bytes, pct: bytes / FS_DOC_LIMIT * 100 };
+}
+function renderAdminStorageUsage(){
+  const info = document.getElementById('adminStorageInfo');
+  const banner = document.getElementById('adminStorageBanner');
+  if(!info || !banner) return;
+  if(!Auth.isTeacher()){ info.textContent=''; banner.style.display='none'; return; }
+  const u = getStoreUsage();
+  const pct = Math.floor(u.pct);
+  info.textContent = `พื้นที่เก็บข้อมูล ${pct}% (${Math.round(u.bytes/1024).toLocaleString()} KB จาก ${Math.round(FS_DOC_LIMIT/1024).toLocaleString()} KB)`;
+  if(u.pct < 80){ banner.style.display='none'; return; }
+  const critical = u.pct >= 95;
+  document.getElementById('adminStorageBannerText').textContent = critical
+    ? `พื้นที่เก็บข้อมูลใกล้เต็มมาก (${pct}%) — การบันทึกผลสอบอาจล้มเหลวเมื่อใดก็ได้ กรุณาสำรองข้อมูลตอนนี้และแจ้งผู้พัฒนา`
+    : `พื้นที่เก็บข้อมูลใช้ไปแล้ว ${pct}% — ถ้าเต็ม ผลสอบใหม่จะบันทึกไม่ได้ แนะนำสำรองข้อมูลไว้และแจ้งผู้พัฒนาให้ย้ายที่เก็บ`;
+  banner.style.background = critical ? '#fef2f2' : '#fffbeb';
+  banner.style.borderColor = critical ? '#fca5a5' : '#fcd34d';
+  banner.style.color = critical ? '#991b1b' : '#92400e';
+  banner.style.display = 'flex';
+}
+
 function initAdmin(){
   const s=Store.init();
   s.adminLoggedIn = Auth.isTeacher();
   document.getElementById('adminGate').innerHTML='';
   document.getElementById('adminContent').style.display='block';
+  try{ renderAdminStorageUsage(); }catch(e){ console.warn('[admin] storage usage err', e); }
 }
 
 // ── Admin Memes ──────────────────────────────────────────────
@@ -9457,7 +9509,7 @@ function initAdminMemes() {
         <input type="text" placeholder="ชื่อ/caption" value="${cap.replace(/"/g,'&quot;')}"
           style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;"
           id="meme_cap_${tier.key}_${i}" />
-        <input type="text" placeholder="วาง URL จาก giphy.com/gifs/..." value="${id}"
+        <input type="text" placeholder="วาง URL จาก giphy.com/gifs/..." value="${esc(id)}"
           style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;"
           id="meme_url_${tier.key}_${i}"
           oninput="updateMemePreview('${tier.key}',${i},this.value)" />
@@ -10710,7 +10762,7 @@ function initAdminMembers(){
       row.innerHTML =
         '<input class="titleInput" style="flex:1;min-width:120px;" value="' + m.name.replace(/"/g,'&quot;') + '" id="mname_' + idx + '" />' +
         '<div style="display:flex;gap:4px;align-items:center;">' +
-          '<input class="titleInput" type="password" maxlength="6" style="width:90px;letter-spacing:3px;" value="' + m.pin + '" id="mpin_' + idx + '" />' +
+          '<input class="titleInput" type="password" maxlength="6" style="width:90px;letter-spacing:3px;" value="' + esc(m.pin) + '" id="mpin_' + idx + '" />' +
           '<button type="button" class="btn" style="padding:4px 8px;min-width:32px;" data-eye="' + idx + '" title="แสดง/ซ่อนรหัส">👁</button>' +
         '</div>' +
         '<button class="btn" data-save="' + idx + '" style="white-space:nowrap;">ยืนยัน</button>' +
@@ -12450,7 +12502,7 @@ function initAdminBenchmark() {
   const examSelect = document.getElementById('bmExamLink');
   if (examSelect) {
     examSelect.innerHTML = '<option value="">— ไม่ผูก —</option>' +
-      (s.exams||[]).map(e => `<option value="${e.id}">${e.subject} · ${e.title}</option>`).join('');
+      (s.exams||[]).map(e => `<option value="${esc(e.id)}">${esc(e.subject)} · ${esc(e.title)}</option>`).join('');
   }
 
   // download template
@@ -12550,11 +12602,11 @@ function initAdminBenchmark() {
     }
     el.innerHTML = bms.map(bm => {
       const exam = (st.exams||[]).find(e=>e.id===bm.examId);
-      const examLabel = exam ? `📎 ${exam.title}` : 'ไม่ผูกชุดข้อสอบ';
+      const examLabel = exam ? `📎 ${esc(exam.title)}` : 'ไม่ผูกชุดข้อสอบ';
       return `<div class="card" style="padding:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <div>
-          <div style="font-weight:800;">${bm.name}</div>
-          <div class="muted" style="font-size:12px;margin-top:3px;">${examLabel} · ${bm.rows.length} อันดับ · วิชา: ${bm.subjectCols.join(', ')||'ไม่มี'} · สูงสุด rank ${bm.totalRanks}</div>
+          <div style="font-weight:800;">${esc(bm.name)}</div>
+          <div class="muted" style="font-size:12px;margin-top:3px;">${examLabel} · ${bm.rows.length} อันดับ · วิชา: ${esc(bm.subjectCols.join(', '))||'ไม่มี'} · สูงสุด rank ${bm.totalRanks}</div>
         </div>
         <button class="btn-delete" data-del-bm="${bm.id}">ลบ</button>
       </div>`;
@@ -12590,7 +12642,7 @@ function renderBenchmarkWidget(containerId, score, examId) {
     const toggleHtml = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
       ${options.map(o=>`<button class="bm-toggle-btn ${o.id===selectedId?'bm-toggle-active':''}" data-bmid="${o.id}"
         style="padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid ${o.id===selectedId?'#111':'var(--border)'};background:${o.id===selectedId?'#111':'#fff'};color:${o.id===selectedId?'#fff':'#374151'};">
-        ${o.name}</button>`).join('')}
+        ${esc(o.name)}</button>`).join('')}
     </div>`;
 
     if (!bm) return `<div style="padding:12px;background:#f9fafb;border-radius:14px;border:1px solid var(--border);">${toggleHtml}<div class="muted" style="font-size:13px;">ไม่แสดงการเปรียบเทียบ</div></div>`;
@@ -12626,7 +12678,7 @@ function renderBenchmarkWidget(containerId, score, examId) {
       const tierHtml = row.tier ? `<span style="background:${row.tier.bg};color:${row.tier.color};border-radius:99px;padding:2px 8px;font-size:11px;font-weight:800;">${row.tier.label}</span>` : '';
       return `<div style="display:grid;gap:4px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
-          <span style="font-weight:${row.isTotal?'900':'700'};font-size:${row.isTotal?'14':'13'}px;">${row.label}</span>
+          <span style="font-weight:${row.isTotal?'900':'700'};font-size:${row.isTotal?'14':'13'}px;">${esc(row.label)}</span>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             ${tierHtml}
             <span style="font-size:12px;color:#6b7280;">${rankStr} จาก ${bm.totalRanks} อันดับ</span>
@@ -12641,7 +12693,7 @@ function renderBenchmarkWidget(containerId, score, examId) {
 
     return `<div style="padding:14px;background:#f9fafb;border-radius:14px;border:1px solid var(--border);">
       ${toggleHtml}
-      <div style="font-weight:800;font-size:13px;margin-bottom:10px;">เทียบกับ: ${bm.name}</div>
+      <div style="font-weight:800;font-size:13px;margin-bottom:10px;">เทียบกับ: ${esc(bm.name)}</div>
       ${barsHtml}
       <div class="muted" style="font-size:11px;margin-top:6px;">* คำนวณจาก interpolation ของอันดับที่ ${bm.rows.map(r=>r.rank).join(', ')}</div>
     </div>`;
@@ -12852,8 +12904,10 @@ const WeaknessTracker = (() => {
     }
     try { localStorage.setItem(flagKey, '1'); } catch(e) {}
     try {
-      await FirebaseSync.saveDoc(_fsDocId(u), d);
-      try { localStorage.removeItem(flagKey); } catch(e) {}
+      // saveDoc คืน false (ไม่ throw) เมื่อบันทึกล้ม — ลบ flag เฉพาะเมื่อสำเร็จจริง ไม่งั้นรอบ flush ถัดไปจะไม่ลองใหม่
+      const ok = await FirebaseSync.saveDoc(_fsDocId(u), d);
+      if (ok === true) { try { localStorage.removeItem(flagKey); } catch(e) {} }
+      else console.warn('[Weakness._saveToCloud] save not confirmed — keep pending flag', u);
     } catch(e) {
       console.error('[Weakness._saveToCloud] failed', e);
     }
@@ -12875,9 +12929,13 @@ const WeaknessTracker = (() => {
       if (!_raw) { try { localStorage.removeItem(flagKey); } catch(e) {} continue; }
       try {
         const _data = JSON.parse(_raw);
-        await FirebaseSync.saveDoc(docId, _data);
-        try { localStorage.removeItem(flagKey); } catch(e) {}
-        console.log('[flushPendingWeaknesses] flushed', sanitized);
+        const _ok = await FirebaseSync.saveDoc(docId, _data);
+        if (_ok === true) {
+          try { localStorage.removeItem(flagKey); } catch(e) {}
+          console.log('[flushPendingWeaknesses] flushed', sanitized);
+        } else {
+          console.warn('[flushPendingWeaknesses] save not confirmed — keep pending flag', sanitized);
+        }
       } catch(e) {
         console.error('[flushPendingWeaknesses] failed for', sanitized, e);
       }
@@ -15397,7 +15455,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.66p';
+  const CURRENT_VERSION = 'v48.67p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
