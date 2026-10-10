@@ -239,6 +239,10 @@ exports.cleanupExpiredSummaries = onSchedule(
 
 // Auto Backup — snapshot mainStore doc daily at 01:00 Bangkok
 // เก็บไว้ในคอลเลกชัน 'app' เดิม (ตาม pattern ของ dailySummary) doc id: <origin>_backup_auto_<YYYY-MM-DD>
+// v48.55: ผลสอบ/ชุดข้อสอบใหม่แยกเป็น doc ต่อรายการ (<origin>_rec_att_* / <origin>_rec_exam_*) — รวมเข้ากับ
+// mainStore ให้ backup ครบทุกอย่าง (รูปแบบเดียวกับที่แอปเห็นในหน่วยความจำ) แล้วแบ่งส่วนละ ≤ 300,000 ตัวอักษร
+// (doc หลัก มี _parts:n + ส่วนที่ 0, ส่วนที่เหลือ <backupId>_p1..) ทุกส่วนมี type/date → cleanupOldAutoBackups ลบตามอายุได้เหมือนเดิม
+const BACKUP_PART_CHARS = 300000;
 exports.autoBackupMainStore = onSchedule(
   {
     schedule: '0 1 * * *',
@@ -248,7 +252,9 @@ exports.autoBackupMainStore = onSchedule(
   async (event) => {
     const db = admin.firestore();
     const snapshot = await db.collection('app').get();
-    const mainStoreDoc = snapshot.docs.find((doc) => doc.id.endsWith('_mainStore'));
+    // เลือก mainStore ของเว็บจริงก่อน (local_mainStore = เปิดจาก file:// ตอนพัฒนา)
+    const mainStoreDoc = snapshot.docs.find((doc) => doc.id.endsWith('_mainStore') && !doc.id.startsWith('local_'))
+      || snapshot.docs.find((doc) => doc.id.endsWith('_mainStore'));
     if (!mainStoreDoc) {
       console.warn('autoBackupMainStore: mainStore doc not found');
       return;
@@ -264,15 +270,51 @@ exports.autoBackupMainStore = onSchedule(
     const todayKey = bangkokNow.toISOString().slice(0, 10);
     const backupId = `${origin}_backup_auto_${todayKey}`;
 
+    // รวม record แยกเข้ากับ mainStore (rec อยู่หน้าสุด ใหม่→เก่า เหมือนในแอป)
+    const store = JSON.parse(raw);
+    const parseRec = (doc) => { try { return JSON.parse(doc.data()._d || 'null'); } catch (e) { return null; } };
+    const byTs = (a, b) => (b._recTs || 0) - (a._recTs || 0);
+    const recAtt = snapshot.docs.filter((doc) => doc.id.startsWith(`${origin}_rec_att_`)).map(parseRec).filter((a) => a && a.id);
+    const recExam = snapshot.docs.filter((doc) => doc.id.startsWith(`${origin}_rec_exam_`)).map(parseRec).filter((r) => r && r.exam && r.exam.id);
+    if (recAtt.length || recExam.length) {
+      const attIds = new Set(recAtt.map((a) => a.id));
+      const examIds = new Set(recExam.map((r) => r.exam.id));
+      store.attempts = recAtt.sort(byTs).concat((store.attempts || []).filter((a) => !(a && attIds.has(a.id))));
+      store.exams = recExam.map((r) => r.exam).sort(byTs).concat((store.exams || []).filter((e) => !(e && examIds.has(e.id))));
+      store.questions = store.questions || {};
+      recExam.forEach((r) => { store.questions[r.exam.id] = r.questions || []; });
+    }
+
+    const str = JSON.stringify(store);
+    const parts = [];
+    for (let i = 0; i < str.length;) {
+      let j = Math.min(i + BACKUP_PART_CHARS, str.length);
+      const c = str.charCodeAt(j - 1);
+      if (j < str.length && c >= 0xD800 && c <= 0xDBFF) j--; // ห้ามตัดกลาง emoji (surrogate pair)
+      parts.push(str.slice(i, j)); i = j;
+    }
+    if (!parts.length) parts.push('');
+    const ts = Date.now();
+    // เขียนส่วนย่อยก่อน doc หลัก — ถ้าล้มกลางทาง จะไม่มี backup ครึ่งๆ โผล่ในรายการ
+    for (let i = 1; i < parts.length; i++) {
+      await db.collection('app').doc(`${backupId}_p${i}`).set({
+        _d: parts[i],
+        _ts: ts,
+        type: 'auto',
+        date: todayKey,
+        _partOf: backupId,
+      });
+    }
     await db.collection('app').doc(backupId).set({
-      _d: raw,
-      _ts: Date.now(),
+      _d: parts[0],
+      _ts: ts,
       type: 'auto',
       date: todayKey,
       createdAt: new Date().toISOString(),
+      _parts: parts.length,
     });
 
-    console.log('autoBackupMainStore: saved', backupId);
+    console.log('autoBackupMainStore: saved', backupId, 'parts:', parts.length, 'rec attempts:', recAtt.length, 'rec exams:', recExam.length);
   }
 );
 

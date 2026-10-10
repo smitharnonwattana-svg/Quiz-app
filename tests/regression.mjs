@@ -416,6 +416,7 @@ currentSection = 'backup';
     FirebaseSync.loadBackupData = async (id) => window._fakeBackups[id]?._full ?? null;
     FirebaseSync.deleteBackup = async (id) => { delete window._fakeBackups[id]; return true; };
     FirebaseSync.saveDoc = async (id, data) => { window._saveDocCalls.push({ id, data: JSON.parse(JSON.stringify(data)) }); return true; };
+    FirebaseSync.loadPrefix = async () => []; // v48.55: restore อ่าน doc แยก (rec_*) ปัจจุบันก่อน — ชุดนี้ไม่มี
     // seed backup เก่า (dataset B — ต่างจาก A ชัดเจน เพื่อพิสูจน์ no-merge)
     window._fakeBackups['fake_auto_2026-01-01'] = {
       id: 'fake_auto_2026-01-01', type: 'auto', label: '', date: '2026-01-01', ts: Date.now() - 86400000,
@@ -4062,6 +4063,307 @@ currentSection = 'reviewFixes';
     const src = fs.readFileSync(new URL('../' + RF_FILE, import.meta.url), 'utf8');
     check('pdf.js: getDocument ตั้ง isEvalSupported:false', /getDocument\(\{[^}]*isEvalSupported:\s*false/s.test(src));
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section: recDocs (v48.55 / preview v48.68p) — แยกที่เก็บ: ผลสอบใหม่ + ชุดข้อสอบใหม่ = 1 doc ต่อรายการ
+// ใช้ Firestore ปลอม (tests/fake-firestore.js) ผ่าน addInitScript ก่อนแอปบูต → ทดสอบ listener/query/
+// การเขียนจริงของ FirebaseSync + Store ได้ทั้งเส้นทาง (ไม่แตะ Firebase จริง) — ข้อมูลอยู่ใน localStorage
+// ของ context จึงรีโหลดแล้วยังอยู่ และแท็บที่ 2 ใน context เดียวกัน = "อีกเครื่อง"
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'recDocs';
+{
+  const REC_FILE = 'index.html';
+  const NS = '127_0_0_1_';
+  const FAKE_FS_PATH = new URL('./fake-firestore.js', import.meta.url).pathname;
+  const oldStore = () => baseCache({
+    exams: [mkExam('old1', 'ชุดเก่า 1', 'วิทยาศาสตร์', { questionCount: 2 }), mkExam('old2', 'ชุดเก่า 2', 'คณิตศาสตร์', { questionCount: 2, order: 2 })],
+    questions: {
+      old1: [{ id: 'q1', no: 1, number: 1, page: 1, correct: 'A' }, { id: 'q2', no: 2, number: 2, page: 1, correct: 'B' }],
+      old2: [{ id: 'q1', no: 1, number: 1, page: 1, correct: 'C' }, { id: 'q2', no: 2, number: 2, page: 1, correct: 'D' }],
+    },
+    attempts: [
+      { id: 'attOld1', examId: 'old1', examTitle: 'ชุดเก่า 1', examSubject: 'วิทยาศาสตร์', takerName: 'นนท์', score: 1, total: 2, startedAt: '2026-09-01T09:50:00Z', submittedAt: '2026-09-01T10:00:00Z', perQuestion: [{ qid: 'q1', no: 1, isCorrect: true, chosen: 'A', correct: 'A' }, { qid: 'q2', no: 2, isCorrect: false, chosen: 'A', correct: 'B' }] },
+      { id: 'attOld2', examId: 'old2', examTitle: 'ชุดเก่า 2', examSubject: 'คณิตศาสตร์', takerName: 'นนท์', score: 2, total: 2, startedAt: '2026-08-01T09:50:00Z', submittedAt: '2026-08-01T10:00:00Z', perQuestion: [] },
+    ],
+    members: [{ pin: '1111', name: 'นนท์' }],
+  });
+  async function newFakeFsContext(store) {
+    const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+    await ctx.route('**/firebasejs/**', r => r.abort());
+    await ctx.addInitScript({ path: FAKE_FS_PATH });
+    await ctx.addInitScript(({ st, id }) => {
+      if (localStorage.getItem('__fakeFS') === null) localStorage.setItem('__fakeFS', JSON.stringify({ [id]: { _d: JSON.stringify(st), _ts: 1 } }));
+    }, { st: store, id: NS + 'mainStore' });
+    return ctx;
+  }
+  async function openFakeFsPage(ctx, { role = 'teacher', name = 'Admin', page } = {}) {
+    if (!page) { page = await ctx.newPage(); page.on('dialog', d => d.accept()); }
+    await page.goto(BASE + '/' + REC_FILE, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof Store !== 'undefined' && Store._cloudLoaded === true, {}, { timeout: 8000 }).catch(() => {});
+    await page.evaluate(({ role, name }) => {
+      sessionStorage.setItem('appSession', JSON.stringify({ role, name, ts: Date.now() }));
+      document.getElementById('offlineBanner')?.remove();
+      MemeScore.show = (score, total, onClose) => { if (onClose) onClose(); };
+    }, { role, name });
+    await page.waitForTimeout(300);
+    return page;
+  }
+  const fsMain = (page) => page.evaluate((id) => JSON.parse(__fakeFS.get(id)._d), NS + 'mainStore');
+  const fsRecs = (page, kind) => page.evaluate(({ p }) => Object.entries(__fakeFS.all()).filter(([id]) => id.startsWith(p))
+    .map(([id, v]) => ({ id, d: JSON.parse(v._d) })), { p: NS + 'rec_' + kind + '_' });
+  const seedJSON = JSON.stringify(oldStore().attempts);
+
+  const ctx = await newFakeFsContext(oldStore());
+  const page = await openFakeFsPage(ctx);
+
+  // ── 1) บูตจาก mainStore เก่าล้วน ──
+  const boot = await page.evaluate(() => ({ ready: FirebaseSync.ready(), ex: Store.load().exams.map(e => e.id), at: Store.load().attempts.map(a => a.id),
+    recSets: __fakeFS.log.filter(l => l.id.includes('_rec_')).length }));
+  check('boot: Firestore ปลอมพร้อม + โหลดข้อมูลเก่าครบ ไม่มีการเขียน doc แยก', boot.ready && boot.ex.join() === 'old1,old2' && boot.at.join() === 'attOld1,attOld2' && boot.recSets === 0, JSON.stringify(boot));
+
+  // ── 2) ส่งผลสอบ (ชุดเก่า) ผ่านหน้า take จริง ──
+  await page.evaluate(() => navigate('take', { id: 'old1', takerName: 'ครู' }));
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === 'ก'); if (b) b.click(); });
+  await page.waitForTimeout(150);
+  await page.evaluate(() => document.getElementById('takeSubmitBtn').click());
+  await page.waitForFunction(() => window._currentPage === 'review', {}, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  let recAtt = await fsRecs(page, 'att');
+  let main = await fsMain(page);
+  const newAttId = recAtt[0] && recAtt[0].d.id;
+  check('take: ส่งผลสอบ → เกิด doc rec_att_* 1 ตัว (มี _rec และ examId ถูก)', recAtt.length === 1 && recAtt[0].d._rec === 1 && recAtt[0].d.examId === 'old1' && recAtt[0].id === NS + 'rec_att_' + newAttId.replace(/[^A-Za-z0-9_-]/g, '_'), JSON.stringify(recAtt.map(r => r.id)));
+  check('take: mainStore ไม่มีผลสอบใหม่ + ผลสอบเก่าเหมือนเดิมทุกตัวอักษร', JSON.stringify(main.attempts) === seedJSON && !main.attempts.some(a => a._rec), JSON.stringify(main.attempts.map(a => a.id)));
+  check('take: ในแอปผลสอบใหม่อยู่บนสุด (เหมือน unshift เดิม)', (await page.evaluate(() => Store.load().attempts.map(a => a.id))).join() === [newAttId, 'attOld1', 'attOld2'].join());
+
+  await openFakeFsPage(ctx, { page });
+  const afterReload = await page.evaluate(() => Store.load().attempts.map(a => a.id));
+  check('reload: ผลสอบใหม่ยังอยู่ และอยู่บนสุด', afterReload.join() === [newAttId, 'attOld1', 'attOld2'].join(), JSON.stringify(afterReload));
+
+  // ── 3) ผลสอบย้อนหลัง (UI จริง) + ฝึกจุดอ่อน/นำเข้า Excel (static: ติดธงที่จุดสร้าง) ──
+  await page.evaluate(() => navigate('admin_exams', {}));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('[data-backfill="old2"]').click());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const nm = document.getElementById('backfillTakerName'); if (nm) { nm.value = 'นนท์'; nm.dispatchEvent(new Event('input')); nm.dispatchEvent(new Event('change')); }
+    document.querySelector('.correctBtns[data-qid="q1"] .correctBtn[data-val="C"]').click();
+    document.getElementById('backfillModalSave').click();
+  });
+  await page.waitForTimeout(400);
+  recAtt = await fsRecs(page, 'att');
+  check('backfill: บันทึกย้อนหลัง → เป็น doc แยก (manualEntry)', recAtt.length === 2 && recAtt.some(r => r.d.manualEntry && r.d.examId === 'old2' && r.d._rec === 1), JSON.stringify(recAtt.map(r => r.d.examId)));
+  main = await fsMain(page);
+  check('backfill: mainStore ผลสอบเก่ายังเหมือนเดิม', JSON.stringify(main.attempts) === seedJSON);
+  const src = fs.readFileSync(new URL('../' + REC_FILE, import.meta.url), 'utf8');
+  check('static: ฝึกแก้จุดอ่อน + นำเข้า Excel ติดธง _rec ที่จุดสร้าง', /mode:'weakness_practice',\s*\n\s*_rec:1, _recTs:Date\.now\(\)/.test(src) && /newOnes\.forEach\(a=>\{ a\._rec=1; a\._recTs=_impTs; \}\)/.test(src));
+
+  // ── 4) สร้างชุดข้อสอบใหม่ (UI admin_new) → doc rec_exam_* พร้อมเฉลย ──
+  const mainExamsBefore = JSON.stringify((await fsMain(page)).exams); // migrate() เติม uploadedAt ให้ข้อมูลเก่าตอนบูตแล้ว — เทียบกับตอนนี้
+  await page.evaluate(() => navigate('admin_new'));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    document.getElementById('newTitle').value = 'ชุดใหม่หลังปล่อย';
+    const sel = document.getElementById('newSubjectSelect'); sel.value = 'วิทยาศาสตร์'; sel.dispatchEvent(new Event('change'));
+    document.getElementById('newQCount').value = '3';
+    document.getElementById('newCreateBtn').click();
+  });
+  await page.waitForTimeout(800);
+  let recEx = await fsRecs(page, 'exam');
+  main = await fsMain(page);
+  const newExamId = recEx[0] && recEx[0].d.exam.id;
+  check('admin_new: เกิด doc rec_exam_* มี exam + questions 3 ข้อ', recEx.length === 1 && recEx[0].d.exam._rec === 1 && recEx[0].d.exam.title === 'ชุดใหม่หลังปล่อย' && recEx[0].d.questions.length === 3, JSON.stringify(recEx.map(r => r.d.exam && r.d.exam.title)));
+  check('admin_new: mainStore ไม่มีชุดใหม่ (exams/questions เก่าเหมือนเดิม)', JSON.stringify(main.exams) === mainExamsBefore && !main.questions[newExamId], JSON.stringify(main.exams.map(e => e.id)));
+  check('admin_new: ในแอปเห็นชุดใหม่ + เฉลย', await page.evaluate((id) => !!Store.load().exams.find(e => e.id === id) && (Store.load().questions[id] || []).length === 3, newExamId));
+
+  // แก้เฉลย (แก้ object ในที่ แล้ว save) → อัปเดตเฉพาะ doc นั้น; แก้กลับค่าเดิม → ต้องเขียนอีกรอบ (ไม่ถูกมองเป็น object ค้าง)
+  const editRound = (val) => page.evaluate(({ id, val }) => {
+    __fakeFS.log.length = 0;
+    const s = Store.load(); s.questions[id][0].correct = val; Store.save(s);
+    return new Promise(r => setTimeout(() => r(__fakeFS.log.map(l => l.op + ':' + l.id)), 200));
+  }, { id: newExamId, val });
+  let log = await editRound('B');
+  recEx = await fsRecs(page, 'exam');
+  check('editor: แก้เฉลยชุดใหม่ → เขียน doc ของชุดนั้น (ไม่แตะ rec_att)', recEx[0].d.questions[0].correct === 'B' && log.includes('set:' + NS + 'rec_exam_' + newExamId) && !log.some(l => l.includes('rec_att_')), JSON.stringify(log));
+  await editRound('C'); log = await editRound('B');
+  recEx = await fsRecs(page, 'exam');
+  check('editor: แก้กลับเป็นค่าที่เคยมี (B→C→B) ยังเขียนจริง', recEx[0].d.questions[0].correct === 'B' && log.includes('set:' + NS + 'rec_exam_' + newExamId), JSON.stringify(log));
+
+  // ── 5) แก้ผลสอบ: rec → doc, เก่า → mainStore ──
+  await page.evaluate((id) => { const s = Store.load(); s.attempts.find(a => a.id === id).revealedAt = '2026-10-10T00:00:00Z'; s.attempts.find(a => a.id === 'attOld1').revealedAt = '2026-10-10T00:00:00Z'; Store.save(s); }, newAttId);
+  await page.waitForTimeout(200);
+  recAtt = await fsRecs(page, 'att'); main = await fsMain(page);
+  check('modify: แก้ผลสอบแยก → doc อัปเดต, แก้ผลสอบเก่า → mainStore อัปเดต', recAtt.find(r => r.d.id === newAttId).d.revealedAt && main.attempts.find(a => a.id === 'attOld1').revealedAt && main.attempts.length === 2);
+
+  // ── 6) "อีกเครื่อง" (แท็บที่ 2) เห็นของใหม่ และ listener ส่งการแก้กลับมา ──
+  const page2 = await openFakeFsPage(ctx, { role: 'student', name: 'นนท์' });
+  check('device2: บูตแล้วเห็นผลสอบแยก + ชุดใหม่', await page2.evaluate(({ a, e }) => !!Store.load().attempts.find(x => x.id === a) && !!Store.load().exams.find(x => x.id === e), { a: newAttId, e: newExamId }));
+  await page.evaluate(() => navigate('stats')); await page.waitForTimeout(300);
+  await page2.evaluate((id) => { const s = Store.load(); s.attempts.find(a => a.id === id).feeling = 'จากอีกเครื่อง'; Store.save(s); }, newAttId);
+  await page.waitForTimeout(4000); // teacher soft refresh 3s
+  check('listener: แก้ผลสอบแยกจากอีกเครื่อง → เครื่องแรกได้ค่าใหม่', await page.evaluate((id) => Store.load().attempts.find(a => a.id === id).feeling === 'จากอีกเครื่อง', newAttId));
+
+  // object ค้าง: ถือ s เก่า (snapshot ก่อนเครื่องอื่นแก้) แล้ว save → ห้ามเขียนทับ doc ด้วยเวอร์ชันเก่า
+  await page.evaluate(() => { window.__staleS = Object.assign({}, Store.load(), { attempts: [...Store.load().attempts] }); window.__staleObj = Store.load().attempts[0]; });
+  await page2.evaluate((id) => { const s = Store.load(); s.attempts.find(a => a.id === id).feeling = 'รอบสอง'; Store.save(s); }, newAttId);
+  await page.waitForTimeout(600);
+  const stale = await page.evaluate((id) => {
+    const cur = Store.load().attempts.find(a => a.id === id);
+    const s = window.__staleS; // ยังถือ object เวอร์ชันก่อน "รอบสอง"
+    const before = s.attempts.find(a => a.id === id).feeling;
+    Store.save(s);
+    return { before, cur: cur.feeling };
+  }, newAttId);
+  await page.waitForTimeout(300);
+  recAtt = await fsRecs(page, 'att');
+  check('stale: หน้าที่ถือ object เก่า save → ไม่เขียนทับเวอร์ชันใหม่กว่า', stale.before === 'จากอีกเครื่อง' && recAtt.find(r => r.d.id === newAttId).d.feeling === 'รอบสอง' && (await page.evaluate((id) => Store.load().attempts.find(a => a.id === id).feeling, newAttId)) === 'รอบสอง', JSON.stringify(stale));
+
+  // หน้า take ต้องไม่ถูกรีเฟรชเมื่อ doc แยกเปลี่ยน
+  await page2.evaluate(() => navigate('take', { id: 'old2', takerName: 'นนท์' }));
+  await page2.waitForTimeout(600);
+  const t0 = await page2.evaluate(() => (window._takeState && window._takeState.attemptId) || (typeof _takeState !== 'undefined' && _takeState && _takeState.attemptId));
+  await page.evaluate((id) => { const s = Store.load(); s.attempts.find(a => a.id === id).feeling = 'รอบสาม'; Store.save(s); }, newAttId);
+  await page2.waitForTimeout(1200);
+  const t1 = await page2.evaluate(() => ({ pg: window._currentPage, id: (typeof _takeState !== 'undefined' && _takeState && _takeState.attemptId), f: Store.load().attempts.find(a => a.feeling)?.feeling }));
+  check('listener: หน้า take ไม่ถูกรีเฟรช (attemptId เดิม) แต่ข้อมูลใน store อัปเดต', t1.pg === 'take' && t0 && t1.id === t0 && t1.f === 'รอบสาม', JSON.stringify({ t0, t1 }));
+  await page2.evaluate(() => { if (typeof cleanupTake === 'function') cleanupTake(); navigate('home'); });
+
+  // ── 7) ลบ: ผลสอบแยกผ่านหน้าสถิติ (UI) ──
+  await page.evaluate(() => navigate('stats')); await page.waitForTimeout(400);
+  const delOk = await page.evaluate((id) => {
+    const b = document.querySelector('[data-del="' + id + '"]'); if (!b) return false;
+    b.click(); document.getElementById('statsConfirmOk').click(); return true;
+  }, newAttId);
+  await page.waitForTimeout(400);
+  recAtt = await fsRecs(page, 'att');
+  check('delete: ลบผลสอบแยกจากหน้าสถิติ → doc หาย', delOk && !recAtt.some(r => r.d.id === newAttId), JSON.stringify({ delOk, ids: recAtt.map(r => r.d.id) }));
+  await page.waitForTimeout(800);
+  check('delete: อีกเครื่องเห็นการลบ (listener removed)', await page2.evaluate((id) => !Store.load().attempts.some(a => a.id === id), newAttId));
+  // อีกเครื่องที่ยังถือ object ของผลสอบที่ถูกลบ save → ต้องไม่ชุบชีวิต
+  await page2.evaluate(() => { const s = window.__s2 = Object.assign({}, Store.load()); Store.save(s); });
+  await page2.waitForTimeout(300);
+  check('delete: ลบแล้วไม่กลับมาเอง', !(await fsRecs(page, 'att')).some(r => r.d.id === newAttId));
+
+  // ลบผลสอบเก่า (UI) → mainStore อัปเดต (ด่านกันหายหมู่ต้องปล่อยผ่าน)
+  await page.evaluate(() => navigate('stats')); await page.waitForTimeout(400);
+  await page.evaluate(() => { const b = document.querySelector('[data-del="attOld2"]'); if (b) { b.click(); document.getElementById('statsConfirmOk').click(); } });
+  await page.waitForTimeout(400);
+  main = await fsMain(page);
+  check('delete: ลบผลสอบเก่า → ออกจาก mainStore (ด่านกันหายปล่อยผ่านเพราะสั่งลบจริง)', main.attempts.map(a => a.id).join() === 'attOld1', JSON.stringify(main.attempts.map(a => a.id)));
+
+  // ลบชุดใหม่ + ชุดเก่า ผ่าน modal ลบใน admin_exams
+  const delExam = async (id) => {
+    await page.evaluate(() => navigate('admin_exams', {})); await page.waitForTimeout(400);
+    await page.evaluate((id) => { document.querySelector('[data-del="' + id + '"]').click(); document.getElementById('adminDeleteModalOk').click(); }, id);
+    await page.waitForTimeout(400);
+  };
+  await delExam(newExamId);
+  check('delete: ลบชุดใหม่ → doc rec_exam หาย', (await fsRecs(page, 'exam')).length === 0);
+  await delExam('old2');
+  main = await fsMain(page);
+  check('delete: ลบชุดเก่า → ออกจาก mainStore (exams + questions)', main.exams.map(e => e.id).join() === 'old1' && !main.questions.old2, JSON.stringify(main.exams.map(e => e.id)));
+  await openFakeFsPage(ctx, { page });
+  const ra = await page.evaluate(() => ({ ex: Store.load().exams.map(e => e.id), at: Store.load().attempts.map(a => a.id) }));
+  check('delete: รีโหลดแล้วสิ่งที่ลบไม่กลับมา', ra.ex.join() === 'old1' && !ra.at.includes(newAttId) && !ra.at.includes('attOld2'), JSON.stringify(ra));
+
+  // ── 8) ด่านกันข้อมูลเก่าหายหมู่ ──
+  const guard = await page.evaluate(() => new Promise(res => {
+    const before = __fakeFS.get('127_0_0_1_mainStore')._d;
+    const toasts = []; const _t = window.toast; window.toast = (m) => { toasts.push(m); return _t && _t(m); };
+    const s = Store.load(); s.attempts = s.attempts.filter(a => a.id !== 'attOld1'); // โค้ดตัดผลสอบเก่าโดยไม่ผ่าน deleteRecords
+    Store.save(s);
+    setTimeout(() => { window.toast = _t; res({ same: __fakeFS.get('127_0_0_1_mainStore')._d === before, toasts }); }, 300);
+  }));
+  check('guard: ผลสอบเก่าหายโดยไม่ได้สั่งลบ → ไม่เขียน mainStore + เตือนให้เปิดหน้าใหม่', guard.same && guard.toasts.some(t => t.includes('เปิดหน้านี้ใหม่')), JSON.stringify(guard));
+  await openFakeFsPage(ctx, { page }); // ล้าง state ที่ถูกตัดในหน่วยความจำ
+  check('guard: รีโหลดแล้วผลสอบเก่ายังอยู่ครบ', (await page.evaluate(() => Store.load().attempts.map(a => a.id))).includes('attOld1'));
+
+  // ── 9) เขียน doc แยกล้ม → recPending → flush ลองใหม่สำเร็จ ──
+  const pend = await page.evaluate(async () => {
+    __fakeFS.failWrites = true;
+    const s = Store.load();
+    s.attempts.unshift({ id: 'attPend', examId: 'old1', examTitle: 'ชุดเก่า 1', takerName: 'นนท์', score: 0, total: 2, submittedAt: new Date().toISOString(), perQuestion: [], _rec: 1, _recTs: Date.now() });
+    Store.save(s);
+    await new Promise(r => setTimeout(r, 200));
+    const flagged = JSON.parse(localStorage.getItem('nanont:recPending') || '{}');
+    __fakeFS.failWrites = false;
+    localStorage.removeItem('nanont:syncPending');
+    await Store.flushPendingSync();
+    await new Promise(r => setTimeout(r, 300));
+    return { flagged, after: localStorage.getItem('nanont:recPending'), doc: !!__fakeFS.get('127_0_0_1_rec_att_attPend') };
+  });
+  check('pending: เขียนล้ม → ติดธง recPending; flush → เขียนสำเร็จ + ล้างธง', pend.flagged['rec_att_attPend'] === 'save' && pend.after === null && pend.doc, JSON.stringify(pend));
+
+  // ── 10) backup แบ่งส่วน + กู้คืน ──
+  const bk = await page.evaluate(async () => {
+    // ผลสอบแยก 2 รายการที่ใหญ่ (doc ละ ~600 KB) → backup รวม ~1.2 MB เกิน 1 MiB ถ้าไม่แบ่ง แต่กล่องหลักยังเล็ก
+    const s = Store.load();
+    ['attBig1', 'attBig2'].forEach((id, i) => s.attempts.unshift({ id, examId: 'old1', examTitle: 'ชุดเก่า 1', takerName: 'นนท์', score: 0, total: 2, submittedAt: new Date().toISOString(), perQuestion: [], note: 'ก'.repeat(200000), _rec: 1, _recTs: Date.now() + i }));
+    Store.save(s);
+    await new Promise(r => setTimeout(r, 300));
+    const ok = await FirebaseSync.saveManualBackup(Store.load(), 'ทดสอบแบ่งส่วน');
+    const list = await FirebaseSync.listBackups();
+    const ids = Object.keys(__fakeFS.all()).filter(id => id.includes('_backup_manual_'));
+    const data = await FirebaseSync.loadBackupData(list[0] && list[0].id);
+    return { ok, listN: list.length, label: list[0] && list[0].label, ids, padOk: !!data && data.attempts.filter(a => a.note && a.note.length === 200000).length === 2, hasRec: !!data && data.attempts.some(a => a.id === 'attPend' && a._rec) };
+  });
+  check('backup: ใหญ่กว่า 1 ส่วน → แบ่งเป็นหลาย doc, รายการโชว์ตัวเดียว, โหลดกลับครบ (รวมผลสอบแยก)', bk.ok && bk.ids.length >= 2 && bk.listN === 1 && bk.label === 'ทดสอบแบ่งส่วน' && bk.padOk && bk.hasRec, JSON.stringify(bk));
+  // ไม่ตัดกลาง emoji: ลองทั้งกรณีขอบส่วนตรงกลางคู่ surrogate และไม่ตรง → ทุกส่วนต้องไม่มีครึ่ง emoji ค้างที่ขอบ + โหลดกลับครบ
+  const emo = await page.evaluate(async () => {
+    const out = [];
+    for (const pre of ['', 'a']) {
+      const before = new Set(Object.keys(__fakeFS.all()));
+      const txt = pre + '😀'.repeat(200000);
+      await FirebaseSync.saveManualBackup({ x: txt }, 'emoji' + pre);
+      const ids = Object.keys(__fakeFS.all()).filter(k => !before.has(k));
+      const bad = ids.some(k => { const d = __fakeFS.get(k)._d; return /[\uD800-\uDBFF]$/.test(d) || /^[\uDC00-\uDFFF]/.test(d); });
+      const main = ids.find(k => !/_p\d+$/.test(k));
+      const back = await FirebaseSync.loadBackupData(main);
+      out.push({ parts: ids.length, bad, same: !!back && back.x === txt });
+      await FirebaseSync.deleteBackup(main);
+    }
+    return out;
+  });
+  check('backup: ไม่ตัดกลาง emoji ที่ขอบส่วน + โหลดกลับตรงทุกตัวอักษร (ลบแล้วไม่เหลือส่วนค้าง)', emo.every(e => e.parts >= 2 && !e.bad && e.same), JSON.stringify(emo));
+  // backup แบบเก่า (doc เดียว ไม่มี _parts) ยังโหลดได้
+  const oldBk = await page.evaluate(async () => {
+    __fakeFS.put('127_0_0_1_backup_auto_2026-10-01', { _d: JSON.stringify({ exams: [], attempts: [{ id: 'x' }], members: [] }), _ts: 5, type: 'auto', date: '2026-10-01' });
+    const list = await FirebaseSync.listBackups();
+    const d = await FirebaseSync.loadBackupData('127_0_0_1_backup_auto_2026-10-01');
+    return { n: list.length, att: d && d.attempts.length };
+  });
+  check('backup: แบบเก่า (doc เดียว) ยังโหลดได้', oldBk.n === 2 && oldBk.att === 1, JSON.stringify(oldBk));
+
+  // กู้คืน backup แบบใหม่ผ่านหน้า backup (UI): สร้างผลสอบหลัง backup → กู้คืน → mainStore + doc แยก ตรงกับตอน backup
+  await page.evaluate(async () => {
+    const s = Store.load();
+    s.attempts.unshift({ id: 'attAfter', examId: 'old1', examTitle: 'ชุดเก่า 1', takerName: 'นนท์', score: 2, total: 2, submittedAt: new Date().toISOString(), perQuestion: [], _rec: 1, _recTs: Date.now() });
+    Store.save(s);
+  });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => navigate('admin_backup')); await page.waitForTimeout(500);
+  await page.evaluate(() => document.getElementById('backupTabManual').click()); await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector('#backupList [data-restore]').click()); await page.waitForTimeout(600);
+  const warn = await page.evaluate(() => document.getElementById('backupRestoreCompare').textContent);
+  check('restore: เตือนจำนวนผลสอบแยกที่จะหาย', warn.includes('ผลสอบ 1 รายการ'), warn);
+  await page.evaluate(() => {
+    const i = document.getElementById('backupRestoreConfirmInput'); i.value = 'กู้คืน'; i.dispatchEvent(new Event('input'));
+    document.getElementById('backupRestoreOk').click(); // สำเร็จแล้วแอปรีโหลดเองหลัง 800ms
+  });
+  await page.waitForTimeout(1200);
+  recAtt = await fsRecs(page, 'att'); main = await fsMain(page);
+  check('restore: doc แยกตรงกับ backup (attPend กลับมา/คงอยู่, attAfter ถูกลบ) และ mainStore ไม่มี record แยก',
+    recAtt.some(r => r.d.id === 'attPend') && !recAtt.some(r => r.d.id === 'attAfter') && !main.attempts.some(a => a._rec) && recAtt.some(r => r.d.id === 'attBig1'), JSON.stringify({ rec: recAtt.map(r => r.d.id), main: main.attempts.map(a => a.id) }));
+
+  // ── 11) แบนเนอร์วัดเฉพาะกล่องหลัก ──
+  await openFakeFsPage(ctx, { page });
+  const usage = await page.evaluate(() => ({ u: getStoreUsage(), main: new Blob([JSON.stringify(Store._mainPayload(Store.load()))]).size, all: new Blob([JSON.stringify(Store.load())]).size }));
+  check('usage: getStoreUsage วัดเฉพาะกล่องหลัก + นับจำนวนที่แยกเก็บ', usage.u.bytes === usage.main && usage.main < usage.all && usage.u.recAtt >= 1, JSON.stringify(usage));
+  await page.evaluate(() => navigate('admin')); await page.waitForTimeout(200);
+  check('usage: บรรทัดในหน้า Admin บอกจำนวนที่แยกเก็บ', /แยกเก็บแล้ว: ผลสอบ \d+ รายการ/.test(await page.evaluate(() => document.getElementById('adminStorageInfo').textContent)));
+
+  await ctx.close();
 }
 
 await browser.close();

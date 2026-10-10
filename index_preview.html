@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.67p -->
+  <!-- APP_VERSION: v48.68p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1401,7 +1401,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.67p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.68p</div>
     </div>
   </div>
 </div>
@@ -2945,16 +2945,34 @@ const FirebaseSync = (() => {
 
   // ── Backup (save-game style: auto รายวันจาก Cloud Function + manual กดเองจากหน้าเว็บ) ──
   // ใช้ collection 'app' เดิม doc id: <origin>_backup_auto_<date> / <origin>_backup_manual_<ts>
+  // v48.68p: backup ใหญ่เกิน 1 doc → แบ่งส่วน: doc หลัก (meta + _parts:n + ส่วนที่ 0) + <id>_p1.._p(n-1)
+  // ส่วนละ ≤ 300,000 ตัวอักษร (≈ ≤ 900 KB แม้เป็นภาษาไทยล้วน) — backup แบบเก่า (ไม่มี _parts) อ่านได้เหมือนเดิม
+  const BACKUP_PART_CHARS = 300000;
   async function saveManualBackup(data, label) {
     if (!_ready) return false;
     try {
       const ts = Date.now();
-      await _doc('backup_manual_' + ts).set({
-        _d: JSON.stringify(data),
+      const id = 'backup_manual_' + ts;
+      const str = JSON.stringify(data);
+      const parts = [];
+      for (let i = 0; i < str.length; ) {
+        let j = Math.min(i + BACKUP_PART_CHARS, str.length);
+        const c = str.charCodeAt(j - 1);
+        if (j < str.length && c >= 0xD800 && c <= 0xDBFF) j--; // ห้ามตัดกลาง emoji (surrogate pair) — ส่วนที่ขาดครึ่งจะเพี้ยนตอนเก็บเป็น UTF-8
+        parts.push(str.slice(i, j)); i = j;
+      }
+      if (!parts.length) parts.push('');
+      // เขียนส่วนย่อยก่อน doc หลัก — ถ้าล้มกลางทาง จะไม่มี backup ครึ่งๆ โผล่ในรายการ
+      for (let i = 1; i < parts.length; i++) {
+        await _doc(id + '_p' + i).set({ _d: parts[i], _ts: ts, type: 'manual', _partOf: _ns(id) });
+      }
+      await _doc(id).set({
+        _d: parts[0],
         _ts: ts,
         type: 'manual',
         label: String(label || '').slice(0, 60),
         createdAt: new Date(ts).toISOString(),
+        _parts: parts.length,
       });
       return true;
     } catch(e) { console.warn('[FB] saveManualBackup err', e); return false; }
@@ -2971,7 +2989,7 @@ const FirebaseSync = (() => {
         .get({ source: 'server' });
       // ไม่มี select()/field-mask ให้ใช้บน client SDK (มีแค่ Admin SDK ฝั่งเซิร์ฟเวอร์) — ดึงมาทั้ง doc
       // แล้วหยิบเฉพาะ metadata ที่ต้องใช้ ทิ้ง _d (payload ก้อนใหญ่) ไป ไม่ผูกไว้ใน object ที่ return
-      return snap.docs.map(d => {
+      return snap.docs.filter(d => !/_p\d+$/.test(d.id) && !d.data()._partOf).map(d => {
         const v = d.data();
         return { id: d.id, type: v.type || '', label: v.label || '', date: v.date || '', ts: v._ts || 0, createdAt: v.createdAt || '' };
       }).sort((a, b) => b.ts - a.ts);
@@ -2983,13 +3001,66 @@ const FirebaseSync = (() => {
     try {
       const s = await db.collection('app').doc(id).get({ source: 'server' });
       if (!s.exists) return null;
-      return JSON.parse(s.data()._d || 'null');
+      const v = s.data();
+      let str = v._d || '';
+      const n = v._parts || 1;
+      for (let i = 1; i < n; i++) {
+        const ps = await db.collection('app').doc(id + '_p' + i).get({ source: 'server' });
+        if (!ps.exists) { console.warn('[FB] backup part missing', id, i); return null; } // ส่วนหาย = ห้ามกู้คืนข้อมูลไม่ครบ
+        str += ps.data()._d || '';
+      }
+      return JSON.parse(str || 'null');
     } catch(e) { console.warn('[FB] loadBackupData err', e); return null; }
   }
 
   async function deleteBackup(id) {
-    try { await db.collection('app').doc(id).delete(); return true; }
+    try {
+      const s = await db.collection('app').doc(id).get({ source: 'server' }).catch(() => null);
+      const n = (s && s.exists && s.data()._parts) || 1;
+      for (let i = 1; i < n; i++) await db.collection('app').doc(id + '_p' + i).delete();
+      await db.collection('app').doc(id).delete();
+      return true;
+    }
     catch(e) { console.warn('[FB] deleteBackup err', e); return false; }
+  }
+
+  // ── v48.68p: เอกสารแยกต่อรายการ (rec_att_* / rec_exam_*) ──
+  // query ตาม id prefix แบบเดียวกับ listBackups (ไม่ต้องสร้าง index) — p = id สั้น (ไม่มี origin)
+  function _prefixQuery(p) {
+    const full = _ns(p), F = firebase.firestore.FieldPath.documentId();
+    return db.collection('app').where(F, '>=', full).where(F, '<', full + '');
+  }
+  function _parseRecDoc(d) {
+    try { return { id: d.id, data: JSON.parse(d.data()._d || 'null') }; } catch(e) { return { id: d.id, data: null }; }
+  }
+
+  // อ่านทุก doc ที่ขึ้นต้นด้วย p — คืน [{id (เต็ม), data}] หรือ null = อ่านไม่ได้ (ห้ามถือว่า "ไม่มี")
+  async function loadPrefix(p) {
+    if (!_ready) return null;
+    try {
+      const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+      const snap = await Promise.race([_prefixQuery(p).get({ source: 'server' }), _timeout]);
+      return snap.docs.map(_parseRecDoc);
+    } catch(e) {
+      try { const snap = await _prefixQuery(p).get(); return snap.docs.map(_parseRecDoc); }
+      catch(e2) { console.warn('[FB] loadPrefix err', p, e2); return null; }
+    }
+  }
+
+  // real-time: onChanges([{type:'added'|'modified'|'removed', id (เต็ม), data}])
+  function listenPrefix(p, onChanges) {
+    if (!_ready) return () => {};
+    return _prefixQuery(p).onSnapshot(snap => {
+      const ch = snap.docChanges().map(c => Object.assign({ type: c.type }, _parseRecDoc(c.doc)));
+      if (ch.length) onChanges(ch);
+    }, e => { console.warn('[FB] listenPrefix err', p, e); });
+  }
+
+  // ลบ doc (id สั้น) — true = ลบสำเร็จ
+  async function deleteDoc(id) {
+    if (!_ready) return false;
+    try { await _doc(id).delete(); return true; }
+    catch(e) { console.warn('[FB] deleteDoc err', id, e); return false; }
   }
 
   // Real-time listener — calls cb(data) whenever doc changes from any device
@@ -3084,7 +3155,7 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, ready: () => _ready, ns: _ns };
+  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, loadPrefix, listenPrefix, deleteDoc, ready: () => _ready, ns: _ns };
 })();
 
 function _updateBellBadge() {
@@ -3393,6 +3464,207 @@ const Store = {
   lastError:null,
   key:"quizSciDemoStoreV1",   // kept for migration cleanup only
   _cache:null,                 // in-memory store — Firebase is source of truth
+  // ── v48.68p: แยกที่เก็บ — ผลสอบใหม่/ชุดข้อสอบใหม่ (ติดธง _rec:1 ตอนสร้าง) เก็บ 1 รายการต่อ 1 doc ──
+  // app/<origin>_rec_att_<id> = attempt, app/<origin>_rec_exam_<id> = {exam, questions}
+  // ข้อมูลเก่าอยู่ใน mainStore เหมือนเดิม (ไม่ย้าย/ไม่แตะ) — ในหน่วยความจำรวมกันเป็นรูปแบบเดิม หน้าอื่นไม่ต้องรู้
+  // map ด้านล่างเป็น "เจ้าของ" record แยก: ทุกจุดที่แทนที่ _cache ต้องเรียก _attachRecs ใส่กลับเข้าไป
+  _recAtt:new Map(),           // attemptId → attempt
+  _recExam:new Map(),          // examId → {exam, questions}
+  _recSeen:new Map(),          // docId → {latest: hash, hist: [hash เวอร์ชันก่อนหน้า ≤5]} — จับ object ค้างจากหน้าที่ถือ s เก่า
+  _recDeleted:new Set(),       // 'att:<id>' / 'exam:<id>' ที่ถูกลบแล้ว (เครื่องนี้หรือเครื่องอื่น) — กัน object ค้างชุบชีวิต
+  _allowDrop:new Set(),        // record เก่าใน mainStore ที่ผู้ใช้สั่งลบจริง (ผ่าน deleteRecords) — ด่านกันหายหมู่ปล่อยผ่าน
+  _mainIds:null,               // id ผลสอบ/ข้อสอบใน mainStore ล่าสุดที่รู้จาก cloud — ใช้กับด่านกันหายหมู่
+  _recSafe(id){ return String(id).replace(/[^A-Za-z0-9_-]/g,'_'); },
+  _recDocId(k,id){ return (k==='exam'?'rec_exam_':'rec_att_')+this._recSafe(id); },
+  _recHash(v){
+    const str=JSON.stringify(v)||'';
+    let h1=0xdeadbeef, h2=0x41c6ce57;
+    for(let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+    h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+    h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+    return (4294967296*(2097151&h2)+(h1>>>0))+':'+str.length;
+  },
+  _recMark(docId,h){
+    const sd=this._recSeen.get(docId)||{latest:'',hist:[]};
+    if(sd.latest&&sd.latest!==h){ sd.hist.unshift(sd.latest); sd.hist=sd.hist.slice(0,5); }
+    sd.latest=h; this._recSeen.set(docId,sd);
+  },
+  _recPendingGet(){ try{ return JSON.parse(localStorage.getItem('nanont:recPending')||'{}')||{}; }catch(e){ return {}; } },
+  _recPending(docId,op){ const p=this._recPendingGet(); p[docId]=op; localStorage.setItem('nanont:recPending',JSON.stringify(p)); },
+  _recPendingClear(docId){
+    const p=this._recPendingGet(); if(!(docId in p)) return;
+    delete p[docId];
+    if(Object.keys(p).length) localStorage.setItem('nanont:recPending',JSON.stringify(p)); else localStorage.removeItem('nanont:recPending');
+  },
+  _recWrite(docId,v){
+    if(!FirebaseSync.ready()){ this._recPending(docId,'save'); return; }
+    FirebaseSync.saveDoc(docId,v).then(ok=>{ if(ok) this._recPendingClear(docId); else this._recPending(docId,'save'); });
+  },
+  _recValueByDocId(docId){
+    if(docId.startsWith('rec_att_')){ for(const [id,a] of this._recAtt) if(this._recDocId('att',id)===docId) return a; }
+    else if(docId.startsWith('rec_exam_')){ for(const [id,r] of this._recExam) if(this._recDocId('exam',id)===docId) return r; }
+    return null;
+  },
+  _flushRecPending(){
+    if(!FirebaseSync.ready()) return;
+    const p=this._recPendingGet();
+    Object.keys(p).forEach(docId=>{
+      if(p[docId]==='del'){ FirebaseSync.deleteDoc(docId).then(ok=>{ if(ok) this._recPendingClear(docId); }); return; }
+      const v=this._recValueByDocId(docId);
+      if(!v){ this._recPendingClear(docId); return; } // ไม่อยู่ในหน่วยความจำแล้ว (ถูกลบ/รีโหลด) — ไม่มีอะไรให้เขียน
+      FirebaseSync.saveDoc(docId,v).then(ok=>{ if(ok) this._recPendingClear(docId); });
+    });
+  },
+  // เขียน record แยกที่ "เปลี่ยนจริง" ใน data — เทียบ hash กับเวอร์ชันล่าสุดที่รู้จัก:
+  // เท่าเดิม → ข้าม; เป็นเวอร์ชันเก่าที่เคยเห็น (object ค้างจากหน้าที่ถือ s เก่า) → ไม่เขียน + สลับเป็นตัวล่าสุด;
+  // ไม่เคยเห็น (สร้าง/แก้ในเครื่องนี้) → เขียน doc นั้น doc เดียว
+  _syncRecs(data){
+    const writes=[];
+    if(Array.isArray(data.attempts)) data.attempts.forEach((a,i)=>{
+      if(!a||!a._rec||!a.id||this._recDeleted.has('att:'+a.id)) return;
+      const docId=this._recDocId('att',a.id), cur=this._recAtt.get(a.id), sd=this._recSeen.get(docId), h=this._recHash(a);
+      if(sd&&h===sd.latest){ if(cur&&cur!==a) data.attempts[i]=cur; return; }
+      if(cur&&cur!==a&&sd&&sd.hist.includes(h)){ data.attempts[i]=cur; return; }
+      this._recAtt.set(a.id,a); this._recMark(docId,h); writes.push([docId,a]);
+    });
+    if(Array.isArray(data.exams)) data.exams.forEach((e,i)=>{
+      if(!e||!e._rec||!e.id||this._recDeleted.has('exam:'+e.id)) return;
+      if(!data.questions||typeof data.questions!=='object') data.questions={};
+      if(!Array.isArray(data.questions[e.id])) data.questions[e.id]=[];
+      const rec={exam:e,questions:data.questions[e.id]};
+      const docId=this._recDocId('exam',e.id), cur=this._recExam.get(e.id), sd=this._recSeen.get(docId), h=this._recHash(rec);
+      const same=cur&&cur.exam===e&&cur.questions===rec.questions;
+      const swap=()=>{ data.exams[i]=cur.exam; data.questions[e.id]=cur.questions; };
+      if(sd&&h===sd.latest){ if(cur&&!same) swap(); return; }
+      if(cur&&!same&&sd&&sd.hist.includes(h)){ swap(); return; }
+      this._recExam.set(e.id,rec); this._recMark(docId,h); writes.push([docId,rec]);
+    });
+    writes.forEach(([docId,v])=>this._recWrite(docId,v));
+  },
+  // ใส่ record แยกจาก map เข้า store (แทนที่ตาม id, ตัดตัวที่ถูกลบ) — ผลสอบ/ข้อสอบแยกอยู่หน้าสุด ใหม่→เก่า
+  // (เหมือน unshift เดิม) ส่วนรายการเก่าคงลำดับเดิมทุกอย่าง
+  _attachRecs(s){
+    if(!s||typeof s!=='object') return s;
+    const del=this._recDeleted, byTs=(a,b)=>((b._recTs||0)-(a._recTs||0))||(new Date(b.submittedAt||0)-new Date(a.submittedAt||0));
+    const atts=Array.isArray(s.attempts)?s.attempts:[];
+    // rec ที่อยู่ในหน่วยความจำแต่ยังไม่เข้า map (เช่น save ถูกปฏิเสธก่อน _syncRecs) — เก็บไว้ ไม่ให้หาย
+    const extraA=atts.filter(a=>a&&a._rec&&!this._recAtt.has(a.id)&&!del.has('att:'+a.id));
+    const oldA=atts.filter(a=>!(a&&(a._rec||this._recAtt.has(a.id))));
+    s.attempts=[...this._recAtt.values(),...extraA].sort(byTs).concat(oldA);
+    const exs=Array.isArray(s.exams)?s.exams:[];
+    if(!s.questions||typeof s.questions!=='object') s.questions={};
+    const extraE=exs.filter(e=>e&&e._rec&&!this._recExam.has(e.id)&&!del.has('exam:'+e.id));
+    const oldE=exs.filter(e=>!(e&&(e._rec||this._recExam.has(e.id))));
+    del.forEach(k=>{ if(k.startsWith('exam:')) delete s.questions[k.slice(5)]; });
+    this._recExam.forEach(r=>{ s.questions[r.exam.id]=r.questions; });
+    s.exams=[...Array.from(this._recExam.values(),r=>r.exam),...extraE].sort(byTs).concat(oldE);
+    return s;
+  },
+  // สำเนาตื้นสำหรับเขียน mainStore — ตัด record แยกออก (mainStore เก็บแค่ข้อมูลเก่า + ส่วนอื่นของแอป)
+  _mainPayload(data){
+    const p=Object.assign({},data);
+    if(Array.isArray(data.attempts)) p.attempts=data.attempts.filter(a=>!(a&&a._rec));
+    if(Array.isArray(data.exams)){
+      const recIds=new Set(this._recExam.keys());
+      data.exams.forEach(e=>{ if(e&&e._rec) recIds.add(e.id); });
+      this._recDeleted.forEach(k=>{ if(k.startsWith('exam:')) recIds.add(k.slice(5)); });
+      p.exams=data.exams.filter(e=>!(e&&e._rec));
+      if(data.questions&&typeof data.questions==='object'){
+        p.questions=Object.assign({},data.questions);
+        recIds.forEach(id=>{ if(!p.exams.some(e=>e&&e.id===id)) delete p.questions[id]; });
+      }
+    }
+    return p;
+  },
+  _setMainIds(m){
+    this._mainIds={
+      att:new Set((Array.isArray(m&&m.attempts)?m.attempts:[]).map(a=>a&&a.id).filter(Boolean)),
+      exam:new Set((Array.isArray(m&&m.exams)?m.exams:[]).map(e=>e&&e.id).filter(Boolean)),
+    };
+  },
+  // ด่านกันข้อมูลเก่าหายหมู่: ผลสอบ/ข้อสอบเก่าที่ cloud มีแต่ payload ไม่มี (และไม่ได้สั่งลบผ่าน deleteRecords) → ห้ามเขียน
+  _dropCheck(p){
+    if(!this._mainIds) return null;
+    const pa=new Set((p.attempts||[]).map(a=>a&&a.id)), pe=new Set((p.exams||[]).map(e=>e&&e.id));
+    const lostA=[...this._mainIds.att].filter(id=>!pa.has(id)&&!this._allowDrop.has('att:'+id));
+    const lostE=[...this._mainIds.exam].filter(id=>!pe.has(id)&&!this._allowDrop.has('exam:'+id));
+    return (lostA.length||lostE.length)?{nA:lostA.length,nE:lostE.length,lostA:lostA.slice(0,5),lostE:lostE.slice(0,5)}:null;
+  },
+  // จุดเขียน mainStore จุดเดียว — คืน Promise<true|false|'blocked'>
+  _writeMain(data,reason){
+    const p=this._mainPayload(data);
+    const bad=this._dropCheck(p);
+    if(bad){
+      console.warn('[Store] mainStore write BLOCKED — old records missing', reason, bad);
+      _takeDiag('mainstore.dropGuard', Object.assign({reason}, bad));
+      if(typeof toast==='function' && Date.now()-(this._dropToastAt||0)>30000){
+        this._dropToastAt=Date.now();
+        toast('⚠️ ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้านี้ใหม่');
+      }
+      return Promise.resolve('blocked');
+    }
+    return FirebaseSync.saveDoc('mainStore',p).then(ok=>{ if(ok) this._setMainIds(p); return ok; });
+  },
+  // ลบแบบระบุชัด — เรียกก่อนโค้ดเดิมตัดรายการออกจาก array แล้ว save (kind: 'attempts' | 'exams')
+  // record แยก → ลบ doc ของมัน; record เก่าใน mainStore → อนุญาตให้ด่านกันหายหมู่ปล่อยผ่าน
+  deleteRecords(kind,ids){
+    const k=kind==='exams'?'exam':'att', map=k==='exam'?this._recExam:this._recAtt;
+    const arr=this._cache?(k==='exam'?this._cache.exams:this._cache.attempts):null;
+    (ids||[]).forEach(id=>{
+      if(!id) return;
+      const isRec=map.has(id)||(Array.isArray(arr)&&arr.some(x=>x&&x.id===id&&x._rec));
+      if(!isRec){ this._allowDrop.add(k+':'+id); return; }
+      const docId=this._recDocId(k,id);
+      map.delete(id); this._recSeen.delete(docId); this._recDeleted.add(k+':'+id);
+      if(!FirebaseSync.ready()){ this._recPending(docId,'del'); return; }
+      FirebaseSync.deleteDoc(docId).then(ok=>{ if(ok) this._recPendingClear(docId); else this._recPending(docId,'del'); });
+    });
+  },
+  // รับการเปลี่ยนแปลงของ record แยกจาก listener (เครื่องอื่น หรือเสียงสะท้อนของเครื่องนี้)
+  _applyRecChanges(k,changes){
+    const pre=FirebaseSync.ns(''), map=k==='exam'?this._recExam:this._recAtt;
+    const idOf=v=>k==='exam'?(v&&v.exam&&v.exam.id):(v&&v.id);
+    let changed=false;
+    changes.forEach(c=>{
+      const docId=c.id.startsWith(pre)?c.id.slice(pre.length):c.id;
+      if(c.type==='removed'){
+        let id=idOf(c.data);
+        if(!id) for(const key of map.keys()) if(this._recDocId(k,key)===docId){ id=key; break; }
+        if(!id) return;
+        if(map.delete(id)) changed=true;
+        this._recSeen.delete(docId); this._recDeleted.add(k+':'+id);
+        return;
+      }
+      const v=c.data, id=idOf(v);
+      if(!id||(k==='exam'&&!Array.isArray(v.questions))) return;
+      const h=this._recHash(v), sd=this._recSeen.get(docId);
+      if(sd&&sd.latest===h) return; // เวอร์ชันเดียวกับที่ถืออยู่ (รวมเสียงสะท้อนจากการเขียนของเครื่องนี้)
+      this._recDeleted.delete(k+':'+id);
+      map.set(id,v); this._recMark(docId,h); changed=true;
+    });
+    if(!changed) return;
+    if(this._cache) this._attachRecs(this._cache);
+    this._scheduleSoftRefresh();
+  },
+  _listenRecs(){
+    FirebaseSync.listenPrefix('rec_att_', ch=>this._applyRecChanges('att',ch));
+    FirebaseSync.listenPrefix('rec_exam_', ch=>this._applyRecChanges('exam',ch));
+  },
+  // re-render หน้าที่ปลอดภัยหลังข้อมูลจาก cloud เปลี่ยน (ไม่แตะหน้าทำข้อสอบ/ฝึก/แก้เฉลย)
+  _scheduleSoftRefresh(){
+    if (this._softRefreshT) clearTimeout(this._softRefreshT);
+    this._softRefreshT = setTimeout(() => {
+      const safeSoftRefresh = ['home','stats','rewards','exams'];
+      const pg = window._currentPage;
+      if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
+        // flag ให้ initExams รู้ว่านี่คือ soft refresh (listener re-nav) ไม่ใช่ผู้ใช้กดเอง
+        // → คงวิชาที่เลือกไว้ ไม่เด้งกลับหน้าเลือกวิชา (navigate→initExams รันแบบ sync อ่าน flag ทัน)
+        window._softRefreshing = true;
+        try { navigate(pg, window._currentParams||{}); }
+        finally { window._softRefreshing = false; }
+      }
+    }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
+  },
   migrate(s){
     if(!s||typeof s!=='object') return s;
     if(!Array.isArray(s.exams)) s.exams=[];
@@ -3472,6 +3744,8 @@ const Store = {
       }
       if (!Store._cloudLoaded) {
         // ห้าม push ก่อนข้อมูล cloud โหลดเสร็จ — กันการทับ Firestore ด้วย store เปล่า
+        // v48.68p: record แยกเขียนได้เลย (doc ของตัวเอง ไม่ทับข้อมูลอื่น) — ผลสอบที่ส่งช่วงบูตจึงไม่หาย
+        this._syncRecs(data); this._attachRecs(data);
         this._cache = data;
         this.lastError = 'cloud-not-loaded';
         console.warn('[Store.save] blocked — cloud data not loaded yet');
@@ -3483,7 +3757,7 @@ const Store = {
         try{
           if (Array.isArray(this._cache.attempts) && Array.isArray(data.attempts)) {
             const _ids = new Set(data.attempts.map(a => a && a.id));
-            const _missing = this._cache.attempts.filter(a => a && a.id && !_ids.has(a.id));
+            const _missing = this._cache.attempts.filter(a => a && a.id && !a._rec && !_ids.has(a.id)); // v48.68p: record แยก → _attachRecs ใส่ให้
             if (_missing.length > 0) data.attempts = [..._missing, ...data.attempts];
           }
           const _mg = _mergeGamificationByTs(data.gamification, this._cache.gamification);
@@ -3496,12 +3770,14 @@ const Store = {
           }
         }catch(e){ console.warn('[Store.save] stale-merge err', e); }
       }
+      this._syncRecs(data);
+      this._attachRecs(data);
       data._savedAt = Date.now();
       this._cache = data;
       if(FirebaseSync.ready()) {
-        FirebaseSync.saveDoc('mainStore', data).then(ok => {
-          if (ok) { localStorage.removeItem('nanont:syncPending'); }
-          else {
+        this._writeMain(data, 'save').then(ok => {
+          if (ok === true) { localStorage.removeItem('nanont:syncPending'); }
+          else if (ok !== 'blocked') {
             localStorage.setItem('nanont:syncPending', '1');
             if (typeof toast === 'function') toast('⚠️ sync ขึ้น cloud ไม่สำเร็จ — จะลองใหม่อัตโนมัติ');
           }
@@ -3529,11 +3805,12 @@ const Store = {
       }catch(e){}
       return;
     }
+    this._setMainIds(cloud);
     try{
       // Merge any in-memory attempts not yet in cloud (submitted before Firebase loaded)
       if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
         const _cloudIds = new Set(cloud.attempts.map(a => a.id));
-        const _localOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+        const _localOnly = this._cache.attempts.filter(a => a && !a._rec && !_cloudIds.has(a.id));
         if (_localOnly.length > 0) {
           cloud.attempts = [..._localOnly, ...cloud.attempts];
           console.log('[Store] merged', _localOnly.length, 'in-memory attempts into cloud');
@@ -3556,7 +3833,7 @@ const Store = {
             cloud.questions = Object.assign({}, _ls.questions, cloud.questions||{});
           }
           console.log('[Store] RECOVERY: merged', _lsOnly.length, 'exams from localStorage → pushing to Firestore');
-          FirebaseSync.saveDoc('mainStore', cloud).then(()=>{
+          this._writeMain(cloud, 'recovery').then(()=>{
             localStorage.removeItem(this.key); // safe to remove after successful push
             console.log('[Store] RECOVERY complete — localStorage cleared');
           }).catch(e=>console.warn('[Store] RECOVERY push err',e));
@@ -3565,7 +3842,7 @@ const Store = {
         }
       }
     }catch(e){ console.warn('[Store] localStorage recovery err',e); }
-    this._cache = cloud;
+    this._cache = this._attachRecs(cloud);
     Store._cloudLoaded = true;
     const _lb = document.getElementById('_storeLoadingBar');
     if(_lb) _lb.remove();
@@ -3586,9 +3863,14 @@ const Store = {
     if(!cloud) throw new Error('cloud empty or unreachable');
     const _cloudCount = Array.isArray(cloud.attempts) ? cloud.attempts.length : 0;
     const _memCount = this._cache ? (Array.isArray(this._cache.attempts) ? this._cache.attempts.length : 0) : 0;
+    this._setMainIds(cloud);
+    // v48.68p: โหลด record แยกใหม่ทั้งหมดด้วย (null = อ่านไม่ได้ → คงของเดิมใน map)
+    const [_ra, _re] = await Promise.all([FirebaseSync.loadPrefix('rec_att_'), FirebaseSync.loadPrefix('rec_exam_')]);
+    if (_ra) this._applyRecChanges('att', _ra.map(d => Object.assign({ type: 'added' }, d)));
+    if (_re) this._applyRecChanges('exam', _re.map(d => Object.assign({ type: 'added' }, d)));
     if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
       const _cloudIds = new Set(cloud.attempts.map(a => a.id));
-      const _localOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+      const _localOnly = this._cache.attempts.filter(a => a && !a._rec && !_cloudIds.has(a.id));
       if (_localOnly.length > 0) {
         const _all = [..._localOnly, ...cloud.attempts];
         const _seen = new Set();
@@ -3600,7 +3882,7 @@ const Store = {
         console.log('[forcePull] preserved', _localOnly.length, 'in-memory attempts');
       }
     }
-    this._cache = cloud;
+    this._cache = this._attachRecs(cloud);
     console.log('[forcePull] complete — cloud:', _cloudCount, 'memBefore:', _memCount);
     return { cloudAttempts: _cloudCount, localAttemptsBefore: _memCount, preserved: 0 };
   },
@@ -3611,7 +3893,8 @@ const Store = {
     if (!Store._cloudLoaded) throw new Error('ข้อมูล cloud ยังโหลดไม่เสร็จ — ห้าม force push ทับ');
     if (!this._cache || !Array.isArray(this._cache.attempts)) throw new Error('ไม่มีข้อมูลใน memory');
     this._cache._savedAt = Date.now();
-    const _ok = await FirebaseSync.saveDoc('mainStore', this._cache);
+    const _ok = await this._writeMain(this._cache, 'forcePush');
+    if (_ok === 'blocked') throw new Error('ข้อมูลเก่าบางรายการหายจากหน่วยความจำ — ไม่เขียนทับ กรุณาเปิดหน้าใหม่');
     if (!_ok) throw new Error('saveDoc returned false');
     const _verified = await FirebaseSync.loadDoc('mainStore');
     if (!_verified) throw new Error('read-back ได้ null — server อาจไม่ได้รับ');
@@ -3619,7 +3902,7 @@ const Store = {
       written: this._cache._savedAt,
       serverTs: _verified._savedAt || 0,
       match: (_verified._savedAt || 0) === this._cache._savedAt,
-      localAttempts: this._cache.attempts.length,
+      localAttempts: this._mainPayload(this._cache).attempts.length,
       serverAttempts: Array.isArray(_verified.attempts) ? _verified.attempts.length : 0
     };
   },
@@ -3630,6 +3913,7 @@ const Store = {
     if (typeof WeaknessTracker !== 'undefined' && WeaknessTracker.flushPendingWeaknesses) {
       WeaknessTracker.flushPendingWeaknesses();
     }
+    this._flushRecPending();
     if (localStorage.getItem('nanont:syncPending') !== '1') return;
     if (!this._cache || !Array.isArray(this._cache.attempts)) {
       localStorage.removeItem('nanont:syncPending');
@@ -3653,7 +3937,8 @@ const Store = {
         }
       }
     } catch(e) { console.warn('[flushPendingSync] cloud merge err', e); }
-    FirebaseSync.saveDoc('mainStore', this._cache).then((ok) => {
+    this._writeMain(this._cache, 'flush').then((ok) => {
+      if (ok === 'blocked') { localStorage.removeItem('nanont:syncPending'); return; }
       if (!ok) { console.warn('[flushPendingSync] push failed — retry next interval'); return; }
       localStorage.removeItem('nanont:syncPending');
       console.log('[flushPendingSync] flushed pending data to cloud');
@@ -3666,6 +3951,7 @@ const Store = {
     if (Store._fbBooted) return this.migrate(this.load());
     Store._fbBooted = true;
     FirebaseSync.init();
+    this._listenRecs();
     _updateOfflineBanner();
     setInterval(_updateOfflineBanner, 5000);
     setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
@@ -3674,7 +3960,6 @@ const Store = {
       this.flushPendingSync();
     });
     // Real-time listener: update in-memory cache when cloud data changes
-    let _listenDocRefreshTimeout = null;
     let _lastCloudHash = '';
     FirebaseSync.listenDoc('mainStore', (cloudData) => {
       try{
@@ -3693,10 +3978,11 @@ const Store = {
         const _hash = JSON.stringify(_hashObj);
         if (_hash === _lastCloudHash) return;
         _lastCloudHash = _hash;
+        this._setMainIds(cloudData);
         // Preserve in-memory attempts not yet in cloud
         if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloudData.attempts)) {
           const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
-          const _memOnly = this._cache.attempts.filter(a => !_cloudIds.has(a.id));
+          const _memOnly = this._cache.attempts.filter(a => a && !a._rec && !_cloudIds.has(a.id));
           if (_memOnly.length > 0) {
             const _all = [..._memOnly, ...cloudData.attempts];
             _all.sort((a,b) => new Date(b.submittedAt||0) - new Date(a.submittedAt||0));
@@ -3724,24 +4010,13 @@ const Store = {
             cloudData.assignments = Array.from(_aMap.values());
           }
         } catch(e) {}
-        this._cache = cloudData;
+        this._cache = this._attachRecs(cloudData);
         _updateBellBadge();
         Store._cloudLoaded = true;
         const _lb2 = document.getElementById('_storeLoadingBar');
         if(_lb2) _lb2.remove();
       }catch(e){}
-      if (_listenDocRefreshTimeout) clearTimeout(_listenDocRefreshTimeout);
-      _listenDocRefreshTimeout = setTimeout(() => {
-      const safeSoftRefresh = ['home','stats','rewards','exams'];
-      const pg = window._currentPage;
-      if(typeof navigate==='function' && pg && safeSoftRefresh.includes(pg)){
-        // flag ให้ initExams รู้ว่านี่คือ soft refresh (listener re-nav) ไม่ใช่ผู้ใช้กดเอง
-        // → คงวิชาที่เลือกไว้ ไม่เด้งกลับหน้าเลือกวิชา (navigate→initExams รันแบบ sync อ่าน flag ทัน)
-        window._softRefreshing = true;
-        try { navigate(pg, window._currentParams||{}); }
-        finally { window._softRefreshing = false; }
-      }
-      }, Auth.isTeacher && Auth.isTeacher() ? 3000 : 500);
+      this._scheduleSoftRefresh();
     });
     Store._cloudLoaded = false;
     // Inject loading bar while waiting for Firebase
@@ -6436,7 +6711,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     // (v47.94: เคลียร์ก่อนเซฟ = ปิดแอประหว่าง check-in modal แล้วคำตอบหายทั้ง attempt)
     function _doSave(feeling, prediction){
       const savedS=Store.load();
-      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null};
+      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null,_rec:1,_recTs:Date.now()}; // v48.68p: _rec = เก็บเป็น doc แยก (ดู Store._syncRecs)
       // v48.22p: ครึ่งหลัง — แทนที่จะสร้าง attempt ใหม่แยกแล้วเชื่อมด้วย parentAttemptId
       // (แบบเดิม v48.15) ให้รวมคำตอบเข้ากับ attempt ครึ่งแรกแล้วคำนวณคะแนนใหม่ทั้งชุดเลย
       // (สูตรเดียวกับปุ่ม "คำนวณคะแนนใหม่") เก็บเป็น attempt เดียวจริง ไม่มี record คู่กันอีก —
@@ -8092,6 +8367,7 @@ function initStats(){
     const _delIds=new Set([pendingDeleteAttemptId]);
     if(_target&&_target.parentAttemptId) _delIds.add(_target.parentAttemptId);
     _all.forEach(a=>{ if(a.parentAttemptId===pendingDeleteAttemptId) _delIds.add(a.id); });
+    Store.deleteRecords('attempts',[..._delIds]); // v48.68p: ลบแบบระบุชัด (doc แยก + ปลดด่านกันหายหมู่)
     s.attempts=_all.filter(a=>!_delIds.has(a.id));
     Store.save(s);closeConfirm();render();
   };
@@ -8944,6 +9220,7 @@ function initStats(){
       // merge: ไม่ทับ attempt ที่มีอยู่แล้ว (ตาม id)
       const existingIds=new Set((s.attempts||[]).map(a=>a.id));
       const newOnes=imported.filter(a=>!existingIds.has(a.id));
+      const _impTs=Date.now(); newOnes.forEach(a=>{ a._rec=1; a._recTs=_impTs; }); // v48.68p: เก็บเป็น doc แยก
       s.attempts=[...newOnes,...(s.attempts||[])];
       Store.save(s);
       render();
@@ -8990,6 +9267,7 @@ function initStats(){
     if (_selectedUser && _selectedUser !== 'all') {
       if(!confirm('ล้างสถิติของ "' + _selectedUser + '" ใช่ไหม?\n\n⚠️ ไม่สามารถกู้คืนได้')) return;
       const s = Store.load();
+      Store.deleteRecords('attempts', s.attempts.filter(a => a.takerName === _selectedUser).map(a => a.id)); // v48.68p
       s.attempts = s.attempts.filter(a => a.takerName !== _selectedUser);
       Store.save(s);
       render();
@@ -9383,6 +9661,7 @@ function initPractice(params){
       startedAt:st.startedAt,submittedAt:new Date().toISOString(),
       usedSeconds:Math.round((Date.now()-new Date(st.startedAt).getTime())/1000),
       mode:'weakness_practice',
+      _rec:1, _recTs:Date.now(), // v48.68p: เก็บเป็น doc แยก
     };
     const sv=Store.load();
     sv.attempts=[attempt,...(sv.attempts||[])];
@@ -9423,9 +9702,10 @@ function initPractice(params){
 // ขนาดข้อมูลทั้งแอปเทียบเพดาน 1 MiB ของ Firestore document (mainStore ถูกเขียนเป็น JSON.stringify ก้อนเดียว — ดู FirebaseSync.saveDoc)
 // เต็มแล้วทุกการบันทึกจะล้มเหลว จึงเตือนครูล่วงหน้า — คำนวณเฉพาะตอนเปิดหน้า Admin (ห้ามใส่ใน Store.save กัน stringify ทุกครั้งที่บันทึก)
 const FS_DOC_LIMIT = 1048576;
+// v48.68p: วัดเฉพาะกล่องหลัก (สิ่งที่ชนเพดานจริง) — ผลสอบ/ชุดข้อสอบใหม่แยกเป็น doc ของตัวเองแล้ว ไม่นับรวม
 function getStoreUsage(){
-  const bytes = new TextEncoder().encode(JSON.stringify(Store.load())).length;
-  return { bytes, pct: bytes / FS_DOC_LIMIT * 100 };
+  const bytes = new TextEncoder().encode(JSON.stringify(Store._mainPayload(Store.load()))).length;
+  return { bytes, pct: bytes / FS_DOC_LIMIT * 100, recAtt: Store._recAtt.size, recExam: Store._recExam.size };
 }
 function renderAdminStorageUsage(){
   const info = document.getElementById('adminStorageInfo');
@@ -9434,12 +9714,13 @@ function renderAdminStorageUsage(){
   if(!Auth.isTeacher()){ info.textContent=''; banner.style.display='none'; return; }
   const u = getStoreUsage();
   const pct = Math.floor(u.pct);
-  info.textContent = `พื้นที่เก็บข้อมูล ${pct}% (${Math.round(u.bytes/1024).toLocaleString()} KB จาก ${Math.round(FS_DOC_LIMIT/1024).toLocaleString()} KB)`;
+  info.textContent = `พื้นที่เก็บข้อมูล ${pct}% (${Math.round(u.bytes/1024).toLocaleString()} KB จาก ${Math.round(FS_DOC_LIMIT/1024).toLocaleString()} KB)`
+    + ((u.recAtt || u.recExam) ? ` · แยกเก็บแล้ว: ผลสอบ ${u.recAtt.toLocaleString()} รายการ, ชุดข้อสอบ ${u.recExam.toLocaleString()} ชุด` : '');
   if(u.pct < 80){ banner.style.display='none'; return; }
   const critical = u.pct >= 95;
   document.getElementById('adminStorageBannerText').textContent = critical
     ? `พื้นที่เก็บข้อมูลใกล้เต็มมาก (${pct}%) — การบันทึกผลสอบอาจล้มเหลวเมื่อใดก็ได้ กรุณาสำรองข้อมูลตอนนี้และแจ้งผู้พัฒนา`
-    : `พื้นที่เก็บข้อมูลใช้ไปแล้ว ${pct}% — ถ้าเต็ม ผลสอบใหม่จะบันทึกไม่ได้ แนะนำสำรองข้อมูลไว้และแจ้งผู้พัฒนาให้ย้ายที่เก็บ`;
+    : `พื้นที่เก็บข้อมูลใช้ไปแล้ว ${pct}% — ถ้าเต็ม การบันทึกข้อมูลหลัก (ข้อสอบเก่า สมาชิก แต้ม การบ้าน) จะล้มเหลว แนะนำสำรองข้อมูลไว้และแจ้งผู้พัฒนา`;
   banner.style.background = critical ? '#fef2f2' : '#fffbeb';
   banner.style.borderColor = critical ? '#fca5a5' : '#fcd34d';
   banner.style.color = critical ? '#991b1b' : '#92400e';
@@ -9689,6 +9970,7 @@ function initAdminExams(){
             if(exam.pdfUrl) FirebaseSync.deleteStoragePdf(exam.pdfUrl);
             if(exam.answerPdfUrl) FirebaseSync.deleteStoragePdf(exam.answerPdfUrl);
           }
+          Store.deleteRecords('exams',[id]); // v48.68p: ลบแบบระบุชัด (doc แยก + ปลดด่านกันหายหมู่)
           s.exams=s.exams.filter(x=>x.id!==id);
           if(s.questions&&s.questions[id]) delete s.questions[id];
           Store.save(s);toast('ลบชุดข้อสอบแล้ว');renderAdmin();
@@ -9891,6 +10173,7 @@ function saveBackfillAttempt() {
     answers, perQuestion, practiceMode: false, halfMode: false, halfQuota: 0, visitOrder: [],
     difficulty: exam.difficulty || 'develop', mood: null, feeling: null, prediction: null,
     manualEntry: true, // ทำมาก่อนแล้ว บันทึกย้อนหลัง — ไม่ใช่การทำข้อสอบสดจริง (ไม่นับ gamification/streak)
+    _rec: 1, _recTs: Date.now(), // v48.68p: เก็บเป็น doc แยก
   };
 
   s.attempts = s.attempts || [];
@@ -11077,11 +11360,30 @@ function initAdminBackup(){
     const bkExams = (data.exams || []).length;
     const bkAttempts = (data.attempts || []).length;
     const bkMembers = (data.members || []).length;
+    // v48.68p: ผลสอบ/ชุดข้อสอบที่แยกเก็บ (หลังวันปล่อย) แต่ไม่มีใน backup นี้ จะถูกลบตอนกู้คืน — บอกให้รู้ก่อน
+    const bkAttIds = new Set((data.attempts || []).map(a => a && a.id));
+    const bkExamIds = new Set((data.exams || []).map(e => e && e.id));
+    const loseAtt = [...Store._recAtt.keys()].filter(id => !bkAttIds.has(id)).length;
+    const loseExam = [...Store._recExam.keys()].filter(id => !bkExamIds.has(id)).length;
     compareEl.innerHTML =
       '<div>📌 ปัจจุบัน: ' + curExams + ' ชุดข้อสอบ, ' + curAttempts + ' attempts, ' + curMembers + ' สมาชิก</div>' +
-      '<div>📦 backup: ' + bkExams + ' ชุดข้อสอบ, ' + bkAttempts + ' attempts, ' + bkMembers + ' สมาชิก</div>';
+      '<div>📦 backup: ' + bkExams + ' ชุดข้อสอบ, ' + bkAttempts + ' attempts, ' + bkMembers + ' สมาชิก</div>' +
+      ((loseAtt || loseExam) ? '<div style="color:#b91c1c;margin-top:6px;">⚠️ ผลสอบ ' + loseAtt + ' รายการ และชุดข้อสอบ ' + loseExam + ' ชุดที่สร้างหลัง backup นี้จะหายไป</div>' : '');
 
     updateOkState();
+  }
+
+  // v48.68p: ทำให้ doc แยก (rec_att_* / rec_exam_*) ตรงกับ backup — คืนจำนวนที่เขียน/ลบไม่สำเร็จ
+  async function restoreRecDocs(bk, curAtt, curExam){
+    const pre = FirebaseSync.ns(''), want = new Map(), curHash = new Map();
+    [...curAtt, ...curExam].forEach(d => curHash.set(d.id.slice(pre.length), Store._recHash(d.data)));
+    (bk.attempts || []).forEach(a => { if (a && a._rec && a.id) want.set(Store._recDocId('att', a.id), a); });
+    (bk.exams || []).forEach(e => { if (e && e._rec && e.id) want.set(Store._recDocId('exam', e.id), { exam: e, questions: (bk.questions || {})[e.id] || [] }); });
+    const jobs = [];
+    want.forEach((v, docId) => { if (curHash.get(docId) !== Store._recHash(v)) jobs.push(FirebaseSync.saveDoc(docId, v)); });
+    curHash.forEach((h, docId) => { if (!want.has(docId)) jobs.push(FirebaseSync.deleteDoc(docId)); });
+    const res = await Promise.all(jobs);
+    return res.filter(r => r !== true).length;
   }
 
   const confirmInput = document.getElementById('backupRestoreConfirmInput');
@@ -11109,8 +11411,23 @@ function initAdminBackup(){
       // bypass Store.save()'s stale-snapshot merge (นี่คือ full overwrite ตั้งใจ ไม่ใช่การ save ปกติ)
       // — ทำให้ _cache ตรงกับ data ที่จะ save ก่อน (data===this._cache) branch merge จะไม่ทำงาน
       _pendingRestoreData._savedAt = Date.now();
+      // v48.68p: กล่องหลักเขียนเฉพาะข้อมูลเก่า (_mainPayload) + ทำให้ doc แยก (rec_*) ตรงกับ backup:
+      // upsert ทุกตัวใน backup และลบตัวที่ไม่มีใน backup (ความหมายเดิม = ย้อนสถานะทั้งหมด) — backup แบบเก่าไม่มี rec ก็ใช้ทางเดียวกัน
+      const _curAtt = await FirebaseSync.loadPrefix('rec_att_');
+      const _curExam = await FirebaseSync.loadPrefix('rec_exam_');
+      if (!_curAtt || !_curExam) {
+        okBtn.disabled = false;
+        okBtn.textContent = '♻️ กู้คืนข้อมูล';
+        toast('❌ อ่านข้อมูลปัจจุบันจาก cloud ไม่สำเร็จ กรุณาลองใหม่');
+        return;
+      }
       Store._cache = _pendingRestoreData;
-      const ok = await FirebaseSync.saveDoc('mainStore', Store._cache);
+      const _payload = Store._mainPayload(_pendingRestoreData);
+      const ok = await FirebaseSync.saveDoc('mainStore', _payload);
+      if (ok) Store._setMainIds(_payload);
+      const recFail = ok ? await restoreRecDocs(_pendingRestoreData, _curAtt, _curExam) : 0;
+      if (ok && recFail) toast('⚠️ กู้คืนกล่องหลักแล้ว แต่ผลสอบ/ชุดข้อสอบแยกเก็บ ' + recFail + ' รายการไม่สำเร็จ — ลองกู้คืนซ้ำอีกครั้ง');
+      if (ok && recFail) { okBtn.disabled = false; okBtn.textContent = '♻️ กู้คืนข้อมูล'; return; }
       if (ok) {
         localStorage.removeItem('nanont:syncPending');
         toast('✅ กู้คืนสำเร็จ กำลังโหลดหน้าใหม่... (แนะนำให้แจ้งนักเรียนรีเฟรชหน้าเว็บด้วย)');
@@ -11345,7 +11662,7 @@ function initAdminNew(){
     const _activeType=document.querySelector('#newExamTypeBtns .examTypeBtn.active');
     const examType=_activeType?_activeType.dataset.val:'mc';
     const folderId=document.getElementById('newFolderSelect')?.value||null;
-    const _newExam={id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType,folderId};
+    const _newExam={id,subject,title,durationSeconds:Math.round(minutes*60),published,pdfUrl,answerPdfUrl:answerPdfUrl||'',questionCount:createPlaceholder?qCount:0,uploadedAt:Date.now(),order:maxOrder+1,difficulty,examType,folderId,_rec:1,_recTs:Date.now()}; // v48.68p: _rec = เก็บ {exam,questions} เป็น doc แยก
     if(examType==='fillblank-num'){
       const _activeNumDigits=document.querySelector('#newNumDigitsBtns .numDigitsBtn.active');
       _newExam.numDigits=_activeNumDigits?Number(_activeNumDigits.dataset.val):3;
@@ -15455,7 +15772,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.67p';
+  const CURRENT_VERSION = 'v48.68p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

@@ -30,3 +30,9 @@ bash tests/run.sh
   แล้วปิด context ทันที
 - Firebase SDK โหลดไม่ได้ใน sandbox (proxy บล็อก) — นั่นคือเหตุที่ต้อง stub ทุกอย่าง
   ซึ่งตรงกับที่แอปออกแบบไว้: ทุกอย่างผ่าน `FirebaseSync`/`Store` interface
+- section `recDocs` (v48.55) ใช้ `tests/fake-firestore.js` แทน: Firebase compat SDK ปลอม ใส่ผ่าน
+  `ctx.addInitScript` ก่อนแอปบูต (บล็อก `**/firebasejs/**`) → ทดสอบ `FirebaseSync` + `Store` ตัวจริงทั้งเส้นทาง
+  (doc get/set/delete/onSnapshot, query ตาม id prefix + docChanges) — ข้อมูลอยู่ใน `localStorage['__fakeFS']`
+  ของ context จึงรีโหลดแล้วยังอยู่ และแท็บที่ 2 ใน context เดียวกัน = "อีกเครื่อง" (event `storage`)
+  รองรับเฉพาะ API ที่แอปใช้; จำลองเพดาน 1 MiB ต่อ doc; `__fakeFS.failWrites = true` จำลองการเขียนล้ม
+- `Store` เป็น `const` ระดับ script ไม่ใช่ `window.Store` — รอบูตด้วย `typeof Store !== 'undefined' && Store._cloudLoaded`
