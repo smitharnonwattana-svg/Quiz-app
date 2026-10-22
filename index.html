@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.56 -->
+  <!-- APP_VERSION: v48.57 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1371,7 +1371,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.56</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.57</div>
     </div>
   </div>
 </div>
@@ -2874,18 +2874,45 @@ const FirebaseSync = (() => {
   function _doc(id) { return db.collection('app').doc(_ns(id)); }
 
   // Write to Firestore
-  async function saveDoc(id, data) {
+  // v48.57: opts.cas = { baseTs, merge(serverData) → payload } = compare-and-set ในทรานแซกชัน:
+  //   อ่าน doc → ถ้า _ts ตรงกับ baseTs (เครื่องนี้เห็นเวอร์ชันล่าสุดอยู่) เขียน data ตรงๆ
+  //   ไม่ตรง (เครื่องอื่นเขียนไปแล้ว/เครื่องนี้ถือสำเนาเก่า) → merge(serverData) แล้วเขียนผลรวม — ไม่เขียนทับของใหม่กว่า
+  //   (merge ต้องเป็นฟังก์ชันบริสุทธิ์: ทรานแซกชันอาจรันซ้ำ) ผลลัพธ์ส่งกลับทาง opts.result = {ts, merged|null}
+  //   ออฟไลน์/ล้ม → false (ผู้เรียกใช้ syncPending ลองใหม่) — ไม่ใช้คิวเขียนออฟไลน์ของ SDK ซึ่งเป็น last-write-wins
+  async function saveDoc(id, data, opts) {
     if (!_ready) return false;
     try {
       setStatus('saving', '💾 กำลัง sync...');
-      await _doc(id).set({ _d: JSON.stringify(data), _ts: Date.now() });
+      if (opts && opts.cas) {
+        const ref = _doc(id), res = {};
+        const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('transaction timeout')), 25000));
+        await Promise.race([db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          const now = Date.now();
+          res.merged = null;
+          if (snap.exists && (snap.data()._ts !== opts.cas.baseTs)) {
+            const serverData = JSON.parse(snap.data()._d || 'null');
+            res.merged = serverData ? opts.cas.merge(serverData) : data;
+            tx.set(ref, { _d: JSON.stringify(res.merged), _ts: now });
+          } else {
+            tx.set(ref, { _d: JSON.stringify(data), _ts: now });
+          }
+          res.ts = now;
+        }), _timeout]);
+        opts.result = res;
+      } else {
+        const ts = Date.now();
+        await _doc(id).set({ _d: JSON.stringify(data), _ts: ts });
+        if (opts) opts.result = { ts, merged: null };
+      }
       setStatus('online', '☁️ sync แล้ว ' + new Date().toLocaleTimeString('th'));
       return true;
     } catch(e) { console.warn('[FB] save err', e); setStatus('error', '⚠️ sync ล้มเหลว'); return false; }
   }
 
   // Read once from Firestore — always from server to bypass offline cache
-  async function loadDoc(id) {
+  // outMeta (ไม่บังคับ): ถูกเติม {ts, fromCache} — ts = _ts ของเอกสาร (ตัวระบุเวอร์ชันที่ใช้กับ compare-and-set ของ saveDoc)
+  async function loadDoc(id, outMeta) {
     if (!_ready) return null;
     try {
       // source: 'server' forces fresh fetch, prevents stale cache causing overwrites
@@ -2896,12 +2923,14 @@ const FirebaseSync = (() => {
         _timeout
       ]);
       if (!s.exists) return null;
+      if (outMeta) { outMeta.ts = s.data()._ts; outMeta.fromCache = false; }
       return JSON.parse(s.data()._d || 'null');
     } catch(e) {
       // fallback to cache if server unreachable
       try {
         const s = await _doc(id).get();
         if (!s.exists) return null;
+        if (outMeta) { outMeta.ts = s.data()._ts; outMeta.fromCache = true; }
         return JSON.parse(s.data()._d || 'null');
       } catch(e2) { console.warn('[FB] load err', e2); return null; }
     }
@@ -3038,7 +3067,7 @@ const FirebaseSync = (() => {
     if (!_ready) return () => {};
     return _doc(id).onSnapshot(s => {
       if (!s.exists) return;
-      try { const d = JSON.parse(s.data()._d || 'null'); if (d) cb(d); } catch(e) {}
+      try { const d = JSON.parse(s.data()._d || 'null'); if (d) cb(d, { ts: s.data()._ts, fromCache: !!(s.metadata && s.metadata.fromCache) }); } catch(e) {}
     }, e => { console.warn('[FB] listen err', e); setStatus('error', '⚠️ sync ขัดข้อง'); });
   }
 
@@ -3570,20 +3599,131 @@ const Store = {
     const lostE=[...this._mainIds.exam].filter(id=>!pe.has(id)&&!this._allowDrop.has('exam:'+id));
     return (lostA.length||lostE.length)?{nA:lostA.length,nE:lostE.length,lostA:lostA.slice(0,5),lostE:lostE.slice(0,5)}:null;
   },
+  // ── v48.57: compare-and-set + merge 3 ทาง (กันบันทึกทับด้วยสำเนาเก่า) ──
+  // เหตุการณ์จริง 19 ต.ค.: iPad ที่ถือสำเนากล่องหลักเก่า (~1–5 ต.ค.) ส่งผลสอบแล้วเขียนทับทั้งก้อน → ข้อสอบ/ผลสอบ/แต้มที่ใหม่กว่าหาย
+  // _base = สำเนาลึกของกล่องหลักตามที่เครื่องนี้ได้รับล่าสุด (+ _ts ของ doc ตอนนั้น) = จุดตั้งต้นที่ข้อมูลในหน่วยความจำพัฒนามา
+  // ตอนเขียน: ถ้าเซิร์ฟเวอร์ยังเป็นเวอร์ชันเดียวกับ base → เขียนตรงๆ; ถ้าไม่ใช่ → merge(base, local, server) แล้วเขียนผลรวม
+  //   ของที่เครื่องนี้ไม่ได้แตะ (local==base) → รับค่าจากเซิร์ฟเวอร์เสมอ จึงไม่มีทางทับของใหม่ด้วยสำเนาเก่า
+  _base:null,                  // {data, ts}
+  _mainChain:null,             // คิวเขียนกล่องหลักทีละรายการ — เขียนถัดไปเริ่มหลัง base อัปเดตจากรายการก่อนหน้าแล้ว
+  _clone(v){ return JSON.parse(JSON.stringify(v)); },
+  _setBase(data,ts){ try{ this._base={data:this._clone(data||{}), ts:(ts==null?null:ts)}; }catch(e){ this._base=null; } },
+  // merge 3 ทางต่อ id: B/L/S = Map(id→ค่า) ของ base/local/server; both(b,l,s) = กติกาเฉพาะเมื่อแก้ทั้งสองฝั่ง (ไม่ระบุ = local ชนะ)
+  _m3entries(B,L,S,both){
+    const H=v=>this._recHash(v), out=new Map(), lOnly=[];
+    S.forEach((s,id)=>{
+      if(L.has(id)){
+        const l=L.get(id);
+        if(!B.has(id)) out.set(id, both?both(undefined,l,s):l);                 // เพิ่งมีทั้งคู่ (id ซ้ำ) → local
+        else{
+          const b=B.get(id);
+          if(H(l)===H(b)) out.set(id,s);                                          // local ไม่แตะ → รับของ server
+          else if(H(s)===H(b)) out.set(id,l);                                     // server ไม่แตะ → รับของ local
+          else out.set(id, both?both(b,l,s):l);                                   // แก้ทั้งคู่
+        }
+      }else{
+        if(!B.has(id)) out.set(id,s);                                             // ใหม่บน server (เครื่องนี้ยังไม่เคยเห็น)
+        else if(H(s)!==H(B.get(id))) out.set(id,s);                               // local ลบ แต่ server แก้ภายหลัง → เก็บของ server
+        // else local ลบ และ server ไม่แตะ → ลบจริง
+      }
+    });
+    L.forEach((l,id)=>{
+      if(S.has(id)) return;
+      if(!B.has(id)) lOnly.push([id,l]);                                          // ใหม่ในเครื่อง ยังไม่ขึ้น server
+      else if(H(l)!==H(B.get(id))) lOnly.push([id,l]);                            // server ลบ แต่ local แก้ → เก็บของ local
+      // else server ลบ และ local ไม่แตะ → ลบจริง
+    });
+    const res=new Map(lOnly); out.forEach((v,id)=>res.set(id,v)); return res;     // ของใหม่ในเครื่องขึ้นหน้า (เหมือน unshift เดิม) ที่เหลือตามลำดับ server
+  },
+  _m3list(b,l,s,keyFn){
+    const arr=a=>Array.isArray(a)?a:[];
+    const toMap=a=>{ const m=new Map(); arr(a).forEach(o=>{ const k=keyFn(o); if(k!=null&&k!=='') m.set(k,o); }); return m; };
+    const keyless=[]; const seen=new Set();
+    [...arr(s),...arr(l)].forEach(o=>{ const k=keyFn(o); if(k==null||k===''){ const h=this._recHash(o); if(!seen.has(h)){ seen.add(h); keyless.push(o); } } });
+    return Array.from(this._m3entries(toMap(b),toMap(l),toMap(s)).values()).concat(keyless);
+  },
+  // แต้มของนักเรียนคนเดียวกันที่ถูกแก้จากทั้ง 2 เครื่อง: บวกส่วนต่างของ local (เทียบ base) ลงบนค่า server และรวม pointLog — ไม่ทิ้งประวัติฝั่งใดฝั่งหนึ่ง
+  _mergeGamUser(b,l,s){
+    if(!l) return s; if(!s) return l;
+    const newer=((l._updatedAt||0)>=(s._updatedAt||0))?l:s, r=Object.assign({},newer);
+    if(b){
+      ['points','stamps'].forEach(f=>{ if(typeof l[f]==='number'&&typeof s[f]==='number'&&typeof b[f]==='number') r[f]=s[f]+(l[f]-b[f]); });
+      if(Array.isArray(l.pointLog)&&Array.isArray(s.pointLog)){
+        const bSet=new Set((Array.isArray(b.pointLog)?b.pointLog:[]).map(e=>this._recHash(e)));
+        const sSet=new Set(s.pointLog.map(e=>this._recHash(e)));
+        const add=l.pointLog.filter(e=>{ const h=this._recHash(e); return !bSet.has(h)&&!sSet.has(h); });
+        r.pointLog=[...s.pointLog,...add].sort((x,y)=>((x&&x.ts)||0)-((y&&y.ts)||0));
+      }
+    }
+    r._updatedAt=Math.max(l._updatedAt||0,s._updatedAt||0);
+    return r;
+  },
+  // รวมกล่องหลัก 3 ทาง — ฟังก์ชันบริสุทธิ์ (ทรานแซกชันอาจรันซ้ำ)
+  _merge3(base,local,server){
+    base=base||{}; local=local||{}; server=server||{};
+    const out=Object.assign({},server);
+    const LISTS={exams:o=>o&&o.id,attempts:o=>o&&o.id,members:o=>o&&(o.pin||o.name),assignments:o=>o&&o.id,benchmarks:o=>o&&o.id,examFolders:o=>o&&o.id};
+    Object.keys(LISTS).forEach(k=>{ if(k in local||k in server) out[k]=this._m3list(base[k],local[k],server[k],LISTS[k]); });
+    const asMap=o=>new Map(Object.entries(o&&typeof o==='object'&&!Array.isArray(o)?o:{}));
+    const toObj=m=>{ const o={}; m.forEach((v,k)=>{ o[k]=v; }); return o; };
+    if('questions' in local||'questions' in server){
+      const q=toObj(this._m3entries(asMap(base.questions),asMap(local.questions),asMap(server.questions)));
+      const live=new Set((out.exams||[]).map(e=>e&&e.id));
+      Object.keys(q).forEach(id=>{ if(!live.has(id)) delete q[id]; });             // เฉลยตามข้อสอบที่เหลือ
+      out.questions=q;
+    }
+    if('gamification' in local||'gamification' in server){
+      out.gamification=toObj(this._m3entries(asMap(base.gamification),asMap(local.gamification),asMap(server.gamification),(b,l,s)=>this._mergeGamUser(b,l,s)));
+    }
+    const skip=new Set([...Object.keys(LISTS),'questions','gamification','_savedAt']);
+    new Set([...Object.keys(local),...Object.keys(server)]).forEach(k=>{
+      if(skip.has(k)) return;
+      const H=v=>this._recHash(v);
+      if(!(k in local)) { out[k]=server[k]; return; }
+      out[k]=(k in base && H(local[k])===H(base[k]) && k in server) ? server[k] : local[k]; // ส่วนอื่น: ไม่แตะ → รับ server, แตะ → local
+    });
+    out._savedAt=Date.now();
+    return out;
+  },
+  // นำผล merge เข้า _cache แบบแก้ในที่ (คง identity ของ object ที่หน้าต่างๆ ถืออยู่) + ใส่ record แยกกลับ + รีเฟรชหน้าที่ปลอดภัย
+  _adoptMerged(m){
+    const c=this._cache; if(!c) return;
+    Object.keys(m).forEach(k=>{ c[k]=m[k]; });
+    this._attachRecs(c);
+    try{ _updateBellBadge(); }catch(e){}
+    this._scheduleSoftRefresh();
+  },
   // จุดเขียน mainStore จุดเดียว — คืน Promise<true|false|'blocked'>
   _writeMain(data,reason){
-    const p=this._mainPayload(data);
-    const bad=this._dropCheck(p);
-    if(bad){
-      console.warn('[Store] mainStore write BLOCKED — old records missing', reason, bad);
-      _takeDiag('mainstore.dropGuard', Object.assign({reason}, bad));
-      if(typeof toast==='function' && Date.now()-(this._dropToastAt||0)>30000){
-        this._dropToastAt=Date.now();
-        toast('⚠️ ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้านี้ใหม่');
+    const run=()=>{
+      const p=this._mainPayload(data);
+      const bad=this._dropCheck(p);
+      if(bad){
+        console.warn('[Store] mainStore write BLOCKED — old records missing', reason, bad);
+        _takeDiag('mainstore.dropGuard', Object.assign({reason}, bad));
+        if(typeof toast==='function' && Date.now()-(this._dropToastAt||0)>30000){
+          this._dropToastAt=Date.now();
+          toast('⚠️ ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้านี้ใหม่');
+        }
+        return Promise.resolve('blocked');
       }
-      return Promise.resolve('blocked');
-    }
-    return FirebaseSync.saveDoc('mainStore',p).then(ok=>{ if(ok) this._setMainIds(p); return ok; });
+      const base=this._base||{data:{},ts:null};   // ไม่มี base = ยังไม่เคยเห็นเซิร์ฟเวอร์ → merge กับ base ว่าง (รวมสองฝั่ง ไม่ลบอะไร)
+      const opts={cas:{baseTs:base.ts, merge:(server)=>this._merge3(base.data,p,server)}};
+      return FirebaseSync.saveDoc('mainStore',p,opts).then(ok=>{
+        if(!ok) return ok;
+        const r=opts.result||{}, finalData=r.merged||p;
+        if(r.merged){
+          try{ _takeDiag('mainstore.merge', {reason, exams:[(p.exams||[]).length,(r.merged.exams||[]).length], attempts:[(p.attempts||[]).length,(r.merged.attempts||[]).length]}); }catch(e){}
+          this._adoptMerged(r.merged);
+        }
+        this._setMainIds(finalData);
+        this._setBase(finalData, r.ts);
+        return ok;
+      });
+    };
+    const chain=(this._mainChain||Promise.resolve()).then(run,run);
+    this._mainChain=chain.catch(()=>{});
+    return chain;
   },
   // ลบแบบระบุชัด — เรียกก่อนโค้ดเดิมตัดรายการออกจาก array แล้ว save (kind: 'attempts' | 'exams')
   // record แยก → ลบ doc ของมัน; record เก่าใน mainStore → อนุญาตให้ด่านกันหายหมู่ปล่อยผ่าน
@@ -3772,12 +3912,14 @@ const Store = {
   },
   // Pull from Firestore and populate in-memory cache — Firebase is always source of truth
   async syncFromCloud(){
-    const cloud = await FirebaseSync.loadDoc('mainStore');
+    const _meta = {};
+    const cloud = await FirebaseSync.loadDoc('mainStore', _meta);
     if(!cloud){
       // แยก "doc ยังไม่มีจริง" (ติดตั้งครั้งแรก/namespace ใหม่) ออกจาก "โหลดไม่สำเร็จ"
       try{
         if (await FirebaseSync.docExists('mainStore') === false) {
           Store._cloudLoaded = true; // cloud ว่างจริงคือความจริง — อนุญาตเซฟแรก
+          this._base = { data: {}, ts: null };
           const _lb0 = document.getElementById('_storeLoadingBar');
           if(_lb0) _lb0.remove();
           console.log('[Store] cloud doc missing — fresh namespace, first save allowed');
@@ -3786,6 +3928,7 @@ const Store = {
       return;
     }
     this._setMainIds(cloud);
+    this._setBase(cloud, _meta.ts); // v48.57: จุดตั้งต้นของการ merge ตอนเขียน (ก่อนผสมของที่ค้างในเครื่อง)
     try{
       // Merge any in-memory attempts not yet in cloud (submitted before Firebase loaded)
       if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloud.attempts)) {
@@ -3839,11 +3982,13 @@ const Store = {
   // Force pull cloud data — bypass timestamp guard. Union-merges any
   // in-memory attempts so nothing the user already submitted is lost.
   async forcePullFromCloud(){
-    const cloud = await FirebaseSync.loadDoc('mainStore');
+    const _meta = {};
+    const cloud = await FirebaseSync.loadDoc('mainStore', _meta);
     if(!cloud) throw new Error('cloud empty or unreachable');
     const _cloudCount = Array.isArray(cloud.attempts) ? cloud.attempts.length : 0;
     const _memCount = this._cache ? (Array.isArray(this._cache.attempts) ? this._cache.attempts.length : 0) : 0;
     this._setMainIds(cloud);
+    this._setBase(cloud, _meta.ts);
     // v48.55: โหลด record แยกใหม่ทั้งหมดด้วย (null = อ่านไม่ได้ → คงของเดิมใน map)
     const [_ra, _re] = await Promise.all([FirebaseSync.loadPrefix('rec_att_'), FirebaseSync.loadPrefix('rec_exam_')]);
     if (_ra) this._applyRecChanges('att', _ra.map(d => Object.assign({ type: 'added' }, d)));
@@ -3941,7 +4086,7 @@ const Store = {
     });
     // Real-time listener: update in-memory cache when cloud data changes
     let _lastCloudHash = '';
-    FirebaseSync.listenDoc('mainStore', (cloudData) => {
+    FirebaseSync.listenDoc('mainStore', (cloudData, _snapMeta) => {
       try{
         // Skip if cloud data hasn't actually changed (strip volatile fields)
         const _hashObj = { ...cloudData };
@@ -3956,13 +4101,26 @@ const Store = {
           _hashObj.gamification = _gStripped;
         }
         const _hash = JSON.stringify(_hashObj);
-        if (_hash === _lastCloudHash) return;
+        if (_hash === _lastCloudHash) { if (this._base && _snapMeta && _snapMeta.ts != null) this._base.ts = _snapMeta.ts; return; } // เนื้อหาเท่าเดิม (ต่างแค่ _savedAt) → อัปเดตเวอร์ชันของ base
         _lastCloudHash = _hash;
         this._setMainIds(cloudData);
+        const _prevBaseIds = new Set(((this._base && this._base.data && this._base.data.attempts) || []).map(a => a && a.id));
+        const _newBase = { data: this._clone(cloudData), ts: (_snapMeta && _snapMeta.ts != null) ? _snapMeta.ts : null }; // ก่อนผสมของในเครื่อง
+        // v48.57: มี base แล้ว → รวม 3 ทาง (base เดิม / ของในเครื่อง / ของ cloud) แทนการเอา cloud ทับแล้วเก็บตกเฉพาะบางส่วน
+        //   ของที่แก้ค้างในเครื่อง (ยังไม่ขึ้น cloud) อยู่รอด; ของที่เครื่องอื่นลบ (เครื่องนี้ไม่ได้แก้) ถูกลบตาม ไม่ฟื้นกลับ
+        let _merged3 = false;
+        if (this._base && this._cache) {
+          try {
+            const _m3 = this._merge3(this._base.data, this._mainPayload(this._cache), this._clone(cloudData));
+            _m3._savedAt = cloudData._savedAt;
+            cloudData = _m3; _merged3 = true;
+          } catch(e) { console.warn('[Store] listener merge3 err — fallback', e); }
+        }
         // Preserve in-memory attempts not yet in cloud
-        if (this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloudData.attempts)) {
+        if (!_merged3 && this._cache && Array.isArray(this._cache.attempts) && Array.isArray(cloudData.attempts)) {
           const _cloudIds = new Set(cloudData.attempts.map(a => a.id));
-          const _memOnly = this._cache.attempts.filter(a => a && !a._rec && !_cloudIds.has(a.id));
+          // v48.57: ฟื้นเฉพาะผลสอบที่ "สร้างในเครื่องหลัง base ล่าสุด" — ผลสอบที่อยู่ใน base เดิมแต่หายจาก cloud = เครื่องอื่นลบ → ไม่ฟื้นกลับ
+          const _memOnly = this._cache.attempts.filter(a => a && !a._rec && !_cloudIds.has(a.id) && !_prevBaseIds.has(a.id));
           if (_memOnly.length > 0) {
             const _all = [..._memOnly, ...cloudData.attempts];
             _all.sort((a,b) => new Date(b.submittedAt||0) - new Date(a.submittedAt||0));
@@ -3975,14 +4133,14 @@ const Store = {
           }
         }
         // Merge gamification — per-user _updatedAt wins
-        try {
+        if (!_merged3) try {
           const _mergedGam = _mergeGamificationByTs(
             this._cache && this._cache.gamification, cloudData.gamification
           );
           if (_mergedGam) cloudData.gamification = _mergedGam;
         } catch(e) {}
         // Merge assignments — union by id (in-memory overrides cloud for same id)
-        try {
+        if (!_merged3) try {
           if (this._cache && Array.isArray(this._cache.assignments) && Array.isArray(cloudData.assignments)) {
             const _aMap = new Map();
             cloudData.assignments.forEach(a => { if (a && a.id) _aMap.set(a.id, a); });
@@ -3991,6 +4149,7 @@ const Store = {
           }
         } catch(e) {}
         this._cache = this._attachRecs(cloudData);
+        this._base = _newBase;
         _updateBellBadge();
         Store._cloudLoaded = true;
         const _lb2 = document.getElementById('_storeLoadingBar');
@@ -11434,8 +11593,9 @@ function initAdminBackup(){
       }
       Store._cache = _pendingRestoreData;
       const _payload = Store._mainPayload(_pendingRestoreData);
-      const ok = await FirebaseSync.saveDoc('mainStore', _payload);
-      if (ok) Store._setMainIds(_payload);
+      const _saveOpts = {};
+      const ok = await FirebaseSync.saveDoc('mainStore', _payload, _saveOpts);
+      if (ok) { Store._setMainIds(_payload); Store._setBase(_payload, _saveOpts.result && _saveOpts.result.ts); }
       const recFail = ok ? await restoreRecDocs(_pendingRestoreData, _curAtt, _curExam) : 0;
       if (ok && recFail) toast('⚠️ กู้คืนกล่องหลักแล้ว แต่ผลสอบ/ชุดข้อสอบแยกเก็บ ' + recFail + ' รายการไม่สำเร็จ — ลองกู้คืนซ้ำอีกครั้ง');
       if (ok && recFail) { okBtn.disabled = false; okBtn.textContent = '♻️ กู้คืนข้อมูล'; return; }
@@ -15782,7 +15942,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.56';
+  const CURRENT_VERSION = 'v48.57';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

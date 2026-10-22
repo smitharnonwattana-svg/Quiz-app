@@ -35,4 +35,8 @@ bash tests/run.sh
   (doc get/set/delete/onSnapshot, query ตาม id prefix + docChanges) — ข้อมูลอยู่ใน `localStorage['__fakeFS']`
   ของ context จึงรีโหลดแล้วยังอยู่ และแท็บที่ 2 ใน context เดียวกัน = "อีกเครื่อง" (event `storage`)
   รองรับเฉพาะ API ที่แอปใช้; จำลองเพดาน 1 MiB ต่อ doc; `__fakeFS.failWrites = true` จำลองการเขียนล้ม
+- section `staleWrite` (v48.57): จำลอง "เครื่องที่ถือข้อมูลเก่า" ด้วย `window.__fsInit` (ตั้งผ่าน `page.addInitScript` ก่อนแอปบูต):
+  `staleCache[docId]` (get/listener แรกคืนเอกสารเก่า fromCache=true), `failServerGet`, `suppressUpdates[docId]` (ไม่รับอัปเดตจากเซิร์ฟเวอร์)
+  และ `__fakeFS.offline = true` (ทรานแซกชันล้ม) — ทดสอบ compare-and-set + merge 3 ทางของกล่องหลัก; หน้าทดสอบทุกหน้าใช้ localStorage ร่วมกัน
+  (จริงๆ คือคนละเครื่อง) จึงต้องตั้ง `nanont:syncPending` เองก่อน flush ถ้าหน้าอื่นเพิ่งบันทึกสำเร็จ
 - `Store` เป็น `const` ระดับ script ไม่ใช่ `window.Store` — รอบูตด้วย `typeof Store !== 'undefined' && Store._cloudLoaded`

@@ -4386,6 +4386,167 @@ currentSection = 'recDocs';
   await ctx.close();
 }
 
+
+// ─────────────────────────────────────────────────────────────────
+// Section: staleWrite (v48.57 / preview v48.70p) — กันบันทึกกล่องหลักทับด้วยสำเนาเก่า (compare-and-set + merge 3 ทาง)
+// เหตุการณ์จริง 19 ต.ค. 2026: เครื่องที่ถือสำเนาเก่าบันทึกทั้งก้อน → ข้อสอบ/ผลสอบ/แต้มที่ใหม่กว่าหาย
+// "เครื่องเก่า" จำลองด้วย window.__fsInit (staleCache + failServerGet + suppressUpdates) — ดู tests/fake-firestore.js
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'staleWrite';
+{
+  const SW_FILE = 'index.html';
+  const NS = '127_0_0_1_';
+  const qs2 = () => [{ id: 'q1', no: 1, number: 1, page: 1, correct: 'A' }, { id: 'q2', no: 2, number: 2, page: 1, correct: 'B' }];
+  const att = (id, examId, t) => ({ id, examId, examTitle: examId, takerName: 'นนท์', score: 1, total: 2, submittedAt: t, perQuestion: [] });
+  const mkSrv = () => baseCache({
+    exams: [mkExam('old1', 'เก่า1', 'คณิตศาสตร์', { questionCount: 2 }), mkExam('old2', 'เก่า2', 'คณิตศาสตร์', { questionCount: 2, order: 2 }), mkExam('new1', 'ใหม่1', 'คณิตศาสตร์', { questionCount: 2, order: 3 })],
+    questions: { old1: qs2(), old2: qs2(), new1: qs2() },
+    attempts: [att('a3', 'new1', '2026-10-07T10:00:00Z'), att('a2', 'old2', '2026-09-20T10:00:00Z'), att('a1', 'old1', '2026-09-01T10:00:00Z')],
+    members: [{ pin: '1111', name: 'นนท์' }],
+    gamification: { 'นนท์': { points: 100, stamps: 5, pointLog: [{ ts: 1, date: 'd1', amount: 50, reason: 'r1' }, { ts: 2, date: 'd2', amount: 50, reason: 'r2' }], _updatedAt: 2000 } },
+  });
+  const mkStale = () => { // สำเนาเก่า: ยังไม่มี new1 / a3 และแต้มเก่ากว่า
+    const s = mkSrv(); s.exams = s.exams.filter(e => e.id !== 'new1'); delete s.questions.new1; s.attempts = s.attempts.filter(a => a.id !== 'a3');
+    s.gamification['นนท์'] = { points: 50, stamps: 5, pointLog: [{ ts: 1, date: 'd1', amount: 50, reason: 'r1' }], _updatedAt: 1000 };
+    return s;
+  };
+  const doc = (st, ts) => ({ _d: JSON.stringify(st), _ts: ts });
+  async function swCtx() {
+    const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+    await ctx.route('**/firebasejs/**', r => r.abort());
+    await ctx.addInitScript({ path: FAKE_FS_PATH_SW });
+    await ctx.addInitScript(({ id, d }) => { if (localStorage.getItem('__fakeFS') === null) localStorage.setItem('__fakeFS', JSON.stringify({ [id]: d })); }, { id: NS + 'mainStore', d: doc(mkSrv(), 2000) });
+    return ctx;
+  }
+  const FAKE_FS_PATH_SW = new URL('./fake-firestore.js', import.meta.url).pathname;
+  async function swPage(ctx, init) {
+    const page = await ctx.newPage(); page.on('dialog', d => d.accept());
+    if (init) await page.addInitScript((f) => { window.__fsInit = f; }, init);
+    await page.goto(BASE + '/' + SW_FILE, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof Store !== 'undefined' && Store._cloudLoaded === true, {}, { timeout: 8000 }).catch(() => {});
+    await page.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })); document.getElementById('offlineBanner')?.remove(); window.__merges = 0; const sd = FirebaseSync.saveDoc; FirebaseSync.saveDoc = async (id, data, opts) => { const ok = await sd(id, data, opts); if (id === 'mainStore' && opts && opts.result && opts.result.merged) window.__merges++; return ok; }; }); // นับเฉพาะการเขียนที่ชนกับเวอร์ชันของเครื่องอื่น (ต้อง merge)
+    await page.waitForTimeout(300);
+    return page;
+  }
+  const srvMain = (page) => page.evaluate((id) => JSON.parse(__fakeFS.get(id)._d), NS + 'mainStore');
+  const ids = (arr) => arr.map(x => x.id).sort().join();
+
+  // ── 1) เหตุการณ์จริง: เครื่องที่ถือสำเนาเก่าส่งผลสอบ + ได้แต้ม → ของใหม่บน server ต้องไม่หาย ──
+  {
+    const ctx = await swCtx();
+    const A = await swPage(ctx, { staleCache: { [NS + 'mainStore']: doc(mkStale(), 1000) }, failServerGet: true, suppressUpdates: { [NS + 'mainStore']: true } });
+    const pre = await A.evaluate(() => ({ ex: Store.load().exams.map(e => e.id).sort().join(), pts: Store.load().gamification['นนท์'].points }));
+    check('stale: จำลองเครื่องเก่าได้จริง (ไม่เห็น new1, แต้ม 50)', pre.ex === 'old1,old2' && pre.pts === 50, JSON.stringify(pre));
+    await A.evaluate(() => {
+      const s = Store.load(); const g = s.gamification['นนท์'];
+      g.points += 10; g.pointLog.push({ ts: 99, date: 'd9', amount: 10, reason: 'ส่งผลสอบ' }); g._updatedAt = 3000;
+      s.attempts.unshift(Object.assign({ id: 'aNew', examId: 'old1', examTitle: 'เก่า1', takerName: 'นนท์', score: 2, total: 2, submittedAt: new Date().toISOString(), perQuestion: [] }, { _rec: 1, _recTs: Date.now() }));
+      Store.save(s);
+    });
+    await A.waitForTimeout(600);
+    const m = await srvMain(A);
+    check('stale: ข้อสอบใหม่ (new1) + เฉลยบน server ไม่หาย', m.exams.some(e => e.id === 'new1') && (m.questions.new1 || []).length === 2, ids(m.exams));
+    check('stale: ผลสอบใหม่ (a3) บน server ไม่หาย และผลสอบเก่าครบ', ['a1', 'a2', 'a3'].every(i => m.attempts.some(a => a.id === i)), ids(m.attempts));
+    const g = m.gamification['นนท์'];
+    check('stale: แต้มรวมถูก (100 บน server + 10 ใหม่ = 110) และประวัติครบ ไม่ถูกทับด้วยของเก่า', g.points === 110 && g.pointLog.length === 3 && g.pointLog.some(e => e.reason === 'ส่งผลสอบ') && g.pointLog.some(e => e.reason === 'r2'), JSON.stringify(g));
+    const mem = await A.evaluate(() => ({ ex: Store.load().exams.map(e => e.id).sort().join(), pts: Store.load().gamification['นนท์'].points, merges: window.__merges }));
+    check('stale: หลังบันทึก หน้าจอของเครื่องเก่าได้ข้อมูลล่าสุดมาด้วย (ผ่าน merge 1 ครั้ง)', mem.ex.includes('new1') && mem.pts === 110 && mem.merges === 1, JSON.stringify(mem));
+    const rec = Object.keys(await A.evaluate(() => __fakeFS.all())).filter(k => k.includes('_rec_att_'));
+    check('stale: ผลสอบใหม่ยังเขียนเป็น doc แยกตามเดิม', rec.length === 1, JSON.stringify(rec));
+    await ctx.close();
+  }
+
+  // ── 2) เครื่องปกติ (เห็นเวอร์ชันล่าสุด) → เขียนตรงๆ ไม่ต้อง merge ──
+  {
+    const ctx = await swCtx();
+    const A = await swPage(ctx);
+    await A.evaluate(() => { const s = Store.load(); s.exams.find(e => e.id === 'old1').title = 'เก่า1 แก้ชื่อ'; Store.save(s); });
+    await A.waitForTimeout(400);
+    const m = await srvMain(A); const merges = await A.evaluate(() => window.__merges);
+    check('fast path: เครื่องที่เห็นล่าสุดเขียนตรงๆ (ไม่ merge) และบันทึกถูก', merges === 0 && m.exams.find(e => e.id === 'old1').title === 'เก่า1 แก้ชื่อ', 'merges=' + merges);
+    await A.evaluate(() => { const s = Store.load(); s.exams.find(e => e.id === 'old1').title = 'เก่า1 แก้ชื่อ 2'; Store.save(s); });
+    await A.waitForTimeout(400);
+    check('fast path: บันทึกต่อเนื่องหลายครั้งยังไม่เข้า merge (base ตามทันหลังเขียนเอง)', (await A.evaluate(() => window.__merges)) === 0 && (await srvMain(A)).exams.find(e => e.id === 'old1').title === 'เก่า1 แก้ชื่อ 2');
+    await ctx.close();
+  }
+
+  // ── 3) เครื่องอื่นลบผลสอบ → เครื่องนี้ไม่ฟื้นกลับ (บั๊กเดิม: ผลสอบที่ลบแล้วเด้งกลับ) ──
+  {
+    const ctx = await swCtx();
+    const A = await swPage(ctx), B = await swPage(ctx);
+    await B.evaluate(() => { Store.deleteRecords('attempts', ['a2']); const s = Store.load(); s.attempts = s.attempts.filter(a => a.id !== 'a2'); Store.save(s); });
+    await A.waitForTimeout(1500); // listener ของ A รับการลบ
+    const aHas = await A.evaluate(() => Store.load().attempts.some(a => a.id === 'a2'));
+    await A.evaluate(() => { const s = Store.load(); s.gamification['นนท์'].points += 1; s.gamification['นนท์']._updatedAt = Date.now(); Store.save(s); });
+    await A.waitForTimeout(600);
+    const m = await srvMain(A);
+    check('delete: ผลสอบที่ลบจากเครื่อง B ไม่ถูกเครื่อง A ฟื้นกลับ (ทั้งในหน้าจอและบน server)', !aHas && !m.attempts.some(a => a.id === 'a2') && m.attempts.length === 2, 'aHas=' + aHas + ' srv=' + ids(m.attempts));
+    // ผลสอบที่สร้างในเครื่อง A แต่ยังไม่ขึ้น cloud ต้องไม่หาย
+    await A.evaluate(() => { __fakeFS.failWrites = true; const s = Store.load(); s.attempts.unshift(Object.assign({ id: 'aLocal', examId: 'old1', examTitle: 'เก่า1', takerName: 'นนท์', score: 1, total: 2, submittedAt: new Date().toISOString(), perQuestion: [] })); Store.save(s); });
+    await A.waitForTimeout(500);
+    await B.evaluate(() => { const s = Store.load(); s.gamification['นนท์'].points += 5; s.gamification['นนท์']._updatedAt = Date.now(); Store.save(s); }); // เครื่อง B เขียนระหว่าง A ออฟไลน์? (B ใช้ failWrites ของตัวเอง = ปกติ)
+    await B.waitForTimeout(500);
+    await A.evaluate(() => { __fakeFS.failWrites = false; localStorage.setItem('nanont:syncPending', '1'); return Store.flushPendingSync(); });
+    await A.waitForTimeout(900);
+    const m2 = await srvMain(A);
+    check('offline: ผลสอบที่สร้างตอนเขียนไม่ได้ ยังขึ้น server หลัง flush และไม่ทับของเครื่องอื่น', m2.attempts.some(a => a.id === 'aLocal') && m2.gamification['นนท์'].points >= 106, ids(m2.attempts) + ' pts=' + m2.gamification['นนท์'].points);
+    await ctx.close();
+  }
+
+  // ── 4) ลบเองจากเครื่องนี้ต้องลบจริง แม้ server ถูกเครื่องอื่นแก้ระหว่างนั้น ──
+  {
+    const ctx = await swCtx();
+    const A = await swPage(ctx, { suppressUpdates: { [NS + 'mainStore']: true } }); // A ไม่เห็นการอัปเดตของ B → base เก่า
+    const B = await swPage(ctx);
+    await B.evaluate(() => { const s = Store.load(); s.attempts.unshift({ id: 'a4', examId: 'old1', examTitle: 'เก่า1', takerName: 'นนท์', score: 2, total: 2, submittedAt: new Date().toISOString(), perQuestion: [] }); Store.save(s); });
+    await B.waitForTimeout(500);
+    await A.evaluate(() => { Store.deleteRecords('exams', ['old2']); const s = Store.load(); s.exams = s.exams.filter(e => e.id !== 'old2'); delete s.questions.old2; Store.save(s); });
+    await A.waitForTimeout(700);
+    const m = await srvMain(A);
+    check('explicit delete: ลบข้อสอบเองจากเครื่องเก่า → หายจริง + ของใหม่ของเครื่อง B (a4) ยังอยู่', !m.exams.some(e => e.id === 'old2') && !('old2' in m.questions) && m.attempts.some(a => a.id === 'a4') && m.exams.some(e => e.id === 'new1'), ids(m.exams) + ' | ' + ids(m.attempts));
+    await ctx.close();
+  }
+
+  // ── 5) แก้เฉลยคนละข้อสอบพร้อมกันจาก 2 เครื่อง → ได้ทั้งสองการแก้ ──
+  {
+    const ctx = await swCtx();
+    const A = await swPage(ctx, { suppressUpdates: { [NS + 'mainStore']: true } });
+    const B = await swPage(ctx);
+    await B.evaluate(() => { const s = Store.load(); s.questions.old2[0].correct = 'D'; Store.save(s); });
+    await B.waitForTimeout(500);
+    await A.evaluate(() => { const s = Store.load(); s.questions.old1[0].correct = 'C'; Store.save(s); });
+    await A.waitForTimeout(700);
+    const m = await srvMain(A);
+    check('concurrent: แก้เฉลยคนละชุดจาก 2 เครื่อง → ได้ทั้งคู่ (old1=C, old2=D)', m.questions.old1[0].correct === 'C' && m.questions.old2[0].correct === 'D', JSON.stringify([m.questions.old1[0].correct, m.questions.old2[0].correct]));
+    await ctx.close();
+  }
+
+  // ── 6) ออฟไลน์ (ทรานแซกชันล้ม) → syncPending → flush แล้ว merge ถูก ──
+  {
+    const ctx = await swCtx();
+    const A = await swPage(ctx);
+    await A.evaluate(() => { __fakeFS.offline = true; const s = Store.load(); s.exams.find(e => e.id === 'old1').title = 'แก้ตอนออฟไลน์'; Store.save(s); });
+    await A.waitForTimeout(600);
+    const pend = await A.evaluate(() => localStorage.getItem('nanont:syncPending'));
+    check('offline: เขียนไม่ได้ → ติดธง syncPending และ server ยังไม่เปลี่ยน', pend === '1' && (await srvMain(A)).exams.find(e => e.id === 'old1').title === 'เก่า1', String(pend));
+    const B = await swPage(ctx);
+    await B.evaluate(() => { const s = Store.load(); s.exams.find(e => e.id === 'old2').title = 'แก้จากเครื่อง B'; Store.save(s); });
+    await B.waitForTimeout(500);
+    // เทสต์ทุกหน้าใช้ localStorage ร่วมกัน (จริงๆ คือคนละเครื่อง) → B ล้างธงของ A ไปด้วย ตั้งกลับเหมือนที่เครื่อง A จะมี
+    await A.evaluate(() => { __fakeFS.offline = false; localStorage.setItem('nanont:syncPending', '1'); return Store.flushPendingSync(); });
+    await A.waitForTimeout(900);
+    const m = await srvMain(A);
+    check('offline: flush แล้วได้ทั้งการแก้ของ A (old1) และของ B (old2)', m.exams.find(e => e.id === 'old1').title === 'แก้ตอนออฟไลน์' && m.exams.find(e => e.id === 'old2').title === 'แก้จากเครื่อง B', JSON.stringify(m.exams.map(e => e.title)));
+    await ctx.close();
+  }
+
+  // ── 7) กู้คืน backup ยังเขียนทับเต็มโดยตั้งใจ (ไม่ merge) ──
+  {
+    const src = fs.readFileSync(new URL('../' + SW_FILE, import.meta.url), 'utf8');
+    check('static: หน้ากู้คืน backup เขียนทับเต็ม (ไม่ส่ง cas) แล้วตั้ง base ใหม่', /saveDoc\('mainStore', _payload, _saveOpts\)/.test(src) && /Store\._setBase\(_payload/.test(src));
+  }
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

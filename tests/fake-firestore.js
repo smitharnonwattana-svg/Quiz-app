@@ -5,6 +5,11 @@
 // ข้อมูลเก็บใน localStorage['__fakeFS'] → รีโหลดแล้วยังอยู่ และหลายแท็บใน context เดียวกันเห็นข้อมูลเดียวกัน
 // (event 'storage' แจ้ง listener ของแท็บอื่น = จำลอง "อีกเครื่อง")
 // เครื่องมือทดสอบ: window.__fakeFS.{all(), get(id), put(id,obj), del(id), log, failWrites, reset()}
+// จำลอง "เครื่องที่ถือข้อมูลเก่า" (ตั้งผ่าน page.addInitScript ก่อนแอปบูต: window.__fsInit = {...}):
+//   staleCache[docId] = {_d,_ts}  → get() แบบไม่ระบุ source และ snapshot แรกของ listener คืนเอกสารเก่าชุดนี้ (metadata.fromCache=true)
+//   failServerGet = true          → get({source:'server'}) ล้ม (แอปถอยไปอ่านแคช)
+//   suppressUpdates[docId] = true → listener ไม่รับการอัปเดตจากเซิร์ฟเวอร์อีก (เหมือนออฟไลน์ค้างแคช)
+// runTransaction: อ่านจากเซิร์ฟเวอร์จริงเสมอ; api.offline = true → ล้ม (จำลองออฟไลน์)
 (() => {
   const KEY = '__fakeFS';
   const LIMIT = 1048576;
@@ -14,8 +19,12 @@
   const notify = () => setTimeout(() => listeners.forEach(fn => { try { fn(); } catch (e) { console.warn('[fakeFS] listener err', e); } }), 0);
   window.addEventListener('storage', (e) => { if (e.key === KEY) notify(); });
 
+  // อ่านตอนเรียกใช้ (ไม่ใช่ตอนติดตั้ง) → ตั้ง window.__fsInit ผ่าน page.addInitScript ลำดับไหนก็ได้
+  const flags = new Proxy({}, { get: (_, k) => Object.assign({ staleCache: {}, failServerGet: false, suppressUpdates: {} }, window.__fsInit || {})[k] });
   const api = {
     log: [],
+    flags,
+    offline: false,
     failWrites: false,
     all: read,
     get: (id) => read()[id] || null,
@@ -25,13 +34,18 @@
   };
   window.__fakeFS = api;
 
-  const docSnap = (id, v) => ({ id, exists: !!v, data: () => (v ? JSON.parse(JSON.stringify(v)) : undefined) });
+  const docSnap = (id, v, fromCache) => ({ id, exists: !!v, metadata: { fromCache: !!fromCache }, data: () => (v ? JSON.parse(JSON.stringify(v)) : undefined) });
   const DOC_ID = '__name__';
 
   function docRef(id) {
     return {
       id,
-      async get() { return docSnap(id, read()[id]); },
+      async get(opts) {
+        const server = !!(opts && opts.source === 'server');
+        if (server && flags.failServerGet) throw new Error('fake: server unreachable');
+        if (!server && flags.staleCache[id]) return docSnap(id, flags.staleCache[id], true);
+        return docSnap(id, read()[id]);
+      },
       async set(obj) {
         if (api.failWrites) throw new Error('fake write failure');
         const json = JSON.stringify(obj);
@@ -47,8 +61,11 @@
         notify();
       },
       onSnapshot(cb) {
-        let last;
+        let last, first = true;
         const fire = () => {
+          if (first && flags.staleCache[id]) { first = false; last = 'stale'; cb(docSnap(id, flags.staleCache[id], true)); return; }
+          first = false;
+          if (flags.suppressUpdates[id]) return;
           const v = read()[id];
           const j = JSON.stringify(v === undefined ? null : v);
           if (j === last) return;
@@ -97,6 +114,13 @@
 
   const db = {
     enablePersistence: () => Promise.resolve(),
+    async runTransaction(fn) {
+      if (api.offline || api.failWrites) throw new Error('fake: transaction failed (offline)');
+      const writes = [];
+      const tx = { get: async (ref) => docSnap(ref.id, read()[ref.id]), set: (ref, obj) => { writes.push([ref, obj]); } };
+      await fn(tx);
+      for (const [ref, obj] of writes) await ref.set(obj);
+    },
     collection: (name) => {
       if (name !== 'app') throw new Error('fake: only collection app');
       return Object.assign(query([]), { doc: docRef });
