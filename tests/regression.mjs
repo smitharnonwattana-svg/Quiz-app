@@ -4722,6 +4722,29 @@ currentSection = 'editorSplit';
     await cn.close();
   }
 
+  // 6.5) เปลี่ยนวิชาในหน้ากรอกเฉลย (v48.59): เดิม applySubject เรียก renderEditorTopicTags() ที่ไม่มีอยู่จริง → ReferenceError
+  //      วิชาถูกบันทึกแต่ไม่มี toast / dropdown Tag ยังเป็นของวิชาเดิม / chip Tag ด่วนยังเป็นของวิชาเดิม
+  const { ctx: cs, page: ps } = await newSeededPage({ file: ES_FILE, cache: { ...esCache(), subjectTopics: { 'คณิตศาสตร์': ['เศษส่วน'], 'วิทยาศาสตร์': ['แรง', 'พลังงาน'] } }, viewport: { width: 1180, height: 820 } });
+  const subjErrs = [];
+  ps.on('pageerror', e => subjErrs.push(e.message));
+  await stubPdf(ps);
+  await openEditor(ps);
+  await ps.evaluate(() => { const c = document.getElementById('editorSetCard'); if (c.classList.contains('collapsed')) document.getElementById('editorSetHead').click(); });
+  await ps.evaluate(() => document.getElementById('editorQuickTagToggle').click());
+  await ps.selectOption('#editorExamSubjectSelect', 'วิทยาศาสตร์');
+  await ps.click('#editorSubjectBtn');
+  await ps.waitForTimeout(250);
+  const sj = await ps.evaluate(() => ({
+    subj: Store.load().exams.find(e => e.id === 'es1').subject,
+    toast: [...document.querySelectorAll('.toast, #toast')].map(t => t.textContent).join('|') + '|' + (document.body.innerText.includes('บันทึกวิชาแล้ว') ? 'บันทึกวิชาแล้ว' : ''),
+    opts: [...document.querySelector('#editorTbody tr:first-child select.tagSel').options].map(o => o.value).filter(Boolean),
+    chips: [...document.querySelectorAll('#editorQuickTagChips [data-qtag-label]')].map(c => c.textContent.replace('✓ ', '').trim()),
+    meta: document.getElementById('editorMeta').textContent,
+  }));
+  check('editorSplit: เปลี่ยนวิชาแล้วกด ✓ → ไม่มี error + บันทึกวิชาลง store + ขึ้น toast "บันทึกวิชาแล้ว"', subjErrs.length === 0 && sj.subj === 'วิทยาศาสตร์' && /บันทึกวิชาแล้ว/.test(sj.toast), JSON.stringify([subjErrs, sj]));
+  check('editorSplit: เปลี่ยนวิชาแล้ว dropdown Tag ของแต่ละข้อ + chip Tag ด่วน เปลี่ยนเป็นรายการ tag ของวิชาใหม่ (ไม่ใช่ของคณิต)', JSON.stringify(sj.opts) === JSON.stringify(['แรง', 'พลังงาน']) && JSON.stringify(sj.chips) === JSON.stringify(['แรง', 'พลังงาน']) && /วิทยาศาสตร์/.test(sj.meta), JSON.stringify(sj));
+  await cs.close();
+
   // 7) ข้อสอบเติมตัวเลข: Enter ในช่องตัวเลข → ไปช่องของข้อถัดไป
   const { ctx: c7, page: p7 } = await newSeededPage({ file: ES_FILE, cache: esCache({ examType: 'fillblank-num', numDigits: 3 }), viewport: { width: 1180, height: 820 } });
   await stubPdf(p7);

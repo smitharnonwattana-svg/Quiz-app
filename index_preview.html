@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.71p -->
+  <!-- APP_VERSION: v48.72p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1456,7 +1456,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.71p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.72p</div>
     </div>
   </div>
 </div>
@@ -12175,7 +12175,9 @@ function initEditor(examId){
 
   function applySubject(){
     const selVal=subjectSelect?.value||'ไม่ระบุ';
-    exam.subject=selVal; Store.save(s); renderEditorTopicTags(); renderTable();
+    exam.subject=selVal; Store.save(s);
+    // v48.72p: เดิมเรียก renderEditorTopicTags() ที่ไม่มีอยู่จริง → ReferenceError หลังบันทึกวิชา (ไม่มี toast, dropdown Tag/chip Tag ด่วนค้างเป็นของวิชาเดิม)
+    _quickTagSelected=null; _qtRenderChips(); _qtUpdateInputUI(); renderTable();
     document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ไม่ระบุ'}`;
     toast('บันทึกวิชาแล้ว');
   }
@@ -16386,7 +16388,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.71p';
+  const CURRENT_VERSION = 'v48.72p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
