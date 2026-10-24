@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.72p -->
+  <!-- APP_VERSION: v48.73p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1456,7 +1456,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.72p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.73p</div>
     </div>
   </div>
 </div>
@@ -2289,7 +2289,7 @@
         <span style="font-weight:900;">ชื่อชุดข้อสอบ</span>
         <input id="newTitle" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" placeholder="เช่น วิทยาศาสตร์ ชุดที่ 2" />
       </label>
-      <div class="grid2">
+      <div class="grid2" style="align-items:start;">
         <label style="display:grid;gap:6px;">
           <span style="font-weight:900;">วิชา</span>
           <select id="newSubjectSelect" onchange="window._onNewSubjectChange(this.value)" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
@@ -2304,12 +2304,21 @@
           </select>
           <input id="newSubject" type="hidden" value="" />
         </label>
-        <label id="newFolderWrap" style="display:none;gap:6px;">
-          <span style="font-weight:900;">โฟลเดอร์</span>
-          <select id="newFolderSelect" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
-            <option value="">ไม่มีโฟลเดอร์</option>
-          </select>
-        </label>
+        <div id="newFolderWrap" style="display:none;gap:6px;align-content:start;">
+          <label for="newFolderSelect" style="font-weight:900;">โฟลเดอร์</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="newFolderSelect" style="flex:1;min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+              <option value="">ไม่มีโฟลเดอร์</option>
+            </select>
+            <button type="button" class="btn" id="newFolderAddBtn" style="white-space:nowrap;padding:12px 14px;font-weight:700;">+ โฟลเดอร์ใหม่</button>
+          </div>
+          <!-- v48.73p: สร้างโฟลเดอร์ใหม่ในหน้านี้เลย (inline แทน prompt — พิมพ์ไทยบน iPad สะดวกกว่า) -->
+          <div id="newFolderAddRow" style="display:none;gap:8px;align-items:center;">
+            <input id="newFolderName" maxlength="60" placeholder="ชื่อโฟลเดอร์ใหม่ (Enter เพื่อสร้าง)" aria-label="ชื่อโฟลเดอร์ใหม่" style="flex:1;min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+            <button type="button" class="btn btnPrimary" id="newFolderOkBtn" style="padding:12px 14px;font-weight:700;">สร้าง</button>
+            <button type="button" class="btn" id="newFolderCancelBtn" style="padding:12px 14px;">ยกเลิก</button>
+          </div>
+        </div>
       </div>
       <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">ประเภทข้อสอบ</span>
@@ -11778,7 +11787,8 @@ function initAdminNew(){
   const _setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   _setVal('newTitle',''); _setVal('newSubjectSelect',''); _setVal('newSubject','');
   _setVal('newPdfUrl',''); _setVal('newAnswerPdfUrl',''); _setVal('newQCount','50');
-  _setVal('newMinutes','45'); _setVal('newPublished','true'); _setVal('newExcelFile','');
+  _setVal('newMinutes','45'); _setVal('newPublished','true'); _setVal('newExcelFile',''); _setVal('newFolderName','');
+  { const r=document.getElementById('newFolderAddRow'); if(r) r.style.display='none'; }
   window._newExcelData=null;
   { const st=document.getElementById('newExcelStatus'); if(st) st.textContent='';
     const pv=document.getElementById('newExcelPreview'); if(pv){ pv.style.display='none'; pv.textContent=''; }
@@ -11892,11 +11902,42 @@ function initAdminNew(){
       const folders=(val&&val!=='อื่นๆ')?((s.examFolders||[]).filter(f=>f.subject===val)):[];
       folderSel.innerHTML='<option value="">ไม่มีโฟลเดอร์</option>'+
         folders.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
-      // v48.71p: แสดงช่องโฟลเดอร์เฉพาะวิชาที่มีโฟลเดอร์จริง (ลดช่องที่ไม่ต้องกรอก)
-      const fw=document.getElementById('newFolderWrap'); if(fw) fw.style.display=folders.length?'grid':'none';
+      // v48.73p: แสดงช่องโฟลเดอร์ทุกวิชาจริง (แม้ยังไม่มีโฟลเดอร์ — สร้างอันแรกได้จากปุ่ม "+ โฟลเดอร์ใหม่"); "อื่นๆ"/ยังไม่เลือกวิชา = ซ่อน
+      const fw=document.getElementById('newFolderWrap'); if(fw) fw.style.display=(val&&val!=='อื่นๆ')?'grid':'none';
     }
   };
+  const _nfRow=document.getElementById('newFolderAddRow');
+  const _nfName=document.getElementById('newFolderName');
+  const _closeNewFolderRow=()=>{ if(_nfRow) _nfRow.style.display='none'; if(_nfName) _nfName.value=''; };
+  const _origSubjChange=window._onNewSubjectChange;
+  window._onNewSubjectChange=(val)=>{ _closeNewFolderRow(); _origSubjChange(val); };
   window._onNewSubjectChange('');
+
+  // v48.73p: สร้างโฟลเดอร์ใหม่ของวิชาที่เลือก — รูปแบบเดียวกับ createFolderForCurrentSubject (หน้า exams) บันทึกทันที
+  function createNewFolder(){
+    const subj=document.getElementById('newSubjectSelect')?.value||'';
+    if(!subj||subj==='อื่นๆ') return toast('เลือกวิชาก่อน');
+    const name=(_nfName?.value||'').replace(/\s+/g,' ').trim();
+    if(!name) return toast('กรุณาใส่ชื่อโฟลเดอร์');
+    if(!s.examFolders) s.examFolders=[];
+    const same=s.examFolders.find(f=>f.subject===subj && String(f.name||'').replace(/\s+/g,' ').trim().toLowerCase()===name.toLowerCase());
+    let id;
+    if(same){ id=same.id; toast('มีโฟลเดอร์นี้แล้ว — เลือกให้แล้ว'); }
+    else{
+      const maxOrder=Math.max(0,...s.examFolders.filter(f=>f.subject===subj).map(f=>f.order||0));
+      id='folder_'+Math.random().toString(16).slice(2);
+      s.examFolders.push({id,subject:subj,name,order:maxOrder+1});
+      Store.save(s);
+      toast('สร้างโฟลเดอร์แล้ว');
+    }
+    _origSubjChange(subj); // วาดตัวเลือกโฟลเดอร์ใหม่ (ไม่ปิด/ล้างช่องกรอกวิชา)
+    document.getElementById('newFolderSelect').value=id;
+    _closeNewFolderRow();
+  }
+  document.getElementById('newFolderAddBtn').onclick=()=>{ if(_nfRow){ _nfRow.style.display='flex'; } if(_nfName) _nfName.focus(); };
+  document.getElementById('newFolderOkBtn').onclick=createNewFolder;
+  document.getElementById('newFolderCancelBtn').onclick=_closeNewFolderRow;
+  if(_nfName) _nfName.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); createNewFolder(); } else if(e.key==='Escape'){ e.preventDefault(); _closeNewFolderRow(); } };
 
   const _ntAddBtn=document.getElementById('newTopicAddBtn');
   const _ntInput=document.getElementById('newTopicInput');
@@ -16388,7 +16429,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.72p';
+  const CURRENT_VERSION = 'v48.73p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

@@ -4745,6 +4745,47 @@ currentSection = 'editorSplit';
   check('editorSplit: เปลี่ยนวิชาแล้ว dropdown Tag ของแต่ละข้อ + chip Tag ด่วน เปลี่ยนเป็นรายการ tag ของวิชาใหม่ (ไม่ใช่ของคณิต)', JSON.stringify(sj.opts) === JSON.stringify(['แรง', 'พลังงาน']) && JSON.stringify(sj.chips) === JSON.stringify(['แรง', 'พลังงาน']) && /วิทยาศาสตร์/.test(sj.meta), JSON.stringify(sj));
   await cs.close();
 
+  // 6.6) สร้างโฟลเดอร์ใหม่จากหน้าสร้างข้อสอบ (v48.60)
+  const { ctx: cf, page: pf } = await newSeededPage({ file: ES_FILE, cache: baseCache({ examFolders: [{ id: 'fOld', subject: 'วิทยาศาสตร์', name: 'วิทย์ แยกเรื่อง', order: 3 }] }), viewport: { width: 1180, height: 820 } });
+  const fErrs = []; pf.on('pageerror', e => fErrs.push(e.message));
+  await pf.evaluate(() => navigate('admin_new'));
+  await pf.waitForTimeout(200);
+  const vis = (id) => pf.evaluate((id) => { const e = document.getElementById(id); return !!e && getComputedStyle(e).display !== 'none' && e.offsetParent !== null; }, id);
+  check('newFolder: ยังไม่เลือกวิชา → ช่องโฟลเดอร์ซ่อน', !(await vis('newFolderWrap')));
+  await pf.selectOption('#newSubjectSelect', 'ภาษาไทย');
+  check('newFolder: วิชาที่ยังไม่มีโฟลเดอร์เลย → ช่องโฟลเดอร์ + ปุ่ม "+ โฟลเดอร์ใหม่" ยังเห็น (สร้างโฟลเดอร์แรกได้)', (await vis('newFolderWrap')) && (await vis('newFolderAddBtn')) && !(await vis('newFolderAddRow')));
+  await pf.selectOption('#newSubjectSelect', 'อื่นๆ');
+  check('newFolder: วิชา "อื่นๆ" → ซ่อนช่องโฟลเดอร์ (โฟลเดอร์ผูกกับวิชาจริง)', !(await vis('newFolderWrap')));
+  await pf.selectOption('#newSubjectSelect', 'วิทยาศาสตร์');
+  await pf.click('#newFolderAddBtn');
+  check('newFolder: กดปุ่ม → โผล่ช่องพิมพ์ชื่อ', await vis('newFolderAddRow'));
+  await pf.fill('#newFolderName', '  วิทย์ L5 ปี70  ');
+  await pf.keyboard.press('Enter');
+  await pf.waitForTimeout(150);
+  const nf = await pf.evaluate(() => { const fs = Store.load().examFolders; const f = fs.find(x => x.name === 'วิทย์ L5 ปี70'); const sel = document.getElementById('newFolderSelect'); return { f, count: fs.length, selVal: sel.value, selText: sel.options[sel.selectedIndex].textContent, row: getComputedStyle(document.getElementById('newFolderAddRow')).display }; });
+  check('newFolder: Enter → สร้างโฟลเดอร์ในวิชาที่เลือก (ตัดช่องว่างหัวท้าย, order = max+1, id folder_*) และเลือกให้ทันที', !!nf.f && nf.f.subject === 'วิทยาศาสตร์' && nf.f.order === 4 && /^folder_/.test(nf.f.id) && nf.selVal === nf.f.id && nf.row === 'none' && fErrs.length === 0, JSON.stringify([nf, fErrs]));
+  await pf.fill('#newTitle', 'ชุดในโฟลเดอร์ใหม่'); await pf.fill('#newQCount', '3');
+  await pf.click('#newCreateBtn'); await pf.waitForTimeout(700);
+  const made = await pf.evaluate(() => { const fs = Store.load().examFolders; const f = fs.find(x => x.name === 'วิทย์ L5 ปี70'); const e = Store.load().exams.find(x => x.title === 'ชุดในโฟลเดอร์ใหม่'); return { eFolder: e && e.folderId, fId: f && f.id }; });
+  check('newFolder: สร้างข้อสอบต่อ → exam.folderId = โฟลเดอร์ที่เพิ่งสร้าง', made.eFolder && made.eFolder === made.fId, JSON.stringify(made));
+  await pf.evaluate(() => navigate('admin_new'));
+  await pf.selectOption('#newSubjectSelect', 'วิทยาศาสตร์');
+  await pf.click('#newFolderAddBtn');
+  await pf.fill('#newFolderName', 'วิทย์   แยกเรื่อง');
+  await pf.click('#newFolderOkBtn'); await pf.waitForTimeout(150);
+  const dup = await pf.evaluate(() => ({ n: Store.load().examFolders.filter(x => /วิทย์\s+แยกเรื่อง/.test(x.name)).length, sel: document.getElementById('newFolderSelect').value }));
+  check('newFolder: ชื่อซ้ำ (ต่างช่องว่าง) → ไม่สร้างซ้ำ แต่เลือกอันเดิมให้', dup.n === 1 && dup.sel === 'fOld', JSON.stringify(dup));
+  const fBefore = await pf.evaluate(() => Store.load().examFolders.length);
+  await pf.click('#newFolderAddBtn'); await pf.fill('#newFolderName', '   '); await pf.click('#newFolderOkBtn');
+  const fAfter = await pf.evaluate(() => Store.load().examFolders.length);
+  check('newFolder: ชื่อว่าง → ไม่สร้าง', fAfter === fBefore, JSON.stringify([fBefore, fAfter]));
+  await pf.fill('#newFolderName', 'ร่างค้าง'); await pf.keyboard.press('Escape');
+  check('newFolder: Esc → ปิดช่องพิมพ์ ไม่สร้าง', !(await vis('newFolderAddRow')) && (await pf.evaluate(() => Store.load().examFolders.length)) === fBefore);
+  await pf.click('#newFolderAddBtn');
+  await pf.evaluate(() => { navigate('admin'); navigate('admin_new'); });
+  check('newFolder: ออก-เข้าหน้าใหม่ → ช่องพิมพ์ถูกปิดและล้าง', !(await vis('newFolderAddRow')) && (await pf.inputValue('#newFolderName')) === '');
+  await cf.close();
+
   // 7) ข้อสอบเติมตัวเลข: Enter ในช่องตัวเลข → ไปช่องของข้อถัดไป
   const { ctx: c7, page: p7 } = await newSeededPage({ file: ES_FILE, cache: esCache({ examType: 'fillblank-num', numDigits: 3 }), viewport: { width: 1180, height: 820 } });
   await stubPdf(p7);
