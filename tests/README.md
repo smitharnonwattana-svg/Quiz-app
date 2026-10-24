@@ -40,7 +40,7 @@ bash tests/run.sh
   และ `__fakeFS.offline = true` (ทรานแซกชันล้ม) — ทดสอบ compare-and-set + merge 3 ทางของกล่องหลัก; หน้าทดสอบทุกหน้าใช้ localStorage ร่วมกัน
   (จริงๆ คือคนละเครื่อง) จึงต้องตั้ง `nanont:syncPending` เองก่อน flush ถ้าหน้าอื่นเพิ่งบันทึกสำเร็จ
 - `Store` เป็น `const` ระดับ script ไม่ใช่ `window.Store` — รอบูตด้วย `typeof Store !== 'undefined' && Store._cloudLoaded`
-- section `editorSplit` (v48.71p, ยังชี้ `index_preview.html`): pdf.js โหลดจาก CDN ไม่ได้ใน sandbox → stub `PdfViewer.create`
+- section `editorSplit` (v48.71p → production v48.58, ชี้ `index.html`): pdf.js โหลดจาก CDN ไม่ได้ใน sandbox → stub `PdfViewer.create`
   ให้บันทึกการเรียก (`window.__pdf`: load/page/destroy) แล้วตรวจว่าเลือกข้อแล้ว PDF เลื่อนไปหน้าถูก; ปุ่มลัดภาษาไทย (ก–จ)
   ส่งด้วย `KeyboardEvent` ตรงๆ เพราะ `page.keyboard.press` ไม่รู้จักตัวอักษรไทย
 - จอกว้าง (≥901px) หน้ากรอกเฉลยพับ "ตั้งค่าชุดข้อสอบ" ไว้เมื่อมี PDF แล้ว — เทสต์ที่ใช้ `page.fill/click` กับช่องในตั้งค่าต้องกาง `#editorSetHead` ก่อน

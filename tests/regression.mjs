@@ -3064,10 +3064,14 @@ currentSection = 'editorTagCollapse';
   check('editorTagCollapse: มือถือ ปุ่มเฉลย font-size ใหญ่ขึ้น (17px)', mobileState.btnFontSize === '17px', mobileState.btnFontSize);
   await ctx.close();
 
-  // 2) Tablet/PC (>600px): คอลัมน์ Tag ยังกรอก/เลือกได้ปกติทุกอย่าง ไม่ถูกซ่อน
+  // 2) Tablet/PC (>600px): คอลัมน์ Tag ยังกรอก/เลือกได้ปกติทุกอย่าง
+  //    v48.58: 1024px = โหมดแบ่งจอ → Tag ซ่อนเป็นค่าเริ่มต้น (ผู้ใช้ขอ ตอนกรอกจะได้ไม่กินพื้นที่) ต้องกด "แสดง Tag" ก่อน
   const { ctx: ctxD, page: pageD } = await newSeededPage({ cache, viewport: { width: 1024, height: 800 } });
   await pageD.evaluate(() => navigate('admin_editor', { id: 'etc1' }));
   await pageD.waitForTimeout(500);
+  const hiddenByDefault = await pageD.evaluate(() => getComputedStyle(document.querySelectorAll('#page-admin_editor .tableBox thead th')[5]).display);
+  check('editorTagCollapse: Tablet/PC (โหมดแบ่งจอ) คอลัมน์ Tag ซ่อนเป็นค่าเริ่มต้น', hiddenByDefault === 'none', hiddenByDefault);
+  await pageD.click('#editorTagToggle');
   const desktopState = await pageD.evaluate(() => {
     const ths = [...document.querySelectorAll('#page-admin_editor .tableBox thead th')];
     const tagTh = ths[5];
@@ -3079,7 +3083,7 @@ currentSection = 'editorTagCollapse';
       selectVisible: sel && getComputedStyle(sel).display !== 'none' && sel.offsetParent !== null,
     };
   });
-  check('editorTagCollapse: Tablet/PC หัวคอลัมน์ Tag ไม่ถูกซ่อน', desktopState.tagThDisplay !== 'none', desktopState.tagThDisplay);
+  check('editorTagCollapse: Tablet/PC กดแสดง Tag → หัวคอลัมน์ Tag ไม่ถูกซ่อน', desktopState.tagThDisplay !== 'none', desktopState.tagThDisplay);
   check('editorTagCollapse: Tablet/PC เซลล์ Tag ต่อแถวไม่ถูกซ่อน', desktopState.tagTdDisplay !== 'none', desktopState.tagTdDisplay);
   check('editorTagCollapse: Tablet/PC select เลือก tag มองเห็น/ใช้งานได้ปกติ', desktopState.selectVisible, desktopState.selectVisible);
 
@@ -3120,11 +3124,14 @@ currentSection = 'editorTagCollapse';
   const { ctx: ctx3, page: page3 } = await newSeededPage({ cache: weightedCache, viewport: { width: 1024, height: 800 } });
   await page3.evaluate(() => navigate('admin_editor', { id: 'etc2' }));
   await page3.waitForTimeout(500);
+  const wHidden = await page3.evaluate(() => getComputedStyle(document.querySelector('#editorTbody tr:first-child td:nth-child(6)')).display);
+  check('editorTagCollapse: weighted Tablet/PC เซลล์ Tag (nth-child 6) ซ่อนเป็นค่าเริ่มต้นในโหมดแบ่งจอ', wHidden === 'none', wHidden);
+  await page3.click('#editorTagToggle');
   const weightedDesktop = await page3.evaluate(() => {
     const td = document.querySelector('#editorTbody tr:first-child td:nth-child(6)');
     return { tdDisplay: getComputedStyle(td).display };
   });
-  check('editorTagCollapse: weighted Tablet/PC เซลล์ Tag (nth-child 6) ไม่ถูกซ่อน', weightedDesktop.tdDisplay !== 'none', JSON.stringify(weightedDesktop));
+  check('editorTagCollapse: weighted Tablet/PC กดแสดง Tag → เซลล์ Tag (nth-child 6) ไม่ถูกซ่อน', weightedDesktop.tdDisplay !== 'none', JSON.stringify(weightedDesktop));
   await ctx3.close();
 }
 
@@ -4552,12 +4559,12 @@ currentSection = 'staleWrite';
 // ─────────────────────────────────────────────────────────────────
 // Section: editorSplit (v48.71p) — หน้ากรอกเฉลยแบบแบ่งจอ (PDF ซ้าย สลับโจทย์/เฉลย, ตารางเดิมขวา)
 // + ปุ่มลัด 1–5/ก–จ/a–e, ↑↓, 0 ล้าง + เตือนออกโดยไม่บันทึก + คอลัมน์ Tag เปิด/ปิดได้ (ค่าเริ่มต้นซ่อน)
-// + หน้าสร้างข้อสอบแบบสั้น / ปุ่ม "+ สร้างชุดใหม่" ในหน้ารายการ — ยังอยู่ใน preview
+// + หน้าสร้างข้อสอบแบบสั้น / ปุ่ม "+ สร้างชุดใหม่" ในหน้ารายการ — ขึ้น production แล้ว (v48.58)
 // pdf.js โหลดไม่ได้ใน sandbox → stub PdfViewer.create ให้บันทึกการเรียก (load/page/destroy)
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'editorSplit';
 {
-  const ES_FILE = 'index_preview.html';
+  const ES_FILE = 'index.html';
   const L = ['A', 'B', 'C', 'D'];
   const esQs = () => Array.from({ length: 20 }, (_, i) => ({
     id: 'q' + (i + 1), no: i + 1, number: i + 1, page: Math.ceil((i + 1) / 5), correct: i < 4 ? L[i] : '',
