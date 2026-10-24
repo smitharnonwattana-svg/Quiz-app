@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.70p -->
+  <!-- APP_VERSION: v48.71p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -523,6 +523,61 @@
     .freeBtn{min-width:38px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:12px;font-family:inherit;transition:all .12s;padding:0 8px;}
     .freeBtn:hover{border-color:#f59e0b;background:#fffbeb;}
     .freeBtn.active{background:#f59e0b;border-color:#f59e0b;color:#fff;}
+
+    /* v48.71p: หน้ากรอกเฉลยแบบแบ่งจอ (PDF ซ้าย / เฉลยขวา) — ใช้เฉพาะจอ ≥901px (iPad แนวนอน/คอม)
+       จอแคบกว่านั้นซ่อนส่วน PDF/หัวพับตั้งค่า เหลือหน้าตาตารางเดิมทุกอย่าง */
+    .editorProgress{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap;}
+    .editorDirtyBadge{font-size:12px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:99px;padding:4px 10px;white-space:nowrap;}
+    .editorSetHead{display:none;}
+    .newAdvanced{border:1px solid var(--border);border-radius:12px;padding:10px 14px;background:#fff;}
+    .newAdvanced > summary{cursor:pointer;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;list-style-position:inside;}
+    .newAdvanced > summary::before{content:'▸';}
+    .newAdvanced[open] > summary::before{content:'▾';}
+    .newAdvanced > summary::-webkit-details-marker{display:none;}
+    .newAdvanced > summary{list-style:none;}
+    @media (min-width:901px){
+      #page-admin_editor.active .container{display:flex;flex-direction:column;height:100dvh;padding:12px 16px;}
+      #page-admin_editor .editorBody{flex:1;min-height:0;display:flex;flex-direction:column;}
+      .editorSetHead{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:800;color:#111;cursor:pointer;text-align:left;border-radius:14px;}
+      .editorSetHead:hover{background:#f9fafb;}
+      .editorSetHead:focus-visible{outline:2px solid #6366f1;outline-offset:-2px;}
+      .editorSetSummary{flex:1;min-width:0;font-weight:500;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+      .editorSetCard{flex-shrink:0;}
+      .editorSetCard.collapsed .editorSetBody{display:none;}
+      .editorSetCard:not(.collapsed) .editorSetBody{border-top:1px solid var(--border);}
+      .editorSplit{flex:1;min-height:460px;display:grid;grid-template-columns:minmax(0,1fr) minmax(480px,44%);gap:12px;margin-top:12px;}
+      .editorSplit.noTag{grid-template-columns:minmax(0,1fr) minmax(340px,32%);}
+      /* ซ่อนคอลัมน์ Tag ด้วย CSS (DOM ยังอยู่ handler เดิมใช้ต่อได้) — th:nth-child(6) คือ Tag เสมอ, td ขยับตามโหมดคะแนน */
+      .editorSplit.noTag table th:nth-child(6),
+      .editorSplit.noTag table:not(.weighted) td:nth-child(5),
+      .editorSplit.noTag table.weighted td:nth-child(6){display:none;}
+      .editorSplit:not(.qtOpen) #editorQuickTag{display:none !important;}
+      .editorPdfWrap{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column;min-height:0;}
+      .editorPdfBar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);}
+      .editorPdfTab{padding:5px 12px;font-size:12px;font-weight:700;}
+      .editorPdfTab.on{background:#111;color:#fff;border-color:#111;}
+      .editorPdfBody{flex:1;min-height:0;position:relative;background:#525659;}
+      .editorPdfView{position:absolute;inset:0;}
+      .editorPdfHidden{visibility:hidden;pointer-events:none;}
+      .editorPdfEmpty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e5e7eb;font-size:14px;text-align:center;padding:20px;}
+      .editorSide{border:1px solid var(--border);border-radius:14px;background:#fff;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+      .editorSideBar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;flex-shrink:0;}
+      .editorSideHint{font-size:12px;min-width:0;}
+      .editorSideBtn{padding:5px 10px;font-size:12px;white-space:nowrap;}
+      .editorSideBtn.on{background:#eef2ff;border-color:#6366f1;color:#4338ca;}
+      .editorSide #editorQuickTag{margin:8px 10px 0 !important;flex-shrink:0;}
+      .editorSide .tableBox{flex:1;min-height:0;max-height:none;}
+      .editorSide table{width:100%;min-width:0 !important;}
+      .editorSide th,.editorSide td{padding:7px 6px;vertical-align:middle;}
+      .editorSide td:first-child input{width:46px;padding:5px 6px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;}
+      .editorSide .correctBtn,.editorSide .optToggle{width:36px;height:34px;}
+      .editorSplit .rowActive{background:#fef9c3 !important;box-shadow:inset 4px 0 0 #111;}
+      .editorKeyHint{display:flex;flex-wrap:wrap;gap:4px 14px;padding:8px 10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);flex-shrink:0;}
+      .editorKeyHint kbd{display:inline-block;min-width:18px;padding:1px 5px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:#fff;font-family:inherit;font-size:11px;color:#111;text-align:center;}
+    }
+    @media (max-width:900px){
+      .editorPdfWrap,.editorSideBar,.editorKeyHint{display:none !important;}
+    }
 
     /* tag content grid (สถิติ → เนื้อหา) — desktop 2 col, mobile 1 col */
     .tag-content-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;}
@@ -1401,7 +1456,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.70p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.71p</div>
     </div>
   </div>
 </div>
@@ -1964,7 +2019,8 @@
       <div>
         <h1 class="h1">📋 รายการข้อสอบ</h1>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btnPrimary" id="adminExamsNewBtn" onclick="navigate('admin_new')" style="font-weight:800;">+ สร้างชุดใหม่</button>
         <button class="btn" id="adminDownloadAllAnswerKeys" title="ดาวน์โหลดเฉลยทุกวิชา (ดึงเฉลยที่มีในระบบมาใส่ให้ ข้อไหนยังไม่มีเว้นว่างไว้กรอกเพิ่ม)">⬇️ ดาวน์โหลดเฉลย</button>
         <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
       </div>
@@ -2216,48 +2272,46 @@
 
 <!-- ===================== PAGE: ADMIN NEW ===================== -->
 <div id="page-admin_new" class="page">
-  <div class="container" style="max-width:900px;">
+  <div class="container" style="max-width:760px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
       <div>
         <h1 class="h1">สร้างชุดข้อสอบใหม่</h1>
+        <div class="muted" style="font-size:13px;margin-top:4px;">กรอกแค่ที่จำเป็น แล้วไปกรอกเฉลยต่อในหน้าถัดไป (ดูโจทย์จาก PDF ข้างๆ ได้)</div>
       </div>
-      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="navigate('admin_exams')">รายการข้อสอบ</button>
+        <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+      </div>
     </div>
-    <div class="card" style="padding:16px;margin-top:16px;display:grid;gap:10px;">
+    <!-- v48.71p: ฟอร์มสั้นหน้าเดียว — ช่องหลักด้านบน, ตั้งค่าที่มีค่าเริ่มต้นอยู่แล้วพับไว้ใน "ตั้งค่าเพิ่มเติม" (id เดิมทั้งหมด) -->
+    <div class="card newForm" style="padding:16px;margin-top:16px;display:grid;gap:14px;">
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">ชื่อชุดข้อสอบ</span>
         <input id="newTitle" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" placeholder="เช่น วิทยาศาสตร์ ชุดที่ 2" />
       </label>
-      <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">วิชา</span>
-        <select id="newSubjectSelect" onchange="window._onNewSubjectChange(this.value)" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
-            <option value="">-- เลือกวิชา --</option>
-            <option value="คณิตศาสตร์">คณิตศาสตร์</option>
-            <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
-            <option value="ภาษาไทย">ภาษาไทย</option>
-            <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
-            <option value="สังคมศึกษา">สังคมศึกษา</option>
-            <option value="สอบเข้า ม.1">สอบเข้า ม.1</option>
-            <option value="อื่นๆ">อื่นๆ</option>
-        </select>
-        <input id="newSubject" type="hidden" value="" />
-      </label>
-      <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">โฟลเดอร์ (ถ้ามี)</span>
-        <select id="newFolderSelect" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
-          <option value="">ไม่มีโฟลเดอร์</option>
-        </select>
-      </label>
-      <!-- เนื้อหาวิชา — แสดงเมื่อเลือกวิชาแล้ว -->
-      <div id="newTopicsWrap" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;display:grid;gap:8px;">
-        <div style="font-weight:900;font-size:13px;">📚 เนื้อหาวิชา <span id="newTopicsSubjLabel" style="color:#3b82f6;"></span></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input id="newTopicInput" style="padding:8px 12px;border:1px solid #bfdbfe;border-radius:10px;font-family:inherit;flex:1;min-width:160px;" placeholder="ชื่อเนื้อหา เช่น เศษส่วน (Enter เพื่อเพิ่ม)" />
-          <button type="button" class="btn" id="newTopicAddBtn">+ เพิ่ม</button>
-        </div>
-        <div id="newTopicTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
+      <div class="grid2">
+        <label style="display:grid;gap:6px;">
+          <span style="font-weight:900;">วิชา</span>
+          <select id="newSubjectSelect" onchange="window._onNewSubjectChange(this.value)" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+              <option value="">-- เลือกวิชา --</option>
+              <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+              <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
+              <option value="ภาษาไทย">ภาษาไทย</option>
+              <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
+              <option value="สังคมศึกษา">สังคมศึกษา</option>
+              <option value="สอบเข้า ม.1">สอบเข้า ม.1</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+          <input id="newSubject" type="hidden" value="" />
+        </label>
+        <label id="newFolderWrap" style="display:none;gap:6px;">
+          <span style="font-weight:900;">โฟลเดอร์</span>
+          <select id="newFolderSelect" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+            <option value="">ไม่มีโฟลเดอร์</option>
+          </select>
+        </label>
       </div>
-      <label style="display:grid;gap:6px;">
+      <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">ประเภทข้อสอบ</span>
         <div style="display:flex;gap:8px;" id="newExamTypeBtns">
           <button type="button" class="btn examTypeBtn active" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #c7d2fe;background:#eef2ff;font-weight:700;font-size:13px;color:#4338ca;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
@@ -2268,61 +2322,35 @@
             <button type="button" class="btn numDigitsBtn active" data-val="3" style="flex:1;padding:8px;border-radius:10px;border:2px solid #c7d2fe;background:#eef2ff;font-weight:700;font-size:12px;color:#4338ca;">3 หลัก</button>
             <button type="button" class="btn numDigitsBtn" data-val="4" style="flex:1;padding:8px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:12px;color:#6b7280;">4 หลัก</button>
           </div>
+          <div id="newNumDigitsHint" style="font-size:11px;color:#9ca3af;">กรอกตัวเลข: ตอบเป็นจำนวนเต็ม 1-3 หลัก (0-999)</div>
         </div>
-        <div id="newNumDigitsHint" style="font-size:11px;color:#9ca3af;">กรอกตัวเลข: ตอบเป็นจำนวนเต็ม 1-3 หลัก (0-999)</div>
-      </label>
-      <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">ระดับความยาก</span>
-        <div style="display:flex;gap:8px;">
-          <label style="flex:1;cursor:pointer;">
-            <input type="radio" name="newDifficulty" value="review" style="display:none;" />
-            <div class="diffBtn" data-val="review" style="padding:10px 8px;border-radius:12px;border:2px solid #bfdbfe;background:#eff6ff;text-align:center;font-weight:700;font-size:13px;color:#2563eb;">🔵 ทบทวน</div>
-          </label>
-          <label style="flex:1;cursor:pointer;">
-            <input type="radio" name="newDifficulty" value="develop" style="display:none;" checked />
-            <div class="diffBtn" data-val="develop" style="padding:10px 8px;border-radius:12px;border:2px solid #fde68a;background:#fffbeb;text-align:center;font-weight:700;font-size:13px;color:#d97706;">🟡 พัฒนา</div>
-          </label>
-          <label style="flex:1;cursor:pointer;">
-            <input type="radio" name="newDifficulty" value="hard" style="display:none;" />
-            <div class="diffBtn" data-val="hard" style="padding:10px 8px;border-radius:12px;border:2px solid #fecaca;background:#fff1f2;text-align:center;font-weight:700;font-size:13px;color:#dc2626;">🔴 ยาก</div>
-          </label>
-        </div>
-      </label>
-      <div class="grid2">
-        <label style="display:grid;gap:6px;">
-          <span style="font-weight:900;">เวลา (นาที)</span>
-          <input id="newMinutes" type="number" min="1" value="45" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-        </label>
-        <label style="display:grid;gap:6px;">
-          <span style="font-weight:900;">เผยแพร่</span>
-          <select id="newPublished" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
-            <option value="true">เผยแพร่</option>
-            <option value="false">ซ่อน</option>
-          </select>
-        </label>
       </div>
-      <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">PDF URL</span>
-        <input id="newPdfUrl" value="./pdfs/science_sample.pdf" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-      </label>
-      <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">หรืออัปโหลด PDF จากเครื่อง</span>
-        <input id="newPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
-      </label>
-      <label style="display:grid;gap:6px;">
-        <span style="font-weight:900;">PDF เฉลย <span class="muted" style="font-weight:400;font-size:12px;">(ไม่บังคับ — แสดงใน tab เฉลยหน้าทบทวน)</span></span>
-        <input id="newAnswerPdfUrl" placeholder="วาง URL หรืออัปโหลดด้านล่าง" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-        <input id="newAnswerPdfFile" type="file" accept="application/pdf" style="padding:12px;border:1px dashed var(--border);border-radius:12px;background:#fff;" />
-      </label>
+      <div style="display:grid;gap:6px;">
+        <span style="font-weight:900;">PDF โจทย์</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <label class="btn btnPrimary" style="cursor:pointer;font-weight:700;">📎 อัปโหลด PDF<input id="newPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+          <span class="muted" style="font-size:12px;">หรือวางลิงก์</span>
+          <input id="newPdfUrl" value="" placeholder="URL (Google Drive / HTTPS)" style="flex:1;min-width:180px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        </div>
+        <div id="newPdfHint" class="muted" style="font-size:12px;">ยังไม่มีก็ได้ — อัปโหลดทีหลังในหน้ากรอกเฉลย</div>
+      </div>
+      <div style="display:grid;gap:6px;">
+        <span style="font-weight:900;">PDF เฉลย <span class="muted" style="font-weight:400;font-size:12px;">(ไม่บังคับ — ดูเทียบตอนกรอกเฉลย และแท็บเฉลยหน้าทบทวน)</span></span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <label class="btn" style="cursor:pointer;font-weight:700;">📎 อัปโหลด PDF เฉลย<input id="newAnswerPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+          <span class="muted" style="font-size:12px;">หรือวางลิงก์</span>
+          <input id="newAnswerPdfUrl" placeholder="URL" style="flex:1;min-width:180px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        </div>
+      </div>
       <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">จำนวนข้อ</span>
-        <input id="newQCount" type="number" min="1" max="999" value="50" style="width:200px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        <input id="newQCount" type="number" min="1" max="999" value="50" style="width:140px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
       </div>
       <!-- hidden: ยังใช้ใน JS อยู่ -->
       <input id="newCreatePlaceholder" type="checkbox" checked style="display:none;" />
       <!-- อัปโหลดเฉลยจาก Excel -->
-      <div style="border:2px dashed var(--border);border-radius:12px;padding:16px;background:#f9fafb;display:grid;gap:8px;">
-        <div style="font-weight:900;">📊 อัปโหลดเฉลยจาก Excel <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ)</span></div>
+      <div style="border:2px dashed var(--border);border-radius:12px;padding:14px;background:#f9fafb;display:grid;gap:8px;">
+        <div style="font-weight:900;">📊 มีเฉลยใน Excel อยู่แล้ว? <span class="muted" style="font-size:12px;font-weight:400;">(ไม่บังคับ — เติมจำนวนข้อให้อัตโนมัติ)</span></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <button type="button" class="btn" id="newDownloadTemplate" style="gap:6px;">⬇️ ดาวน์โหลด Template</button>
           <label class="btn" style="cursor:pointer;">
@@ -2333,8 +2361,52 @@
         </div>
         <div id="newExcelPreview" style="display:none;padding:8px 12px;background:#dcfce7;border-radius:8px;font-size:12px;color:#166534;font-weight:700;"></div>
       </div>
+      <details id="newAdvanced" class="newAdvanced">
+        <summary>ตั้งค่าเพิ่มเติม <span class="muted" id="newAdvancedSummary" style="font-weight:400;font-size:12px;">เวลา 45 นาที · ระดับพัฒนา · เผยแพร่</span></summary>
+        <div style="display:grid;gap:12px;padding-top:12px;">
+          <div class="grid2">
+            <label style="display:grid;gap:6px;">
+              <span style="font-weight:900;">เวลา (นาที)</span>
+              <input id="newMinutes" type="number" min="1" value="45" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+            </label>
+            <label style="display:grid;gap:6px;">
+              <span style="font-weight:900;">เผยแพร่</span>
+              <select id="newPublished" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+                <option value="true">เผยแพร่</option>
+                <option value="false">ซ่อน</option>
+              </select>
+            </label>
+          </div>
+          <div style="display:grid;gap:6px;">
+            <span style="font-weight:900;">ระดับความยาก</span>
+            <div style="display:flex;gap:8px;">
+              <label style="flex:1;cursor:pointer;">
+                <input type="radio" name="newDifficulty" value="review" style="display:none;" />
+                <div class="diffBtn" data-val="review" style="padding:10px 8px;border-radius:12px;border:2px solid #bfdbfe;background:#eff6ff;text-align:center;font-weight:700;font-size:13px;color:#2563eb;">🔵 ทบทวน</div>
+              </label>
+              <label style="flex:1;cursor:pointer;">
+                <input type="radio" name="newDifficulty" value="develop" style="display:none;" checked />
+                <div class="diffBtn" data-val="develop" style="padding:10px 8px;border-radius:12px;border:2px solid #fde68a;background:#fffbeb;text-align:center;font-weight:700;font-size:13px;color:#d97706;">🟡 พัฒนา</div>
+              </label>
+              <label style="flex:1;cursor:pointer;">
+                <input type="radio" name="newDifficulty" value="hard" style="display:none;" />
+                <div class="diffBtn" data-val="hard" style="padding:10px 8px;border-radius:12px;border:2px solid #fecaca;background:#fff1f2;text-align:center;font-weight:700;font-size:13px;color:#dc2626;">🔴 ยาก</div>
+              </label>
+            </div>
+          </div>
+          <!-- เนื้อหาวิชา — แสดงเมื่อเลือกวิชาแล้ว -->
+          <div id="newTopicsWrap" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;gap:8px;">
+            <div style="font-weight:900;font-size:13px;">📚 เนื้อหาวิชา (ใช้เป็น Tag) <span id="newTopicsSubjLabel" style="color:#3b82f6;"></span></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input id="newTopicInput" style="padding:8px 12px;border:1px solid #bfdbfe;border-radius:10px;font-family:inherit;flex:1;min-width:160px;" placeholder="ชื่อเนื้อหา เช่น เศษส่วน (Enter เพื่อเพิ่ม)" />
+              <button type="button" class="btn" id="newTopicAddBtn">+ เพิ่ม</button>
+            </div>
+            <div id="newTopicTags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
+          </div>
+        </div>
+      </details>
 
-      <button class="btn btnPrimary" id="newCreateBtn" style="width:fit-content;">สร้าง</button>
+      <button class="btn btnPrimary" id="newCreateBtn" style="width:fit-content;padding:12px 22px;font-weight:800;">สร้างแล้วไปกรอกเฉลย →</button>
     </div>
   </div>
 </div>
@@ -2385,14 +2457,19 @@
         <div id="editorMeta" style="display:none;"></div>
         <div id="editorTypeBadge" style="display:inline-block;margin-top:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;"></div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <span id="editorProgress" class="editorProgress"></span>
+        <span id="editorDirtyBadge" class="editorDirtyBadge" style="display:none;">● ยังไม่บันทึก</span>
+        <button class="btn btnPrimary" id="editorSave" style="padding:8px 20px;">💾 บันทึกทั้งหมด</button>
         <button class="btn" onclick="navigate('admin_exams')">← รายการชุดข้อสอบ</button>
         <button class="btn" onclick="navigate('home')">หน้าแรก</button>
       </div>
     </div>
-    <div style="margin-top:16px;">
-      <div class="card">
-        <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+    <div class="editorBody" style="margin-top:12px;">
+      <!-- v48.71p: ตั้งค่าชุดข้อสอบ — จอ ≥901px พับเก็บได้ (หัวเป็น <button> ไม่ใช่ div เพื่อไม่ชน selector มือถือ .card > div > div) -->
+      <div class="card editorSetCard" id="editorSetCard">
+        <button type="button" class="editorSetHead" id="editorSetHead" aria-expanded="true" aria-controls="editorSetBody"><span class="editorSetArrow" aria-hidden="true">▾</span> ⚙️ ตั้งค่าชุดข้อสอบ <span id="editorSetSummary" class="editorSetSummary"></span></button>
+        <div class="editorSetBody" id="editorSetBody" style="padding:14px 16px;border-bottom:1px solid var(--border);">
           <!-- Row 1: ชื่อ / วิชา / จำนวนข้อ -->
           <div style="display:grid;grid-template-columns:2fr 1.5fr auto auto;gap:12px;align-items:end;flex-wrap:wrap;">
             <div style="display:flex;flex-direction:column;gap:4px;">
@@ -2494,52 +2571,80 @@
               <input id="editorExcelFile" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
             </label>
             <span id="editorExcelStatus" class="muted" style="font-size:12px;flex:1;"></span>
-            <button class="btn btnPrimary" id="editorSave" style="padding:8px 20px;">💾 บันทึกทั้งหมด</button>
           </div>
-        </div>
-        <div id="editorMsg" class="muted" style="padding:12px;display:none;"></div>
-        <!-- Quick Tag Panel -->
-        <div id="editorQuickTag" style="display:none;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;margin-top:8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:12px;font-weight:800;color:#374151;">🏷️ Tag หลัก <span style="color:#9ca3af;font-weight:600;font-size:11px;">— คลิก chip เพื่อใส่/ลบ tag กับหลายข้อพร้อมกัน (1 ข้อ มี tag หลักได้ 1 อัน)</span></div>
-            <button id="editorQuickTagAdd" type="button" class="btn" style="font-size:11px;padding:4px 10px;">+ เพิ่ม tag</button>
-          </div>
-          <div id="editorQuickTagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
-          <div id="editorQuickTagInputWrap" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb;">
-            <div style="font-size:11px;color:#6b7280;margin-bottom:5px;">📌 ใส่กับข้อที่ tag: <strong id="editorQuickTagSel" style="color:#6366f1;"></strong> — กรอกเลขข้อ เช่น <code style="background:#fff;padding:1px 4px;border-radius:4px;border:1px solid #e5e7eb;">1-5,8,11</code></div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <input id="editorQuickTagRange" type="text" placeholder="1-5,8,11" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px;" />
-              <button id="editorQuickTagApply" type="button" class="btn btnPrimary" style="font-size:12px;padding:7px 14px;">+ ใส่ tag</button>
-              <button id="editorQuickTagRemove" type="button" class="btn" style="font-size:12px;padding:7px 14px;color:#dc2626;border-color:#fca5a5;">− ลบ tag</button>
-              <button id="editorQuickTagCancel" type="button" class="btn" style="font-size:12px;padding:7px 10px;">ปิด</button>
+          <!-- Weighted scoring controls -->
+          <div id="editorWeightedBar" style="padding:10px 12px;margin-top:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+            <div style="font-size:12px;font-weight:800;color:#b45309;flex:1;min-width:160px;">⚖️ ระบบคะแนน <span id="editorWeightedStatus" style="color:#92400e;font-weight:600;font-size:11px;"></span></div>
+            <div id="editorWeightedBulkWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:11px;color:#6b7280;">ตั้งทุกข้อ:</span>
+              <input id="editorWeightedBulkInput" type="number" min="0" step="0.5" placeholder="2.5" style="width:80px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" />
+              <button id="editorWeightedBulkBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;">ใช้</button>
             </div>
-            <div id="editorQuickTagMsg" style="font-size:11px;color:#6b7280;margin-top:5px;min-height:14px;"></div>
+            <button id="editorWeightedToggleBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;font-weight:700;">⚖️ เปิดระบบคะแนน</button>
+          </div>
+      </div>
+        <div id="editorMsg" class="muted" style="padding:12px;display:none;"></div>
+      </div>
+      <!-- v48.71p: แบ่งจอ PDF ซ้าย / เฉลยขวา (เฉพาะจอ ≥901px — จอแคบซ่อนส่วน PDF เหลือตารางเดิม) -->
+      <div class="editorSplit noTag" id="editorSplit">
+        <div class="editorPdfWrap">
+          <div class="editorPdfBar">
+            <div style="display:flex;gap:6px;" role="tablist">
+              <button type="button" class="btn editorPdfTab on" id="editorTabQuestion" role="tab" aria-selected="true">📄 โจทย์</button>
+              <button type="button" class="btn editorPdfTab" id="editorTabAnswer" role="tab" aria-selected="false">✅ เฉลย</button>
+            </div>
+            <span class="muted" id="editorPdfInfo" style="font-size:12px;"></span>
+          </div>
+          <div class="editorPdfBody">
+            <div id="editorPdfViewer" class="editorPdfView"></div>
+            <div id="editorAnswerPdfViewer" class="editorPdfView editorPdfHidden"></div>
+            <div id="editorPdfEmpty" class="editorPdfEmpty" style="display:none;">
+              <div style="font-weight:700;">ยังไม่มี PDF โจทย์</div>
+              <button type="button" class="btn" id="editorPdfEmptyBtn" style="margin-top:10px;">เปิดตั้งค่าเพื่ออัปโหลด PDF</button>
+            </div>
           </div>
         </div>
-        <!-- Weighted scoring controls -->
-        <div id="editorWeightedBar" style="padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-          <div style="font-size:12px;font-weight:800;color:#b45309;flex:1;min-width:160px;">⚖️ ระบบคะแนน <span id="editorWeightedStatus" style="color:#92400e;font-weight:600;font-size:11px;"></span></div>
-          <div id="editorWeightedBulkWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span style="font-size:11px;color:#6b7280;">ตั้งทุกข้อ:</span>
-            <input id="editorWeightedBulkInput" type="number" min="0" step="0.5" placeholder="2.5" style="width:80px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" />
-            <button id="editorWeightedBulkBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;">ใช้</button>
+        <div class="editorSide">
+          <div class="editorSideBar">
+            <b>เฉลย</b><span class="muted editorSideHint">แตะข้อเพื่อดูโจทย์ · กดเลข/ตัวอักษรเพื่อเลือก</span>
+            <span style="flex:1;"></span>
+            <button type="button" class="btn editorSideBtn" id="editorTagToggle" aria-pressed="false">🏷 แสดง Tag</button>
+            <button type="button" class="btn editorSideBtn" id="editorQuickTagToggle" aria-pressed="false">Tag ด่วน</button>
           </div>
-          <button id="editorWeightedToggleBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;font-weight:700;">⚖️ เปิดระบบคะแนน</button>
-        </div>
-        <div class="tableBox">
-          <table style="min-width:300px;">
-            <thead>
-              <tr>
-                <th style="width:56px;">หน้า</th>
-                <th style="width:56px;">ข้อ</th>
-                <th style="width:120px;">เฉลย</th>
-                <th style="width:80px;display:none;" class="editorPtsTh">คะแนน</th>
-                <th style="width:60px;">ฟรี</th>
-                <th style="width:100px;">Tag</th>
-              </tr>
-            </thead>
-            <tbody id="editorTbody"></tbody>
-          </table>
+          <!-- Quick Tag Panel -->
+          <div id="editorQuickTag" style="display:none;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;margin-top:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+              <div style="font-size:12px;font-weight:800;color:#374151;">🏷️ Tag หลัก <span style="color:#9ca3af;font-weight:600;font-size:11px;">— คลิก chip เพื่อใส่/ลบ tag กับหลายข้อพร้อมกัน (1 ข้อ มี tag หลักได้ 1 อัน)</span></div>
+              <button id="editorQuickTagAdd" type="button" class="btn" style="font-size:11px;padding:4px 10px;">+ เพิ่ม tag</button>
+            </div>
+            <div id="editorQuickTagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+            <div id="editorQuickTagInputWrap" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb;">
+              <div style="font-size:11px;color:#6b7280;margin-bottom:5px;">📌 ใส่กับข้อที่ tag: <strong id="editorQuickTagSel" style="color:#6366f1;"></strong> — กรอกเลขข้อ เช่น <code style="background:#fff;padding:1px 4px;border-radius:4px;border:1px solid #e5e7eb;">1-5,8,11</code></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <input id="editorQuickTagRange" type="text" placeholder="1-5,8,11" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px;" />
+                <button id="editorQuickTagApply" type="button" class="btn btnPrimary" style="font-size:12px;padding:7px 14px;">+ ใส่ tag</button>
+                <button id="editorQuickTagRemove" type="button" class="btn" style="font-size:12px;padding:7px 14px;color:#dc2626;border-color:#fca5a5;">− ลบ tag</button>
+                <button id="editorQuickTagCancel" type="button" class="btn" style="font-size:12px;padding:7px 10px;">ปิด</button>
+              </div>
+              <div id="editorQuickTagMsg" style="font-size:11px;color:#6b7280;margin-top:5px;min-height:14px;"></div>
+            </div>
+          </div>
+          <div class="tableBox">
+            <table style="min-width:300px;">
+              <thead>
+                <tr>
+                  <th style="width:56px;">หน้า</th>
+                  <th style="width:56px;">ข้อ</th>
+                  <th style="width:120px;">เฉลย</th>
+                  <th style="width:80px;display:none;" class="editorPtsTh">คะแนน</th>
+                  <th style="width:60px;">ฟรี</th>
+                  <th style="width:100px;">Tag</th>
+                </tr>
+              </thead>
+              <tbody id="editorTbody"></tbody>
+            </table>
+          </div>
+          <div class="editorKeyHint"><span><kbd>1</kbd>–<kbd>5</kbd> หรือ <kbd>ก</kbd>–<kbd>จ</kbd> เลือกคำตอบแล้วไปข้อถัดไป</span><span><kbd>↑</kbd><kbd>↓</kbd> เลื่อนข้อ</span><span><kbd>0</kbd> ล้าง</span></div>
         </div>
       </div>
     </div>
@@ -2711,7 +2816,9 @@ const PdfViewer = (() => {
         await new Promise(r => setTimeout(r, 300));
       }
 
-      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const _doc = pdfDoc;
+      for (let pageNum = 1; pageNum <= _doc.numPages; pageNum++) {
+        if (pdfDoc !== _doc) return; // v48.71p: ถูก destroy()/โหลดไฟล์ใหม่ระหว่าง render — หยุด ไม่ render ต่อลงไฟล์เก่า
         const wrapper = document.createElement('div');
         wrapper.id = `${containerId}-page-${pageNum}`;
         wrapper.style.cssText = 'width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;';
@@ -2729,7 +2836,7 @@ const PdfViewer = (() => {
         pageCanvases[pageNum] = canvas;
 
         try {
-          const page = await pdfDoc.getPage(pageNum);
+          const page = await _doc.getPage(pageNum);
           const viewport = page.getViewport({ scale: 1 });
           // ถ้ายังไม่ได้ width ให้ลองอ่านใหม่
           const w = scrollArea.clientWidth > 16 ? scrollArea.clientWidth - 16 : containerWidth;
@@ -2853,7 +2960,17 @@ const PdfViewer = (() => {
       scrollToPage(page);
     }
 
-    return { loadUrl, setPage };
+    // v48.71p: เก็บกวาดเมื่อออกจากหน้า/เปลี่ยนไฟล์ (หน้ากรอกเฉลยเปิด viewer ใหม่บ่อย) — ปิดเอกสาร pdf.js คืนหน่วยความจำ + ล้าง DOM
+    function destroy() {
+      const d = pdfDoc;
+      pdfDoc = null;
+      currentUrl = null;
+      pageCanvases = [];
+      if (d && typeof d.destroy === 'function') { try { d.destroy(); } catch (e) {} }
+      container.innerHTML = '';
+    }
+
+    return { loadUrl, setPage, destroy };
   }
 
   return { create };
@@ -5429,6 +5546,12 @@ function doLogin() {
 }
 
 function navigate(page, params={}){
+  // v48.71p: ออกจากหน้ากรอกเฉลย (หรือเปิดชุดอื่น) ขณะยังมีเฉลยที่ไม่ได้บันทึก → ถามก่อน ยกเลิกได้;
+  // ออกแล้วเก็บกวาด PDF viewer/ปุ่มลัดของหน้านั้น — ต้องเป็นอย่างแรกของ navigate ก่อนแตะสถานะอื่น
+  if(_currentPage==='admin_editor' && (page!=='admin_editor' || (params&&params.id)!==(_pageParams&&_pageParams.id))){
+    if(window._editorDirty && !confirm('มีเฉลยที่ยังไม่บันทึก — ออกโดยไม่บันทึก?')) return;
+    _editorCleanup();
+  }
   // hide take page cleanup
   // v48.18 diag ⭐ ผู้ต้องสงสัย #2: จับตรงนี้เพราะ cleanupTake() ล้าง _takeState ทิ้ง ทำให้
   // ไปเช็คใน initTake ไม่ทันแล้ว — started:true + to:'take' = ข้อสอบที่กำลังทำอยู่ถูกรีสตาร์ทกลางคัน
@@ -11651,6 +11774,29 @@ function initAdminNew(){
   // reset file input
   if(pdfFileEl) pdfFileEl.value='';
 
+  // v48.71p: เริ่มฟอร์มใหม่ทุกครั้งที่เข้าหน้า (เดิมค่าชุดก่อนค้างอยู่ รวมถึงข้อมูล Excel ที่อ่านไว้ → สร้างชุดใหม่แล้วได้เฉลยของชุดเก่าติดไป)
+  const _setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  _setVal('newTitle',''); _setVal('newSubjectSelect',''); _setVal('newSubject','');
+  _setVal('newPdfUrl',''); _setVal('newAnswerPdfUrl',''); _setVal('newQCount','50');
+  _setVal('newMinutes','45'); _setVal('newPublished','true'); _setVal('newExcelFile','');
+  window._newExcelData=null;
+  { const st=document.getElementById('newExcelStatus'); if(st) st.textContent='';
+    const pv=document.getElementById('newExcelPreview'); if(pv){ pv.style.display='none'; pv.textContent=''; }
+    const adv=document.getElementById('newAdvanced'); if(adv) adv.open=false; }
+  document.querySelectorAll('#newExamTypeBtns .examTypeBtn').forEach(b=>{
+    const on=b.dataset.val==='mc';
+    b.classList.toggle('active',on);
+    b.style.background=on?'#eef2ff':'#fff'; b.style.borderColor=on?'#c7d2fe':'#e5e7eb'; b.style.color=on?'#4338ca':'#6b7280';
+  });
+  document.querySelectorAll('#newNumDigitsBtns .numDigitsBtn').forEach(b=>{
+    const on=b.dataset.val==='3';
+    b.classList.toggle('active',on);
+    b.style.background=on?'#eef2ff':'#fff'; b.style.borderColor=on?'#c7d2fe':'#e5e7eb'; b.style.color=on?'#4338ca':'#6b7280';
+  });
+  { const nd=document.getElementById('newNumDigitsWrap'); if(nd) nd.style.display='none';
+    const nh=document.getElementById('newNumDigitsHint'); if(nh) nh.textContent=numHintText(3); }
+  let _uploading=0; // กันกด "สร้าง" ขณะ PDF ยังอัปโหลดไม่เสร็จ (ได้ข้อสอบที่ไม่มี PDF)
+
   const newPdfFileEl=pdfFileEl.cloneNode(true);
   pdfFileEl.parentNode.replaceChild(newPdfFileEl,pdfFileEl);
   newPdfFileEl.addEventListener('change',async(e)=>{
@@ -11661,6 +11807,7 @@ function initAdminNew(){
       toast('⏳ กำลังอัปโหลด PDF...');
       pdfUrlEl.value='';
       pdfUrlEl.placeholder='กำลังอัปโหลด...';
+      _uploading++;
       const url = await FirebaseSync.uploadPdf(f, pct => {
         pdfUrlEl.placeholder = `อัปโหลด ${pct}%...`;
       });
@@ -11670,6 +11817,8 @@ function initAdminNew(){
     }catch(err){
       pdfUrlEl.placeholder='';
       toast('อัปโหลดไม่สำเร็จ: '+(err?.message||err));
+    }finally{
+      _uploading=Math.max(0,_uploading-1);
     }
   });
 
@@ -11685,6 +11834,7 @@ function initAdminNew(){
       if(f.type&&f.type!=='application/pdf'){toast('กรุณาเลือกไฟล์ PDF');return;}
       toast('⏳ กำลังอัปโหลด PDF เฉลย...');
       answerPdfUrlEl.placeholder='กำลังอัปโหลด...';
+      _uploading++;
       const url = await FirebaseSync.uploadPdf(f, pct=>{
         answerPdfUrlEl.placeholder=`อัปโหลด ${pct}%...`;
       });
@@ -11694,6 +11844,8 @@ function initAdminNew(){
     }catch(err){
       answerPdfUrlEl.placeholder='';
       toast('อัปโหลดไม่สำเร็จ: '+(err?.message||err));
+    }finally{
+      _uploading=Math.max(0,_uploading-1);
     }
   });
 
@@ -11740,8 +11892,11 @@ function initAdminNew(){
       const folders=(val&&val!=='อื่นๆ')?((s.examFolders||[]).filter(f=>f.subject===val)):[];
       folderSel.innerHTML='<option value="">ไม่มีโฟลเดอร์</option>'+
         folders.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
+      // v48.71p: แสดงช่องโฟลเดอร์เฉพาะวิชาที่มีโฟลเดอร์จริง (ลดช่องที่ไม่ต้องกรอก)
+      const fw=document.getElementById('newFolderWrap'); if(fw) fw.style.display=folders.length?'grid':'none';
     }
   };
+  window._onNewSubjectChange('');
 
   const _ntAddBtn=document.getElementById('newTopicAddBtn');
   const _ntInput=document.getElementById('newTopicInput');
@@ -11814,7 +11969,20 @@ function initAdminNew(){
     });
   });
 
+  // v48.71p: สรุปค่าใน "ตั้งค่าเพิ่มเติม" ให้เห็นโดยไม่ต้องกางออก
+  const _advSum=document.getElementById('newAdvancedSummary');
+  const _syncAdvSum=()=>{
+    if(!_advSum) return;
+    const d=document.querySelector('#page-admin_new .diffBtn.active');
+    const lbl={review:'ทบทวน',develop:'พัฒนา',hard:'ยาก'}[d?d.dataset.val:'develop'];
+    _advSum.textContent=`เวลา ${document.getElementById('newMinutes').value||45} นาที · ระดับ${lbl} · ${document.getElementById('newPublished').value==='true'?'เผยแพร่':'ซ่อน'}`;
+  };
+  ['newMinutes','newPublished'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.oninput=_syncAdvSum; el.onchange=_syncAdvSum; } });
+  document.querySelectorAll('#page-admin_new .diffBtn').forEach(b=>b.closest('label').addEventListener('click',()=>setTimeout(_syncAdvSum,0)));
+  _syncAdvSum();
+
   newCreateBtn.addEventListener('click',()=>{
+    if(_uploading) return toast('รออัปโหลด PDF ให้เสร็จก่อน แล้วค่อยกดสร้าง');
     const title=document.getElementById('newTitle').value.trim()||'Exam ใหม่';
     const _selVal=document.getElementById('newSubjectSelect')?.value||'';
     const subject=_selVal||'';
@@ -11858,11 +12026,30 @@ function initAdminNew(){
 }
 
 // ===================== ADMIN EDITOR PAGE =====================
+// v48.71p: สถานะของหน้ากรอกเฉลยที่ต้องใช้ข้ามฟังก์ชัน — navigate() เตือนออกโดยไม่บันทึก และเก็บกวาด
+// PDF viewer / blob URL / ตัวฟังปุ่มลัดเมื่อออกจากหน้า (initEditor เรียกซ้ำได้หลายรอบต่อ session)
+window._editorDirty=false;
+let _editorGen=0;
+const _editorRes={viewers:[], blobs:[], offs:[]};
+function _editorCleanup(){
+  _editorGen++;
+  _editorRes.viewers.forEach(v=>{ try{ v.destroy(); }catch(e){} });
+  _editorRes.blobs.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(e){} });
+  _editorRes.offs.forEach(fn=>{ try{ fn(); }catch(e){} });
+  _editorRes.viewers=[]; _editorRes.blobs=[]; _editorRes.offs=[];
+  window._editorDirty=false;
+}
+window.addEventListener('beforeunload',(e)=>{
+  if(window._currentPage==='admin_editor' && window._editorDirty){ e.preventDefault(); e.returnValue=''; }
+});
+
 function initEditor(examId){
   const s=Store.init();
   if(!Auth.isTeacher()){navigate('home');return;}
   const exam=s.exams.find(e=>e.id===examId);
   if(!exam){navigate('admin');return;}
+  _editorCleanup();
+  const _gen=_editorGen;
 
   // normalize
   const list=(s.questions[examId]||[]).map(q=>({...q, no:q.no??q.number??0}));
@@ -11933,7 +12120,7 @@ function initEditor(examId){
         list.forEach(q=>{if(q.points==null) q.points=1;});
       }
       s.questions[examId]=list; // flush list ลง store (กัน points default หาย)
-      Store.save(s);
+      Store.save(s); _setDirty(false);
       _syncWeightedUI();
       renderTable();
     };
@@ -11945,7 +12132,7 @@ function initEditor(examId){
       if(!Number.isFinite(v)||v<0){toast('กรุณาใส่ตัวเลข ≥ 0');return;}
       list.forEach(q=>{q.points=v;});
       s.questions[examId]=list; // flush list ลง store
-      Store.save(s);
+      Store.save(s); _setDirty(false);
       _syncWeightedUI();
       renderTable();
       toast(`ตั้งทุกข้อเป็น ${fmtPts(v)} แล้ว`);
@@ -12003,7 +12190,7 @@ function initEditor(examId){
       _diffBtns.forEach(x=>x.classList.remove('active'));
       b.classList.add('active');
       exam.difficulty=b.dataset.val;
-      Store.save(s);
+      Store.save(s); _updateSetSummary();
       toast('บันทึกระดับความยากแล้ว');
     };
   });
@@ -12035,7 +12222,7 @@ function initEditor(examId){
       exam.examType=newType;
       list.forEach(q=>{ q.correct=''; if(newType==='fillblank-num') delete q.optCount; });
       s.questions[examId]=list;
-      Store.save(s);
+      Store.save(s); _setDirty(false);
       toast('เปลี่ยนประเภทข้อสอบแล้ว');
       navigate('admin_editor', {id: examId});
     };
@@ -12076,7 +12263,7 @@ function initEditor(examId){
   function applyDuration(){
     const mins=parseInt(durationInput?.value||'0',10);
     if(!mins||mins<1){toast('กรุณากรอกเวลาอย่างน้อย 1 นาที');durationInput?.focus?.();return;}
-    exam.durationSeconds=mins*60;Store.save(s);
+    exam.durationSeconds=mins*60;Store.save(s);_updateSetSummary();
     if(durationStatus) durationStatus.textContent='✅';
     setTimeout(()=>{ if(durationStatus) durationStatus.textContent=''; },2000);
     toast('บันทึกเวลาแล้ว');
@@ -12089,9 +12276,12 @@ function initEditor(examId){
   const editorPdfStatusEl = document.getElementById('editorPdfStatus');
   if(editorPdfUrlEl) editorPdfUrlEl.value = (exam.pdfUrl && !exam.pdfUrl.startsWith('localpdf:')) ? exam.pdfUrl : '';
 
+  // v48.71p: ตั้งค่าในส่วนแบ่งจอด้านล่าง — เปลี่ยน PDF แล้วโหลดฝั่งซ้ายใหม่ทันที
+  let _onExamPdfChanged=()=>{}, _onAnswerPdfChanged=()=>{};
   function updateExamPdf(newUrl) {
     exam.pdfUrl = newUrl;
     Store.save(s);
+    _onExamPdfChanged();
     document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
     // ไฟล์ PDF เดิมใน Storage จะไม่ถูกลบตามอีกต่อไป (เผื่อกู้คืนภายหลัง) — ดู CLAUDE.md
     toast('✅ อัปเดต PDF แล้ว');
@@ -12113,6 +12303,7 @@ function initEditor(examId){
   function updateAnswerPdf(newUrl) {
     exam.answerPdfUrl = newUrl;
     Store.save(s);
+    _onAnswerPdfChanged();
     toast('✅ อัปเดต PDF เฉลยแล้ว');
   }
   const editorAnswerPdfUrlBtn = document.getElementById('editorAnswerPdfUrlBtn');
@@ -12167,9 +12358,40 @@ function initEditor(examId){
 
   let selectedIndex=0;
   const refs={};
+  const rowPaint={}; // v48.71p: idx → ฟังก์ชันวาดช่องเฉลยของแถวนั้นใหม่ (ใช้ตอนกดปุ่มลัด ไม่ต้อง render ทั้งตาราง)
   const fieldOrder=['page','correct','free'];
 
-  function select(i){selectedIndex=Math.max(0,Math.min(list.length-1,i));highlight();}
+  // v48.71p: สถานะ PDF ฝั่งซ้าย (ประกาศก่อน renderTable ครั้งแรก เพราะ select() → _followPdf() อ่านค่าเหล่านี้)
+  const _splitEl=document.getElementById('editorSplit');
+  const _mqSplit=window.matchMedia?window.matchMedia('(min-width:901px)'):{matches:true};
+  let _pdfTab='question';
+  let _qPdf=null, _aPdf=null; // {viewer, gdrive} ของแท็บโจทย์/เฉลย (null = ยังไม่โหลด)
+  let _qPdfUrl=null, _aPdfUrl=null;
+
+  // v48.71p: ธง "ยังไม่บันทึก" — ตั้งเมื่อแก้เฉลย/หน้า/ฟรี/คะแนน/จ/Excel ที่ยังไม่ได้กดบันทึก,
+  // ล้างเมื่อบันทึก list ทั้งก้อน (ปุ่มบันทึก หรือการกระทำที่บันทึกทันทีพร้อม list อยู่แล้ว)
+  const _dirtyBadge=document.getElementById('editorDirtyBadge');
+  const _progressEl=document.getElementById('editorProgress');
+  function _updateProgress(){
+    if(!_progressEl) return;
+    const done=list.filter(q=>q.correct!=null&&String(q.correct)!=='').length;
+    _progressEl.textContent=`กรอกแล้ว ${done}/${list.length}`;
+  }
+  function _setDirty(v){
+    window._editorDirty=!!v;
+    if(_dirtyBadge) _dirtyBadge.style.display=v?'':'none';
+    _updateProgress();
+  }
+  _setDirty(false);
+
+  // follow: false = ไม่ให้ PDF เลื่อนตาม (เช่น render ตารางใหม่), true = บังคับเลื่อนแม้เป็นแถวเดิม (คลิกแถว),
+  // ไม่ระบุ = เลื่อนเมื่อเปลี่ยนแถว
+  function select(i,follow){
+    const prev=selectedIndex;
+    selectedIndex=Math.max(0,Math.min(list.length-1,i));
+    highlight();
+    if(follow!==false && (follow===true || prev!==selectedIndex)) _followPdf();
+  }
   function highlight(){[...document.getElementById('editorTbody').children].forEach((tr,idx)=>{tr.classList.toggle('rowActive',idx===selectedIndex);}); }
   function focusField(ri,field){const el=refs[`${ri}:${field}`];if(el&&el.focus) el.focus();}
   function nextField(ri,field){const i=fieldOrder.indexOf(field);if(i<fieldOrder.length-1) return{rowIndex:ri,field:fieldOrder[i+1]};return{rowIndex:Math.min(ri+1,list.length-1),field:'page'};}
@@ -12184,10 +12406,11 @@ function initEditor(examId){
     tbody.innerHTML='';
     // clear refs
     Object.keys(refs).forEach(k=>delete refs[k]);
+    Object.keys(rowPaint).forEach(k=>delete rowPaint[k]);
     list.forEach((q,idx)=>{
       const tr=document.createElement('tr');
       if(Math.floor(idx/5)%2===1) tr.classList.add('editorRowAlt');
-      tr.addEventListener('click',()=>select(idx));
+      tr.addEventListener('click',()=>select(idx,true));
       const _qTags=Array.isArray(q.tags)?q.tags:(q.topic?[q.topic]:[]);
       const _qSubTags=Array.isArray(q.subTags)?q.subTags:[];
       // v48.28p: เปลี่ยนช่อง Tag จากปุ่มเปิด modal เป็น dropdown เลือก tag หลักได้เร็วขึ้น —
@@ -12215,6 +12438,7 @@ function initEditor(examId){
             const v=Number(ptsInput.value);
             if(Number.isFinite(v)&&v>=0){
               q.points=v;
+              _setDirty(true);
               if(_weightedStatus){
                 const totalPts=list.reduce((s,qq)=>s+getQPoints(qq),0);
                 _weightedStatus.textContent=`— เปิดอยู่ (รวม ${fmtPts(totalPts)} คะแนน)`;
@@ -12231,7 +12455,14 @@ function initEditor(examId){
             const v=numInput.value.replace(/[^\d]/g,'').slice(0,_numDigits);
             if(v!==numInput.value) numInput.value=v;
             q.correct=v;
+            _setDirty(true);
           });
+          // v48.71p: Enter ในช่องตัวเลข → ไปกรอกข้อถัดไปทันที
+          numInput.addEventListener('keydown',(e)=>{
+            if(e.key==='Enter'){ e.preventDefault(); _gotoRow(idx+1,true); }
+          });
+          refs[`${idx}:correctNum`]=numInput;
+          rowPaint[idx]=()=>{ numInput.value=q.correct||''; };
         }
       } else {
         // ปุ่มเฉลย ก-ง + ช่องที่ 5: "+" (กดค้าง 2 วิ → เป็น จ) / "จ" (กดค้าง 2 วิ → กลับเป็น +)
@@ -12256,6 +12487,7 @@ function initEditor(examId){
               _cell.querySelectorAll('.correctBtn').forEach(b=>b.classList.remove('selected'));
               btn.classList.add('selected');
               q.correct=btn.getAttribute('data-val');
+              _setDirty(true);
             });
           });
           const _slot=_cell.querySelector(_has5?'.optE':'.optToggle');
@@ -12277,9 +12509,11 @@ function initEditor(examId){
             }
             select(idx);
             _paintCorrectCell();
+            _setDirty(true);
           });
         };
         _paintCorrectCell();
+        rowPaint[idx]=_paintCorrectCell;
       }
       const pageInput = tr.querySelector('input[data-field="page"]');
       refs[`${idx}:page`]=pageInput;
@@ -12297,6 +12531,8 @@ function initEditor(examId){
           const el=refs[`${i}:page`];
           if(el) el.value=newPage;
         }
+        _setDirty(true);
+        _followPdf();
       });
       const tagSel=tr.querySelector('select[data-field="tags"]');
       if(tagSel){
@@ -12307,7 +12543,7 @@ function initEditor(examId){
           const _cur=(Array.isArray(q.tags)&&q.tags[0])||q.topic||'';
           if(_cur!==v) q.subTags=[]; // เปลี่ยน tag หลัก → ล้าง tag ย่อย (semantics เดิมของ tag modal)
           q.tags=v?[v]:[]; q.topic=v||'';
-          s.questions[examId]=list; Store.save(s);
+          s.questions[examId]=list; Store.save(s); _setDirty(false);
           renderTable();
         });
       }
@@ -12323,10 +12559,12 @@ function initEditor(examId){
         q.isFree=!q.isFree;
         freeBtn.classList.toggle('active',q.isFree);
         freeBtn.textContent=q.isFree?'✓ ฟรี':'ฟรี';
+        _setDirty(true);
       });
       tbody.appendChild(tr);
     });
-    select(selectedIndex);
+    select(selectedIndex,false);
+    _updateProgress();
   }
   renderTable();
   _syncWeightedUI();
@@ -12399,7 +12637,7 @@ function initEditor(examId){
         });
         if(_quickTagSelected===t) _quickTagSelected=null;
         s.questions[examId]=list;
-        Store.save(s);
+        Store.save(s); _setDirty(false);
         _qtRenderChips();
         _qtUpdateInputUI();
         renderTable();
@@ -12450,7 +12688,7 @@ function initEditor(examId){
       }
     });
     s.questions[examId]=list;
-    Store.save(s);
+    Store.save(s); _setDirty(false);
     renderTable();
     if(_qtMsgEl){
       const verb=mode==='add'?'ใส่':'ลบ';
@@ -12509,8 +12747,8 @@ function initEditor(examId){
     }
     exam.questionCount = newCount;
     s.questions[examId]=list;
-    Store.save(s);
-    renderTable();
+    Store.save(s); _setDirty(false);
+    renderTable(); _updateSetSummary();
     qCountStatus.textContent = newCount > oldCount
       ? `✅ เพิ่มเป็น ${newCount} ข้อแล้ว (ข้อ ${oldCount+1}–${newCount} ใช้หน้า PDF เดิม)`
       : `✅ ลดเหลือ ${newCount} ข้อแล้ว`;
@@ -12520,11 +12758,217 @@ function initEditor(examId){
   if(qCountInput) qCountInput.onkeydown = (e) => { if(e.key==='Enter'){ e.preventDefault(); applyQCount(); } };
 
   document.getElementById('editorSave').onclick=()=>{
-    s.questions[examId]=list;exam.questionCount=list.length;Store.save(s);toast('บันทึกแล้ว');
+    s.questions[examId]=list;exam.questionCount=list.length;Store.save(s);_setDirty(false);toast('บันทึกแล้ว');
   };
 
-  // bind excel import สำหรับ editor
-  bindEditorExcel(examId, list, renderTable, exam.examType, ()=>!!exam.weighted, exam.subject, _numDigits);
+  // bind excel import สำหรับ editor (นำเข้าแล้วยังไม่บันทึก → ธง "ยังไม่บันทึก")
+  bindEditorExcel(examId, list, ()=>{ renderTable(); _setDirty(true); }, exam.examType, ()=>!!exam.weighted, exam.subject, _numDigits);
+
+  // ═══════ v48.71p: แบ่งจอ — PDF ซ้าย (สลับโจทย์/เฉลย) + ปุ่มลัดกรอกเฉลย ═══════
+  const _pdfInfoEl=document.getElementById('editorPdfInfo');
+  const _pdfEmptyEl=document.getElementById('editorPdfEmpty');
+  const _tabQEl=document.getElementById('editorTabQuestion');
+  const _tabAEl=document.getElementById('editorTabAnswer');
+  const _viewQEl=document.getElementById('editorPdfViewer');
+  const _viewAEl=document.getElementById('editorAnswerPdfViewer');
+  const _setCard=document.getElementById('editorSetCard');
+  const _setHead=document.getElementById('editorSetHead');
+  const _lsGet=(k)=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
+  const _lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+
+  // ── ตั้งค่าชุดข้อสอบ: พับเก็บได้ (เปิดไว้ถ้ายังไม่มี PDF โจทย์ จะได้เห็นช่องอัปโหลดทันที) ──
+  const _DIFF_LABEL={review:'ทบทวน',develop:'พัฒนา',hard:'ยาก'};
+  function _updateSetSummary(){
+    const el=document.getElementById('editorSetSummary'); if(!el) return;
+    el.textContent=[`${list.length} ข้อ`,`${Math.round((exam.durationSeconds||0)/60)} นาที`,`ระดับ: ${_DIFF_LABEL[exam.difficulty||'develop']||'-'}`,
+      exam.pdfUrl?'PDF โจทย์ ✓':'ยังไม่มี PDF โจทย์', exam.answerPdfUrl?'PDF เฉลย ✓':'ไม่มี PDF เฉลย'].join(' · ');
+  }
+  function _setSettingsOpen(open){
+    if(!_setCard) return;
+    _setCard.classList.toggle('collapsed',!open);
+    if(_setHead){
+      _setHead.setAttribute('aria-expanded',open?'true':'false');
+      const ar=_setHead.querySelector('.editorSetArrow'); if(ar) ar.textContent=open?'▾':'▸';
+    }
+    _updateSetSummary();
+  }
+  if(_setHead) _setHead.onclick=()=>_setSettingsOpen(_setCard.classList.contains('collapsed'));
+  _setSettingsOpen(!exam.pdfUrl);
+
+  // ── แสดง/ซ่อนคอลัมน์ Tag (ค่าเริ่มต้นซ่อน ตอนกรอกจะได้ไม่กินพื้นที่ — จำค่าไว้) + แผง Tag ด่วน ──
+  const _tagToggle=document.getElementById('editorTagToggle');
+  const _qtToggle=document.getElementById('editorQuickTagToggle');
+  function _applyTagCol(show){
+    if(_splitEl) _splitEl.classList.toggle('noTag',!show);
+    if(_tagToggle){
+      _tagToggle.textContent=show?'🏷 ซ่อน Tag':'🏷 แสดง Tag';
+      _tagToggle.classList.toggle('on',show);
+      _tagToggle.setAttribute('aria-pressed',show?'true':'false');
+    }
+  }
+  _applyTagCol(_lsGet('nanont:editorShowTag')==='1');
+  if(_tagToggle) _tagToggle.onclick=()=>{
+    const show=_splitEl.classList.contains('noTag');
+    _applyTagCol(show); _lsSet('nanont:editorShowTag',show?'1':'0');
+  };
+  if(_splitEl) _splitEl.classList.remove('qtOpen');
+  if(_qtToggle){
+    _qtToggle.classList.remove('on'); _qtToggle.setAttribute('aria-pressed','false');
+    _qtToggle.onclick=()=>{
+      const open=_splitEl.classList.toggle('qtOpen');
+      _qtToggle.classList.toggle('on',open); _qtToggle.setAttribute('aria-pressed',open?'true':'false');
+    };
+  }
+
+  // ── PDF: ใช้ PdfViewer เดียวกับหน้าทบทวน (Drive = iframe เลื่อนหน้าอัตโนมัติไม่ได้, localpdf: = ไฟล์ในเครื่อง) ──
+  async function _mountExamPdf(containerId, url, page){
+    const el=document.getElementById(containerId);
+    el.innerHTML='';
+    const gid=(url.match(/drive\.google\.com\/file\/d\/([^/?#]+)/)||[])[1]
+      || (url.includes('drive.google.com') ? (url.match(/[?&]id=([^&]+)/)||[])[1] : null);
+    if(gid){
+      const iframe=document.createElement('iframe');
+      iframe.src=`https://drive.google.com/file/d/${gid}/preview`;
+      iframe.allow='autoplay';
+      iframe.title='PDF';
+      iframe.style.cssText='width:100%;height:100%;border:none;display:block;background:#525659;';
+      el.appendChild(iframe);
+      return {viewer:null, gdrive:true};
+    }
+    let u=url;
+    if(u.startsWith('localpdf:')){
+      const blob=await PdfDB.get(u.slice('localpdf:'.length));
+      if(_gen!==_editorGen) return null; // ออกจากหน้า/เปิดชุดอื่นไปแล้วระหว่างรอ
+      if(!blob){ el.innerHTML='<div style="color:#f88;padding:20px;font-size:13px;">⚠️ ไม่พบไฟล์ PDF ในเครื่องนี้</div>'; return null; }
+      u=URL.createObjectURL(blob);
+      _editorRes.blobs.push(u);
+    } else if(u.startsWith('./')||u.startsWith('../')){
+      u=new URL(u,window.location.href).href;
+    }
+    const viewer=PdfViewer.create(containerId);
+    _editorRes.viewers.push(viewer);
+    viewer.loadUrl(u,page).then(()=>{
+      // ระหว่างโหลดผู้ใช้อาจเลือกข้ออื่นไปแล้ว → เลื่อนไปหน้าของข้อปัจจุบัน
+      if(_gen===_editorGen && _pdfTab==='question' && _qPdf && _qPdf.viewer===viewer){
+        const p=_curPage(); if(p!==page) setTimeout(()=>viewer.setPage(p),200);
+      }
+    });
+    return {viewer, gdrive:false};
+  }
+  function _curPage(){ const q=list[selectedIndex]; return Math.max(1,Number(q&&q.page)||1); }
+  function _setPdfInfo(){
+    if(!_pdfInfoEl) return;
+    if(_pdfTab==='answer'){ _pdfInfoEl.textContent='PDF เฉลย'; return; }
+    if(!exam.pdfUrl){ _pdfInfoEl.textContent=''; return; }
+    const q=list[selectedIndex];
+    if(_qPdf && _qPdf.gdrive){ _pdfInfoEl.textContent='Google Drive — เลื่อนหน้าเอง'+(q?` (ข้อ ${q.number||q.no} หน้า ${_curPage()})`:''); return; }
+    _pdfInfoEl.textContent=q?`หน้า ${_curPage()} (ข้อ ${q.number||q.no})`:'';
+  }
+  function _followPdf(){
+    if(_pdfTab==='question' && _qPdf && _qPdf.viewer) _qPdf.viewer.setPage(_curPage());
+    _setPdfInfo();
+  }
+  function _destroyView(v){
+    if(v && v.viewer){
+      try{ v.viewer.destroy(); }catch(e){}
+      _editorRes.viewers=_editorRes.viewers.filter(x=>x!==v.viewer);
+    }
+  }
+  async function _loadQuestionPdf(force){
+    if(!_mqSplit.matches) return; // จอแคบไม่แสดง PDF — ไม่ต้องโหลด/เรนเดอร์ให้เปลือง
+    if(!force && _qPdfUrl===exam.pdfUrl) return;
+    _destroyView(_qPdf); _qPdf=null; _qPdfUrl=exam.pdfUrl||null;
+    if(_pdfEmptyEl) _pdfEmptyEl.style.display=exam.pdfUrl?'none':'flex';
+    if(!exam.pdfUrl){ _viewQEl.innerHTML=''; _setPdfInfo(); return; }
+    _qPdf=await _mountExamPdf('editorPdfViewer', exam.pdfUrl, _curPage());
+    _setPdfInfo();
+  }
+  async function _loadAnswerPdf(){
+    if(!exam.answerPdfUrl || _aPdfUrl===exam.answerPdfUrl) return;
+    _destroyView(_aPdf); _aPdf=null; _aPdfUrl=exam.answerPdfUrl;
+    _aPdf=await _mountExamPdf('editorAnswerPdfViewer', exam.answerPdfUrl, 1);
+  }
+  function _setPdfTab(tab){
+    if(tab==='answer' && !exam.answerPdfUrl) tab='question';
+    _pdfTab=tab;
+    const isQ=tab==='question';
+    // สลับด้วย visibility (ไม่ใช่ display:none) — คงตำแหน่งเลื่อนของแต่ละไฟล์ไว้ตอนสลับไปมา
+    _viewQEl.classList.toggle('editorPdfHidden',!isQ);
+    _viewAEl.classList.toggle('editorPdfHidden',isQ);
+    if(_pdfEmptyEl) _pdfEmptyEl.style.visibility=isQ?'':'hidden';
+    [[_tabQEl,isQ],[_tabAEl,!isQ]].forEach(([b,on])=>{ if(b){ b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); } });
+    if(!isQ) _loadAnswerPdf();
+    else _followPdf();
+    _setPdfInfo();
+  }
+  function _syncAnswerTab(){
+    if(_tabAEl) _tabAEl.style.display=exam.answerPdfUrl?'':'none';
+    if(!exam.answerPdfUrl && _pdfTab==='answer') _setPdfTab('question');
+  }
+  if(_tabQEl) _tabQEl.onclick=()=>{ _setPdfTab('question'); _lsSet('nanont:editorPdfTab','question'); };
+  if(_tabAEl) _tabAEl.onclick=()=>{ _setPdfTab('answer'); _lsSet('nanont:editorPdfTab','answer'); };
+  const _pdfEmptyBtn=document.getElementById('editorPdfEmptyBtn');
+  if(_pdfEmptyBtn) _pdfEmptyBtn.onclick=()=>{ _setSettingsOpen(true); const u=document.getElementById('editorPdfUrl'); if(u) u.focus(); };
+  _viewQEl.innerHTML=''; _viewAEl.innerHTML='';
+  _syncAnswerTab();
+  _loadQuestionPdf(true);
+  _setPdfTab(_lsGet('nanont:editorPdfTab')==='answer'?'answer':'question');
+  // หมุน iPad จากแนวตั้งเป็นแนวนอน → เริ่มแสดง PDF
+  if(_mqSplit.addEventListener){
+    const _onMq=()=>{ if(_mqSplit.matches){ _loadQuestionPdf(); if(_pdfTab==='answer') _loadAnswerPdf(); } };
+    _mqSplit.addEventListener('change',_onMq);
+    _editorRes.offs.push(()=>_mqSplit.removeEventListener('change',_onMq));
+  }
+  // เปลี่ยน/อัปโหลด PDF ในตั้งค่า → โหลดใหม่ทันที (hook ผ่านตัวแปรที่ updateExamPdf/updateAnswerPdf เรียก)
+  _onExamPdfChanged=()=>{ _loadQuestionPdf(true); _updateSetSummary(); };
+  _onAnswerPdfChanged=()=>{ _aPdfUrl=null; _destroyView(_aPdf); _aPdf=null; _viewAEl.innerHTML=''; _syncAnswerTab(); if(_pdfTab==='answer') _loadAnswerPdf(); _updateSetSummary(); };
+
+  // ── ปุ่มลัด (ทุกขนาดจอ; ไม่ทำงานขณะพิมพ์ในช่อง input/select หรือมีหน้าต่าง tag เปิดอยู่) ──
+  function _ensureRowVisible(i){
+    const tr=document.getElementById('editorTbody').children[i]; if(!tr) return;
+    const box=tr.closest('.tableBox'); if(!box) return;
+    const head=box.querySelector('thead'); const hh=head?head.offsetHeight:0;
+    const br=box.getBoundingClientRect(), r=tr.getBoundingClientRect();
+    // เลื่อนเฉพาะกล่องตาราง (ไม่ใช้ scrollIntoView — มันเลื่อน scroller ชั้นนอกทุกชั้นด้วย)
+    if(r.top<br.top+hh) box.scrollTop-=(br.top+hh-r.top);
+    else if(r.bottom>br.bottom) box.scrollTop+=(r.bottom-br.bottom);
+  }
+  function _gotoRow(i,focusNum){
+    if(i<0||i>=list.length) return;
+    select(i);
+    _ensureRowVisible(selectedIndex);
+    if(focusNum){ const el=refs[`${selectedIndex}:correctNum`]; if(el) el.focus(); }
+  }
+  const _KEY_LETTER={'ก':'A','ข':'B','ค':'C','ง':'D','จ':'E',a:'A',b:'B',c:'C',d:'D',e:'E'};
+  const _CODE_LETTER={Digit1:'A',Digit2:'B',Digit3:'C',Digit4:'D',Digit5:'E',Numpad1:'A',Numpad2:'B',Numpad3:'C',Numpad4:'D',Numpad5:'E'};
+  function _onEditorKey(e){
+    if(window._currentPage!=='admin_editor' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t=e.target;
+    if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    const tm=document.getElementById('tagModal'); if(tm && tm.style.display && tm.style.display!=='none') return;
+    if(!list.length) return;
+    const q=list[selectedIndex];
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); _gotoRow(selectedIndex+(e.key==='ArrowDown'?1:-1)); return; }
+    if(_isFillNum){
+      if(e.key==='Enter'){ e.preventDefault(); _gotoRow(selectedIndex,true); }
+      return;
+    }
+    const isClear=e.key==='Backspace'||e.key==='Delete'||e.code==='Digit0'||e.code==='Numpad0';
+    const letter=_CODE_LETTER[e.code]||_KEY_LETTER[String(e.key).toLowerCase()];
+    if(!isClear && !letter) return;
+    e.preventDefault();
+    if(isClear){
+      if(q.correct){ q.correct=''; _setDirty(true); }
+      if(rowPaint[selectedIndex]) rowPaint[selectedIndex]();
+      return;
+    }
+    if(letter==='E' && q.optCount!==5){ toast('ข้อนี้ยังไม่มีตัวเลือก จ — กด + ค้าง 2 วิ เพื่อเพิ่ม'); return; }
+    q.correct=letter; _setDirty(true);
+    if(rowPaint[selectedIndex]) rowPaint[selectedIndex]();
+    _gotoRow(selectedIndex+1); // ไปข้อถัดไปอัตโนมัติ (ข้อสุดท้ายอยู่ที่เดิม)
+  }
+  document.addEventListener('keydown',_onEditorKey);
+  _editorRes.offs.push(()=>document.removeEventListener('keydown',_onEditorKey));
 }
 
 // ===================== ADMIN EXAM LIST — ดาวน์โหลด Template เฉลยทุกวิชา =====================
@@ -15942,7 +16386,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.70p';
+  const CURRENT_VERSION = 'v48.71p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

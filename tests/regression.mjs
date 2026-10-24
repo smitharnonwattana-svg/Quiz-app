@@ -512,6 +512,8 @@ currentSection = 'purge';
   await page.evaluate(() => { Store._cache.exams.push({ id: 'eC', title: 'ชุด C', subject: 'ทั่วไป', questionCount: 1, published: true, order: 9, durationSeconds: 600, examType: 'mc', pdfUrl: 'https://firebasestorage.googleapis.com/x/c_q.pdf' }); Store._cache.questions.eC = [{ id: 'q1', no: 1, number: 1, correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } }]; });
   await page.evaluate(() => navigate('admin_editor', { id: 'eC' }));
   await page.waitForTimeout(500);
+  // v48.71p: จอกว้างพับ "ตั้งค่าชุดข้อสอบ" ไว้เมื่อมี PDF แล้ว → กางก่อนพิมพ์ (หน้าเก่าไม่มีปุ่มนี้ = ไม่ทำอะไร)
+  await page.evaluate(() => { const c = document.getElementById('editorSetCard'); if (c && c.classList.contains('collapsed')) document.getElementById('editorSetHead').click(); });
   await page.fill('#editorPdfUrl', 'https://firebasestorage.googleapis.com/x/c_new.pdf');
   await page.click('#editorPdfUrlBtn');
   await page.waitForTimeout(300);
@@ -4545,6 +4547,206 @@ currentSection = 'staleWrite';
     const src = fs.readFileSync(new URL('../' + SW_FILE, import.meta.url), 'utf8');
     check('static: หน้ากู้คืน backup เขียนทับเต็ม (ไม่ส่ง cas) แล้วตั้ง base ใหม่', /saveDoc\('mainStore', _payload, _saveOpts\)/.test(src) && /Store\._setBase\(_payload/.test(src));
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section: editorSplit (v48.71p) — หน้ากรอกเฉลยแบบแบ่งจอ (PDF ซ้าย สลับโจทย์/เฉลย, ตารางเดิมขวา)
+// + ปุ่มลัด 1–5/ก–จ/a–e, ↑↓, 0 ล้าง + เตือนออกโดยไม่บันทึก + คอลัมน์ Tag เปิด/ปิดได้ (ค่าเริ่มต้นซ่อน)
+// + หน้าสร้างข้อสอบแบบสั้น / ปุ่ม "+ สร้างชุดใหม่" ในหน้ารายการ — ยังอยู่ใน preview
+// pdf.js โหลดไม่ได้ใน sandbox → stub PdfViewer.create ให้บันทึกการเรียก (load/page/destroy)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'editorSplit';
+{
+  const ES_FILE = 'index_preview.html';
+  const L = ['A', 'B', 'C', 'D'];
+  const esQs = () => Array.from({ length: 20 }, (_, i) => ({
+    id: 'q' + (i + 1), no: i + 1, number: i + 1, page: Math.ceil((i + 1) / 5), correct: i < 4 ? L[i] : '',
+    choices: { A: '', B: '', C: '', D: '' }, ...(i === 15 ? { optCount: 5 } : {}),
+  }));
+  const esCache = (examExtra = {}) => baseCache({
+    exams: [mkExam('es1', 'ชุดแบ่งจอ', 'คณิตศาสตร์', { questionCount: 20, pdfUrl: './q.pdf', answerPdfUrl: './a.pdf', ...examExtra })],
+    questions: { es1: esQs() },
+    subjectTopics: { 'คณิตศาสตร์': ['เศษส่วน'] },
+  });
+  const stubPdf = (page) => page.evaluate(() => {
+    window.__pdf = [];
+    PdfViewer.create = (id) => ({
+      loadUrl: async (u, p) => { window.__pdf.push(['load', id, u, p]); },
+      setPage: (p) => { window.__pdf.push(['page', id, p]); },
+      destroy: () => { window.__pdf.push(['destroy', id]); },
+    });
+  });
+  const openEditor = async (page) => { await page.evaluate(() => navigate('admin_editor', { id: 'es1' })); await page.waitForTimeout(400); };
+  const lastPage = (page) => page.evaluate(() => { const p = window.__pdf.filter(c => c[0] === 'page' && c[1] === 'editorPdfViewer'); return p.length ? p[p.length - 1][2] : null; });
+  const selIdx = (page) => page.evaluate(() => [...document.querySelectorAll('#editorTbody tr')].findIndex(t => t.classList.contains('rowActive')));
+  const rowSel = (page, i) => page.evaluate((i) => (document.querySelectorAll('#editorTbody tr')[i].querySelector('.correctBtn.selected') || {}).dataset?.val || '', i);
+  const key = (page, k, code) => page.evaluate(([k, code]) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: code || '', bubbles: true, cancelable: true })), [k, code]);
+
+  // 1) iPad แนวนอน 1180px: โครงแบ่งจอ + PDF โหลด + Tag ซ่อนเป็นค่าเริ่มต้น
+  const { ctx, page } = await newSeededPage({ file: ES_FILE, cache: esCache(), viewport: { width: 1180, height: 820 } });
+  await stubPdf(page);
+  await openEditor(page);
+  const lay = await page.evaluate(() => {
+    const sp = document.getElementById('editorSplit');
+    const ths = [...document.querySelectorAll('#page-admin_editor .tableBox thead th')];
+    const td = document.querySelector('#editorTbody tr:first-child td:nth-child(5)');
+    const pw = document.querySelector('.editorPdfWrap').getBoundingClientRect();
+    const sd = document.querySelector('.editorSide').getBoundingClientRect();
+    return {
+      grid: getComputedStyle(sp).display, tableInSide: !!document.querySelector('.editorSide #editorTbody'),
+      pdfLeft: pw.width > 300 && pw.right <= sd.left + 1, noTag: sp.classList.contains('noTag'),
+      tagTh: getComputedStyle(ths[5]).display, tagTd: getComputedStyle(td).display,
+      collapsed: document.getElementById('editorSetCard').classList.contains('collapsed'),
+      ansTab: getComputedStyle(document.getElementById('editorTabAnswer')).display,
+      loads: window.__pdf.filter(c => c[0] === 'load'), sideW: Math.round(sd.width),
+      overflowX: document.querySelector('.editorSide .tableBox').scrollWidth - document.querySelector('.editorSide .tableBox').clientWidth,
+      prog: document.getElementById('editorProgress').textContent,
+    };
+  });
+  check('editorSplit: 1180px เป็นกริดแบ่งจอ PDF ซ้าย ตารางเดิมอยู่ฝั่งขวา', lay.grid === 'grid' && lay.tableInSide && lay.pdfLeft, JSON.stringify(lay));
+  check('editorSplit: โหลด PDF โจทย์ (q.pdf แปลงเป็น URL เต็ม) ที่หน้าของข้อแรก ไม่โหลด PDF เฉลยจนกว่าจะกดแท็บ', lay.loads.length === 1 && lay.loads[0][1] === 'editorPdfViewer' && /\/q\.pdf$/.test(lay.loads[0][2]) && lay.loads[0][3] === 1, JSON.stringify(lay.loads));
+  check('editorSplit: คอลัมน์ Tag ซ่อนเป็นค่าเริ่มต้น (หัว+เซลล์) ฝั่งขวาแคบ', lay.noTag && lay.tagTh === 'none' && lay.tagTd === 'none' && lay.sideW < 420, JSON.stringify(lay));
+  check('editorSplit: ตารางฝั่งขวาไม่ล้นแนวนอน (เห็นคอลัมน์ฟรีครบ)', lay.overflowX <= 1, String(lay.overflowX));
+  check('editorSplit: มี PDF แล้ว → ตั้งค่าชุดข้อสอบพับไว้, มีแท็บเฉลยเพราะมี answerPdfUrl', lay.collapsed && lay.ansTab !== 'none', JSON.stringify(lay));
+  check('editorSplit: แสดงความคืบหน้า กรอกแล้ว 4/20', lay.prog === 'กรอกแล้ว 4/20', lay.prog);
+
+  // 2) คลิกแถว → PDF เลื่อนไปหน้าของข้อนั้น; ปุ่มลัดเลือกคำตอบแล้วข้ามไปข้อถัดไป
+  await page.locator('#editorTbody tr').nth(6).locator('td').nth(1).click();
+  await page.waitForTimeout(100);
+  check('editorSplit: คลิกแถวข้อ 7 (หน้า 2) → PDF setPage(2)', (await lastPage(page)) === 2, String(await lastPage(page)));
+  await page.locator('#editorTbody tr').nth(9).locator('td').nth(1).click();
+  await page.keyboard.press('3');
+  await page.waitForTimeout(100);
+  check('editorSplit: กด 3 ที่ข้อ 10 → เฉลย ค + เลื่อนไปข้อ 11 + PDF ตามไปหน้า 3', (await rowSel(page, 9)) === 'C' && (await selIdx(page)) === 10 && (await lastPage(page)) === 3, JSON.stringify([await rowSel(page, 9), await selIdx(page), await lastPage(page)]));
+  await key(page, 'ข');
+  check('editorSplit: กด ข (แป้นไทย) → เฉลย B แล้วไปข้อถัดไป', (await rowSel(page, 10)) === 'B' && (await selIdx(page)) === 11, JSON.stringify([await rowSel(page, 10), await selIdx(page)]));
+  await key(page, 'd');
+  check('editorSplit: กด d → เฉลย D', (await rowSel(page, 11)) === 'D', await rowSel(page, 11));
+  await key(page, 'ArrowUp');
+  await key(page, '0', 'Digit0');
+  check('editorSplit: ↑ กลับข้อ 12 แล้วกด 0 → ล้างเฉลย (อยู่ข้อเดิม)', (await rowSel(page, 11)) === '' && (await selIdx(page)) === 11, JSON.stringify([await rowSel(page, 11), await selIdx(page)]));
+  await key(page, '5', 'Digit5');
+  check('editorSplit: กด 5 ที่ข้อที่ไม่มีตัวเลือก จ → ไม่เปลี่ยน ไม่ข้ามข้อ', (await rowSel(page, 11)) === '' && (await selIdx(page)) === 11, JSON.stringify([await rowSel(page, 11), await selIdx(page)]));
+  await page.locator('#editorTbody tr').nth(15).locator('td').nth(1).click();
+  await key(page, 'จ');
+  check('editorSplit: กด จ ที่ข้อ 16 (มีตัวเลือก จ) → เฉลย E', (await rowSel(page, 15)) === 'E', await rowSel(page, 15));
+  // พิมพ์ในช่องหน้า → ไม่ถูกตีเป็นปุ่มลัด
+  const pg = page.locator('#editorTbody tr').nth(2).locator('input[data-field="page"]');
+  await pg.click(); await pg.fill(''); await page.keyboard.type('2');
+  check('editorSplit: พิมพ์ 2 ในช่องหน้า → ช่องเป็น 2 และไม่เลือกคำตอบ/ไม่ข้ามข้อ', (await pg.inputValue()) === '2' && (await rowSel(page, 2)) === 'C' && (await selIdx(page)) === 2, JSON.stringify([await pg.inputValue(), await rowSel(page, 2), await selIdx(page)]));
+
+  // 3) ธง "ยังไม่บันทึก" + เตือนออกจากหน้า (ยกเลิก = อยู่หน้าเดิม) + บันทึกแล้วออกได้เลย
+  const dirty = await page.evaluate(() => ({ d: window._editorDirty, badge: getComputedStyle(document.getElementById('editorDirtyBadge')).display }));
+  check('editorSplit: แก้แล้วขึ้นป้าย "ยังไม่บันทึก"', dirty.d === true && dirty.badge !== 'none', JSON.stringify(dirty));
+  page.removeAllListeners('dialog');
+  let dialogs = [];
+  page.on('dialog', d => { dialogs.push(d.message()); d.dismiss(); });
+  await page.evaluate(() => navigate('admin_exams'));
+  await page.waitForTimeout(150);
+  const stay = await page.evaluate(() => window._currentPage);
+  check('editorSplit: ออกจากหน้าขณะยังไม่บันทึก → มี confirm, กดยกเลิกแล้วอยู่หน้าเดิม', dialogs.length === 1 && /ยังไม่บันทึก/.test(dialogs[0]) && stay === 'admin_editor', JSON.stringify([dialogs, stay]));
+  const notSaved = await page.evaluate(() => Store.load().questions.es1[9].correct);
+  check('editorSplit: ก่อนกดบันทึก ค่าใน store ยังเป็นค่าเดิม', notSaved === '', notSaved);
+  await page.click('#editorSave');
+  await page.waitForTimeout(100);
+  const saved = await page.evaluate(() => { const q = Store.load().questions.es1; return { d: window._editorDirty, q10: q[9].correct, q11: q[10].correct, q12: q[11].correct, q16: q[15].correct, q3page: q[2].page, keys: Object.keys(q[9]).sort().join(',') }; });
+  check('editorSplit: กดบันทึก → store ได้ค่าจากปุ่มลัด (C/B/ว่าง/E) + หน้า + ธงหาย', !saved.d && saved.q10 === 'C' && saved.q11 === 'B' && saved.q12 === '' && saved.q16 === 'E' && saved.q3page === 2, JSON.stringify(saved));
+  check('editorSplit: รูปแบบข้อมูลข้อไม่เปลี่ยน (ไม่มีฟิลด์ใหม่)', saved.keys === 'choices,correct,id,no,number,page', saved.keys);
+  dialogs = [];
+  await page.evaluate(() => navigate('admin_exams'));
+  await page.waitForTimeout(150);
+  const left = await page.evaluate(() => ({ p: window._currentPage, destroyed: window.__pdf.filter(c => c[0] === 'destroy').map(c => c[1]) }));
+  check('editorSplit: บันทึกแล้วออกได้ไม่ถาม + เก็บกวาด PDF viewer', dialogs.length === 0 && left.p === 'admin_exams' && left.destroyed.includes('editorPdfViewer'), JSON.stringify([dialogs, left]));
+  const keyAfter = await page.evaluate(() => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '1', code: 'Digit1', bubbles: true })); return Store.load().questions.es1[0].correct; });
+  check('editorSplit: ออกจากหน้าแล้วปุ่มลัดไม่ทำงานต่อ', keyAfter === 'A', keyAfter);
+
+  // 4) แท็บเฉลย (โหลดเมื่อกด + จำแท็บ) และ Tag เปิด/ปิด (จำค่า, เลือก tag ได้)
+  await openEditor(page);
+  await page.click('#editorTabAnswer');
+  await page.waitForTimeout(100);
+  const ans = await page.evaluate(() => ({ loads: window.__pdf.filter(c => c[0] === 'load' && c[1] === 'editorAnswerPdfViewer').map(c => c[2]), on: document.getElementById('editorTabAnswer').classList.contains('on'), qHidden: document.getElementById('editorPdfViewer').classList.contains('editorPdfHidden'), ls: localStorage.getItem('nanont:editorPdfTab') }));
+  check('editorSplit: กดแท็บเฉลย → โหลด ./a.pdf, ซ่อนโจทย์ (visibility), จำแท็บ', ans.loads.length === 1 && /\/a\.pdf$/.test(ans.loads[0]) && ans.on && ans.qHidden && ans.ls === 'answer', JSON.stringify(ans));
+  const before = (await page.evaluate(() => window.__pdf.length));
+  await page.locator('#editorTbody tr').nth(12).locator('td').nth(1).click();
+  const noFollow = await page.evaluate((n) => window.__pdf.slice(n).filter(c => c[0] === 'page').length, before);
+  check('editorSplit: อยู่แท็บเฉลย → คลิกข้อไม่เลื่อน PDF (เลขหน้าเฉลยไม่ตรงกับโจทย์)', noFollow === 0, String(noFollow));
+  await page.click('#editorTabQuestion');
+  await page.click('#editorTagToggle');
+  const tagOn = await page.evaluate(() => {
+    const th = document.querySelectorAll('#page-admin_editor .tableBox thead th')[5];
+    const sel = document.querySelector('#editorTbody tr:first-child select.tagSel');
+    return { th: getComputedStyle(th).display, vis: !!(sel && sel.offsetParent), ls: localStorage.getItem('nanont:editorShowTag'), txt: document.getElementById('editorTagToggle').textContent };
+  });
+  check('editorSplit: กด "แสดง Tag" → เห็นคอลัมน์ + dropdown, จำค่า, ปุ่มเปลี่ยนเป็น "ซ่อน Tag"', tagOn.th !== 'none' && tagOn.vis && tagOn.ls === '1' && /ซ่อน Tag/.test(tagOn.txt), JSON.stringify(tagOn));
+  await page.selectOption('#editorTbody tr:first-child select.tagSel', 'เศษส่วน');
+  const tagSaved = await page.evaluate(() => Store.load().questions.es1[0].tags);
+  check('editorSplit: เลือก tag ใน dropdown → บันทึกลง store', Array.isArray(tagSaved) && tagSaved[0] === 'เศษส่วน', JSON.stringify(tagSaved));
+  await page.evaluate(() => navigate('admin_exams'));
+  await openEditor(page);
+  const remembered = await page.evaluate(() => ({ noTag: document.getElementById('editorSplit').classList.contains('noTag'), tab: document.getElementById('editorTabAnswer').classList.contains('on') }));
+  check('editorSplit: เข้าใหม่ → จำค่าแสดง Tag (ไม่ซ่อน)', remembered.noTag === false, JSON.stringify(remembered));
+  // Tag ด่วน: ซ่อนในโหมดแบ่งจอจนกว่าจะกดปุ่ม
+  const qt = await page.evaluate(() => { const a = getComputedStyle(document.getElementById('editorQuickTag')).display; document.getElementById('editorQuickTagToggle').click(); const b = getComputedStyle(document.getElementById('editorQuickTag')).display; return [a, b]; });
+  check('editorSplit: แผง Tag ด่วนซ่อนในโหมดแบ่งจอ กดปุ่มแล้วโผล่', qt[0] === 'none' && qt[1] !== 'none', JSON.stringify(qt));
+  await ctx.close();
+
+  // 5) ไม่มี PDF เฉลย → ไม่มีแท็บเฉลย; ไม่มี PDF โจทย์ → กล่องว่าง + ตั้งค่ากางออก; เปลี่ยน URL PDF → โหลดใหม่
+  const { ctx: c5, page: p5 } = await newSeededPage({ file: ES_FILE, cache: esCache({ pdfUrl: '', answerPdfUrl: '' }), viewport: { width: 1180, height: 820 } });
+  await stubPdf(p5);
+  await p5.evaluate(() => localStorage.setItem('nanont:editorPdfTab', 'answer'));
+  await openEditor(p5);
+  const np = await p5.evaluate(() => ({ ans: getComputedStyle(document.getElementById('editorTabAnswer')).display, empty: getComputedStyle(document.getElementById('editorPdfEmpty')).display, open: !document.getElementById('editorSetCard').classList.contains('collapsed'), loads: window.__pdf.length, qOn: document.getElementById('editorTabQuestion').classList.contains('on') }));
+  check('editorSplit: ไม่มี PDF → ไม่มีแท็บเฉลย, กล่อง "ยังไม่มี PDF", ตั้งค่ากางไว้, ไม่เรียกโหลด, แท็บโจทย์แม้จำแท็บเฉลยไว้', np.ans === 'none' && np.empty !== 'none' && np.open && np.loads === 0 && np.qOn, JSON.stringify(np));
+  await p5.fill('#editorPdfUrl', './new.pdf');
+  await p5.click('#editorPdfUrlBtn');
+  await p5.waitForTimeout(100);
+  const reload = await p5.evaluate(() => ({ loads: window.__pdf.filter(c => c[0] === 'load').map(c => c[2]), empty: getComputedStyle(document.getElementById('editorPdfEmpty')).display }));
+  check('editorSplit: ใส่ URL PDF ในตั้งค่า → โหลดฝั่งซ้ายทันที', reload.loads.some(u => /\/new\.pdf$/.test(u)) && reload.empty === 'none', JSON.stringify(reload));
+  await c5.close();
+
+  // 6) จอแคบ: ไม่มีส่วน PDF / ไม่เรียก PdfViewer, iPad แนวตั้งยังเห็น Tag, มือถือซ่อน Tag ตามเดิม
+  for (const [w, h, tagVisible] of [[820, 1180, true], [390, 844, false]]) {
+    const { ctx: cn, page: pn } = await newSeededPage({ file: ES_FILE, cache: esCache(), viewport: { width: w, height: h } });
+    await stubPdf(pn);
+    await openEditor(pn);
+    const nar = await pn.evaluate(() => ({ pdf: getComputedStyle(document.querySelector('.editorPdfWrap')).display, head: getComputedStyle(document.getElementById('editorSetHead')).display, body: getComputedStyle(document.getElementById('editorSetBody')).display, calls: window.__pdf.length, tag: getComputedStyle(document.querySelectorAll('#page-admin_editor .tableBox thead th')[5]).display, qt: getComputedStyle(document.getElementById('editorQuickTag')).display }));
+    check(`editorSplit: ${w}px ไม่มีส่วน PDF และไม่โหลด PDF, ตั้งค่าแสดงเต็มเหมือนเดิม`, nar.pdf === 'none' && nar.calls === 0 && nar.head === 'none' && nar.body !== 'none', JSON.stringify(nar));
+    check(`editorSplit: ${w}px คอลัมน์ Tag ${tagVisible ? 'ยังเห็น (ไม่ใช้ปุ่มซ่อน)' : 'ซ่อนตามกฎมือถือเดิม'} + แผง Tag ด่วนแสดงตามเดิม`, (nar.tag !== 'none') === tagVisible && nar.qt !== 'none', JSON.stringify(nar));
+    await cn.close();
+  }
+
+  // 7) ข้อสอบเติมตัวเลข: Enter ในช่องตัวเลข → ไปช่องของข้อถัดไป
+  const { ctx: c7, page: p7 } = await newSeededPage({ file: ES_FILE, cache: esCache({ examType: 'fillblank-num', numDigits: 3 }), viewport: { width: 1180, height: 820 } });
+  await stubPdf(p7);
+  await openEditor(p7);
+  const n1 = p7.locator('#editorTbody tr').nth(0).locator('input[data-field="correctNum"]');
+  await n1.click(); await p7.keyboard.type('125'); await p7.keyboard.press('Enter');
+  const fn = await p7.evaluate(() => ({ focusRow: [...document.querySelectorAll('#editorTbody tr')].findIndex(t => t.contains(document.activeElement)), sel: [...document.querySelectorAll('#editorTbody tr')].findIndex(t => t.classList.contains('rowActive')), dirty: window._editorDirty }));
+  check('editorSplit: เติมตัวเลข พิมพ์ 125 แล้ว Enter → โฟกัสช่องข้อ 2 + ติดธงยังไม่บันทึก', fn.focusRow === 1 && fn.sel === 1 && fn.dirty, JSON.stringify(fn));
+  await c7.close();
+
+  // 8) หน้าสร้างข้อสอบแบบสั้น + ปุ่มสร้างในหน้ารายการ
+  const { ctx: c8, page: p8 } = await newSeededPage({ file: ES_FILE, cache: baseCache({ examFolders: [{ id: 'fM', subject: 'คณิตศาสตร์', name: 'ชุดกลาง', order: 1 }] }), viewport: { width: 1180, height: 820 } });
+  await stubPdf(p8);
+  await p8.evaluate(() => navigate('admin_exams'));
+  await p8.click('#adminExamsNewBtn');
+  await p8.waitForTimeout(200);
+  const f0 = await p8.evaluate(() => ({ p: window._currentPage, pdf: document.getElementById('newPdfUrl').value, adv: document.getElementById('newAdvanced').open, folder: getComputedStyle(document.getElementById('newFolderWrap')).display, topics: getComputedStyle(document.getElementById('newTopicsWrap')).display, min: document.getElementById('newMinutes').value }));
+  check('editorSplit: หน้ารายการมีปุ่ม "+ สร้างชุดใหม่" → เปิดหน้าสร้าง', f0.p === 'admin_new', JSON.stringify(f0));
+  check('editorSplit: หน้าสร้าง ไม่มีค่าตัวอย่าง PDF, ตั้งค่าเพิ่มเติมพับไว้ (ค่าเริ่มต้น 45 นาที), ช่องโฟลเดอร์/เนื้อหาซ่อนจนเลือกวิชา', f0.pdf === '' && f0.adv === false && f0.folder === 'none' && f0.topics === 'none' && f0.min === '45', JSON.stringify(f0));
+  await p8.fill('#newTitle', 'ชุดค้าง'); await p8.selectOption('#newSubjectSelect', 'คณิตศาสตร์'); await p8.fill('#newQCount', '7');
+  await p8.evaluate(() => { window._newExcelData = [{ no: 1, page: 1, correct: 'B' }]; });
+  const folderShown = await p8.evaluate(() => getComputedStyle(document.getElementById('newFolderWrap')).display);
+  check('editorSplit: เลือกวิชาที่มีโฟลเดอร์ → ช่องโฟลเดอร์โผล่', folderShown !== 'none', folderShown);
+  await p8.evaluate(() => { navigate('admin'); navigate('admin_new'); });
+  const f1 = await p8.evaluate(() => ({ t: document.getElementById('newTitle').value, s: document.getElementById('newSubjectSelect').value, n: document.getElementById('newQCount').value, x: window._newExcelData }));
+  check('editorSplit: ออกแล้วกลับเข้าหน้าสร้าง → ฟอร์ม + ข้อมูล Excel ที่อ่านค้างไว้ถูกล้าง', f1.t === '' && f1.s === '' && f1.n === '50' && f1.x === null, JSON.stringify(f1));
+  await p8.fill('#newTitle', 'ชุดใหม่สั้น'); await p8.selectOption('#newSubjectSelect', 'คณิตศาสตร์'); await p8.fill('#newQCount', '6');
+  await p8.click('#newCreateBtn');
+  await p8.waitForTimeout(800);
+  const f2 = await p8.evaluate(() => { const e = Store.load().exams.find(x => x.title === 'ชุดใหม่สั้น'); return { p: window._currentPage, n: e && Store.load().questions[e.id].length, pdf: e && e.pdfUrl, dur: e && e.durationSeconds, pub: e && e.published, diff: e && e.difficulty, split: getComputedStyle(document.getElementById('editorSplit')).display }; });
+  check('editorSplit: สร้าง → ได้ข้อสอบตามค่าเริ่มต้น (45 นาที/เผยแพร่/พัฒนา, ไม่มี PDF) แล้วเข้าหน้ากรอกเฉลยแบบแบ่งจอ', f2.p === 'admin_editor' && f2.n === 6 && f2.pdf === '' && f2.dur === 2700 && f2.pub === true && f2.diff === 'develop' && f2.split === 'grid', JSON.stringify(f2));
+  await c8.close();
 }
 
 await browser.close();
