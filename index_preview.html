@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.74p -->
+  <!-- APP_VERSION: v48.75p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -565,6 +565,13 @@
     .newTile.done{border:1.5px solid #86efac;background:#f0fdf4;color:#166534;}
     .newTile.done svg{color:#16a34a;}
     .newTileSub{overflow-wrap:anywhere;}
+    /* v48.75p: จำนวนข้อ + เวลา เรียงข้างกัน (แบ่งแถวเท่ากัน — stepper ยืดเต็มคอลัมน์) */
+    .newPair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end;}
+    .newPairCol{display:grid;gap:6px;min-width:0;}
+    .newPairLbl{font-weight:900;font-size:14px;}
+    .newPair .newStepper{width:100%;}
+    .newPair .newStepper button{width:40px;flex-shrink:0;}
+    .newPair .newStepper input{flex:1;min-width:0;width:auto;}
     .newStepper{display:inline-flex;align-items:stretch;border:1px solid var(--border);border-radius:12px;overflow:hidden;width:max-content;background:#fff;}
     .newStepper button{width:46px;border:none;background:#f9fafb;font-family:inherit;font-size:20px;font-weight:700;color:#374151;cursor:pointer;}
     .newStepper button:active{background:#e5e7eb;}
@@ -1399,7 +1406,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.74p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.75p</div>
     </div>
   </div>
 </div>
@@ -2297,11 +2304,25 @@
       </div>
      </div>
      <div class="card newStep">
-      <div class="newStepHead"><i>3</i>จำนวนข้อ</div>
-      <div class="newStepper" role="group" aria-label="จำนวนข้อ">
-        <button type="button" data-step-for="newQCount" data-step="-1" aria-label="ลดจำนวนข้อ">−</button>
-        <input id="newQCount" type="number" min="1" max="999" value="50" aria-label="จำนวนข้อ" />
-        <button type="button" data-step-for="newQCount" data-step="1" aria-label="เพิ่มจำนวนข้อ">+</button>
+      <div class="newStepHead"><i>3</i>จำนวนข้อและเวลา</div>
+      <!-- v48.75p: เวลาย้ายมาไว้ข้างจำนวนข้อ (เดิมซ่อนอยู่ใน "ตั้งค่าเพิ่มเติม") -->
+      <div class="newPair">
+        <div class="newPairCol">
+          <label for="newQCount" class="newPairLbl">จำนวนข้อ</label>
+          <div class="newStepper" role="group" aria-label="จำนวนข้อ">
+            <button type="button" data-step-for="newQCount" data-step="-1" aria-label="ลดจำนวนข้อ">−</button>
+            <input id="newQCount" type="number" min="1" max="999" value="50" />
+            <button type="button" data-step-for="newQCount" data-step="1" aria-label="เพิ่มจำนวนข้อ">+</button>
+          </div>
+        </div>
+        <div class="newPairCol">
+          <label for="newMinutes" class="newPairLbl">เวลา (นาที)</label>
+          <div class="newStepper" role="group" aria-label="เวลา (นาที)">
+            <button type="button" data-step-for="newMinutes" data-step="-5" aria-label="ลดเวลา 5 นาที">−</button>
+            <input id="newMinutes" type="number" min="1" value="45" />
+            <button type="button" data-step-for="newMinutes" data-step="5" aria-label="เพิ่มเวลา 5 นาที">+</button>
+          </div>
+        </div>
       </div>
       <!-- hidden: ยังใช้ใน JS อยู่ -->
       <input id="newCreatePlaceholder" type="checkbox" checked style="display:none;" />
@@ -2320,25 +2341,15 @@
       </div>
      </div>
       <details id="newAdvanced" class="newAdvanced">
-        <summary>ตั้งค่าเพิ่มเติม <span class="muted" id="newAdvancedSummary" style="font-weight:400;font-size:12px;">เวลา 45 นาที · ระดับพัฒนา · เผยแพร่</span></summary>
+        <summary>ตั้งค่าเพิ่มเติม <span class="muted" id="newAdvancedSummary" style="font-weight:400;font-size:12px;">ระดับพัฒนา · เผยแพร่</span></summary>
         <div style="display:grid;gap:12px;padding-top:12px;">
-          <div class="grid2">
-            <div style="display:grid;gap:6px;">
-              <label for="newMinutes" style="font-weight:900;">เวลา (นาที)</label>
-              <div class="newStepper" role="group" aria-label="เวลา (นาที)">
-                <button type="button" data-step-for="newMinutes" data-step="-5" aria-label="ลดเวลา 5 นาที">−</button>
-                <input id="newMinutes" type="number" min="1" value="45" />
-                <button type="button" data-step-for="newMinutes" data-step="5" aria-label="เพิ่มเวลา 5 นาที">+</button>
-              </div>
-            </div>
-            <label style="display:grid;gap:6px;">
-              <span style="font-weight:900;">เผยแพร่</span>
-              <select id="newPublished" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
-                <option value="true">เผยแพร่</option>
-                <option value="false">ซ่อน</option>
-              </select>
-            </label>
-          </div>
+          <label style="display:grid;gap:6px;">
+            <span style="font-weight:900;">เผยแพร่</span>
+            <select id="newPublished" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+              <option value="true">เผยแพร่</option>
+              <option value="false">ซ่อน</option>
+            </select>
+          </label>
           <div style="display:grid;gap:6px;">
             <span style="font-weight:900;">ระดับความยาก</span>
             <div style="display:flex;gap:8px;">
@@ -12011,9 +12022,9 @@ function initAdminNew(){
     if(!_advSum) return;
     const d=document.querySelector('#page-admin_new .diffBtn.active');
     const lbl={review:'ทบทวน',develop:'พัฒนา',hard:'ยาก'}[d?d.dataset.val:'develop'];
-    _advSum.textContent=`เวลา ${document.getElementById('newMinutes').value||45} นาที · ระดับ${lbl} · ${document.getElementById('newPublished').value==='true'?'เผยแพร่':'ซ่อน'}`;
+    _advSum.textContent=`ระดับ${lbl} · ${document.getElementById('newPublished').value==='true'?'เผยแพร่':'ซ่อน'}`; // v48.75p: เวลาย้ายขึ้นการ์ดจำนวนข้อแล้ว
   };
-  ['newMinutes','newPublished'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.oninput=_syncAdvSum; el.onchange=_syncAdvSum; } });
+  ['newPublished'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.oninput=_syncAdvSum; el.onchange=_syncAdvSum; } });
   document.querySelectorAll('#page-admin_new .diffBtn').forEach(b=>b.closest('label').addEventListener('click',()=>setTimeout(_syncAdvSum,0)));
   _syncAdvSum();
 
@@ -16519,7 +16530,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.74p';
+  const CURRENT_VERSION = 'v48.75p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

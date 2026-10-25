@@ -4968,11 +4968,13 @@ currentSection = 'mobileA';
   await p8.click('#newSubjChips button[data-val="คณิตศาสตร์"]');
   const ch = await p8.evaluate(() => ({ v: document.getElementById('newSubjectSelect').value, pressed: document.querySelector('#newSubjChips button[data-val="คณิตศาสตร์"]').getAttribute('aria-pressed'), folder: getComputedStyle(document.getElementById('newFolderWrap')).display, ov: document.getElementById('page-admin_new').scrollWidth - innerWidth }));
   check('mobileA: แตะชิปวิชา → select ได้ค่า + ชิปติด + ช่องโฟลเดอร์โผล่ (ยังไม่ล้นจอ)', ch.v === 'คณิตศาสตร์' && ch.pressed === 'true' && ch.folder !== 'none' && ch.ov <= 0, JSON.stringify(ch));
+  // v48.75p: เวลาย้ายมาอยู่แถวเดียวกับจำนวนข้อ (การ์ดขั้น 3) — ไม่ต้องกาง "ตั้งค่าเพิ่มเติม"
+  const pair = await p8.evaluate(() => { const q = document.getElementById('newQCount').getBoundingClientRect(), m = document.getElementById('newMinutes').getBoundingClientRect(); return { sameRow: Math.round(q.top) === Math.round(m.top), inStep3: !!document.querySelector('.newStep .newPair #newMinutes'), inAdv: !!document.querySelector('#newAdvanced #newMinutes'), ov: document.getElementById('page-admin_new').scrollWidth - innerWidth }; });
+  check('mobileA: "เวลา (นาที)" อยู่ข้างจำนวนข้อในการ์ดขั้น 3 (แถวเดียวกัน ไม่ล้นจอ) และไม่อยู่ใน "ตั้งค่าเพิ่มเติม" แล้ว', pair.sameRow && pair.inStep3 && !pair.inAdv && pair.ov <= 0, JSON.stringify(pair));
   await p8.click('[data-step-for="newQCount"][data-step="1"]');
-  await p8.evaluate(() => { document.getElementById('newAdvanced').open = true; });
   await p8.click('[data-step-for="newMinutes"][data-step="-5"]');
   const st = await p8.evaluate(() => ({ q: document.getElementById('newQCount').value, m: document.getElementById('newMinutes').value, sum: document.getElementById('newAdvancedSummary').textContent }));
-  check('mobileA: ปุ่ม − + เปลี่ยนจำนวนข้อ (51) และเวลา (40 นาที) + สรุปตั้งค่าอัปเดต', st.q === '51' && st.m === '40' && /เวลา 40 นาที/.test(st.sum), JSON.stringify(st));
+  check('mobileA: ปุ่ม − + เปลี่ยนจำนวนข้อ (51) และเวลา (40 นาที) ได้โดยไม่ต้องกางตั้งค่า; สรุปตั้งค่าเหลือระดับ · เผยแพร่', st.q === '51' && st.m === '40' && st.sum === 'ระดับพัฒนา · เผยแพร่', JSON.stringify(st));
   await p8.fill('#newPdfUrl', 'https://drive.google.com/file/d/abc/view');
   const tile = await p8.evaluate(() => ({ cls: document.getElementById('newPdfTile').className, sub: document.querySelector('#newPdfTile .newTileSub').textContent }));
   check('mobileA: ใส่ลิงก์ PDF → กล่อง PDF โจทย์ขึ้นสีเขียว "มีลิงก์แล้ว"', /done/.test(tile.cls) && /มีลิงก์แล้ว/.test(tile.sub), JSON.stringify(tile));
