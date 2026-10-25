@@ -4711,14 +4711,15 @@ currentSection = 'editorSplit';
   check('editorSplit: ใส่ URL PDF ในตั้งค่า → โหลดฝั่งซ้ายทันที', reload.loads.some(u => /\/new\.pdf$/.test(u)) && reload.empty === 'none', JSON.stringify(reload));
   await c5.close();
 
-  // 6) จอแคบ: ไม่มีส่วน PDF / ไม่เรียก PdfViewer, iPad แนวตั้งยังเห็น Tag, มือถือซ่อน Tag ตามเดิม
+  // 6) จอแคบ (v48.61 พฤติกรรมใหม่): ไม่มี PDF แบบฝัง/ไม่เรียก PdfViewer จนกว่าจะกด "ดูโจทย์", มีหัวพับตั้งค่า (พับเมื่อมี PDF),
+  //    แผง Tag ด่วนซ่อนจนกดปุ่ม, iPad แนวตั้งยังเห็นคอลัมน์ Tag, มือถือซ่อน Tag ตามเดิม
   for (const [w, h, tagVisible] of [[820, 1180, true], [390, 844, false]]) {
     const { ctx: cn, page: pn } = await newSeededPage({ file: ES_FILE, cache: esCache(), viewport: { width: w, height: h } });
     await stubPdf(pn);
     await openEditor(pn);
     const nar = await pn.evaluate(() => ({ pdf: getComputedStyle(document.querySelector('.editorPdfWrap')).display, head: getComputedStyle(document.getElementById('editorSetHead')).display, body: getComputedStyle(document.getElementById('editorSetBody')).display, calls: window.__pdf.length, tag: getComputedStyle(document.querySelectorAll('#page-admin_editor .tableBox thead th')[5]).display, qt: getComputedStyle(document.getElementById('editorQuickTag')).display }));
-    check(`editorSplit: ${w}px ไม่มีส่วน PDF และไม่โหลด PDF, ตั้งค่าแสดงเต็มเหมือนเดิม`, nar.pdf === 'none' && nar.calls === 0 && nar.head === 'none' && nar.body !== 'none', JSON.stringify(nar));
-    check(`editorSplit: ${w}px คอลัมน์ Tag ${tagVisible ? 'ยังเห็น (ไม่ใช้ปุ่มซ่อน)' : 'ซ่อนตามกฎมือถือเดิม'} + แผง Tag ด่วนแสดงตามเดิม`, (nar.tag !== 'none') === tagVisible && nar.qt !== 'none', JSON.stringify(nar));
+    check(`editorSplit: ${w}px ไม่มี PDF แบบฝังและไม่โหลด PDF จนกว่าจะกด "ดูโจทย์", มีหัวพับตั้งค่า (พับไว้เพราะมี PDF)`, nar.pdf === 'none' && nar.calls === 0 && nar.head !== 'none' && nar.body === 'none', JSON.stringify(nar));
+    check(`editorSplit: ${w}px คอลัมน์ Tag ${tagVisible ? 'ยังเห็น (ไม่ใช้ปุ่มซ่อน)' : 'ซ่อนตามกฎมือถือเดิม'} + แผง Tag ด่วนซ่อนจนกดปุ่ม "Tag ด่วน"`, (nar.tag !== 'none') === tagVisible && nar.qt === 'none', JSON.stringify(nar));
     await cn.close();
   }
 
@@ -4823,11 +4824,11 @@ currentSection = 'editorSplit';
 // ─────────────────────────────────────────────────────────────────
 // Section: mobileA (v48.74p) — หน้ามือถือแบบ A: กรอกเฉลยเป็นการ์ด + แถบล่าง "ดูโจทย์" + แผ่น PDF จากด้านล่าง
 // (แผ่น/แถบล่าง/หัวพับตั้งค่า ใช้ทุกจอที่ไม่แบ่งจอ ≤900px; การ์ดเฉพาะ ≤600px) + หน้าสร้างข้อสอบไม่ล้นจอ/การ์ด 3 ขั้น
-// ยังอยู่ใน preview — stub PdfViewer.create เหมือน editorSplit
+// ขึ้น production แล้ว (v48.61) — stub PdfViewer.create เหมือน editorSplit
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'mobileA';
 {
-  const MA_FILE = 'index_preview.html';
+  const MA_FILE = 'index.html';
   const L = ['A', 'B', 'C', 'D'];
   const maQs = (n = 20) => Array.from({ length: n }, (_, i) => ({
     id: 'q' + (i + 1), no: i + 1, number: i + 1, page: Math.ceil((i + 1) / 5), correct: i < 4 ? L[i] : '',

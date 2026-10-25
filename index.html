@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.60 -->
+  <!-- APP_VERSION: v48.61 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -73,7 +73,7 @@
     .badge.warn{background:#fffbeb;border-color:#fde68a;color:#92400e;}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
     .hr{height:1px;background:var(--border);margin:14px 0;}
-    .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:12px;opacity:0;transform:translateY(8px);transition:.2s;font-size:13px;z-index:9999;}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:12px;opacity:0;transform:translateY(8px);transition:.2s;font-size:13px;z-index:9999;pointer-events:none;} /* v48.61: toast ที่จางหายแล้วยังรับการแตะ — บังปุ่มมุมขวาล่าง (เช่น "ดูโจทย์") */
     .toast.show{opacity:1;transform:translateY(0);}
     .page{display:none;}
     .page.active{display:block;}
@@ -528,23 +528,74 @@
        จอแคบกว่านั้นซ่อนส่วน PDF/หัวพับตั้งค่า เหลือหน้าตาตารางเดิมทุกอย่าง */
     .editorProgress{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap;}
     .editorDirtyBadge{font-size:12px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:99px;padding:4px 10px;white-space:nowrap;}
-    .editorSetHead{display:none;}
+    /* v48.61: สไตล์ร่วมของหัวพับตั้งค่า / แถบ PDF / แถบเฉลย ย้ายออกจาก media ≥901px — จอ ≤900px ใช้ด้วย (พับตั้งค่า + แผ่นดูโจทย์) */
+    .editorSetHead{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:800;color:#111;cursor:pointer;text-align:left;border-radius:14px;}
+    .editorSetHead:hover{background:#f9fafb;}
+    .editorSetHead:focus-visible{outline:2px solid #6366f1;outline-offset:-2px;}
+    .editorSetSummary{flex:1;min-width:0;font-weight:500;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+    .editorSetCard.collapsed .editorSetBody{display:none;}
+    .editorSetCard:not(.collapsed) .editorSetBody{border-top:1px solid var(--border);}
+    .editorPdfBar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);}
+    .editorPdfTab{padding:5px 12px;font-size:12px;font-weight:700;}
+    .editorPdfTab.on{background:#111;color:#fff;border-color:#111;}
+    .editorPdfBody{flex:1;min-height:0;position:relative;background:#525659;}
+    .editorPdfView{position:absolute;inset:0;}
+    .editorPdfHidden{visibility:hidden;pointer-events:none;}
+    .editorPdfEmpty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e5e7eb;font-size:14px;text-align:center;padding:20px;}
+    .editorSideBar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;flex-shrink:0;}
+    .editorSideHint{font-size:12px;min-width:0;}
+    .editorSideBtn{padding:5px 10px;font-size:12px;white-space:nowrap;}
+    .editorSideBtn.on{background:#eef2ff;border-color:#6366f1;color:#4338ca;}
+    .editorBackM,.editorTitleM,.editorProgBar,.editorBottomBar,.editorSheetAns,.editorSheetScrim,.editorPdfClose{display:none;}
     .newAdvanced{border:1px solid var(--border);border-radius:12px;padding:10px 14px;background:#fff;}
     .newAdvanced > summary{cursor:pointer;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;list-style-position:inside;}
     .newAdvanced > summary::before{content:'▸';}
     .newAdvanced[open] > summary::before{content:'▾';}
     .newAdvanced > summary::-webkit-details-marker{display:none;}
     .newAdvanced > summary{list-style:none;}
+    /* v48.61: หน้าสร้างข้อสอบ — การ์ดเป็นขั้น / กล่องอัปโหลด PDF / ปุ่ม − + / ชิปวิชา (มือถือ) */
+    .newStep{padding:16px;display:grid;gap:12px;}
+    .newStepHead{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;}
+    .newStepHead i{font-style:normal;width:24px;height:24px;border-radius:50%;background:var(--black);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;}
+    .newTiles{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;}
+    .newTile{border:1.5px dashed #cbd5e1;border-radius:14px;padding:14px 10px;text-align:center;font-size:13px;color:var(--muted);background:#fafafa;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;}
+    .newTile b{color:#111;font-size:14px;}
+    .newTile svg{color:#64748b;}
+    .newTile:focus-within,.newTile:hover{border-color:#94a3b8;background:#f8fafc;}
+    .newTile.done{border:1.5px solid #86efac;background:#f0fdf4;color:#166534;}
+    .newTile.done svg{color:#16a34a;}
+    .newTileSub{overflow-wrap:anywhere;}
+    /* v48.61: จำนวนข้อ + เวลา เรียงข้างกัน (แบ่งแถวเท่ากัน — stepper ยืดเต็มคอลัมน์) */
+    .newPair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end;}
+    .newPairCol{display:grid;gap:6px;min-width:0;}
+    .newPairLbl{font-weight:900;font-size:14px;}
+    .newPair .newStepper{width:100%;}
+    .newPair .newStepper button{width:40px;flex-shrink:0;}
+    .newPair .newStepper input{flex:1;min-width:0;width:auto;}
+    .newStepper{display:inline-flex;align-items:stretch;border:1px solid var(--border);border-radius:12px;overflow:hidden;width:max-content;background:#fff;}
+    .newStepper button{width:46px;border:none;background:#f9fafb;font-family:inherit;font-size:20px;font-weight:700;color:#374151;cursor:pointer;}
+    .newStepper button:active{background:#e5e7eb;}
+    .newStepper input{width:80px;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:inherit;font-size:16px;font-weight:700;padding:11px 4px;-moz-appearance:textfield;}
+    .newStepper input::-webkit-inner-spin-button,.newStepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+    .newSubjChips{display:none;}
+    @media (max-width:600px){
+      #page-admin_new .container{padding:16px 12px 110px;}
+      #page-admin_new .grid2{grid-template-columns:minmax(0,1fr);}
+      #page-admin_new .newStep{padding:14px;}
+      .newSubjChips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+      .newSubjChips::-webkit-scrollbar{display:none;}
+      .newSubjChips button{flex-shrink:0;border:1px solid var(--border);border-radius:999px;padding:9px 14px;background:#fff;font-family:inherit;font-size:14px;font-weight:600;color:#111;cursor:pointer;}
+      .newSubjChips button[aria-pressed="true"]{background:var(--black);border-color:var(--black);color:#fff;}
+      #newSubjectSelect{display:none;}
+      #newExamTypeBtns .examTypeBtn{font-size:13px !important;padding:10px 4px !important;}
+      .newCreateBar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--border);padding:10px 16px calc(10px + env(safe-area-inset-bottom));}
+      #newCreateBtn{width:100% !important;padding:14px !important;font-size:16px;border-radius:14px;}
+      body:has(#page-admin_new.active) .toast{bottom:calc(90px + env(safe-area-inset-bottom));}
+    }
     @media (min-width:901px){
       #page-admin_editor.active .container{display:flex;flex-direction:column;height:100dvh;padding:12px 16px;}
       #page-admin_editor .editorBody{flex:1;min-height:0;display:flex;flex-direction:column;}
-      .editorSetHead{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:800;color:#111;cursor:pointer;text-align:left;border-radius:14px;}
-      .editorSetHead:hover{background:#f9fafb;}
-      .editorSetHead:focus-visible{outline:2px solid #6366f1;outline-offset:-2px;}
-      .editorSetSummary{flex:1;min-width:0;font-weight:500;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
       .editorSetCard{flex-shrink:0;}
-      .editorSetCard.collapsed .editorSetBody{display:none;}
-      .editorSetCard:not(.collapsed) .editorSetBody{border-top:1px solid var(--border);}
       .editorSplit{flex:1;min-height:460px;display:grid;grid-template-columns:minmax(0,1fr) minmax(480px,44%);gap:12px;margin-top:12px;}
       .editorSplit.noTag{grid-template-columns:minmax(0,1fr) minmax(340px,32%);}
       /* ซ่อนคอลัมน์ Tag ด้วย CSS (DOM ยังอยู่ handler เดิมใช้ต่อได้) — th:nth-child(6) คือ Tag เสมอ, td ขยับตามโหมดคะแนน */
@@ -553,18 +604,7 @@
       .editorSplit.noTag table.weighted td:nth-child(6){display:none;}
       .editorSplit:not(.qtOpen) #editorQuickTag{display:none !important;}
       .editorPdfWrap{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column;min-height:0;}
-      .editorPdfBar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);}
-      .editorPdfTab{padding:5px 12px;font-size:12px;font-weight:700;}
-      .editorPdfTab.on{background:#111;color:#fff;border-color:#111;}
-      .editorPdfBody{flex:1;min-height:0;position:relative;background:#525659;}
-      .editorPdfView{position:absolute;inset:0;}
-      .editorPdfHidden{visibility:hidden;pointer-events:none;}
-      .editorPdfEmpty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e5e7eb;font-size:14px;text-align:center;padding:20px;}
       .editorSide{border:1px solid var(--border);border-radius:14px;background:#fff;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-      .editorSideBar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;flex-shrink:0;}
-      .editorSideHint{font-size:12px;min-width:0;}
-      .editorSideBtn{padding:5px 10px;font-size:12px;white-space:nowrap;}
-      .editorSideBtn.on{background:#eef2ff;border-color:#6366f1;color:#4338ca;}
       .editorSide #editorQuickTag{margin:8px 10px 0 !important;flex-shrink:0;}
       .editorSide .tableBox{flex:1;min-height:0;max-height:none;}
       .editorSide table{width:100%;min-width:0 !important;}
@@ -576,7 +616,37 @@
       .editorKeyHint kbd{display:inline-block;min-width:18px;padding:1px 5px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:#fff;font-family:inherit;font-size:11px;color:#111;text-align:center;}
     }
     @media (max-width:900px){
-      .editorPdfWrap,.editorSideBar,.editorKeyHint{display:none !important;}
+      /* v48.61: จอไม่แบ่ง (iPad แนวตั้ง/มือถือ) — หัวติดบน, แถบล่าง "ข้อ N · ดูโจทย์", PDF เป็นแผ่นเลื่อนขึ้นจากล่าง */
+      .editorKeyHint,.editorSideHint,#editorTagToggle{display:none !important;}
+      #page-admin_editor .editorHead{position:sticky;top:0;z-index:20;background:#fff;margin:-24px -24px 0;padding:14px 24px 12px;border-bottom:1px solid var(--border);}
+      #page-admin_editor .container{padding-bottom:110px;}
+      .editorSideBar{padding:12px 2px 0;border-bottom:none;}
+      .editorSplit:not(.qtOpen) #editorQuickTag{display:none !important;}
+      .editorBottomBar{display:flex;align-items:center;gap:10px;position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--border);padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,.05);}
+      .editorWhere{flex:1;min-width:0;font-size:13px;color:var(--muted);}
+      .editorWhere b{display:block;font-size:16px;color:#111;}
+      #editorOpenPdfBtn{display:inline-flex;align-items:center;gap:6px;font-weight:700;padding:11px 16px;}
+      #editorOpenPdfBtn.noPdf{color:var(--muted);}
+      .editorPdfWrap{display:none;}
+      .editorSplit.pdfOpen .editorPdfWrap{display:flex;flex-direction:column;position:fixed;left:0;right:0;bottom:0;height:86dvh;z-index:60;background:#fff;border-radius:18px 18px 0 0;overflow:hidden;box-shadow:0 -8px 30px rgba(0,0,0,.25);}
+      .editorSplit.pdfOpen .editorSheetScrim{display:block;position:fixed;inset:0;z-index:55;background:rgba(17,24,39,.45);}
+      #page-admin_editor.sheetOpen{overflow:hidden !important;}
+      body.isOffline #page-admin_editor.active{padding-top:36px;}
+      body.isOffline #page-admin_editor .editorHead{top:36px;}
+      body:has(#page-admin_editor.active) .toast{bottom:calc(84px + env(safe-area-inset-bottom));}
+      .editorPdfBar{padding:12px 14px 10px;}
+      .editorPdfClose{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:none;background:#f3f4f6;color:#374151;cursor:pointer;margin-left:auto;flex-shrink:0;}
+      .editorSheetAns{display:block;flex-shrink:0;border-top:1px solid var(--border);padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:#fff;}
+      .esaNav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted);}
+      .esaNav b{font-size:16px;color:#111;}
+      .esaArr{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#111;}
+      .esaArr:disabled{opacity:.35;cursor:default;}
+      .esaBtns{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:8px;}
+      .esaBtns button{height:48px;border:1px solid var(--border);border-radius:12px;background:#fff;font-family:inherit;font-size:19px;font-weight:800;color:#111;cursor:pointer;}
+      .esaBtns button.on{background:#111827;border-color:#111827;color:#fff;}
+      .esaNum{display:flex;gap:8px;}
+      .esaNum input{flex:1;min-width:0;height:48px;border:1px solid var(--border);border-radius:12px;font-family:inherit;font-size:20px;font-weight:800;text-align:center;letter-spacing:3px;}
+      .esaNum button{padding:0 18px;}
     }
 
     /* tag content grid (สถิติ → เนื้อหา) — desktop 2 col, mobile 1 col */
@@ -670,39 +740,6 @@
       #page-admin_editor .card > div > div:first-child,
       #page-admin_editor .card > div > div:nth-child(2) {
         grid-template-columns: 1fr !important;
-      }
-
-      /* ─── Editor table: fit 4 columns on mobile ─── */
-      #page-admin_editor table {
-        min-width: 0 !important;
-        width: 100% !important;
-        table-layout: fixed;
-      }
-      /* col 1: หน้า (was หน้า PDF) */
-      #page-admin_editor table th:nth-child(1),
-      #page-admin_editor table td:nth-child(1) {
-        width: 60px !important;
-      }
-      /* col 2: ข้อ */
-      #page-admin_editor table th:nth-child(2),
-      #page-admin_editor table td:nth-child(2) {
-        width: 36px !important;
-      }
-      /* col 3: เฉลย — takes remaining space */
-      #page-admin_editor table th:nth-child(3),
-      #page-admin_editor table td:nth-child(3) {
-        width: auto !important;
-      }
-      /* col 4: ฟรี */
-      #page-admin_editor table th:nth-child(4),
-      #page-admin_editor table td:nth-child(4) {
-        width: 44px !important;
-      }
-      /* shrink answer buttons */
-      #page-admin_editor table td button {
-        padding: 6px 8px !important;
-        font-size: 13px !important;
-        min-width: 32px !important;
       }
 
       /* ─── Benchmark: collapse form to 1 column ─── */
@@ -845,135 +882,48 @@
         min-width: 0 !important;
       }
 
-      /* Editor table mobile fit — v45.84 */
-      /* ─── Editor table: fit 5 columns on mobile ─── */
-      #page-admin_editor .tableBox {
-        overflow-x: hidden !important;
-      }
-      #page-admin_editor table {
-        width: 100% !important;
-        min-width: 0 !important;
-        table-layout: fixed !important;
-      }
-      #page-admin_editor table th:nth-child(1),
-      #page-admin_editor table td:nth-child(1) {
-        width: 52px !important;
-        padding: 6px 2px !important;
-      }
-      #page-admin_editor table td:nth-child(1) input {
-        width: 44px !important;
-        padding: 4px 6px !important;
-        font-size: 13px !important;
-      }
-      #page-admin_editor table th:nth-child(2),
-      #page-admin_editor table td:nth-child(2) {
-        width: 32px !important;
-        font-size: 12px !important;
-        padding: 6px 2px !important;
-      }
-      #page-admin_editor table th:nth-child(3),
-      #page-admin_editor table td:nth-child(3) {
-        width: auto !important;
-        padding: 6px 2px !important;
-      }
-      /* v47.71 fix: บังคับให้ปุ่ม ก ข ค ง ใช้ grid 4 คอลัมน์ fill 100% ของ cell
-         แก้ปัญหา .correctBtn ที่มี width:34px fixed + padding ล้น overflow ไปทับปุ่ม "ฟรี" */
-      #page-admin_editor table td:nth-child(3) {
-        overflow: hidden !important;
-      }
-      #page-admin_editor table td:nth-child(3) .correctBtns {
-        display: grid !important;
-        grid-template-columns: repeat(5, 1fr) !important; /* ช่องที่ 5 = ปุ่ม + / จ (ตัวเลือกที่ 5 ต่อข้อ) */
-        gap: 5px !important;
-        width: 100% !important;
-        min-width: 0 !important;
-      }
-      #page-admin_editor table td:nth-child(3) .correctBtn,
-      #page-admin_editor table td:nth-child(3) .optToggle {
-        width: 100% !important;
-        min-width: 0 !important;
-        height: auto !important;
-        padding: 11px 0 !important;
-        font-size: 17px !important;
-        box-sizing: border-box !important;
-      }
-      #page-admin_editor table th:nth-child(4),
-      #page-admin_editor table td:nth-child(4) {
-        width: 40px !important;
-        padding: 6px 2px !important;
-      }
-      #page-admin_editor table td:nth-child(4) .freeBtn {
-        font-size: 11px !important;
-        padding: 4px 4px !important;
-        width: 100% !important;
-      }
-      /* v48.28p: คอลัมน์ Tag เดิมเป็นปุ่มเดี่ยว 36-42px — เปลี่ยนเป็น dropdown + ปุ่ม tag ย่อย
-         table-layout:fixed ทำให้คอลัมน์ "เฉลย" (auto) กินพื้นที่ที่เหลือหลังหักคอลัมน์ fixed —
-         ถ้าขยาย Tag กว้างเกิน (เคยลอง 110-120px) จะไปแย่งพื้นที่ "เฉลย" จนปุ่ม ก/ข/ค/ง บีบจนอ่านไม่ออก
-         แก้ด้วยการวางซ้อนแนวตั้ง (dropdown บน ปุ่ม tag ย่อยล่าง) แทนเรียงแนวนอน กว้างแค่ 74px พอ —
-         ตัวหนังสือใน select ที่ตัดด้วย ellipsis ไม่กระทบการใช้งานจริง เพราะแตะแล้ว browser
-         เปิด native picker แสดงตัวเลือกเต็มอยู่แล้วไม่ว่ากล่องจะแคบแค่ไหน */
-      /* v48.50 (แก้บั๊กที่พบระหว่างทำ): table-layout:fixed กำหนดความกว้างคอลัมน์จาก <th> ของ
-         แถวแรกเท่านั้น (ความกว้างที่ตั้งบน <td> ถูกเบราว์เซอร์เพิกเฉยเสมอ) และ <th> ที่
-         display:none (คะแนน, ตอนไม่เปิดระบบคะแนน) จะถูกตัดออกจากผังคอลัมน์ที่มองเห็นไปเลย —
-         ผลคือตัวขับความกว้างจริงของคอลัมน์ "ฟรี" คือ th:nth-child(5) (ไม่ใช่ th:nth-child(4)
-         ที่โดนซ่อนอยู่ ใช้ไม่ได้ผล) */
-      #page-admin_editor table th:nth-child(5) {
-        width: 40px !important;
-      }
-      /* v48.51: ซ่อนคอลัมน์ Tag ไปเลยทั้งคอลัมน์บนมือถือ (ไม่มี toggle ให้กดขยายอีกต่อไป
-         อย่าง v48.50 — เปลี่ยนใจให้เรียบง่ายกว่าเดิม) กรอก/แก้ tag ได้เฉพาะบน Tablet/PC
-         (>600px, ไม่ใช้ table-layout:fixed ไม่มีปัญหาพื้นที่แคบอยู่แล้ว) — th:nth-child(6)
-         คือ "Tag" เสมอทั้ง 2 โหมด (ตำแหน่ง "คะแนน" คงที่ที่ 4 เสมอไม่ว่าจะซ่อนหรือไม่) แต่ td
-         ตำแหน่งต่างกันตามโหมด (ไม่ weighted=nth-child(5) เพราะไม่มี td คะแนนแทรก, weighted=
-         nth-child(6) เพราะมี td คะแนนแทรกก่อน) */
-      #page-admin_editor table th:nth-child(6) {
-        display: none !important;
-      }
-      #page-admin_editor table:not(.weighted) td:nth-child(5) {
-        display: none !important;
-      }
-      #page-admin_editor table.weighted td:nth-child(6) {
-        display: none !important;
-      }
-
-      /* ── เปิดระบบคะแนน weighted (มี 6 คอลัมน์): override nth-child shift ── */
-      /* คอลัมน์ 4 = คะแนน (input) */
-      #page-admin_editor table.weighted th:nth-child(4),
-      #page-admin_editor table.weighted td:nth-child(4) {
-        width: 58px !important;
-        padding: 6px 2px !important;
-      }
-      #page-admin_editor table.weighted td:nth-child(4) input {
-        width: 48px !important;
-        padding: 4px 4px !important;
-        font-size: 12px !important;
-      }
-      /* คอลัมน์ 5 = ฟรี */
-      #page-admin_editor table.weighted th:nth-child(5),
-      #page-admin_editor table.weighted td:nth-child(5) {
-        width: 40px !important;
-        padding: 6px 2px !important;
-      }
-      #page-admin_editor table.weighted td:nth-child(5) .freeBtn {
-        font-size: 10px !important;
-        padding: 4px 2px !important;
-        width: 100% !important;
-        min-width: 0 !important;
-      }
-      /* คอลัมน์ 6 = Tag — v48.51: ซ่อนทั้งคอลัมน์บนมือถือ (กฎ th:nth-child(6)/
-         table.weighted td:nth-child(6) ที่ display:none อยู่ด้านบนแล้ว ครอบคลุมโหมดนี้ไว้แล้ว
-         ไม่ต้องเพิ่มกฎซ้ำ) */
-      /* ลดขนาดคอลัมน์เฉลย (3) เมื่อ weighted เพื่อให้คะแนนพอ */
-      #page-admin_editor table.weighted td:nth-child(3) .correctBtn,
-      #page-admin_editor table.weighted td:nth-child(3) .optToggle {
-        height: auto !important;
-        padding: 8px 0 !important;
-        font-size: 14px !important;
-        min-width: 0 !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-      }
+      /* v48.61: หน้ากรอกเฉลยบนมือถือ — แถวข้อเป็นการ์ด 2 บรรทัด (ตารางเดิม เปลี่ยนรูปด้วย CSS; td มี class จาก renderTable)
+         บรรทัดบน: เลขข้อ (วงกลม ดำเมื่อกรอกแล้ว) · หน้า · คะแนน (ถ้าเปิด) · ฟรี | บรรทัดล่าง: ปุ่มคำตอบ 5 ช่องเต็มกว้าง
+         แทนกฎตารางมือถือเดิม (table-layout:fixed + nth-child) — คอลัมน์ Tag ยังซ่อนบนมือถือเหมือน v48.51 */
+      #page-admin_editor .container{padding:0 12px 110px;}
+      #page-admin_editor .editorHead{display:grid !important;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"back title save" "prog prog dirty";align-items:center;gap:8px 8px;margin:0 -12px;padding:8px 12px 10px;}
+      #page-admin_editor .editorHeadActions{display:contents !important;}
+      .editorBackM{display:flex;grid-area:back;align-items:center;justify-content:center;width:36px;height:36px;border:none;background:none;color:#111;padding:0;cursor:pointer;}
+      .editorHeadTitle{grid-area:title;min-width:0;}
+      .editorTitleM{display:block;font-size:17px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      #page-admin_editor #editorTitle,#page-admin_editor #editorTypeBadge,#page-admin_editor .editorNavBtn{display:none !important;}
+      #editorSave{grid-area:save;padding:9px 14px !important;font-size:14px;font-weight:700;}
+      .editorProgWrap{grid-area:prog;display:flex;align-items:center;gap:10px;min-width:0;}
+      .editorProgress{font-size:12px;}
+      .editorProgBar{display:block;flex:1;height:6px;border-radius:3px;background:#e5e7eb;overflow:hidden;}
+      .editorProgBar i{display:block;height:100%;width:0;background:var(--ok);border-radius:3px;transition:width .2s ease-out;}
+      #editorDirtyBadge{grid-area:dirty;padding:2px 8px;font-size:11px;}
+      .editorSetCard{margin:0;}
+      #page-admin_editor .tableBox{max-height:none !important;overflow:visible !important;}
+      #page-admin_editor .tableBox table{display:block;width:100% !important;min-width:0 !important;}
+      #page-admin_editor .tableBox thead th{display:none !important;}
+      #page-admin_editor .tableBox tbody{display:flex;flex-direction:column;gap:8px;padding-top:8px;}
+      #editorTbody tr{display:grid;grid-template-columns:auto auto auto minmax(0,1fr) auto;grid-template-areas:"no page pts . free" "ans ans ans ans ans";align-items:center;gap:8px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:9px 10px 10px;}
+      #editorTbody tr.editorRowAlt{background:#f8fbff;}
+      #editorTbody tr.rowActive{background:#fefce8 !important;border-color:#facc15;box-shadow:inset 4px 0 0 #111;}
+      #editorTbody td{display:block;padding:0;border:none;width:auto !important;min-width:0;}
+      #editorTbody td.cTag{display:none !important;}
+      #editorTbody td.cNo{grid-area:no;width:30px !important;height:30px;border-radius:50%;border:1.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:13px;color:#475569;}
+      #editorTbody tr:has(.correctBtn.selected) td.cNo,
+      #editorTbody tr:has(input[data-field="correctNum"]:not(:placeholder-shown)) td.cNo{background:#111827;border-color:#111827;color:#fff;}
+      #editorTbody td.cPage{grid-area:page;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);}
+      #editorTbody td.cPage::before{content:'หน้า';}
+      #editorTbody td.cPage input{width:46px;padding:5px 6px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:#111;}
+      #editorTbody td.cPts{grid-area:pts;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);}
+      #editorTbody td.cPts::before{content:'คะแนน';}
+      #editorTbody td.cPts input{width:52px !important;padding:5px 6px !important;font-size:13px !important;}
+      #editorTbody td.cFree{grid-area:free;}
+      #editorTbody td.cFree .freeBtn{height:28px;padding:0 10px;font-size:12px;}
+      #editorTbody td.cAns{grid-area:ans;}
+      #editorTbody td.cAns .correctBtns{display:grid !important;grid-template-columns:repeat(5,minmax(0,1fr)) !important;gap:7px !important;width:100% !important;}
+      #editorTbody td.cAns .correctBtn,
+      #editorTbody td.cAns .optToggle{width:100% !important;min-width:0 !important;height:42px !important;padding:0 !important;font-size:17px !important;border-radius:11px;box-sizing:border-box !important;}
+      #editorTbody td.cAns input[data-field="correctNum"]{width:100% !important;height:42px;font-size:18px !important;}
       /* compact bar คะแนน controls */
       #editorWeightedBar { padding: 8px 10px !important; gap: 6px !important; }
       #editorWeightedBar > div:first-child { font-size: 11px !important; flex: 1 1 100% !important; }
@@ -1426,7 +1376,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.60</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.61</div>
     </div>
   </div>
 </div>
@@ -2254,14 +2204,18 @@
       </div>
     </div>
     <!-- v48.58: ฟอร์มสั้นหน้าเดียว — ช่องหลักด้านบน, ตั้งค่าที่มีค่าเริ่มต้นอยู่แล้วพับไว้ใน "ตั้งค่าเพิ่มเติม" (id เดิมทั้งหมด) -->
-    <div class="card newForm" style="padding:16px;margin-top:16px;display:grid;gap:14px;">
+    <!-- v48.61: แบ่งเป็นการ์ด 3 ขั้น (ข้อมูลชุด → ไฟล์ PDF → จำนวนข้อ) — มือถือ 1 คอลัมน์ + ปุ่มสร้างติดล่างจอ -->
+    <div class="newForm" style="margin-top:16px;display:grid;gap:12px;">
+     <div class="card newStep">
+      <div class="newStepHead"><i>1</i>ข้อมูลชุด</div>
       <label style="display:grid;gap:6px;">
         <span style="font-weight:900;">ชื่อชุดข้อสอบ</span>
         <input id="newTitle" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" placeholder="เช่น วิทยาศาสตร์ ชุดที่ 2" />
       </label>
       <div class="grid2" style="align-items:start;">
-        <label style="display:grid;gap:6px;">
-          <span style="font-weight:900;">วิชา</span>
+        <div style="display:grid;gap:6px;min-width:0;">
+          <label for="newSubjectSelect" style="font-weight:900;">วิชา</label>
+          <div class="newSubjChips" id="newSubjChips" role="group" aria-label="เลือกวิชา"></div>
           <select id="newSubjectSelect" onchange="window._onNewSubjectChange(this.value)" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
               <option value="">-- เลือกวิชา --</option>
               <option value="คณิตศาสตร์">คณิตศาสตร์</option>
@@ -2273,7 +2227,7 @@
               <option value="อื่นๆ">อื่นๆ</option>
           </select>
           <input id="newSubject" type="hidden" value="" />
-        </label>
+        </div>
         <div id="newFolderWrap" style="display:none;gap:6px;align-content:start;">
           <label for="newFolderSelect" style="font-weight:900;">โฟลเดอร์</label>
           <div style="display:flex;gap:8px;align-items:center;">
@@ -2304,26 +2258,41 @@
           <div id="newNumDigitsHint" style="font-size:11px;color:#9ca3af;">กรอกตัวเลข: ตอบเป็นจำนวนเต็ม 1-3 หลัก (0-999)</div>
         </div>
       </div>
+     </div>
+     <div class="card newStep">
+      <div class="newStepHead"><i>2</i>ไฟล์ PDF</div>
+      <div class="newTiles">
+        <label class="newTile" id="newPdfTile"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg><b>PDF โจทย์</b><span class="newTileSub">แตะเพื่ออัปโหลด</span><input id="newPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+        <label class="newTile" id="newAnswerPdfTile"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg><b>PDF เฉลย</b><span class="newTileSub">ไม่บังคับ</span><input id="newAnswerPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+      </div>
       <div style="display:grid;gap:6px;">
-        <span style="font-weight:900;">PDF โจทย์</span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <label class="btn btnPrimary" style="cursor:pointer;font-weight:700;">📎 อัปโหลด PDF<input id="newPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
-          <span class="muted" style="font-size:12px;">หรือวางลิงก์</span>
-          <input id="newPdfUrl" value="" placeholder="URL (Google Drive / HTTPS)" style="flex:1;min-width:180px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-        </div>
+        <label for="newPdfUrl" class="muted" style="font-size:12px;font-weight:700;">หรือวางลิงก์ PDF โจทย์ (Google Drive / HTTPS)</label>
+        <input id="newPdfUrl" value="" placeholder="URL (Google Drive / HTTPS)" style="min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        <label for="newAnswerPdfUrl" class="muted" style="font-size:12px;font-weight:700;">ลิงก์ PDF เฉลย (ไม่บังคับ — ดูเทียบตอนกรอกเฉลย และแท็บเฉลยหน้าทบทวน)</label>
+        <input id="newAnswerPdfUrl" placeholder="URL" style="min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
         <div id="newPdfHint" class="muted" style="font-size:12px;">ยังไม่มีก็ได้ — อัปโหลดทีหลังในหน้ากรอกเฉลย</div>
       </div>
-      <div style="display:grid;gap:6px;">
-        <span style="font-weight:900;">PDF เฉลย <span class="muted" style="font-weight:400;font-size:12px;">(ไม่บังคับ — ดูเทียบตอนกรอกเฉลย และแท็บเฉลยหน้าทบทวน)</span></span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <label class="btn" style="cursor:pointer;font-weight:700;">📎 อัปโหลด PDF เฉลย<input id="newAnswerPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
-          <span class="muted" style="font-size:12px;">หรือวางลิงก์</span>
-          <input id="newAnswerPdfUrl" placeholder="URL" style="flex:1;min-width:180px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+     </div>
+     <div class="card newStep">
+      <div class="newStepHead"><i>3</i>จำนวนข้อและเวลา</div>
+      <!-- v48.61: เวลาย้ายมาไว้ข้างจำนวนข้อ (เดิมซ่อนอยู่ใน "ตั้งค่าเพิ่มเติม") -->
+      <div class="newPair">
+        <div class="newPairCol">
+          <label for="newQCount" class="newPairLbl">จำนวนข้อ</label>
+          <div class="newStepper" role="group" aria-label="จำนวนข้อ">
+            <button type="button" data-step-for="newQCount" data-step="-1" aria-label="ลดจำนวนข้อ">−</button>
+            <input id="newQCount" type="number" min="1" max="999" value="50" />
+            <button type="button" data-step-for="newQCount" data-step="1" aria-label="เพิ่มจำนวนข้อ">+</button>
+          </div>
         </div>
-      </div>
-      <div style="display:grid;gap:6px;">
-        <span style="font-weight:900;">จำนวนข้อ</span>
-        <input id="newQCount" type="number" min="1" max="999" value="50" style="width:140px;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
+        <div class="newPairCol">
+          <label for="newMinutes" class="newPairLbl">เวลา (นาที)</label>
+          <div class="newStepper" role="group" aria-label="เวลา (นาที)">
+            <button type="button" data-step-for="newMinutes" data-step="-5" aria-label="ลดเวลา 5 นาที">−</button>
+            <input id="newMinutes" type="number" min="1" value="45" />
+            <button type="button" data-step-for="newMinutes" data-step="5" aria-label="เพิ่มเวลา 5 นาที">+</button>
+          </div>
+        </div>
       </div>
       <!-- hidden: ยังใช้ใน JS อยู่ -->
       <input id="newCreatePlaceholder" type="checkbox" checked style="display:none;" />
@@ -2340,22 +2309,17 @@
         </div>
         <div id="newExcelPreview" style="display:none;padding:8px 12px;background:#dcfce7;border-radius:8px;font-size:12px;color:#166534;font-weight:700;"></div>
       </div>
+     </div>
       <details id="newAdvanced" class="newAdvanced">
-        <summary>ตั้งค่าเพิ่มเติม <span class="muted" id="newAdvancedSummary" style="font-weight:400;font-size:12px;">เวลา 45 นาที · ระดับพัฒนา · เผยแพร่</span></summary>
+        <summary>ตั้งค่าเพิ่มเติม <span class="muted" id="newAdvancedSummary" style="font-weight:400;font-size:12px;">ระดับพัฒนา · เผยแพร่</span></summary>
         <div style="display:grid;gap:12px;padding-top:12px;">
-          <div class="grid2">
-            <label style="display:grid;gap:6px;">
-              <span style="font-weight:900;">เวลา (นาที)</span>
-              <input id="newMinutes" type="number" min="1" value="45" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;" />
-            </label>
-            <label style="display:grid;gap:6px;">
-              <span style="font-weight:900;">เผยแพร่</span>
-              <select id="newPublished" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
-                <option value="true">เผยแพร่</option>
-                <option value="false">ซ่อน</option>
-              </select>
-            </label>
-          </div>
+          <label style="display:grid;gap:6px;">
+            <span style="font-weight:900;">เผยแพร่</span>
+            <select id="newPublished" style="padding:12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;">
+              <option value="true">เผยแพร่</option>
+              <option value="false">ซ่อน</option>
+            </select>
+          </label>
           <div style="display:grid;gap:6px;">
             <span style="font-weight:900;">ระดับความยาก</span>
             <div style="display:flex;gap:8px;">
@@ -2385,7 +2349,7 @@
         </div>
       </details>
 
-      <button class="btn btnPrimary" id="newCreateBtn" style="width:fit-content;padding:12px 22px;font-weight:800;">สร้างแล้วไปกรอกเฉลย →</button>
+      <div class="newCreateBar"><button class="btn btnPrimary" id="newCreateBtn" style="width:fit-content;padding:12px 22px;font-weight:800;">สร้างแล้วไปกรอกเฉลย →</button></div>
     </div>
   </div>
 </div>
@@ -2430,18 +2394,21 @@
 <!-- ===================== PAGE: ADMIN EDITOR ===================== -->
 <div id="page-admin_editor" class="page">
   <div class="container" style="max-width:1400px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
-      <div>
+    <!-- v48.61: จอ ≤900px หัวติดบน; มือถือ ≤600px แสดงแบบย่อ (‹ ชื่อชุด · บันทึก / แถบความคืบหน้า) -->
+    <div class="editorHead" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <button type="button" class="editorBackM" id="editorBackM" aria-label="กลับรายการชุดข้อสอบ" onclick="navigate('admin_exams')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="editorHeadTitle">
+        <div class="editorTitleM" id="editorTitleM"></div>
         <h1 class="h1" id="editorTitle">Editor</h1>
         <div id="editorMeta" style="display:none;"></div>
         <div id="editorTypeBadge" style="display:inline-block;margin-top:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;"></div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <span id="editorProgress" class="editorProgress"></span>
+      <div class="editorHeadActions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <span class="editorProgWrap"><span id="editorProgress" class="editorProgress"></span><span class="editorProgBar" aria-hidden="true"><i id="editorProgFill"></i></span></span>
         <span id="editorDirtyBadge" class="editorDirtyBadge" style="display:none;">● ยังไม่บันทึก</span>
         <button class="btn btnPrimary" id="editorSave" style="padding:8px 20px;">💾 บันทึกทั้งหมด</button>
-        <button class="btn" onclick="navigate('admin_exams')">← รายการชุดข้อสอบ</button>
-        <button class="btn" onclick="navigate('home')">หน้าแรก</button>
+        <button class="btn editorNavBtn" onclick="navigate('admin_exams')">← รายการชุดข้อสอบ</button>
+        <button class="btn editorNavBtn" onclick="navigate('home')">หน้าแรก</button>
       </div>
     </div>
     <div class="editorBody" style="margin-top:12px;">
@@ -2573,6 +2540,7 @@
               <button type="button" class="btn editorPdfTab" id="editorTabAnswer" role="tab" aria-selected="false">✅ เฉลย</button>
             </div>
             <span class="muted" id="editorPdfInfo" style="font-size:12px;"></span>
+            <button type="button" class="editorPdfClose" id="editorPdfClose" aria-label="ปิด PDF"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
           </div>
           <div class="editorPdfBody">
             <div id="editorPdfViewer" class="editorPdfView"></div>
@@ -2582,7 +2550,10 @@
               <button type="button" class="btn" id="editorPdfEmptyBtn" style="margin-top:10px;">เปิดตั้งค่าเพื่ออัปโหลด PDF</button>
             </div>
           </div>
+          <!-- v48.61: แผ่น "ดูโจทย์" (จอ ≤900px) — ตอบข้อปัจจุบันได้ขณะดู PDF -->
+          <div class="editorSheetAns" id="editorSheetAns"></div>
         </div>
+        <div class="editorSheetScrim" id="editorSheetScrim"></div>
         <div class="editorSide">
           <div class="editorSideBar">
             <b>เฉลย</b><span class="muted editorSideHint">แตะข้อเพื่อดูโจทย์ · กดเลข/ตัวอักษรเพื่อเลือก</span>
@@ -2626,6 +2597,11 @@
           <div class="editorKeyHint"><span><kbd>1</kbd>–<kbd>5</kbd> หรือ <kbd>ก</kbd>–<kbd>จ</kbd> เลือกคำตอบแล้วไปข้อถัดไป</span><span><kbd>↑</kbd><kbd>↓</kbd> เลื่อนข้อ</span><span><kbd>0</kbd> ล้าง</span></div>
         </div>
       </div>
+    </div>
+    <!-- v48.61: แถบล่างติดจอ (จอ ≤900px) — ข้อที่เลือก + ปุ่มเปิด PDF -->
+    <div class="editorBottomBar" id="editorBottomBar">
+      <div class="editorWhere"><b id="editorWhereNo">ข้อ 1</b><span id="editorWhereSub"></span></div>
+      <button type="button" class="btn" id="editorOpenPdfBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/></svg><span id="editorOpenPdfLbl">ดูโจทย์</span></button>
     </div>
   </div>
 </div>
@@ -3327,6 +3303,8 @@ function _updateOfflineBanner() {
       if (document.body) document.body.appendChild(banner);
     }
     if (banner) banner.style.display = _isOffline ? 'block' : 'none';
+    // v48.61: ให้หัวติดบนของหน้ากรอกเฉลย (จอ ≤900px) หลบแถบนี้ — ไม่งั้นแถบทับปุ่มบันทึก
+    if (document.body) document.body.classList.toggle('isOffline', !!_isOffline);
     // v48.18 diag: log เฉพาะตอน "เปลี่ยนสถานะ" ไม่ใช่ทุก 5 วิ (แถบนี้ z-index 99998 ทับปุ่มปากกา)
     if (window._diagLastOffline !== _isOffline) {
       window._diagLastOffline = _isOffline;
@@ -11807,6 +11785,24 @@ function initAdminNew(){
   { const nd=document.getElementById('newNumDigitsWrap'); if(nd) nd.style.display='none';
     const nh=document.getElementById('newNumDigitsHint'); if(nh) nh.textContent=numHintText(3); }
   let _uploading=0; // กันกด "สร้าง" ขณะ PDF ยังอัปโหลดไม่เสร็จ (ได้ข้อสอบที่ไม่มี PDF)
+  // v48.61: กล่องอัปโหลด PDF ขึ้นสีเขียวเมื่อมีไฟล์/ลิงก์แล้ว
+  const _syncPdfTiles=()=>{
+    [['newPdfUrl','newPdfTile','แตะเพื่ออัปโหลด'],['newAnswerPdfUrl','newAnswerPdfTile','ไม่บังคับ']].forEach(([u,t,empty])=>{
+      const v=(document.getElementById(u)?.value||'').trim(), tile=document.getElementById(t); if(!tile) return;
+      tile.classList.toggle('done',!!v);
+      const sub=tile.querySelector('.newTileSub'); if(sub) sub.textContent=v?(/firebasestorage|^localpdf:/.test(v)?'อัปโหลดแล้ว ✓ · แตะเพื่อเปลี่ยน':'มีลิงก์แล้ว ✓'):empty;
+    });
+  };
+  ['newPdfUrl','newAnswerPdfUrl'].forEach(id=>{ const el=document.getElementById(id); if(el) el.oninput=_syncPdfTiles; });
+  _syncPdfTiles();
+  // v48.61: ปุ่ม − + ข้างจำนวนข้อ/เวลา (ช่องเดิมยังพิมพ์ได้) — ยิง input event ให้ตัวสรุป "ตั้งค่าเพิ่มเติม" อัปเดต
+  document.querySelectorAll('#page-admin_new [data-step-for]').forEach(b=>{
+    b.onclick=()=>{
+      const el=document.getElementById(b.dataset.stepFor); if(!el) return;
+      const max=Number(el.max)||9999, v=Math.max(1,Math.min(max,(parseInt(el.value,10)||0)+Number(b.dataset.step)));
+      el.value=v; el.dispatchEvent(new Event('input',{bubbles:true}));
+    };
+  });
 
   const newPdfFileEl=pdfFileEl.cloneNode(true);
   pdfFileEl.parentNode.replaceChild(newPdfFileEl,pdfFileEl);
@@ -11824,6 +11820,7 @@ function initAdminNew(){
       });
       pdfUrlEl.value = url;
       pdfUrlEl.placeholder = '';
+      _syncPdfTiles();
       toast('✅ อัปโหลด PDF สำเร็จ — ใช้ได้ทุกเครื่อง');
     }catch(err){
       pdfUrlEl.placeholder='';
@@ -11851,6 +11848,7 @@ function initAdminNew(){
       });
       answerPdfUrlEl.value = url;
       answerPdfUrlEl.placeholder='';
+      _syncPdfTiles();
       toast('✅ อัปโหลด PDF เฉลยสำเร็จ');
     }catch(err){
       answerPdfUrlEl.placeholder='';
@@ -11911,7 +11909,15 @@ function initAdminNew(){
   const _nfName=document.getElementById('newFolderName');
   const _closeNewFolderRow=()=>{ if(_nfRow) _nfRow.style.display='none'; if(_nfName) _nfName.value=''; };
   const _origSubjChange=window._onNewSubjectChange;
-  window._onNewSubjectChange=(val)=>{ _closeNewFolderRow(); _origSubjChange(val); };
+  // v48.61: ชิปวิชา (มือถือ) — สร้างจาก option ของ select (select ยังเป็นตัวเก็บค่าจริง) และตามค่า select ทุกครั้งที่เปลี่ยน
+  const _subjSel=document.getElementById('newSubjectSelect');
+  const _subjChips=document.getElementById('newSubjChips');
+  const _syncSubjChips=()=>{ if(_subjChips) _subjChips.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.val===_subjSel.value?'true':'false')); };
+  if(_subjChips && _subjSel){
+    _subjChips.innerHTML=[..._subjSel.options].filter(o=>o.value).map(o=>`<button type="button" data-val="${esc(o.value)}" aria-pressed="false">${esc(o.textContent)}</button>`).join('');
+    _subjChips.querySelectorAll('button').forEach(b=>b.onclick=()=>{ _subjSel.value=b.dataset.val; window._onNewSubjectChange(b.dataset.val); });
+  }
+  window._onNewSubjectChange=(val)=>{ _closeNewFolderRow(); _origSubjChange(val); _syncSubjChips(); };
   window._onNewSubjectChange('');
 
   // v48.60: สร้างโฟลเดอร์ใหม่ของวิชาที่เลือก — รูปแบบเดียวกับ createFolderForCurrentSubject (หน้า exams) บันทึกทันที
@@ -12017,9 +12023,9 @@ function initAdminNew(){
     if(!_advSum) return;
     const d=document.querySelector('#page-admin_new .diffBtn.active');
     const lbl={review:'ทบทวน',develop:'พัฒนา',hard:'ยาก'}[d?d.dataset.val:'develop'];
-    _advSum.textContent=`เวลา ${document.getElementById('newMinutes').value||45} นาที · ระดับ${lbl} · ${document.getElementById('newPublished').value==='true'?'เผยแพร่':'ซ่อน'}`;
+    _advSum.textContent=`ระดับ${lbl} · ${document.getElementById('newPublished').value==='true'?'เผยแพร่':'ซ่อน'}`; // v48.61: เวลาย้ายขึ้นการ์ดจำนวนข้อแล้ว
   };
-  ['newMinutes','newPublished'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.oninput=_syncAdvSum; el.onchange=_syncAdvSum; } });
+  ['newPublished'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.oninput=_syncAdvSum; el.onchange=_syncAdvSum; } });
   document.querySelectorAll('#page-admin_new .diffBtn').forEach(b=>b.closest('label').addEventListener('click',()=>setTimeout(_syncAdvSum,0)));
   _syncAdvSum();
 
@@ -12080,6 +12086,9 @@ function _editorCleanup(){
   _editorRes.offs.forEach(fn=>{ try{ fn(); }catch(e){} });
   _editorRes.viewers=[]; _editorRes.blobs=[]; _editorRes.offs=[];
   window._editorDirty=false;
+  // v48.61: ปิดแผ่นดูโจทย์ที่อาจเปิดค้าง
+  document.getElementById('editorSplit')?.classList.remove('pdfOpen');
+  document.getElementById('page-admin_editor')?.classList.remove('sheetOpen');
 }
 window.addEventListener('beforeunload',(e)=>{
   if(window._currentPage==='admin_editor' && window._editorDirty){ e.preventDefault(); e.returnValue=''; }
@@ -12103,6 +12112,7 @@ function initEditor(examId){
   if(!exam.numDigits) exam.numDigits=3;
   const _numDigits=exam.numDigits;
   document.getElementById('editorTitle').textContent='แก้ไขข้อสอบ: '+exam.title;
+  { const tm=document.getElementById('editorTitleM'); if(tm) tm.textContent=exam.title||''; } // v48.61: ชื่อแบบสั้นบนหัวมือถือ
   document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
   const _typeBadge=document.getElementById('editorTypeBadge');
   if(_typeBadge){
@@ -12190,6 +12200,7 @@ function initEditor(examId){
     if(!v){alert('กรุณากรอกชื่อชุดข้อสอบ');titleInput?.focus?.();return;}
     exam.title=v;Store.save(s);
     document.getElementById('editorTitle').textContent='แก้ไขข้อสอบ: '+exam.title;
+    { const tm=document.getElementById('editorTitleM'); if(tm) tm.textContent=exam.title; }
     toast('บันทึกชื่อแล้ว');
   }
   renameBtn.onclick=(e)=>{e.preventDefault();applyRename();};
@@ -12408,6 +12419,7 @@ function initEditor(examId){
   // v48.58: สถานะ PDF ฝั่งซ้าย (ประกาศก่อน renderTable ครั้งแรก เพราะ select() → _followPdf() อ่านค่าเหล่านี้)
   const _splitEl=document.getElementById('editorSplit');
   const _mqSplit=window.matchMedia?window.matchMedia('(min-width:901px)'):{matches:true};
+  const _mqPhone=window.matchMedia?window.matchMedia('(max-width:600px)'):{matches:false}; // v48.61: การ์ดมือถือ
   let _pdfTab='question';
   let _qPdf=null, _aPdf=null; // {viewer, gdrive} ของแท็บโจทย์/เฉลย (null = ยังไม่โหลด)
   let _qPdfUrl=null, _aPdfUrl=null;
@@ -12420,6 +12432,7 @@ function initEditor(examId){
     if(!_progressEl) return;
     const done=list.filter(q=>q.correct!=null&&String(q.correct)!=='').length;
     _progressEl.textContent=`กรอกแล้ว ${done}/${list.length}`;
+    const pf=document.getElementById('editorProgFill'); if(pf) pf.style.width=(list.length?Math.round(done/list.length*100):0)+'%';
   }
   function _setDirty(v){
     window._editorDirty=!!v;
@@ -12434,7 +12447,17 @@ function initEditor(examId){
     const prev=selectedIndex;
     selectedIndex=Math.max(0,Math.min(list.length-1,i));
     highlight();
+    _updateWhere();
     if(follow!==false && (follow===true || prev!==selectedIndex)) _followPdf();
+  }
+  // v48.61: แถบล่าง (จอ ≤900px) "ข้อ N · หน้า P" + แถวตอบในแผ่นดูโจทย์ — อ่าน DOM ตอนเรียก (เรียกได้ก่อนส่วนแบ่งจอด้านล่างทำงาน)
+  function _updateWhere(){
+    const q=list[selectedIndex];
+    const no=document.getElementById('editorWhereNo'), sub=document.getElementById('editorWhereSub');
+    if(no) no.textContent=q?`ข้อ ${q.number||q.no}`:'';
+    if(sub) sub.textContent=q?`หน้า ${Math.max(1,Number(q.page)||1)}`:'';
+    const sp=document.getElementById('editorSplit');
+    if(sp && sp.classList.contains('pdfOpen')) _paintSheetAns();
   }
   function highlight(){[...document.getElementById('editorTbody').children].forEach((tr,idx)=>{tr.classList.toggle('rowActive',idx===selectedIndex);}); }
   function focusField(ri,field){const el=refs[`${ri}:${field}`];if(el&&el.focus) el.focus();}
@@ -12471,9 +12494,9 @@ function initEditor(examId){
         ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${_numDigits}}" maxlength="${_numDigits}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
         : `<div class="correctBtns" data-field="correct"></div>`;
       const _ptsCellHtml=exam.weighted
-        ? `<td><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
+        ? `<td class="cPts"><input type="number" min="0" step="0.5" value="${fmtPts(getQPoints(q))}" data-field="points" style="width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;text-align:center;" /></td>`
         : '';
-      tr.innerHTML=`<td><input type="number" min="1" value="${q.page}" data-field="page" /></td><td style="font-weight:900;">${q.number||q.no}</td><td>${_correctCellHtml}</td>${_ptsCellHtml}<td><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td><div style="display:flex;gap:3px;align-items:center;"><select class="tagSel" data-field="tags" style="flex:1;min-width:0;padding:4px 6px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;font-family:inherit;">${_tagOptsHtml}</select><button type="button" class="btn subTagBtn" data-field="subtags" title="tag ย่อย (↳)" style="font-size:11px;padding:3px 6px;flex-shrink:0;">↳${_qSubTags.length||''}</button></div></td>`;
+      tr.innerHTML=`<td class="cPage"><input type="number" min="1" value="${q.page}" data-field="page" aria-label="หน้า PDF ของข้อ ${q.number||q.no}" /></td><td class="cNo" style="font-weight:900;">${q.number||q.no}</td><td class="cAns">${_correctCellHtml}</td>${_ptsCellHtml}<td class="cFree"><button type="button" class="freeBtn${q.isFree?' active':''}" data-field="free" title="ข้อฟรี: ทุกคนได้คะแนนโดยไม่ต้องตอบถูก">${q.isFree?'✓ ฟรี':'ฟรี'}</button></td><td class="cTag"><div style="display:flex;gap:3px;align-items:center;"><select class="tagSel" data-field="tags" style="flex:1;min-width:0;padding:4px 6px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;font-family:inherit;">${_tagOptsHtml}</select><button type="button" class="btn subTagBtn" data-field="subtags" title="tag ย่อย (↳)" style="font-size:11px;padding:3px 6px;flex-shrink:0;">↳${_qSubTags.length||''}</button></div></td>`;
       if(exam.weighted){
         const ptsInput=tr.querySelector('input[data-field="points"]');
         if(ptsInput){
@@ -12532,6 +12555,7 @@ function initEditor(examId){
               btn.classList.add('selected');
               q.correct=btn.getAttribute('data-val');
               _setDirty(true);
+              if(_mqPhone.matches) _gotoRow(idx+1); // v48.61: มือถือ แตะคำตอบแล้วไฮไลต์ไปข้อถัดไป (จอใหญ่คงเดิม)
             });
           });
           const _slot=_cell.querySelector(_has5?'.optE':'.optToggle');
@@ -12919,7 +12943,7 @@ function initEditor(examId){
     }
   }
   async function _loadQuestionPdf(force){
-    if(!_mqSplit.matches) return; // จอแคบไม่แสดง PDF — ไม่ต้องโหลด/เรนเดอร์ให้เปลือง
+    if(!_pdfVisible()) return; // จอแคบที่ยังไม่เปิดแผ่นดูโจทย์ — ไม่ต้องโหลด/เรนเดอร์ให้เปลือง (v48.61: เปิดแผ่นแล้วโหลด)
     if(!force && _qPdfUrl===exam.pdfUrl) return;
     _destroyView(_qPdf); _qPdf=null; _qPdfUrl=exam.pdfUrl||null;
     if(_pdfEmptyEl) _pdfEmptyEl.style.display=exam.pdfUrl?'none':'flex';
@@ -12928,7 +12952,7 @@ function initEditor(examId){
     _setPdfInfo();
   }
   async function _loadAnswerPdf(){
-    if(!exam.answerPdfUrl || _aPdfUrl===exam.answerPdfUrl) return;
+    if(!_pdfVisible() || !exam.answerPdfUrl || _aPdfUrl===exam.answerPdfUrl) return;
     _destroyView(_aPdf); _aPdf=null; _aPdfUrl=exam.answerPdfUrl;
     _aPdf=await _mountExamPdf('editorAnswerPdfViewer', exam.answerPdfUrl, 1);
   }
@@ -12964,18 +12988,93 @@ function initEditor(examId){
     _editorRes.offs.push(()=>_mqSplit.removeEventListener('change',_onMq));
   }
   // เปลี่ยน/อัปโหลด PDF ในตั้งค่า → โหลดใหม่ทันที (hook ผ่านตัวแปรที่ updateExamPdf/updateAnswerPdf เรียก)
-  _onExamPdfChanged=()=>{ _loadQuestionPdf(true); _updateSetSummary(); };
+  _onExamPdfChanged=()=>{ _loadQuestionPdf(true); _updateSetSummary(); _syncOpenPdfBtn(); };
   _onAnswerPdfChanged=()=>{ _aPdfUrl=null; _destroyView(_aPdf); _aPdf=null; _viewAEl.innerHTML=''; _syncAnswerTab(); if(_pdfTab==='answer') _loadAnswerPdf(); _updateSetSummary(); };
+
+  // ═══ v48.61: แผ่น "ดูโจทย์" สำหรับจอไม่แบ่ง (≤900px) — ใช้ .editorPdfWrap/viewer/แท็บเดิม แสดงเป็นแผ่นจากด้านล่าง ═══
+  const _pageEl=document.getElementById('page-admin_editor');
+  function _pdfVisible(){ return _mqSplit.matches || (!!_splitEl && _splitEl.classList.contains('pdfOpen')); }
+  function _syncOpenPdfBtn(){
+    const b=document.getElementById('editorOpenPdfBtn'), l=document.getElementById('editorOpenPdfLbl');
+    if(b) b.classList.toggle('noPdf',!exam.pdfUrl);
+    if(l) l.textContent=exam.pdfUrl?'ดูโจทย์':'ยังไม่มี PDF';
+  }
+  function _openPdfSheet(){
+    if(!exam.pdfUrl){
+      _setSettingsOpen(true);
+      const u=document.getElementById('editorPdfUrl');
+      if(u){ u.focus(); }
+      toast('ใส่ลิงก์หรืออัปโหลด PDF โจทย์ในตั้งค่าก่อน');
+      return;
+    }
+    _splitEl.classList.add('pdfOpen');
+    if(_pageEl) _pageEl.classList.add('sheetOpen');
+    _loadQuestionPdf();
+    if(_pdfTab==='answer') _loadAnswerPdf();
+    _followPdf();
+    _paintSheetAns();
+  }
+  function _closePdfSheet(){
+    _splitEl.classList.remove('pdfOpen');
+    if(_pageEl) _pageEl.classList.remove('sheetOpen');
+    _ensureRowVisible(selectedIndex);
+  }
+  function _answerCurrent(val){
+    const idx=selectedIndex, q=list[idx]; if(!q) return;
+    q.correct=val; _setDirty(true);
+    if(rowPaint[idx]) rowPaint[idx]();
+    _paintSheetAns();
+    _gotoRow(idx+1); // ไปข้อถัดไป + PDF ตาม (ข้อสุดท้ายอยู่ที่เดิม)
+  }
+  // แถวตอบท้ายแผ่น: ‹ ข้อ N › + ปุ่ม ก–ง (+จ ถ้าข้อนั้นมี) / ช่องตัวเลข + ถัดไป
+  function _paintSheetAns(){
+    const box=document.getElementById('editorSheetAns'); if(!box) return;
+    const q=list[selectedIndex]; if(!q){ box.innerHTML=''; return; }
+    const no=q.number||q.no, pg=Math.max(1,Number(q.page)||1);
+    const nav=`<div class="esaNav"><button type="button" class="esaArr" data-esa="prev" aria-label="ข้อก่อนหน้า"${selectedIndex<=0?' disabled':''}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>`+
+      `<span><b>ข้อ ${no}</b> · หน้า ${pg}</span><button type="button" class="esaArr" data-esa="next" aria-label="ข้อถัดไป"${selectedIndex>=list.length-1?' disabled':''}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
+    if(_isFillNum){
+      box.innerHTML=nav+`<div class="esaNum"><input type="text" inputmode="numeric" maxlength="${_numDigits}" aria-label="เฉลยข้อ ${no}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" /><button type="button" class="btn btnPrimary" data-esa="numNext">ถัดไป</button></div>`;
+      const inp=box.querySelector('input');
+      const commit=()=>{ const v=inp.value.replace(/[^\d]/g,'').slice(0,_numDigits); if(v!==(q.correct||'')){ q.correct=v; _setDirty(true); if(rowPaint[selectedIndex]) rowPaint[selectedIndex](); } };
+      inp.addEventListener('input',()=>{ const v=inp.value.replace(/[^\d]/g,'').slice(0,_numDigits); if(v!==inp.value) inp.value=v; });
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); _gotoRow(selectedIndex+1); const n=box.querySelector('input'); if(n) n.focus(); } });
+      box.querySelector('[data-esa="numNext"]').onclick=()=>{ commit(); _gotoRow(selectedIndex+1); };
+    } else {
+      const letters=getQLetters(q);
+      box.innerHTML=nav+`<div class="esaBtns" style="--n:${letters.length}">`+letters.map(v=>`<button type="button" data-val="${v}" class="${q.correct===v?'on':''}" aria-pressed="${q.correct===v}">${CHOICE_LABELS[v]}</button>`).join('')+`</div>`;
+      box.querySelectorAll('.esaBtns button').forEach(b=>b.onclick=()=>_answerCurrent(b.dataset.val));
+    }
+    box.querySelector('[data-esa="prev"]').onclick=()=>_gotoRow(selectedIndex-1);
+    box.querySelector('[data-esa="next"]').onclick=()=>_gotoRow(selectedIndex+1);
+  }
+  { const ob=document.getElementById('editorOpenPdfBtn'); if(ob) ob.onclick=_openPdfSheet;
+    const cb=document.getElementById('editorPdfClose'); if(cb) cb.onclick=_closePdfSheet;
+    const sc=document.getElementById('editorSheetScrim'); if(sc) sc.onclick=_closePdfSheet; }
+  _syncOpenPdfBtn();
+  _updateWhere();
 
   // ── ปุ่มลัด (ทุกขนาดจอ; ไม่ทำงานขณะพิมพ์ในช่อง input/select หรือมีหน้าต่าง tag เปิดอยู่) ──
   function _ensureRowVisible(i){
     const tr=document.getElementById('editorTbody').children[i]; if(!tr) return;
     const box=tr.closest('.tableBox'); if(!box) return;
-    const head=box.querySelector('thead'); const hh=head?head.offsetHeight:0;
-    const br=box.getBoundingClientRect(), r=tr.getBoundingClientRect();
-    // เลื่อนเฉพาะกล่องตาราง (ไม่ใช้ scrollIntoView — มันเลื่อน scroller ชั้นนอกทุกชั้นด้วย)
-    if(r.top<br.top+hh) box.scrollTop-=(br.top+hh-r.top);
-    else if(r.bottom>br.bottom) box.scrollTop+=(r.bottom-br.bottom);
+    const r=tr.getBoundingClientRect();
+    // เลื่อนเฉพาะ scroller ที่เลื่อนได้จริง (ไม่ใช้ scrollIntoView — มันเลื่อน scroller ชั้นนอกทุกชั้นด้วย)
+    if(box.scrollHeight>box.clientHeight+1){
+      const head=box.querySelector('thead'); const hh=head?head.offsetHeight:0;
+      const br=box.getBoundingClientRect();
+      if(r.top<br.top+hh) box.scrollTop-=(br.top+hh-r.top);
+      else if(r.bottom>br.bottom) box.scrollTop+=(r.bottom-br.bottom);
+      return;
+    }
+    // v48.61: มือถือ — ตารางไม่ใช่กล่องเลื่อน เลื่อนทั้งหน้าแทน โดยเผื่อหัวติดบน/แถบล่างที่บังอยู่
+    if(!_pageEl) return;
+    const hd=_pageEl.querySelector('.editorHead');
+    const topLimit=(hd && getComputedStyle(hd).position==='sticky') ? hd.getBoundingClientRect().bottom+8 : 8;
+    const bb=document.getElementById('editorBottomBar');
+    const botLimit=(bb && getComputedStyle(bb).display!=='none') ? bb.getBoundingClientRect().top-8 : window.innerHeight-8;
+    if(r.top<topLimit) _pageEl.scrollTop-=(topLimit-r.top);
+    else if(r.bottom>botLimit) _pageEl.scrollTop+=(r.bottom-botLimit);
   }
   function _gotoRow(i,focusNum){
     if(i<0||i>=list.length) return;
@@ -12987,6 +13086,7 @@ function initEditor(examId){
   const _CODE_LETTER={Digit1:'A',Digit2:'B',Digit3:'C',Digit4:'D',Digit5:'E',Numpad1:'A',Numpad2:'B',Numpad3:'C',Numpad4:'D',Numpad5:'E'};
   function _onEditorKey(e){
     if(window._currentPage!=='admin_editor' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    if(e.key==='Escape' && _splitEl && _splitEl.classList.contains('pdfOpen')){ e.preventDefault(); _closePdfSheet(); return; }
     const t=e.target;
     if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     const tm=document.getElementById('tagModal'); if(tm && tm.style.display && tm.style.display!=='none') return;
@@ -13009,6 +13109,7 @@ function initEditor(examId){
     if(letter==='E' && q.optCount!==5){ toast('ข้อนี้ยังไม่มีตัวเลือก จ — กด + ค้าง 2 วิ เพื่อเพิ่ม'); return; }
     q.correct=letter; _setDirty(true);
     if(rowPaint[selectedIndex]) rowPaint[selectedIndex]();
+    _updateWhere();
     _gotoRow(selectedIndex+1); // ไปข้อถัดไปอัตโนมัติ (ข้อสุดท้ายอยู่ที่เดิม)
   }
   document.addEventListener('keydown',_onEditorKey);
@@ -16429,7 +16530,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.60';
+  const CURRENT_VERSION = 'v48.61';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
