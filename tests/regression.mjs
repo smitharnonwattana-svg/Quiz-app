@@ -4820,6 +4820,174 @@ currentSection = 'editorSplit';
   await c8.close();
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: mobileA (v48.74p) — หน้ามือถือแบบ A: กรอกเฉลยเป็นการ์ด + แถบล่าง "ดูโจทย์" + แผ่น PDF จากด้านล่าง
+// (แผ่น/แถบล่าง/หัวพับตั้งค่า ใช้ทุกจอที่ไม่แบ่งจอ ≤900px; การ์ดเฉพาะ ≤600px) + หน้าสร้างข้อสอบไม่ล้นจอ/การ์ด 3 ขั้น
+// ยังอยู่ใน preview — stub PdfViewer.create เหมือน editorSplit
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'mobileA';
+{
+  const MA_FILE = 'index_preview.html';
+  const L = ['A', 'B', 'C', 'D'];
+  const maQs = (n = 20) => Array.from({ length: n }, (_, i) => ({
+    id: 'q' + (i + 1), no: i + 1, number: i + 1, page: Math.ceil((i + 1) / 5), correct: i < 4 ? L[i] : '',
+    choices: { A: '', B: '', C: '', D: '' }, ...(i === 7 ? { optCount: 5 } : {}),
+  }));
+  const maCache = (examExtra = {}) => baseCache({
+    exams: [mkExam('ma1', 'ชุดมือถือ', 'คณิตศาสตร์', { questionCount: 20, pdfUrl: './q.pdf', answerPdfUrl: './a.pdf', ...examExtra })],
+    questions: { ma1: maQs() },
+    examFolders: [{ id: 'fM', subject: 'คณิตศาสตร์', name: 'ชุดกลาง', order: 1 }],
+  });
+  const stubPdf = (page) => page.evaluate(() => {
+    window.__pdf = [];
+    PdfViewer.create = (id) => ({
+      loadUrl: async (u, p) => { window.__pdf.push(['load', id, u, p]); },
+      setPage: (p) => { window.__pdf.push(['page', id, p]); },
+      destroy: () => { window.__pdf.push(['destroy', id]); },
+    });
+  });
+  const open = async (page) => { await page.evaluate(() => navigate('admin_editor', { id: 'ma1' })); await page.waitForTimeout(400); };
+  const selIdx = (page) => page.evaluate(() => [...document.querySelectorAll('#editorTbody tr')].findIndex(t => t.classList.contains('rowActive')));
+  const loads = (page, id) => page.evaluate((id) => window.__pdf.filter(c => c[0] === 'load' && c[1] === id).length, id);
+  const lastPage = (page) => page.evaluate(() => { const p = window.__pdf.filter(c => c[0] === 'page' && c[1] === 'editorPdfViewer'); return p.length ? p[p.length - 1][2] : null; });
+
+  // 1) มือถือ 390px: ตั้งค่าพับ → รายการอยู่ในจอแรก, การ์ด, เลขข้อดำเมื่อมีเฉลย
+  const { ctx, page } = await newSeededPage({ file: MA_FILE, cache: maCache(), viewport: { width: 390, height: 844 } });
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await stubPdf(page);
+  await open(page);
+  const lay = await page.evaluate(() => {
+    const tr = document.querySelector('#editorTbody tr'), tr5 = document.querySelectorAll('#editorTbody tr')[4];
+    const btns = [...tr.querySelectorAll('.correctBtn,.optToggle')].map(b => b.getBoundingClientRect());
+    const no = (r) => getComputedStyle(r.querySelector('td.cNo')).backgroundColor;
+    return {
+      head: getComputedStyle(document.getElementById('editorSetHead')).display,
+      collapsed: document.getElementById('editorSetCard').classList.contains('collapsed'),
+      firstTop: Math.round(tr.getBoundingClientRect().top), th: getComputedStyle(document.querySelector('#page-admin_editor .tableBox thead th')).display,
+      grid: getComputedStyle(tr).display, nBtn: btns.length, sameRow: new Set(btns.map(r => Math.round(r.top))).size, minH: Math.round(Math.min(...btns.map(r => r.height))),
+      noDone: no(tr), noEmpty: no(tr5), bar: getComputedStyle(document.getElementById('editorBottomBar')).display,
+      where: document.getElementById('editorWhereNo').textContent, titleM: document.getElementById('editorTitleM').textContent,
+      ov: document.documentElement.scrollWidth - innerWidth, loadsBefore: window.__pdf.filter(c => c[0] === 'load').length,
+    };
+  });
+  check('mobileA: 390px ตั้งค่าพับไว้ (มี PDF) → แถวข้อแรกอยู่ในจอแรก (เดิมต้องเลื่อน ~970px)', lay.head !== 'none' && lay.collapsed && lay.firstTop < 400, JSON.stringify(lay));
+  check('mobileA: 390px แถวข้อเป็นการ์ด (grid) หัวตารางซ่อน, ปุ่มคำตอบ 5 ช่องแถวเดียว ≥38px, ไม่ล้นแนวนอน', lay.grid === 'grid' && lay.th === 'none' && lay.nBtn === 5 && lay.sameRow === 1 && lay.minH >= 38 && lay.ov <= 0, JSON.stringify(lay));
+  check('mobileA: เลขข้อเป็นวงกลมดำเมื่อมีเฉลย / ไม่ดำเมื่อยังว่าง', lay.noDone === 'rgb(17, 24, 39)' && lay.noEmpty !== lay.noDone, JSON.stringify([lay.noDone, lay.noEmpty]));
+  check('mobileA: หัวแบบย่อแสดงชื่อชุด + แถบล่าง "ข้อ 1" + ยังไม่โหลด PDF จนกว่าจะกดดูโจทย์', lay.titleM === 'ชุดมือถือ' && lay.bar === 'flex' && lay.where === 'ข้อ 1' && lay.loadsBefore === 0, JSON.stringify(lay));
+
+  const guard = await page.evaluate(() => {
+    const t = document.getElementById('toast'), b = document.getElementById('offlineBanner'), h = document.querySelector('#page-admin_editor .editorHead');
+    return { toastPE: t ? getComputedStyle(t).pointerEvents : 'none', banner: !!(b && getComputedStyle(b).display !== 'none'), bannerBottom: b ? Math.round(b.getBoundingClientRect().bottom) : 0, headTop: Math.round(h.getBoundingClientRect().top), saveTop: Math.round(document.getElementById('editorSave').getBoundingClientRect().top) };
+  });
+  check('mobileA: toast ที่จางหายไม่รับการแตะ (เคยบังปุ่ม "ดูโจทย์" มุมขวาล่าง)', guard.toastPE === 'none', JSON.stringify(guard));
+  check('mobileA: แถบ Offline ไม่ทับหัว/ปุ่มบันทึก (หัวเลื่อนลงใต้แถบ)', !guard.banner || (guard.headTop >= guard.bannerBottom - 1 && guard.saveTop >= guard.bannerBottom), JSON.stringify(guard));
+
+  // 2) แตะคำตอบในรายการ → ไฮไลต์ไปข้อถัดไป + ติดธง + แถบล่างตาม
+  await page.locator('#editorTbody tr').nth(4).locator('.correctBtn[data-val="C"]').click();
+  await page.waitForTimeout(150);
+  const tap = await page.evaluate(() => ({ dirty: window._editorDirty, where: document.getElementById('editorWhereNo').textContent, sub: document.getElementById('editorWhereSub').textContent, prog: document.getElementById('editorProgFill').style.width }));
+  check('mobileA: แตะ ค ที่ข้อ 5 → ไฮไลต์ข้อ 6 + ยังไม่บันทึก + แถบล่าง "ข้อ 6 · หน้า 2" + แถบความคืบหน้า 25%', (await selIdx(page)) === 5 && tap.dirty && tap.where === 'ข้อ 6' && tap.sub === 'หน้า 2' && tap.prog === '25%', JSON.stringify([await selIdx(page), tap]));
+
+  // 3) แผ่นดูโจทย์: เปิด → โหลด PDF + เลื่อนไปหน้าของข้อ, ตอบในแผ่น → ตารางได้ค่า + ไปข้อถัดไป + PDF ตาม
+  await page.click('#editorOpenPdfBtn');
+  await page.waitForTimeout(150);
+  const sh = await page.evaluate(() => {
+    const w = document.querySelector('.editorPdfWrap').getBoundingClientRect();
+    return { open: document.getElementById('editorSplit').classList.contains('pdfOpen'), pos: getComputedStyle(document.querySelector('.editorPdfWrap')).position, h: Math.round(w.height), btns: [...document.querySelectorAll('#editorSheetAns .esaBtns button')].map(b => b.textContent), lock: getComputedStyle(document.getElementById('page-admin_editor')).overflowY };
+  });
+  check('mobileA: กด "ดูโจทย์" → แผ่นเลื่อนขึ้น (fixed สูง >60% จอ) ล็อกการเลื่อนหน้า + ปุ่ม ก–ง ของข้อปัจจุบัน', sh.open && sh.pos === 'fixed' && sh.h > 500 && sh.lock === 'hidden' && JSON.stringify(sh.btns) === JSON.stringify(['ก', 'ข', 'ค', 'ง']), JSON.stringify(sh));
+  const firstLoad = await page.evaluate(() => window.__pdf.find(c => c[0] === 'load' && c[1] === 'editorPdfViewer'));
+  check('mobileA: เปิดแผ่นแล้วค่อยโหลด PDF โจทย์ (1 ครั้ง) โดยเปิดที่หน้า 2 ของข้อ 6', (await loads(page, 'editorPdfViewer')) === 1 && firstLoad && firstLoad[3] === 2, JSON.stringify(firstLoad));
+  await page.locator('#editorSheetAns .esaBtns button').nth(1).click();
+  await page.waitForTimeout(100);
+  const sa = await page.evaluate(() => ({ q6: (document.querySelectorAll('#editorTbody tr')[5].querySelector('.correctBtn.selected') || {}).dataset?.val, nav: document.querySelector('#editorSheetAns .esaNav b').textContent }));
+  check('mobileA: กด ข ในแผ่น → ข้อ 6 ในรายการได้ ข + แผ่นไปข้อ 7', sa.q6 === 'B' && sa.nav === 'ข้อ 7' && (await selIdx(page)) === 6, JSON.stringify(sa));
+  await page.click('#editorSheetAns [data-esa="next"]');
+  const five = await page.evaluate(() => [...document.querySelectorAll('#editorSheetAns .esaBtns button')].map(b => b.textContent));
+  check('mobileA: › ไปข้อ 8 (มีตัวเลือก จ) → แผ่นแสดง ก ข ค ง จ', JSON.stringify(five) === JSON.stringify(['ก', 'ข', 'ค', 'ง', 'จ']), JSON.stringify(five));
+  await page.click('#editorSheetAns [data-esa="next"]'); await page.click('#editorSheetAns [data-esa="next"]'); await page.click('#editorSheetAns [data-esa="next"]');
+  check('mobileA: เลื่อนข้อในแผ่นข้ามหน้า (ข้อ 11) → PDF เลื่อนไปหน้า 3', (await lastPage(page)) === 3, String(await lastPage(page)));
+  await page.click('#editorTabAnswer');
+  check('mobileA: แท็บเฉลยในแผ่น → โหลด PDF เฉลย', (await loads(page, 'editorAnswerPdfViewer')) === 1, String(await loads(page, 'editorAnswerPdfViewer')));
+  await page.click('#editorTabQuestion');
+  await page.click('#editorSheetScrim', { position: { x: 20, y: 40 } });
+  const closed = await page.evaluate(() => ({ open: document.getElementById('editorSplit').classList.contains('pdfOpen'), lock: getComputedStyle(document.getElementById('page-admin_editor')).overflowY }));
+  check('mobileA: แตะฉากหลัง → ปิดแผ่น + ปลดล็อกการเลื่อน', !closed.open && closed.lock !== 'hidden', JSON.stringify(closed));
+  await page.click('#editorOpenPdfBtn');
+  await page.keyboard.press('Escape');
+  check('mobileA: เปิดซ้ำไม่โหลด PDF ใหม่ + Esc ปิดแผ่น', (await loads(page, 'editorPdfViewer')) === 1 && !(await page.evaluate(() => document.getElementById('editorSplit').classList.contains('pdfOpen'))));
+  await page.click('#editorSave');
+  const saved = await page.evaluate(() => { const q = Store.load().questions.ma1; return [q[4].correct, q[5].correct, Object.keys(q[5]).sort().join(',')]; });
+  check('mobileA: กดบันทึก → store ได้ค่าจากรายการ+แผ่น (ข้อ 5=C, ข้อ 6=B) รูปแบบข้อมูลเดิม', saved[0] === 'C' && saved[1] === 'B' && saved[2] === 'choices,correct,id,no,number,page', JSON.stringify(saved));
+  page.removeAllListeners('dialog'); page.on('dialog', d => d.accept());
+  await page.click('#editorOpenPdfBtn');
+  await page.evaluate(() => navigate('admin_exams'));
+  const left = await page.evaluate(() => ({ p: window._currentPage, open: document.getElementById('editorSplit').classList.contains('pdfOpen'), sheetCls: document.getElementById('page-admin_editor').classList.contains('sheetOpen') }));
+  check('mobileA: ออกจากหน้าขณะแผ่นเปิด → แผ่นถูกปิด/เก็บกวาด', left.p === 'admin_exams' && !left.open && !left.sheetCls, JSON.stringify(left));
+  check('mobileA: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+  await ctx.close();
+
+  // 4) ไม่มี PDF → ปุ่ม "ยังไม่มี PDF" กดแล้วกางตั้งค่า ไม่เปิดแผ่น; ข้อสอบเติมตัวเลขในแผ่น
+  const { ctx: c4, page: p4 } = await newSeededPage({ file: MA_FILE, cache: maCache({ pdfUrl: '', answerPdfUrl: '' }), viewport: { width: 390, height: 844 } });
+  await stubPdf(p4); await open(p4);
+  const lbl = await p4.evaluate(() => document.getElementById('editorOpenPdfLbl').textContent);
+  await p4.click('#editorOpenPdfBtn');
+  const np = await p4.evaluate(() => ({ open: document.getElementById('editorSplit').classList.contains('pdfOpen'), set: !document.getElementById('editorSetCard').classList.contains('collapsed'), calls: window.__pdf.length }));
+  check('mobileA: ไม่มี PDF → ปุ่ม "ยังไม่มี PDF" กดแล้วไม่เปิดแผ่น แต่กางตั้งค่าให้ใส่ PDF', lbl === 'ยังไม่มี PDF' && !np.open && np.set && np.calls === 0, JSON.stringify([lbl, np]));
+  await c4.close();
+  const { ctx: c5, page: p5 } = await newSeededPage({ file: MA_FILE, cache: maCache({ examType: 'fillblank-num', numDigits: 3 }), viewport: { width: 390, height: 844 } });
+  await stubPdf(p5); await open(p5);
+  await p5.click('#editorOpenPdfBtn');
+  await p5.fill('#editorSheetAns .esaNum input', '125');
+  await p5.click('#editorSheetAns [data-esa="numNext"]');
+  const fn = await p5.evaluate(() => ({ v: document.querySelector('#editorTbody tr input[data-field="correctNum"]').value, nav: document.querySelector('#editorSheetAns .esaNav b').textContent, dirty: window._editorDirty }));
+  check('mobileA: เติมตัวเลขในแผ่น: พิมพ์ 125 + ถัดไป → ข้อ 1 ได้ 125 แล้วไปข้อ 2', fn.v === '125' && fn.nav === 'ข้อ 2' && fn.dirty, JSON.stringify(fn));
+  await c5.close();
+
+  // 5) iPad แนวตั้ง 820px: มีหัวพับ/แถบล่าง/แผ่น แต่ตารางแบบเดิม (คอลัมน์ Tag เห็น) ; 1180px: ไม่มีแถบล่าง (แบ่งจอเดิม)
+  const { ctx: c6, page: p6 } = await newSeededPage({ file: MA_FILE, cache: maCache(), viewport: { width: 820, height: 1180 } });
+  await stubPdf(p6); await open(p6);
+  const ip = await p6.evaluate(() => ({ bar: getComputedStyle(document.getElementById('editorBottomBar')).display, tr: getComputedStyle(document.querySelector('#editorTbody tr')).display, tag: getComputedStyle(document.querySelectorAll('#page-admin_editor .tableBox thead th')[5]).display, sticky: getComputedStyle(document.querySelector('#page-admin_editor .editorHead')).position }));
+  await p6.click('#editorOpenPdfBtn');
+  const ipOpen = await p6.evaluate(() => getComputedStyle(document.querySelector('.editorPdfWrap')).position);
+  check('mobileA: 820px มีแถบล่าง + หัวติดบน + แผ่นดูโจทย์ แต่ตารางแบบเดิม (คอลัมน์ Tag ยังเห็น)', ip.bar === 'flex' && ip.tr === 'table-row' && ip.tag !== 'none' && ip.sticky === 'sticky' && ipOpen === 'fixed', JSON.stringify([ip, ipOpen]));
+  await c6.close();
+  const { ctx: c7, page: p7 } = await newSeededPage({ file: MA_FILE, cache: maCache(), viewport: { width: 1180, height: 820 } });
+  await stubPdf(p7); await open(p7);
+  const dk = await p7.evaluate(() => ({ bar: getComputedStyle(document.getElementById('editorBottomBar')).display, sheetAns: getComputedStyle(document.getElementById('editorSheetAns')).display, pos: getComputedStyle(document.querySelector('.editorPdfWrap')).position, loads: window.__pdf.filter(c => c[0] === 'load').length }));
+  check('mobileA: 1180px แบ่งจอเหมือนเดิม — ไม่มีแถบล่าง/แถวตอบในแผ่น, PDF โหลดทันทีฝั่งซ้าย', dk.bar === 'none' && dk.sheetAns === 'none' && dk.pos !== 'fixed' && dk.loads === 1, JSON.stringify(dk));
+  await c7.close();
+
+  // 6) หน้าสร้างข้อสอบบนมือถือ
+  const { ctx: c8, page: p8 } = await newSeededPage({ file: MA_FILE, cache: baseCache({ examFolders: [{ id: 'fM', subject: 'คณิตศาสตร์', name: 'ชุดกลาง', order: 1 }] }), viewport: { width: 390, height: 844 } });
+  const nErrs = []; p8.on('pageerror', e => nErrs.push(e.message));
+  await p8.evaluate(() => navigate('admin_new'));
+  await p8.waitForTimeout(200);
+  const nf = await p8.evaluate(() => ({ ov: document.getElementById('page-admin_new').scrollWidth - innerWidth, steps: document.querySelectorAll('#page-admin_new .newStep').length, chips: document.querySelectorAll('#newSubjChips button').length, sel: getComputedStyle(document.getElementById('newSubjectSelect')).display, cta: Math.round(document.getElementById('newCreateBtn').getBoundingClientRect().bottom) }));
+  check('mobileA: หน้าสร้าง 390px ไม่ล้นจอ (เดิมล้นขวา), การ์ด 3 ขั้น, ชิปวิชาแทน dropdown, ปุ่มสร้างอยู่ในจอเสมอ', nf.ov <= 0 && nf.steps === 3 && nf.chips === 7 && nf.sel === 'none' && nf.cta <= 844, JSON.stringify(nf));
+  await p8.click('#newSubjChips button[data-val="คณิตศาสตร์"]');
+  const ch = await p8.evaluate(() => ({ v: document.getElementById('newSubjectSelect').value, pressed: document.querySelector('#newSubjChips button[data-val="คณิตศาสตร์"]').getAttribute('aria-pressed'), folder: getComputedStyle(document.getElementById('newFolderWrap')).display, ov: document.getElementById('page-admin_new').scrollWidth - innerWidth }));
+  check('mobileA: แตะชิปวิชา → select ได้ค่า + ชิปติด + ช่องโฟลเดอร์โผล่ (ยังไม่ล้นจอ)', ch.v === 'คณิตศาสตร์' && ch.pressed === 'true' && ch.folder !== 'none' && ch.ov <= 0, JSON.stringify(ch));
+  await p8.click('[data-step-for="newQCount"][data-step="1"]');
+  await p8.evaluate(() => { document.getElementById('newAdvanced').open = true; });
+  await p8.click('[data-step-for="newMinutes"][data-step="-5"]');
+  const st = await p8.evaluate(() => ({ q: document.getElementById('newQCount').value, m: document.getElementById('newMinutes').value, sum: document.getElementById('newAdvancedSummary').textContent }));
+  check('mobileA: ปุ่ม − + เปลี่ยนจำนวนข้อ (51) และเวลา (40 นาที) + สรุปตั้งค่าอัปเดต', st.q === '51' && st.m === '40' && /เวลา 40 นาที/.test(st.sum), JSON.stringify(st));
+  await p8.fill('#newPdfUrl', 'https://drive.google.com/file/d/abc/view');
+  const tile = await p8.evaluate(() => ({ cls: document.getElementById('newPdfTile').className, sub: document.querySelector('#newPdfTile .newTileSub').textContent }));
+  check('mobileA: ใส่ลิงก์ PDF → กล่อง PDF โจทย์ขึ้นสีเขียว "มีลิงก์แล้ว"', /done/.test(tile.cls) && /มีลิงก์แล้ว/.test(tile.sub), JSON.stringify(tile));
+  await p8.fill('#newTitle', 'ชุดสร้างบนมือถือ');
+  await p8.click('#newCreateBtn');
+  await p8.waitForTimeout(700);
+  const made = await p8.evaluate(() => { const e = Store.load().exams.find(x => x.title === 'ชุดสร้างบนมือถือ'); return { p: window._currentPage, n: e && Store.load().questions[e.id].length, d: e && e.durationSeconds, pdf: e && e.pdfUrl, s: e && e.subject }; });
+  check('mobileA: สร้างจากมือถือ → ได้ข้อสอบตามค่าที่กรอก (51 ข้อ/40 นาที/ลิงก์ PDF/วิชา) แล้วเข้าหน้ากรอกเฉลย', made.p === 'admin_editor' && made.n === 51 && made.d === 2400 && /drive\.google/.test(made.pdf) && made.s === 'คณิตศาสตร์', JSON.stringify(made));
+  await p8.evaluate(() => navigate('admin_new'));
+  const rs = await p8.evaluate(() => ({ pressed: [...document.querySelectorAll('#newSubjChips button')].filter(b => b.getAttribute('aria-pressed') === 'true').length, tile: document.getElementById('newPdfTile').className }));
+  check('mobileA: กลับเข้าหน้าสร้าง → ชิปวิชา/กล่อง PDF รีเซ็ต', rs.pressed === 0 && !/done/.test(rs.tile), JSON.stringify(rs));
+  check('mobileA: หน้าสร้างไม่มี error', nErrs.length === 0, JSON.stringify(nErrs));
+  await c8.close();
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
