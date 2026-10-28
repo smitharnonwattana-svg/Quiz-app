@@ -5090,6 +5090,115 @@ currentSection = 'summaryShot';
   await ctx.close();
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: shareExam (v48.77p) — ปุ่ม "ส่งให้ลูก" ในหน้ารายการข้อสอบ (admin_exams): 📤 ฝากการบ้าน / 🔗 แชร์ลิงก์
+// + ลิงก์ชี้หน้าจริงเสมอ, จำข้อสอบเป้าหมายข้ามรีโหลดอัตโนมัติ (?_v=), แบนเนอร์ login ทั่วไป, "กำลังโหลด" แทน "ไม่พบ" บนเครื่องใหม่
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'shareExam';
+{
+  const SH_FILE = 'index_preview.html';
+  const PROD = 'https://smitharnonwattana-svg.github.io/Quiz-app/';
+  const mk = (id, title, pub) => ({ id, title, subject: 'วิทยาศาสตร์', questionCount: 3, published: pub, order: 1, durationSeconds: 600, examType: 'mc', uploadedAt: Date.now(), pdfUrl: 'https://x/y.pdf' });
+  const cache = () => baseCache({
+    exams: [mk('sa1', 'ตะลุยโจทย์ วิทย์ A ชุด 1', true), mk('sa2', 'ชุดซ่อน', false)],
+    questions: { sa1: mkQ(), sa2: mkQ() }, members: [{ pin: '311257', name: 'ณนนท์' }],
+  });
+  const toastText = (page) => page.evaluate(() => document.getElementById('toast').textContent);
+
+  // 1) เดสก์ท็อป: ทุกแถวมี 2 ปุ่ม + ปุ่มเดิมครบ + ไม่ล้นจอ; ฝากการบ้าน → modal → สร้างการบ้าน
+  const { ctx, page } = await newSeededPage({ file: SH_FILE, cache: cache(), viewport: { width: 1440, height: 900 } });
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.evaluate(() => navigate('admin_exams')); await page.waitForTimeout(400);
+  const d = await page.evaluate(() => ({ a: document.querySelectorAll('#adminTbody [data-assign]').length, s: document.querySelectorAll('#adminTbody [data-share]').length, old: ['data-edit', 'data-backfill', 'data-del'].map(k => document.querySelectorAll(`#adminTbody [${k}]`).length), ths: [...document.querySelectorAll('#page-admin_exams thead th')].map(t => t.textContent.trim()), ov: (() => { const w = document.querySelector('#page-admin_exams .tableWrap'); return w.scrollWidth - w.clientWidth; })(), titleW: Math.round(document.querySelector('#adminTbody tr td').getBoundingClientRect().width) }));
+  check('shareExam: admin_exams ทุกแถวมีปุ่ม "ฝากการบ้าน" + "แชร์ลิงก์" (คอลัมน์ "ส่งให้ลูก") และปุ่มเดิมครบ ไม่ล้นจอ', d.a === 2 && d.s === 2 && d.old.every(n => n === 2) && d.ths.includes('ส่งให้ลูก') && d.ov <= 0, JSON.stringify(d));
+  check('shareExam: จอกว้าง (1440px) คอลัมน์ชื่อชุดกว้างพอ ไม่ถูกบีบจนตัดคำทีละคำ (≥200px)', d.titleW >= 200, String(d.titleW));
+  await page.click('#adminTbody [data-assign="sa1"]');
+  const mod = await page.evaluate(() => ({ has: !!document.getElementById('assignModal'), txt: (document.getElementById('assignModal') || {}).textContent || '' }));
+  check('shareExam: กด "ฝากการบ้าน" → เปิด modal ส่งการบ้านของข้อสอบนั้น (ชื่อข้อสอบ + รายชื่อเด็ก + ปุ่มส่งให้)', mod.has && /ตะลุยโจทย์ วิทย์ A ชุด 1/.test(mod.txt) && /ณนนท์/.test(mod.txt) && /ส่งให้/.test(mod.txt), mod.txt.replace(/\s+/g, ' ').slice(0, 200));
+  await page.evaluate(() => [...document.querySelectorAll('#assignModal button')].find(b => b.textContent.trim() === 'ส่งให้').click());
+  await page.waitForTimeout(200);
+  const asg = await page.evaluate(() => (Store.load().assignments || []).map(a => [a.examId, a.assignedTo, a.status]));
+  check('shareExam: กด "ส่งให้" → เกิดการบ้านของเด็ก (examId/ชื่อ/pending) ตามระบบเดิม', asg.length === 1 && asg[0][0] === 'sa1' && asg[0][1] === 'ณนนท์' && asg[0][2] === 'pending', JSON.stringify(asg));
+  await page.evaluate(() => document.getElementById('assignModal')?.remove());
+  await page.click('#adminTbody [data-assign="sa2"]');
+  check('shareExam: ข้อสอบที่ซ่อนอยู่ → เตือนครู (ไม่บล็อก) ตอนฝากการบ้าน', /ซ่อนอยู่/.test(await toastText(page)), await toastText(page));
+  await page.evaluate(() => document.getElementById('assignModal')?.remove());
+
+  // 2) แชร์ลิงก์: navigator.share เรียกด้วยลิงก์หน้าจริง (แม้เปิดจาก localhost/preview), fallback คัดลอก, ยกเลิกไม่แจ้ง error
+  const setup = (mode) => page.evaluate((mode) => {
+    window.__shared = []; window.__copied = []; window.__prompts = [];
+    window.prompt = (m, t) => { window.__prompts.push(t); return null; };
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t) => { window.__copied.push(t); } }, configurable: true });
+    if (mode === 'ok') navigator.share = async (x) => { window.__shared.push(x); };
+    else if (mode === 'abort') navigator.share = async (x) => { window.__shared.push(x); const e = new Error('x'); e.name = 'AbortError'; throw e; };
+    else if (mode === 'fail') navigator.share = async (x) => { window.__shared.push(x); throw new Error('boom'); };
+    else navigator.share = undefined;
+  }, mode);
+  await setup('ok');
+  await page.click('#adminTbody [data-share="sa1"]'); await page.waitForTimeout(100);
+  const sh = await page.evaluate(() => ({ n: window.__shared.length, d: window.__shared[0], here: location.origin + location.pathname }));
+  check('shareExam: กด "แชร์ลิงก์" → เมนูแชร์ได้ลิงก์หน้าจริงเสมอ (ไม่ใช่ URL ของหน้าที่เปิดอยู่) + ชื่อ/ข้อความ', sh.n === 1 && sh.d.url === PROD + '?exam=sa1' && !sh.here.startsWith(PROD) && /ตะลุยโจทย์ วิทย์ A ชุด 1/.test(sh.d.title) && /PIN/.test(sh.d.text), JSON.stringify(sh));
+  await setup('none');
+  await page.click('#adminTbody [data-share="sa1"]'); await page.waitForTimeout(100);
+  const cp = await page.evaluate(() => window.__copied);
+  check('shareExam: เบราว์เซอร์ไม่มีเมนูแชร์ → คัดลอกข้อความ+ลิงก์ลงคลิปบอร์ด + toast', cp.length === 1 && cp[0].includes(PROD + '?exam=sa1') && /คัดลอก/.test(await toastText(page)), JSON.stringify(cp));
+  await setup('abort');
+  await page.click('#adminTbody [data-share="sa1"]'); await page.waitForTimeout(100);
+  check('shareExam: ผู้ใช้ปิดเมนูแชร์ (AbortError) → ไม่คัดลอก/ไม่แจ้ง error', (await page.evaluate(() => window.__copied.length)) === 0, '');
+  await setup('fail');
+  await page.click('#adminTbody [data-share="sa1"]'); await page.waitForTimeout(150);
+  check('shareExam: แชร์ล้มเหลวจริง → ถอยไปคัดลอกลิงก์ให้', (await page.evaluate(() => window.__copied.length)) === 1, '');
+  await setup('ok');
+  await page.click('#adminTbody [data-share="sa2"]');
+  check('shareExam: แชร์ข้อสอบที่ซ่อนอยู่ → เตือนครู (ยังแชร์ได้)', /ซ่อนอยู่/.test(await toastText(page)) && (await page.evaluate(() => window.__shared.length)) === 1, await toastText(page));
+  // ปุ่มคัดลอกลิงก์เดิมในหน้ารายการข้อสอบก็ใช้ลิงก์หน้าจริงเหมือนกัน
+  await setup('none');
+  await page.evaluate(() => copyExamLink({ dataset: { examid: 'sa1', title: 'ชุด 1' } }, { stopPropagation() {} }));
+  await page.waitForTimeout(100);
+  check('shareExam: ปุ่มคัดลอกลิงก์เดิม (หน้ารายการข้อสอบ) ใช้ลิงก์หน้าจริงด้วย', (await page.evaluate(() => window.__copied.map(t => t.includes('https://smitharnonwattana-svg.github.io/Quiz-app/?exam=sa1')))).every(Boolean) && (await page.evaluate(() => window.__copied.length)) >= 1, '');
+  await ctx.close();
+
+  // 3) มือถือ 390px: การ์ดมี 2 ปุ่ม ไม่ล้นจอ
+  const { ctx: cm, page: pm } = await newSeededPage({ file: SH_FILE, cache: cache(), viewport: { width: 390, height: 844 } });
+  await pm.evaluate(() => navigate('admin_exams')); await pm.waitForTimeout(400);
+  const mo = await pm.evaluate(() => ({ a: document.querySelectorAll('[data-assign]').length, s: document.querySelectorAll('[data-share]').length, ov: document.getElementById('page-admin_exams').scrollWidth - innerWidth, h: Math.round(document.querySelector('[data-share]').getBoundingClientRect().height) }));
+  check('shareExam: มือถือ 390px การ์ดข้อสอบมี 2 ปุ่ม (กดง่าย ≥36px) ไม่ล้นจอ', mo.a === 2 && mo.s === 2 && mo.ov <= 0 && mo.h >= 36, JSON.stringify(mo));
+  await cm.close();
+
+  // 4) ลิงก์ ?exam=ID: จำข้อสอบข้ามรีโหลดอัตโนมัติ, หมดอายุ, แบนเนอร์ทั่วไป, ล็อกอินแล้วพาไปข้อสอบ + "กำลังโหลด"
+  const { ctx: c4, page: p4 } = await newSeededPage({ file: SH_FILE + '?exam=sa1', cache: baseCache(), viewport: { width: 390, height: 844 } });
+  const boot = await p4.evaluate(() => ({ pend: window._pendingExamId, ls: JSON.parse(localStorage.getItem('nanont:pendingExam') || 'null'), hint: getComputedStyle(document.getElementById('loginExamHint')).display, title: document.getElementById('loginExamHintTitle').textContent, url: location.search }));
+  check('shareExam: เปิดลิงก์ ?exam=ID → จำ id (หน่วยความจำ + localStorage), ตัด ?exam= ออกจากแถบ URL, แบนเนอร์ login ขึ้นข้อความทั่วไปเมื่อเครื่องไม่มีข้อมูลข้อสอบ', boot.pend === 'sa1' && boot.ls && boot.ls.id === 'sa1' && boot.hint === 'block' && boot.title === 'ข้อสอบที่ครูส่งให้' && boot.url === '', JSON.stringify(boot));
+  const logout = () => p4.evaluate(() => { localStorage.removeItem('appSession'); sessionStorage.removeItem('appSession'); });
+  await logout(); // เครื่องของเด็กที่ยังไม่ได้ล็อกอิน (ถ้าล็อกอินอยู่แล้วจะถูกพาเข้าข้อสอบทันที — ตรวจแยกด้านล่าง)
+  await p4.goto(BASE + '/' + SH_FILE + '?_v=123', { waitUntil: 'domcontentloaded' }); await p4.waitForTimeout(600);
+  const rl = await p4.evaluate(() => window._pendingExamId);
+  check('shareExam: แอปรีโหลดตัวเองตอนอัปเวอร์ชัน (?_v=) → ยังจำข้อสอบที่จะเปิดได้ (เดิมหายเพราะ ?exam= ถูกตัด)', rl === 'sa1', String(rl));
+  await logout();
+  await p4.goto(BASE + '/' + SH_FILE, { waitUntil: 'domcontentloaded' }); await p4.waitForTimeout(600);
+  const plain = await p4.evaluate(() => window._pendingExamId || null);
+  check('shareExam: เปิดแอปตามปกติภายหลัง (ไม่มี ?exam=/?_v=) → ไม่ถูกพาไปข้อสอบเก่า', plain === null, String(plain));
+  await p4.evaluate(() => localStorage.setItem('nanont:pendingExam', JSON.stringify({ id: 'sa1', ts: Date.now() - 11 * 60 * 1000 })));
+  await logout();
+  await p4.goto(BASE + '/' + SH_FILE + '?_v=456', { waitUntil: 'domcontentloaded' }); await p4.waitForTimeout(600);
+  check('shareExam: ค่าที่จำไว้เกิน 10 นาที → ไม่ใช้', (await p4.evaluate(() => window._pendingExamId || null)) === null, '');
+  await logout();
+  await p4.goto(BASE + '/' + SH_FILE + '?exam=sa1', { waitUntil: 'domcontentloaded' }); await p4.waitForTimeout(800);
+  await p4.evaluate(() => { _pinVal = '134140'; doLogin(); }); // PIN ครู (PIN เด็กมาจากรายชื่อสมาชิกซึ่งเครื่องทดสอบที่ยังไม่โหลดข้อมูลไม่มี)
+  await p4.waitForTimeout(500);
+  const lg = await p4.evaluate(() => ({ page: window._currentPage, ls: localStorage.getItem('nanont:pendingExam'), txt: document.getElementById('examDetailWrap').textContent.replace(/\s+/g, ' '), cloud: !!Store._cloudLoaded }));
+  check('shareExam: ใส่ PIN แล้วพาไปหน้าข้อสอบ + ล้างค่าที่จำ; เครื่องใหม่ยังไม่โหลดข้อมูล → "กำลังโหลดข้อมูล" (ไม่ใช่ "ไม่พบข้อสอบ")', lg.page === 'exam' && lg.ls === null && /กำลังโหลดข้อมูล/.test(lg.txt) && !/ไม่พบข้อสอบ/.test(lg.txt), JSON.stringify(lg));
+  // เด็กล็อกอินอยู่แล้ว (เซสชันยังอยู่) เปิดลิงก์ → เข้าหน้าข้อสอบทันที (ไม่ต้องใส่ PIN ซ้ำ) และล้างค่าที่จำ
+  await p4.evaluate(() => localStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })));
+  await p4.goto(BASE + '/' + SH_FILE + '?exam=sa1', { waitUntil: 'domcontentloaded' }); await p4.waitForTimeout(800);
+  const direct = await p4.evaluate(() => ({ page: window._currentPage, ls: localStorage.getItem('nanont:pendingExam') }));
+  check('shareExam: เปิดลิงก์ตอนล็อกอินอยู่แล้ว → เข้าหน้าข้อสอบทันที + ล้างค่าที่จำ', direct.page === 'exam' && direct.ls === null, JSON.stringify(direct));
+  await p4.evaluate(() => { Store._cloudLoaded = true; navigate('exam', { id: 'sa1' }); });
+  check('shareExam: โหลดเสร็จแล้วยังไม่มีข้อสอบนี้จริง → "ไม่พบข้อสอบ"', /ไม่พบข้อสอบ/.test(await p4.evaluate(() => document.getElementById('examDetailWrap').textContent)), '');
+  await c4.close();
+  check('shareExam: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
