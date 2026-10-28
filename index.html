@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.62 -->
+  <!-- APP_VERSION: v48.63 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -66,6 +66,15 @@
     #page-admin_exams .tableWrap table td:first-child{width:55px;}
     #page-admin_exams .tableWrap table [data-edit],
     #page-admin_exams .tableWrap table [data-backfill]{white-space:nowrap;padding-left:6px;padding-right:6px;font-size:12px;}
+    /* v48.63: คอลัมน์ "ส่งให้ลูก" (2 ปุ่มเรียงบน-ล่าง) + ขยายหน้าให้ชื่อชุดไม่ถูกบีบ (เดิมคอลัมน์ชื่อเหลือ ~70px ตัดคำทีละคำ) */
+    #page-admin_exams .container{max-width:1400px;}
+    #page-admin_exams .tableWrap table [data-assign],
+    #page-admin_exams .tableWrap table [data-share]{white-space:nowrap;padding:6px 8px;font-size:12px;width:100%;}
+    .sendCol{display:flex;flex-direction:column;gap:6px;}
+    @media (min-width:1360px){
+      #page-admin_exams .tableWrap table th:first-child,
+      #page-admin_exams .tableWrap table td:first-child{width:230px;}
+    }
     th,td{padding:10px 12px;border-top:1px solid var(--border);vertical-align:top;text-align:left;}
     thead th{background:var(--bg);border-top:none;position:sticky;top:0;z-index:1;}
     .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);}
@@ -1439,7 +1448,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.62</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.63</div>
     </div>
   </div>
 </div>
@@ -2019,16 +2028,17 @@
         <thead>
           <tr>
             <th>ชื่อชุด</th>
-            <th style="width:145px;">วิชา</th>
-            <th style="width:135px;">โฟลเดอร์</th>
-            <th style="width:110px;">จัดลำดับ</th>
+            <th style="width:120px;">วิชา</th>
+            <th style="width:125px;">โฟลเดอร์</th>
+            <th style="width:80px;">จัดลำดับ</th>
             <th style="width:148px;">สถานะ</th>
-            <th style="width:70px;">ข้อ</th>
-            <th style="width:135px;">อัพโหลด</th>
-            <th style="width:60px;">PDF</th>
-            <th style="width:110px;">แก้ไข</th>
-            <th style="width:110px;">ย้อนหลัง</th>
-            <th style="width:70px;">ลบ</th>
+            <th style="width:56px;">ข้อ</th>
+            <th style="width:112px;">อัพโหลด</th>
+            <th style="width:54px;">PDF</th>
+            <th style="width:104px;">แก้ไข</th>
+            <th style="width:104px;">ย้อนหลัง</th>
+            <th style="width:124px;">ส่งให้ลูก</th>
+            <th style="width:60px;">ลบ</th>
           </tr>
         </thead>
         <tbody id="adminTbody"></tbody>
@@ -5260,20 +5270,25 @@ function _showAssignModal(examId, examTitle, examSubject) {
   const s = Store.load();
   const assignments = s.assignments || [];
 
-  const itemsHtml = members.map(m => {
-    const pendingCount = assignments.filter(
-      a => a.assignedTo === m.name && a.status === 'pending'
-    ).length;
-    const blocked = pendingCount >= 3;
+  // v48.63: เด็กที่ได้รับการบ้านชุดนี้ไปแล้ว (pending) → "ส่งแล้ว" + ปุ่มยกเลิก แทนปุ่ม "ส่งให้" (ห้ามส่งซ้ำ)
+  // ปุ่มใช้ data-* + listener (ไม่ฝังชื่อ/ชื่อชุดเป็นสตริงใน onclick — ชื่อที่มี ' หรือ " ทำให้ปุ่มพัง)
+  const itemsHtml = members.map((m, i) => {
+    const mine = assignments.filter(a => a.assignedTo === m.name && a.status === 'pending');
+    const sent = mine.find(a => a.examId === examId);
+    const blocked = mine.length >= 3;
     return `
-      <div style="display:flex;justify-content:space-between;align-items:center;
-        padding:10px 14px;border-bottom:1px solid #f3f4f6;">
+      <div data-asg-row="${esc(m.name)}" style="display:flex;justify-content:space-between;align-items:center;
+        padding:10px 14px;border-bottom:1px solid #f3f4f6;gap:8px;">
         <div style="font-size:14px;color:#374151;">${esc(m.name)}</div>
-        ${blocked
+        ${sent
+          ? `<div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:#6b7280;">✓ ส่งแล้ว</span>
+              <button class="btn" data-asg-cancel="${esc(sent.id)}" style="font-size:12px;padding:4px 12px;
+                color:#D70015;border-color:#D70015;">ยกเลิก</button>
+            </div>`
+          : blocked
           ? `<span style="font-size:12px;color:#9ca3af;">มีการบ้านค้างอยู่ 3 ชุดแล้ว</span>`
-          : `<button class="btn btnPrimary" style="font-size:12px;padding:4px 12px;"
-              onclick="_assignToStudent('${esc(m.name)}','${esc(examId)}','${esc(examTitle)}','${esc(examSubject)}')">
-              ส่งให้</button>`
+          : `<button class="btn btnPrimary" data-asg-to="${i}" style="font-size:12px;padding:4px 12px;">ส่งให้</button>`
         }
       </div>
     `;
@@ -5300,12 +5315,36 @@ function _showAssignModal(examId, examTitle, examSubject) {
     </div>
   `;
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelectorAll('[data-asg-to]').forEach(btn => btn.addEventListener('click', () => {
+    _assignToStudent(members[Number(btn.dataset.asgTo)].name, examId, examTitle, examSubject);
+  }));
+  modal.querySelectorAll('[data-asg-cancel]').forEach(btn => btn.addEventListener('click', () => {
+    _cancelAssignmentInModal(btn.dataset.asgCancel);
+  }));
   document.body.appendChild(modal);
+}
+
+// v48.63: ยกเลิกการบ้านจาก modal ส่งการบ้าน (ถูกเรียกจากหน้าอื่นที่ไม่ใช่หน้าแรก จึงไม่ renderHome เหมือน _cancelAssignment ของกระดิ่ง)
+function _cancelAssignmentInModal(assignId) {
+  if (!confirm('ยกเลิกการบ้านนี้?')) return;
+  const s = Store.load();
+  const a = (s.assignments||[]).find(x => x.id === assignId);
+  if (a) { a.status = 'cancelled'; Store.save(s); }
+  const modal = document.getElementById('assignModal');
+  if (modal) modal.remove();
+  toast('✅ ยกเลิกการบ้านแล้ว');
 }
 
 function _assignToStudent(studentName, examId, examTitle, examSubject) {
   const s = Store.load();
   const assignments = s.assignments || [];
+  // v48.63: ชุดนี้ส่งให้เด็กคนนี้ไปแล้ว (ยัง pending) → ไม่สร้างซ้ำ (กดรัว / modal ค้าง / ลิงก์เก่า)
+  if (assignments.some(a => a.assignedTo === studentName && a.examId === examId && a.status === 'pending')) {
+    const modal0 = document.getElementById('assignModal');
+    if (modal0) modal0.remove();
+    toast('ส่งการบ้านชุดนี้ให้ ' + studentName + ' ไปแล้ว');
+    return;
+  }
   const pendingCount = assignments.filter(
     a => a.assignedTo === studentName && a.status === 'pending'
   ).length;
@@ -5556,6 +5595,7 @@ function doLogin() {
   _updatePinDots(false);
   const _pendingId = window._pendingExamId || null;
   window._pendingExamId = null;
+  if (_pendingId && typeof _clearPendingExam === 'function') _clearPendingExam();
   navigate(_pendingId ? 'exam' : 'home', _pendingId ? {id: _pendingId} : {});
   const _loginName = Auth.getName();
   if (_loginName && !Auth.isTeacher()) {
@@ -6464,7 +6504,11 @@ function initExamDetail(id){
   const s=Store.load();
   const exam=s.exams.find(e=>e.id===id);
   const wrap=document.getElementById('examDetailWrap');
-  if(!exam){wrap.innerHTML=`<h1 class="h1">ไม่พบข้อสอบ</h1>`;return;}
+  if(!exam){
+    // v48.63: เครื่องใหม่ที่เปิดจากลิงก์ — ข้อมูลยังไม่ถึงจาก cloud อย่าแจ้ง "ไม่พบ" (หน้านี้จะรีเฟรชเองหลังโหลดเสร็จ)
+    wrap.innerHTML=Store._cloudLoaded?`<h1 class="h1">ไม่พบข้อสอบ</h1>`:`<h1 class="h1">กำลังโหลดข้อมูล…</h1><div class="muted" style="margin-top:6px;">รอสักครู่ ระบบกำลังดึงข้อสอบ</div>`;
+    return;
+  }
   wrap.innerHTML=`
     <h1 class="h1">${esc(exam.title)}</h1>
     <div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
@@ -10442,6 +10486,10 @@ function initAdminExams(){
             ${(()=>{const rf=(s.examFolders||[]).filter(f=>f.subject===(e.subject||'ไม่ระบุ'));
               return rf.length?`<div style="margin-bottom:8px;"><select class="folderSel" data-folder="${e.id}" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;font-size:13px;"><option value="">ไม่มีโฟลเดอร์</option>${rf.map(f=>`<option value="${f.id}" ${e.folderId===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>`:'';
             })()}
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <button class="btn" data-assign="${e.id}" style="flex:1;text-align:center;padding:11px 8px;" title="ฝากเป็นการบ้าน — เด็กเห็นกระดิ่งเตือนในแอป">📤 ฝากการบ้าน</button>
+              <button class="btn" data-share="${e.id}" style="flex:1;text-align:center;padding:11px 8px;" title="แชร์ลิงก์ข้อสอบ (LINE / ข้อความ / คัดลอก)">🔗 แชร์ลิงก์</button>
+            </div>
             <div style="display:flex;gap:8px;">
               <button class="btn" data-edit="${e.id}" style="flex:1;text-align:center;">เปิด Editor</button>
               <button class="btn" data-backfill="${e.id}" style="flex:1;text-align:center;" title="กรอกคำตอบข้อสอบที่เคยทำมาก่อน">📝 ย้อนหลัง</button>
@@ -10468,11 +10516,19 @@ function initAdminExams(){
         <td style="text-align:center;">${hasPdf?`<button class="btn" style="padding:4px 10px;font-size:13px;" data-copy="${esc(e.pdfUrl)}" title="${esc(e.pdfUrl)}">📋</button>`:'<span class="muted">-</span>'}</td>
         <td><button class="btn" data-edit="${e.id}">เปิด Editor</button></td>
         <td><button class="btn" data-backfill="${e.id}" title="กรอกคำตอบข้อสอบที่เคยทำมาก่อน">📝 ย้อนหลัง</button></td>
+        <td><div class="sendCol"><button class="btn" data-assign="${e.id}" title="ฝากเป็นการบ้าน — เด็กเห็นกระดิ่งเตือนในแอป">📤 ฝากการบ้าน</button><button class="btn" data-share="${e.id}" title="แชร์ลิงก์ข้อสอบ (LINE / ข้อความ / คัดลอก)">🔗 แชร์ลิงก์</button></div></td>
         <td><button class="btn" style="border-color:#ef4444;color:#b91c1c;" data-del="${e.id}">ลบ</button></td>
       `;
       tb.appendChild(tr);
     });
     }
+    // v48.63: ส่งให้ลูก — ฝากการบ้าน (modal เดิมของหน้ารายการข้อสอบ) / แชร์ลิงก์
+    tb.querySelectorAll('[data-assign]').forEach(btn=>btn.addEventListener('click',()=>{
+      const ex=(s.exams||[]).find(x=>x.id===btn.getAttribute('data-assign')); if(!ex) return;
+      if(!ex.published) toast('ข้อสอบนี้ยังซ่อนอยู่ — เด็กไม่เห็นในรายการ แต่เปิดจากการบ้านได้');
+      _showAssignModal(ex.id,ex.title||'',ex.subject||'');
+    }));
+    tb.querySelectorAll('[data-share]').forEach(btn=>btn.addEventListener('click',()=>shareExamLink(btn.getAttribute('data-share'))));
     tb.querySelectorAll('[data-copy]').forEach(btn=>{
       btn.addEventListener('click',()=>{
         const url=btn.getAttribute('data-copy');
@@ -15818,9 +15874,25 @@ function syncDailySummary(userId) {
 }
 
 // ── Shared exam link: detect ?exam=ID in URL ──────────────
+// v48.63: ลิงก์ที่แชร์ชี้หน้าจริงเสมอ (ไม่ใช่ URL ปัจจุบัน — แชร์จากหน้า preview ลิงก์จะชี้ไฟล์ preview)
+const PROD_BASE_URL = 'https://smitharnonwattana-svg.github.io/Quiz-app/';
+function examShareUrl(id) { return PROD_BASE_URL + '?exam=' + encodeURIComponent(id); }
+// v48.63: จำข้อสอบเป้าหมายข้ามการรีโหลด — แอปรีโหลดตัวเองตอนอัปเวอร์ชัน (?_v=) ซึ่งตัด ?exam= ทิ้ง
+// → ค่าที่อยู่แค่ในหน่วยความจำ (_pendingExamId) หาย; เก็บไว้ชั่วคราว (10 นาที) และใช้คืนเฉพาะตอนรีโหลดอัตโนมัติเท่านั้น
+// (เปิดแอปปกติภายหลังจะไม่ถูกพาไปข้อสอบเก่า)
+const _PENDING_EXAM_KEY = 'nanont:pendingExam', _PENDING_EXAM_TTL = 10 * 60 * 1000;
+function _savePendingExam(id) { try { localStorage.setItem(_PENDING_EXAM_KEY, JSON.stringify({ id, ts: Date.now() })); } catch (e) {} }
+function _loadPendingExam() {
+  try { const v = JSON.parse(localStorage.getItem(_PENDING_EXAM_KEY) || 'null'); if (v && v.id && Date.now() - v.ts < _PENDING_EXAM_TTL) return v.id; } catch (e) {}
+  return null;
+}
+function _clearPendingExam() { try { localStorage.removeItem(_PENDING_EXAM_KEY); } catch (e) {} }
 (function() {
   const p = new URLSearchParams(location.search);
-  const eid = p.get('exam');
+  const fromLink = p.get('exam');
+  let eid = fromLink;
+  if (fromLink) _savePendingExam(fromLink);
+  else if (p.has('_v')) eid = _loadPendingExam(); // รีโหลดอัตโนมัติตอนอัปเวอร์ชัน
   if (eid) {
     window._pendingExamId = eid;
     // try to show exam title in login hint (from local store first)
@@ -15830,7 +15902,8 @@ function syncDailySummary(userId) {
     if (hint) {
       hint.style.display = 'block';
       const t = document.getElementById('loginExamHintTitle');
-      if (t && ex) t.textContent = ex.title;
+      // เครื่องใหม่ยังไม่มีข้อมูลข้อสอบ → ข้อความทั่วไป (เดิมเป็นบรรทัดว่าง)
+      if (t) t.textContent = ex ? ex.title : 'ข้อสอบที่ครูส่งให้';
     }
     // clean ?exam= from URL bar without reload
     history.replaceState(null, '', location.pathname);
@@ -15841,13 +15914,31 @@ function copyExamLink(btn, ev) {
   ev.stopPropagation();
   const examId = btn.dataset.examid;
   const title = btn.dataset.title;
-  const url = `${location.origin}${location.pathname}?exam=${examId}`;
+  const url = examShareUrl(examId);
   const text = `📚 ${title}\n${url}`;
   navigator.clipboard.writeText(text).then(() => {
     toast('คัดลอกลิ้งแล้ว 🔗');
   }).catch(() => {
     prompt('คัดลอกลิ้งด้านล่าง:', text);
   });
+}
+
+// v48.63: ปุ่ม "🔗 แชร์ลิงก์" ในหน้ารายการข้อสอบ (admin_exams) — เมนูแชร์ของเครื่อง (LINE/ข้อความ/คัดลอก) ถ้ามี
+// ไม่งั้นคัดลอกลงคลิปบอร์ด; ต้องเรียก navigator.share ทันทีในการกด (iOS ไม่ยอมถ้ามี await คั่น)
+function shareExamLink(examId) {
+  const ex = (Store.load().exams || []).find(e => e.id === examId);
+  if (!ex) { toast('ไม่พบข้อสอบนี้'); return; }
+  const url = examShareUrl(ex.id);
+  const title = 'ข้อสอบ: ' + (ex.title || '');
+  const text = `📚 ${ex.title || 'ข้อสอบ'}\nเปิดลิงก์แล้วใส่ PIN เพื่อทำข้อสอบ`;
+  const copyFallback = () => {
+    const t = `${text}\n${url}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast('คัดลอกลิงก์แล้ว 🔗')).catch(() => prompt('คัดลอกลิงก์ด้านล่าง:', t));
+    else prompt('คัดลอกลิงก์ด้านล่าง:', t);
+  };
+  if (!ex.published) toast('ข้อสอบนี้ยังซ่อนอยู่ — เด็กไม่เห็นในรายการ แต่เปิดจากลิงก์/การบ้านได้');
+  if (navigator.share) navigator.share({ title, text, url }).catch(e => { if (!(e && e.name === 'AbortError')) copyFallback(); });
+  else copyFallback();
 }
 
 // Show login page on startup — but restore previous page if session still valid
@@ -15863,6 +15954,7 @@ if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
 } else if (Auth.isLoggedIn() && window._pendingExamId) {
   const _pid = window._pendingExamId;
   window._pendingExamId = null;
+  _clearPendingExam();
   navigate('exam', { id: _pid });
 } else {
   navigate('login');
@@ -16842,7 +16934,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.62';
+  const CURRENT_VERSION = 'v48.63';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

@@ -48,3 +48,4 @@ bash tests/run.sh
   stub `PdfViewer.create` แบบเดียวกับ editorSplit; ใน sandbox แถบ "Offline mode" แสดงเสมอ (Firebase โหลดไม่ได้) จึงใช้ทดสอบว่าหัวติดบนหลบแถบนี้ได้ด้วย
 - section `summaryShot` (v48.76p → production v48.62, ชี้ `index.html`): ปุ่ม "📸 บันทึกรูปสรุป" → รูปสรุปผลสอบ; html2canvas โหลดจาก CDN ไม่ได้ใน sandbox จึงใส่ตัวแทนที่คืน canvas ตามขนาดจริง
   (ตัวจริงตรวจแยกด้วยภาพ — `npm pack html2canvas@1.4.1` แล้ว route ไฟล์ให้ URL cdnjs); ชื่อไฟล์ดาวน์โหลดต้องเป็น ASCII (ชื่อไทยถูกตัดเหลือ "download" ในบางเบราว์เซอร์)
+- section `shareExam` (v48.77p/v48.78p → production v48.63, ชี้ `index.html`): หน้ารายการข้อสอบ (admin_exams) ปุ่ม "ฝากการบ้าน"/"แชร์ลิงก์" (ลิงก์ชี้หน้าจริงเสมอ), จำข้อสอบจากลิงก์ `?exam=` ข้ามรีโหลด, และ assignDup: ส่งการบ้านชุดเดิมซ้ำไม่ได้ (ปุ่มเปลี่ยนเป็น "ยกเลิก")

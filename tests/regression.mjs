@@ -5091,12 +5091,12 @@ currentSection = 'summaryShot';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: shareExam (v48.77p) — ปุ่ม "ส่งให้ลูก" ในหน้ารายการข้อสอบ (admin_exams): 📤 ฝากการบ้าน / 🔗 แชร์ลิงก์
+// Section: shareExam (v48.77p/v48.78p → production v48.63, ชี้ index.html) — ปุ่ม "ส่งให้ลูก" ในหน้ารายการข้อสอบ (admin_exams): 📤 ฝากการบ้าน / 🔗 แชร์ลิงก์
 // + ลิงก์ชี้หน้าจริงเสมอ, จำข้อสอบเป้าหมายข้ามรีโหลดอัตโนมัติ (?_v=), แบนเนอร์ login ทั่วไป, "กำลังโหลด" แทน "ไม่พบ" บนเครื่องใหม่
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'shareExam';
 {
-  const SH_FILE = 'index_preview.html';
+  const SH_FILE = 'index.html';
   const PROD = 'https://smitharnonwattana-svg.github.io/Quiz-app/';
   const mk = (id, title, pub) => ({ id, title, subject: 'วิทยาศาสตร์', questionCount: 3, published: pub, order: 1, durationSeconds: 600, examType: 'mc', uploadedAt: Date.now(), pdfUrl: 'https://x/y.pdf' });
   const cache = () => baseCache({
