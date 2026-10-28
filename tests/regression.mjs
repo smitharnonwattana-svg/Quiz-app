@@ -4992,13 +4992,13 @@ currentSection = 'mobileA';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: summaryShot (v48.76p) — ปุ่ม "📸 บันทึกรูปสรุป" บนการ์ดผลสอบ (หน้าผลการฝึกซ้อม) → รูปสรุปผลสอบส่งให้ AI
+// Section: summaryShot (v48.76p → production v48.62) — ปุ่ม "📸 บันทึกรูปสรุป" บนการ์ดผลสอบ (หน้าผลการฝึกซ้อม) → รูปสรุปผลสอบส่งให้ AI
 // ≤20 ข้อ = 1 รูป, >20 ข้อ = 2 รูป (สรุป+ข้อที่ผิด / ทุกข้อ 3 คอลัมน์); Anxiety เฉพาะบัญชีครู; ชื่อไฟล์ ASCII
 // html2canvas โหลดจาก CDN ไม่ได้ใน sandbox → ใส่ตัวแทนที่คืน canvas ตามขนาดจริง (ตัว lib จริงตรวจด้วยภาพแยกต่างหาก)
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'summaryShot';
 {
-  const SS_FILE = 'index_preview.html';
+  const SS_FILE = 'index.html';
   const seedExam = (N, wrongNos, extra = {}) => {
     const qs = [], pq = [], ans = {};
     for (let i = 1; i <= N; i++) {

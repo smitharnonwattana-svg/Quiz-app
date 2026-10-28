@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.61 -->
+  <!-- APP_VERSION: v48.62 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -578,6 +578,69 @@
     .newStepper input{width:80px;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:inherit;font-size:16px;font-weight:700;padding:11px 4px;-moz-appearance:textfield;}
     .newStepper input::-webkit-inner-spin-button,.newStepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
     .newSubjChips{display:none;}
+    /* v48.62: รูปสรุปผลสอบ — .shSheet คือหน้าที่ถูกวาดเป็นรูป (กว้าง 720px, สไตล์ inline-safe ไม่พึ่งตัวแปรหน้าอื่น) */
+    .shHost{position:fixed;left:-10000px;top:0;width:720px;pointer-events:none;}
+    .shSheet{width:720px;padding:24px 24px 18px;background:#f3f4f6;color:#111827;font-family:-apple-system,"Noto Sans Thai","Sukhumvit Set",system-ui,sans-serif;font-size:16px;line-height:1.45;box-sizing:border-box;}
+    .shSheet *{box-sizing:border-box;}
+    .shCard{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:16px 20px;margin-bottom:12px;}
+    .shTop{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#6b7280;margin-bottom:8px;gap:8px;}
+    .shBadge{background:#eef2ff;color:#4338ca;border-radius:999px;padding:3px 12px;font-weight:700;font-size:12px;white-space:nowrap;}
+    .shTitle{font-size:20px;font-weight:800;}.shScore{font-size:32px;font-weight:900;margin-top:4px;}
+    .shMuted{color:#6b7280;}.shRow2{font-size:14px;color:#6b7280;margin-top:2px;}
+    .shSum{font-size:18px;font-weight:800;margin-top:8px;}
+    .shWrong{margin-top:6px;font-size:14px;line-height:1.7;}.shWrong b{color:#b91c1c;font-size:15px;}
+    .shH{font-weight:800;font-size:15px;margin-bottom:8px;}
+    .shPills{display:flex;flex-wrap:wrap;gap:6px;}
+    .shPill{width:44px;height:44px;border-radius:50%;border:2px solid #22c55e;background:#f0fdf4;color:#166534;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;}
+    .shPill sup{font-size:9px;}
+    .shPill.bad{border-color:#ef4444;background:#fff5f5;color:#b91c1c;}
+    .shPill.free{border-color:#f59e0b;background:#fffbeb;color:#b45309;}
+    .shPill.skip{border-color:#d1d5db;background:#f9fafb;color:#6b7280;}
+    .shHr{border-top:1px solid #e5e7eb;margin:10px 0;}
+    .shKv{display:flex;gap:26px;flex-wrap:wrap;font-size:15px;}.shKv small{color:#9ca3af;font-size:13px;margin-right:4px;}
+    .shCal{font-size:15px;display:flex;gap:16px;flex-wrap:wrap;}
+    .shAx{display:grid;gap:4px;font-size:14px;}
+    .shR5{display:flex;align-items:center;gap:12px;margin:7px 0;font-size:15px;}
+    .shRank{width:28px;height:28px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;}
+    .shBar{flex:1;height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;}.shBar i{display:block;height:100%;background:#e05555;border-radius:5px;}
+    .shOk{color:#16a34a;}.shBd{color:#dc2626;text-decoration:line-through;}.shArr{color:#9ca3af;margin:0 4px;}.shFree{color:#b45309;}
+    /* หมายเหตุ: stylesheet หลักตั้ง table{min-width:760px} และ td{padding:10px 12px} — ต้อง reset ให้ตารางในรูปกว้างแค่การ์ด */
+    .shTbl{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:16px;}
+    .shTbl td{padding:10px 6px;border-top:1px solid #e5e7eb;font-size:16px;vertical-align:middle;text-align:left;overflow:hidden;}
+    .shTbl tr:first-child td{border-top:none;}
+    .shNo{font-weight:900;width:64px;}.shPg{color:#9ca3af;font-size:14px;width:66px;}
+    .shAns{font-weight:900;font-size:19px;}.shTm{color:#9ca3af;font-size:14px;white-space:nowrap;width:86px;text-align:right;}
+    .shSt{text-align:right;width:92px;}
+    .shTag{display:inline-block;border-radius:999px;padding:3px 14px;font-weight:700;font-size:14px;border:1.5px solid;white-space:nowrap;}
+    .shTag.g{border-color:#4ade80;background:#f0fdf4;color:#166534;}.shTag.r{border-color:#f87171;background:#fff5f5;color:#b91c1c;}.shTag.f{border-color:#fcd34d;background:#fffbeb;color:#b45309;}
+    .shWg{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .shWc{display:flex;align-items:center;gap:8px;border:1.5px solid #fecaca;background:#fff5f5;border-radius:12px;padding:8px 10px;}
+    .shWc .shN{width:30px;height:30px;border-radius:50%;background:#ef4444;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .shWc .shA{font-weight:900;font-size:16px;flex:1;white-space:nowrap;}
+    .shWc .shT{font-size:12px;color:#9ca3af;text-align:right;line-height:1.25;}
+    .shG3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+    .shQc{display:flex;align-items:center;gap:7px;border:1.5px solid #bbf7d0;background:#f0fdf4;border-radius:12px;padding:7px 9px;min-width:0;}
+    .shQc.r{border-color:#fecaca;background:#fff5f5;}.shQc.f{border-color:#fde68a;background:#fffbeb;}.shQc.s{border-color:#e5e7eb;background:#f9fafb;}
+    .shQc .shN{width:28px;height:28px;border-radius:50%;background:#22c55e;color:#fff;font-weight:800;font-size:12.5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .shQc.r .shN{background:#ef4444;}.shQc.f .shN{background:#f59e0b;}.shQc.s .shN{background:#9ca3af;}
+    .shQc .shA{font-weight:900;font-size:15px;flex:1;white-space:nowrap;min-width:0;}
+    .shQc .shT{font-size:11px;color:#9ca3af;text-align:right;line-height:1.2;flex-shrink:0;}
+    .shLegend{font-size:12.5px;color:#6b7280;line-height:1.6;padding:2px 6px 0;}
+    .shFoot{display:flex;justify-content:space-between;font-size:12px;color:#9ca3af;margin-top:8px;padding:0 6px;gap:8px;}
+    /* หน้าต่างตรวจรูป */
+    .shotOverlay{position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,.5);align-items:flex-end;justify-content:center;}
+    .shotSheet{width:100%;max-width:640px;height:88dvh;background:#fff;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 30px rgba(0,0,0,.3);}
+    .shotHandle{width:40px;height:5px;border-radius:3px;background:#d1d5db;margin:8px auto 2px;flex-shrink:0;}
+    .shotHead{display:flex;align-items:center;gap:8px;padding:6px 14px 10px;flex-shrink:0;}.shotHead b{font-size:16px;flex:1;}
+    .shotClose{width:34px;height:34px;border-radius:50%;border:none;background:#f3f4f6;color:#374151;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+    .shotBody{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#e5e7eb;padding:10px;}
+    .shotItem{margin:0 0 12px;}.shotItem figcaption{font-size:12px;font-weight:700;color:#6b7280;margin:2px 2px 6px;}
+    .shotItem img{width:100%;display:block;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.2);background:#fff;-webkit-touch-callout:default;user-select:auto;-webkit-user-select:auto;}
+    .shotItemBtns{display:flex;gap:8px;margin-top:8px;}.shotItemBtns .btn{flex:1;padding:9px 10px;font-size:13px;font-weight:700;}
+    .shotBar{flex-shrink:0;padding:10px 14px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:#fff;}
+    .shotHint{font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px;}
+    .shotBar .btn{width:100%;padding:14px;font-size:16px;font-weight:700;}
+    @media (min-width:700px){.shotOverlay{align-items:center;}.shotSheet{border-radius:20px;height:90dvh;}}
     @media (max-width:600px){
       #page-admin_new .container{padding:16px 12px 110px;}
       #page-admin_new .grid2{grid-template-columns:minmax(0,1fr);}
@@ -1376,7 +1439,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.61</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.62</div>
     </div>
   </div>
 </div>
@@ -2351,6 +2414,16 @@
 
       <div class="newCreateBar"><button class="btn btnPrimary" id="newCreateBtn" style="width:fit-content;padding:12px 22px;font-weight:800;">สร้างแล้วไปกรอกเฉลย →</button></div>
     </div>
+  </div>
+</div>
+
+<!-- v48.62: หน้าต่างตรวจรูปสรุปผลสอบ (แชร์ / คัดลอก / ดาวน์โหลด) -->
+<div id="shotModal" class="shotOverlay" role="dialog" aria-modal="true" aria-labelledby="shotModalTitle" style="display:none;">
+  <div class="shotSheet">
+    <div class="shotHandle" aria-hidden="true"></div>
+    <div class="shotHead"><b id="shotModalTitle">รูปสรุปผลสอบพร้อมแล้ว ✓</b><button type="button" id="shotModalClose" class="shotClose" aria-label="ปิด"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="shotBody" id="shotModalBody"></div>
+    <div class="shotBar"><div class="shotHint">เลื่อนดูได้ · กดค้างที่รูปเพื่อบันทึก/คัดลอกก็ได้</div><button type="button" id="shotShareBtn" class="btn btnPrimary"></button></div>
   </div>
 </div>
 
@@ -5492,6 +5565,7 @@ function doLogin() {
 }
 
 function navigate(page, params={}){
+  if(typeof closeShotModal==='function') closeShotModal(); // v48.62: ปิดหน้าต่างรูปสรุปที่อาจเปิดค้าง
   // v48.58: ออกจากหน้ากรอกเฉลย (หรือเปิดชุดอื่น) ขณะยังมีเฉลยที่ไม่ได้บันทึก → ถามก่อน ยกเลิกได้;
   // ออกแล้วเก็บกวาด PDF viewer/ปุ่มลัดของหน้านั้น — ต้องเป็นอย่างแรกของ navigate ก่อนแตะสถานะอื่น
   if(_currentPage==='admin_editor' && (page!=='admin_editor' || (params&&params.id)!==(_pageParams&&_pageParams.id))){
@@ -8263,6 +8337,242 @@ function calcAnxietyMarkers(att){
   return{panicChanges:panicRate>0.3,endRushing,unvisited,totalChanges};
 }
 
+// ===================== SUMMARY IMAGE (v48.62) =====================
+// ปุ่ม "📸 บันทึกรูปสรุป" บนการ์ดผลสอบ (หน้าผลการฝึกซ้อม) → สร้างรูปสรุปผลการทำข้อสอบครั้งนั้นให้ส่งต่อให้ AI วิเคราะห์
+// ข้อมูลชุดเดียวกับหน้าทบทวน (คะแนน/ผิดข้อ/อารมณ์/Calibration/Anxiety/TOP 5 ข้อผิดบ่อย/รายข้อ+เวลา) —
+// ≤ SHOT_SPLIT_AT ข้อ = 1 รูป, มากกว่านั้นแบ่ง 2 รูป (รูป 1 สรุป+ข้อที่ผิด / รูป 2 ทุกข้อแบบตารางย่อ) เพราะรูปยาวเกินไป
+// AI จะย่อจนตัวหนังสือเล็กอ่านไม่ออก; วาดรูปด้วย html2canvas (โหลดตอนกดปุ่มครั้งแรกเท่านั้น ไม่กระทบการเปิดแอป)
+const SHOT_MOOD={low:'🪫 หมดแรง',ok:'😐 พอไหว',good:'😊 โอเค',high:'⚡ พร้อมมาก'};
+const SHOT_FEEL={hard:'😤 ยากเกิน',confused:'😐 พอไหว',ok:'😊 โอเค',confident:'🎯 มั่นใจ'};
+const SHOT_DIFF={review:'ทบทวน',develop:'พัฒนา',hard:'ยาก'};
+const SHOT_SPLIT_AT=20;
+function _shotMmss(sec){sec=Math.max(0,Math.floor(Number(sec)||0));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');}
+function _shotLetter(v){
+  if(v==null||String(v).trim()==='') return '—';
+  const t=String(v).trim();
+  return CHOICE_LABELS[t]||t;
+}
+// รวมข้อมูลของ 1 ผลสอบเป็นโมเดลเดียว — logic ตามหน้าทบทวน (initReview) เพื่อให้ตัวเลขตรงกัน
+function buildAttemptSummary(att,s){
+  const exam=(s.exams||[]).find(e=>e.id===att.examId)||null;
+  const examType=att.examType||(exam&&exam.examType)||'mc';
+  const isFillNum=examType==='fillblank-num';
+  const pqAll=Array.isArray(att.perQuestion)?att.perQuestion:[];
+  let qs=((s.questions&&s.questions[att.examId])||[]).map(q=>({...q,no:q.no??q.number}));
+  if(!qs.length&&pqAll.length) qs=pqAll.map(p=>({id:p.qid||String(p.no),no:p.no,page:p.page||1,correct:p.correct||null}));
+  if(att.halfPart===2&&pqAll.length){ const ids=new Set(pqAll.map(p=>p.qid)); qs=qs.filter(q=>ids.has(q.id)); }
+  else if(att.mode==='weakness_practice'&&pqAll.length){ const nos=new Set(pqAll.map(p=>Number(p.no))); qs=qs.filter(q=>nos.has(Number(q.no))); }
+  const answers=att.answers||{};
+  const rows=qs.map((q,idx)=>{
+    const no=Number(q.no)||idx+1;
+    const pq=pqAll.find(p=>Number(p.no)===no)||null;
+    const rawChosen=answers[q.id]??answers[String(q.id)]??(pq?pq.chosen:null)??null;
+    const chosen=(rawChosen==null||String(rawChosen).trim()==='')?null:String(rawChosen).trim();
+    const correct=(q.correct==null||String(q.correct).trim()==='')?null:String(q.correct).trim();
+    return {
+      no, page:q.page||(pq&&pq.page)||null, chosen, correct,
+      ok:pq?!!pq.isCorrect:isAnswerCorrect(chosen,q.correct,examType),
+      free:!!(q.isFree||(pq&&pq.isFree)),
+      skipped:!!(att.halfMode&&pq&&pq.counted===false),
+      unsure:!!(pq&&pq.unsure),
+      sec:(pq&&pq.elapsedMs>0)?pq.elapsedMs/1000:null,
+    };
+  });
+  const weighted=isWeightedAttempt(att);
+  const total=Number(att.total||rows.length||0);
+  const score=Number.isFinite(Number(att.score))?Number(att.score):0;
+  const totalItems=att.halfMode?(att.halfQuota||0):(pqAll.length||rows.length);
+  const correctCount=pqAll.length?pqAll.filter(p=>p&&p.isCorrect&&p.counted!==false).length:(weighted?0:score);
+  const wrongNos=Array.from(new Set(
+    pqAll.length?pqAll.filter(p=>!p.isCorrect&&p.counted!==false).map(p=>Number(p.no)||0).filter(n=>n>0)
+                :rows.filter(r=>!r.ok&&!r.skipped).map(r=>r.no)
+  )).sort((a,b)=>a-b);
+  const wrongSet=new Set(wrongNos);
+  const pct=total?Math.round(score/total*100):0;
+  const unsureRows=rows.filter(r=>r.unsure);
+  const unsureOk=unsureRows.filter(r=>r.ok).length;
+  let summaryText=weighted
+    ?`ถูก ${correctCount}/${totalItems} ข้อ • คะแนน ${fmtPts(score)}/${fmtPts(total)} (${pct}%) • ผิด ${wrongNos.length} ข้อ`
+    :`ถูก ${correctCount}/${totalItems} (${pct}%) • ผิด ${wrongNos.length} ข้อ`;
+  if(unsureRows.length) summaryText+=` • 🤔 ไม่แน่ใจ ${unsureRows.length} ข้อ (ถูก ${unsureOk} / ผิด ${unsureRows.length-unsureOk})`;
+  // TOP 5 ข้อที่ผิดบ่อย — รวมทุกครั้งที่ทำชุดนี้ (ไม่รวมแก้จุดอ่อน) เหมือนหน้าทบทวน
+  const examAtts=mergeHalfModePairs((s.attempts||[]).filter(a=>a.examId===att.examId)).filter(a=>a.mode!=='weakness_practice');
+  const wrongCount={};
+  examAtts.forEach(a=>(a.perQuestion||[]).forEach(p=>{ if(p.counted===false) return; if(!p.isCorrect&&p.no) wrongCount[p.no]=(wrongCount[p.no]||0)+1; }));
+  const top5=Object.entries(wrongCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([no,cnt])=>({no,cnt}));
+  const anxiety=Auth.isTeacher()?calcAnxietyMarkers(att):null; // เฉพาะบัญชีครู เหมือนหน้าทบทวน
+  const dur=Number(att.usedSeconds)>0?_shotMmss(att.usedSeconds)+((exam&&exam.durationSeconds&&!att.practiceMode)?` (กำหนด ${_shotMmss(exam.durationSeconds)})`:''):null;
+  return {
+    att, title:att.examTitle||(exam&&exam.title)||'ข้อสอบ', subject:att.examSubject||(exam&&exam.subject)||'ไม่ระบุ',
+    taker:(att.takerName||'').trim()||'ไม่ระบุ', isFillNum, weighted,
+    typeLabel:isFillNum?'กรอกตัวเลข':'เลือกตอบ ก–ง',
+    diffLabel:SHOT_DIFF[att.difficulty||(exam&&exam.difficulty)]||null,
+    modeLabel:att.halfMode?(att.halfPart===2?'🤝 คนละครึ่ง (ครึ่งหลัง)':'🤝 คนละครึ่ง'):att.mode==='weakness_practice'?'🎯 แก้จุดอ่อน':att.practiceMode?'📝 ฝึกซ้อม':att.manualEntry?'🕰️ บันทึกย้อนหลัง':'⏱ สอบจริง',
+    submitted:att.submittedAt?(()=>{try{return new Date(att.submittedAt).toLocaleString('th-TH');}catch(e){return att.submittedAt;}})():null,
+    dur, scoreHead:weighted?`คะแนน ${fmtPts(score)}/${fmtPts(total)} (${pct}%)`:`คะแนน ${score}/${total}`,
+    summaryText, wrongNos, rows, wrongRows:rows.filter(r=>wrongSet.has(r.no)),
+    mood:att.mood?(SHOT_MOOD[att.mood]||att.mood):null, feel:att.feeling?(SHOT_FEEL[att.feeling]||att.feeling):null,
+    cal:calcCalibration(att), anxiety, top5, examAttemptCount:examAtts.length,
+  };
+}
+function _shotAnsHtml(r,isFillNum){
+  if(r.skipped) return '<span class="shMuted">ข้าม</span>';
+  if(r.free) return '<span class="shFree">ฟรี</span>';
+  const show=(v)=>esc(isFillNum?(v==null?'—':v):_shotLetter(v));
+  if(r.ok) return `<span class="shOk">${show(r.chosen!=null?r.chosen:r.correct)}</span>`;
+  return `<span class="shBd">${show(r.chosen)}</span><span class="shArr">→</span><span class="shOk">${show(r.correct)}</span>`;
+}
+function _shotHeadCard(m,badge,compact){
+  if(compact) return `<div class="shCard"><div class="shTop"><span>สรุปผลการทำข้อสอบ · My Exam Academia</span><span class="shBadge">${esc(badge)}</span></div><div class="shTitle" style="font-size:18px">${esc(m.title)} <span class="shMuted" style="font-weight:600;font-size:14px">· ${esc(m.taker)} · ${esc(m.scoreHead.replace('คะแนน ',''))}${m.submitted?' · '+esc(m.submitted.split(' ')[0].replace(',','')):''}</span></div></div>`;
+  return `<div class="shCard">
+    <div class="shTop"><span>สรุปผลการทำข้อสอบ · My Exam Academia</span><span class="shBadge">${esc(badge)}</span></div>
+    <div class="shTitle">${esc(m.title)}</div>
+    <div class="shRow2">วิชา: ${esc(m.subject)} • ผู้ทำ: ${esc(m.taker)} • ประเภท: ${esc(m.typeLabel)}${m.diffLabel?' • ความยาก: '+esc(m.diffLabel):''}</div>
+    <div class="shScore">${esc(m.scoreHead)}</div>
+    ${(m.submitted||m.dur)?`<div class="shRow2">${m.submitted?'ส่งคำตอบ: '+esc(m.submitted):''}${(m.submitted&&m.dur)?' • ':''}${m.dur?'เวลา: '+esc(m.dur):''}</div>`:''}
+    <div class="shSum">${esc(m.summaryText)}</div>
+    <div class="shWrong"><span class="shMuted">ผิดข้อ:</span> <b>${m.wrongNos.length?esc(m.wrongNos.join(', ')):'-'}</b></div>
+  </div>`;
+}
+function _shotPills(m){
+  return `<div class="shCard"><div class="shH shMuted" style="font-weight:600">ภาพรวมรายข้อ</div><div class="shPills">`+
+    m.rows.map(r=>`<div class="shPill ${r.skipped?'skip':(r.free?'free':(r.ok?'':'bad'))}">${r.no}${r.unsure?'<sup>🤔</sup>':''}</div>`).join('')+`</div></div>`;
+}
+function _shotAnalytics(m){
+  const parts=[];
+  if(m.mood||m.feel) parts.push(`<div class="shKv">${m.mood?`<span><small>ก่อนสอบ</small><b>${esc(m.mood)}</b></span>`:''}${m.feel?`<span><small>หลังสอบ</small><b>${esc(m.feel)}</b></span>`:''}</div>`);
+  if(m.cal){
+    const d=m.cal.diff, ad=Math.abs(d), col=ad<=3?'#16a34a':ad<=7?'#ca8a04':'#dc2626';
+    parts.push(`<div class="shH">🎯 Calibration</div><div class="shCal"><span>ทายไว้ <b>${m.cal.prediction}/${m.cal.total}</b> ข้อ</span><span>ได้จริง <b>${m.cal.actual}/${m.cal.total}</b> ข้อ</span><b style="color:${col}">(${d>=0?'+':''}${d} ข้อ)</b></div>`);
+  }
+  if(m.anxiety){
+    const a=m.anxiety;
+    parts.push(`<div class="shH">🧠 Anxiety Markers</div><div class="shAx"><div>${a.panicChanges?'⚠️':'✅'} Panic Changes — เปลี่ยนคำตอบ ${a.totalChanges} ครั้ง${a.panicChanges?' (สูงผิดปกติ)':' (ปกติ)'}</div><div>${a.endRushing?'⚠️':'✅'} End Rushing — ${a.endRushing?'เร่งช่วงท้ายผิดปกติ':'ความเร็วสม่ำเสมอ'}</div><div>${a.unvisited>0?'⚠️':'✅'} Skipping — ${a.unvisited>0?`ข้าม ${a.unvisited} ข้อ`:'เปิดทุกข้อ'}</div></div>`);
+  }
+  return parts.length?`<div class="shCard">${parts.join('<div class="shHr"></div>')}</div>`:'';
+}
+function _shotTop5(m){
+  if(!m.top5.length) return '';
+  const max=m.top5[0].cnt;
+  return `<div class="shCard"><div class="shH">❌ ข้อที่ผิดบ่อย TOP 5 <span class="shMuted" style="font-weight:400;font-size:13px">— รวมทุกครั้งที่ทำชุดนี้</span></div>`+
+    m.top5.map((t,i)=>`<div class="shR5"><span class="shRank">${i+1}</span><span style="width:54px">ข้อ ${esc(t.no)}</span><span class="shBar"><i style="width:${Math.round(t.cnt/max*100)}%"></i></span><span class="shMuted" style="width:76px;text-align:right">${t.cnt}/${m.examAttemptCount} ครั้ง</span></div>`).join('')+`</div>`;
+}
+function _shotLegend(extra){
+  return `<div class="shLegend">คำอธิบาย: <span class="shBd" style="font-weight:700">แดงขีดฆ่า</span> = คำตอบที่เลือก (ผิด) → <b class="shOk">เขียว</b> = เฉลย · ⏱ = เวลาที่ใช้ทำข้อนั้น (นาที:วินาที) · 🤔 = ติ๊กไม่แน่ใจ · "ฟรี" = ข้อที่ให้คะแนนอัตโนมัติ${extra||''}</div>`;
+}
+function _shotFoot(){ return `<div class="shFoot"><span>สร้างจากแอป My Exam Academia</span><span>บันทึกรูปเมื่อ ${esc(new Date().toLocaleString('th-TH'))}</span></div>`; }
+// คืน array ของ HTML (1 หรือ 2 หน้า) — กว้าง 720px, สไตล์ .shSheet ใน stylesheet หลัก
+function renderSummaryPages(m){
+  const multi=m.rows.length>SHOT_SPLIT_AT;
+  if(!multi){
+    const table='<div class="shCard" style="padding:6px 16px">'+(m.rows.length?`<table class="shTbl">`+m.rows.map(r=>`<tr><td class="shNo">ข้อ ${r.no}</td><td class="shPg">${r.page?'หน้า '+esc(r.page):''}</td><td class="shAns">${_shotAnsHtml(r,m.isFillNum)}${r.unsure?' 🤔':''}</td><td class="shTm">${r.sec!=null?'⏱ '+_shotMmss(r.sec):''}</td><td class="shSt">${r.skipped?'':(r.free?'<span class="shTag f">ฟรี</span>':`<span class="shTag ${r.ok?'g':'r'}">${r.ok?'✓ ถูก':'✕ ผิด'}</span>`)}</td></tr>`).join('')+`</table>`:'<div class="shMuted" style="padding:14px">ไม่มีข้อมูลรายข้อ</div>')+'</div>';
+    return [`<div class="shSheet">${_shotHeadCard(m,m.modeLabel)}${_shotPills(m)}${_shotAnalytics(m)}${_shotTop5(m)}${table}${_shotLegend()}${_shotFoot()}</div>`];
+  }
+  const wrongCard=m.wrongRows.length
+    ?`<div class="shCard"><div class="shH">✕ ข้อที่ผิด <span class="shMuted" style="font-weight:400;font-size:13px">(${m.wrongRows.length} ข้อ) — คำตอบที่เลือก → เฉลย · เวลาที่ใช้</span></div><div class="shWg">`+
+      m.wrongRows.map(r=>`<div class="shWc"><span class="shN">${r.no}</span><span class="shA">${_shotAnsHtml(r,m.isFillNum)}</span><span class="shT">${r.page?'หน้า '+esc(r.page):''}${r.unsure?' 🤔':''}${r.sec!=null?'<br>⏱ '+_shotMmss(r.sec):''}</span></div>`).join('')+`</div></div>`
+    :`<div class="shCard"><div class="shH">🎉 ไม่มีข้อที่ผิด</div></div>`;
+  const grid=`<div class="shG3">`+m.rows.map(r=>`<div class="shQc ${r.skipped?'s':(r.free?'f':(r.ok?'':'r'))}"><span class="shN">${r.no}</span><span class="shA">${_shotAnsHtml(r,m.isFillNum)}${r.unsure?' 🤔':''}</span><span class="shT">${r.page?'ห.'+esc(r.page):''}${r.sec!=null?'<br>'+_shotMmss(r.sec):''}</span></div>`).join('')+`</div>`;
+  return [
+    `<div class="shSheet">${_shotHeadCard(m,m.modeLabel+' · ภาพ 1/2')}${_shotPills(m)}${_shotAnalytics(m)}${_shotTop5(m)}${wrongCard}${_shotLegend(' · <b>รายการครบทุกข้อดูในภาพที่ 2</b>')}${_shotFoot()}</div>`,
+    `<div class="shSheet">${_shotHeadCard(m,'รายข้อทั้งหมด · ภาพ 2/2',true)}${grid}<div class="shLegend" style="margin-top:12px">คำอธิบาย: เขียว = ถูก · แดง = ผิด (<span class="shBd" style="font-weight:700">ที่เลือก</span> → <b class="shOk">เฉลย</b>) · ส้ม = ข้อฟรี · เทา = ข้าม · 🤔 = ไม่แน่ใจ · มุมขวา: หน้า PDF และเวลาที่ใช้ (นาที:วินาที)</div>${_shotFoot()}</div>`,
+  ];
+}
+// ── วาดเป็นรูป + หน้าต่างตรวจรูป (แชร์ / คัดลอก / ดาวน์โหลด) ──
+let _shotLibPromise=null;
+function _shotLoadLib(){
+  if(window.html2canvas) return Promise.resolve(window.html2canvas);
+  if(_shotLibPromise) return _shotLibPromise;
+  _shotLibPromise=new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    sc.onload=()=>window.html2canvas?res(window.html2canvas):rej(new Error('ตัวสร้างรูปไม่พร้อม'));
+    sc.onerror=()=>{ _shotLibPromise=null; sc.remove(); rej(new Error('โหลดตัวสร้างรูปไม่ได้ — ต้องต่อเน็ตในครั้งแรก')); };
+    document.head.appendChild(sc);
+  });
+  return _shotLibPromise;
+}
+let _shotUrls=[];
+function closeShotModal(){
+  const ov=document.getElementById('shotModal'); if(!ov) return;
+  ov.style.display='none';
+  _shotUrls.forEach(u=>{ try{URL.revokeObjectURL(u);}catch(e){} }); _shotUrls=[];
+  const body=document.getElementById('shotModalBody'); if(body) body.innerHTML='';
+  document.removeEventListener('keydown',_shotEsc);
+  if(window._shotReturnFocus&&window._shotReturnFocus.focus){ try{window._shotReturnFocus.focus();}catch(e){} }
+}
+function _shotEsc(e){ if(e.key==='Escape'){ e.preventDefault(); closeShotModal(); } }
+function _shotDownload(blob,name){
+  const u=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+function _openShotModal(blobs,baseName){
+  const ov=document.getElementById('shotModal'), body=document.getElementById('shotModalBody'), share=document.getElementById('shotShareBtn');
+  if(!ov||!body||!share) return;
+  _shotUrls.forEach(u=>{ try{URL.revokeObjectURL(u);}catch(e){} }); _shotUrls=[];
+  const n=blobs.length, names=blobs.map((_,i)=>`${baseName}${n>1?`_${i+1}-${n}`:''}.png`);
+  const files=blobs.map((b,i)=>new File([b],names[i],{type:'image/png'}));
+  const canClip=!!(navigator.clipboard&&window.ClipboardItem);
+  body.innerHTML=blobs.map((b,i)=>{ const u=URL.createObjectURL(b); _shotUrls.push(u);
+    return `<figure class="shotItem"><figcaption>${n>1?`ภาพ ${i+1}/${n}`:'รูปสรุปผลสอบ'}</figcaption><img src="${u}" alt="รูปสรุปผลสอบ${n>1?` ภาพ ${i+1} จาก ${n}`:''}"><div class="shotItemBtns">${canClip?`<button type="button" class="btn" data-copy="${i}">📋 คัดลอก</button>`:''}<button type="button" class="btn" data-dl="${i}">⬇️ ดาวน์โหลด</button></div></figure>`; }).join('');
+  body.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>_shotDownload(blobs[+b.dataset.dl],names[+b.dataset.dl]));
+  body.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
+    try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blobs[+b.dataset.copy]})]); toast('คัดลอกรูปแล้ว'); }
+    catch(e){ toast('คัดลอกไม่ได้ — กดค้างที่รูปแล้วเลือกคัดลอกแทน'); }
+  });
+  const canShare=!!(navigator.canShare&&navigator.canShare({files}));
+  share.textContent=canShare?(n>1?`📤 แชร์ / บันทึก ทั้ง ${n} รูป`:'📤 แชร์ / บันทึกรูป'):(n>1?`⬇️ ดาวน์โหลดทั้ง ${n} รูป`:'⬇️ ดาวน์โหลดรูป');
+  share.onclick=async()=>{
+    if(canShare){
+      try{ await navigator.share({files,title:'สรุปผลการทำข้อสอบ'}); return; }
+      catch(e){ if(e&&e.name==='AbortError') return; }
+    }
+    blobs.forEach((b,i)=>setTimeout(()=>_shotDownload(b,names[i]),i*400));
+  };
+  document.getElementById('shotModalClose').onclick=closeShotModal;
+  ov.onclick=(e)=>{ if(e.target===ov) closeShotModal(); };
+  ov.style.display='flex';
+  document.addEventListener('keydown',_shotEsc);
+  document.getElementById('shotModalClose').focus();
+}
+async function captureAttemptSummary(attId,btn){
+  const s=Store.load(), att=(s.attempts||[]).find(a=>a.id===attId);
+  if(!att){ toast('ไม่พบผลสอบนี้'); return; }
+  const oldTxt=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='⏳ กำลังสร้างรูป…'; }
+  window._shotReturnFocus=btn||null;
+  const host=document.createElement('div'); host.className='shHost';
+  try{
+    const h2c=await _shotLoadLib();
+    const m=buildAttemptSummary(att,s);
+    const pages=renderSummaryPages(m);
+    document.body.appendChild(host);
+    if(document.fonts&&document.fonts.ready){ try{await document.fonts.ready;}catch(e){} }
+    const blobs=[];
+    for(const html of pages){
+      host.innerHTML=html;
+      const el=host.firstElementChild;
+      const h=Math.max(200,el.getBoundingClientRect().height);
+      const scale=Math.max(1,Math.min(2,Math.sqrt(12e6/(720*h)))); // จำกัดพื้นที่ ~12 ล้านพิกเซล (iOS canvas จำกัด ~16.7M)
+      const canvas=await h2c(el,{scale,backgroundColor:'#f3f4f6',useCORS:true,logging:false,windowWidth:720});
+      const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+      if(!blob) throw new Error('แปลงรูปไม่สำเร็จ');
+      blobs.push(blob);
+    }
+    // ชื่อไฟล์เป็น ASCII ล้วน (บางเบราว์เซอร์/ระบบตัดชื่อไทยเหลือ "download") — วัน+เวลาที่ส่งคำตอบทำให้แยกรูปแต่ละครั้งได้
+    const d=att.submittedAt?new Date(att.submittedAt):new Date();
+    const stamp=isNaN(d)?'':d.toISOString().slice(0,16).replace('T','_').replace(':','');
+    _openShotModal(blobs,`exam-summary_${stamp}`);
+  }catch(err){
+    console.warn('captureAttemptSummary',err);
+    toast('สร้างรูปไม่สำเร็จ: '+((err&&err.message)||err));
+  }finally{
+    host.remove();
+    if(btn){ btn.disabled=false; btn.textContent=oldTxt; }
+  }
+}
+
 // ===================== DASHBOARD PAGE =====================
 let _dashChart=null;
 let _dashTime='all';
@@ -9159,6 +9469,7 @@ function initStats(){
         <div class="ac-btns" style="margin-top:6px;justify-content:space-between;">
           <div style="display:flex;gap:8px;">
             <button class="btn" style="padding:6px 12px;font-size:12px;" data-review="${a.id}">📋 ดูเฉลย</button>
+            <button class="btn" style="padding:6px 12px;font-size:12px;color:#fff;background:#111;border-color:#111;font-weight:700;" data-shot="${esc(a.id)}" title="สร้างรูปสรุปผลสอบครั้งนี้ — ส่งให้ AI วิเคราะห์ต่อได้">📸 บันทึกรูปสรุป</button>
             ${_tagsSorted.length?`<button class="btn" id="${_tagCollapseId}_btn" style="padding:6px 12px;font-size:12px;color:#6366f1;border-color:#a5b4fc;">▸ เนื้อหา</button>`:''}
           </div>
           ${Auth.isTeacher()?`<button class="btn-delete" style="padding:6px 12px;" data-del="${a.id}">ลบ</button>`:''}
@@ -9225,6 +9536,7 @@ function initStats(){
 
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
+    rowsEl.querySelectorAll('[data-shot]').forEach(btn=>btn.addEventListener('click',()=>captureAttemptSummary(btn.getAttribute('data-shot'),btn))); // v48.62
     _cardUids.forEach(uid=>{
       const btn=rowsEl.querySelector(`#atag_${uid}_btn`);
       const panel=rowsEl.querySelector(`#atag_${uid}`);
@@ -16530,7 +16842,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.61';
+  const CURRENT_VERSION = 'v48.62';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

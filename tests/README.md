@@ -46,3 +46,5 @@ bash tests/run.sh
 - จอกว้าง (≥901px) หน้ากรอกเฉลยพับ "ตั้งค่าชุดข้อสอบ" ไว้เมื่อมี PDF แล้ว — เทสต์ที่ใช้ `page.fill/click` กับช่องในตั้งค่าต้องกาง `#editorSetHead` ก่อน
 - section `mobileA` (v48.74p → production v48.61, ชี้ `index.html`): หน้ามือถือแบบ A — การ์ดกรอกเฉลย (≤600px), แถบล่าง + แผ่น "ดูโจทย์" (≤900px), หน้าสร้างข้อสอบไม่ล้นจอ;
   stub `PdfViewer.create` แบบเดียวกับ editorSplit; ใน sandbox แถบ "Offline mode" แสดงเสมอ (Firebase โหลดไม่ได้) จึงใช้ทดสอบว่าหัวติดบนหลบแถบนี้ได้ด้วย
+- section `summaryShot` (v48.76p → production v48.62, ชี้ `index.html`): ปุ่ม "📸 บันทึกรูปสรุป" → รูปสรุปผลสอบ; html2canvas โหลดจาก CDN ไม่ได้ใน sandbox จึงใส่ตัวแทนที่คืน canvas ตามขนาดจริง
+  (ตัวจริงตรวจแยกด้วยภาพ — `npm pack html2canvas@1.4.1` แล้ว route ไฟล์ให้ URL cdnjs); ชื่อไฟล์ดาวน์โหลดต้องเป็น ASCII (ชื่อไทยถูกตัดเหลือ "download" ในบางเบราว์เซอร์)
