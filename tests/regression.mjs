@@ -4991,6 +4991,105 @@ currentSection = 'mobileA';
   await c8.close();
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: summaryShot (v48.76p) — ปุ่ม "📸 บันทึกรูปสรุป" บนการ์ดผลสอบ (หน้าผลการฝึกซ้อม) → รูปสรุปผลสอบส่งให้ AI
+// ≤20 ข้อ = 1 รูป, >20 ข้อ = 2 รูป (สรุป+ข้อที่ผิด / ทุกข้อ 3 คอลัมน์); Anxiety เฉพาะบัญชีครู; ชื่อไฟล์ ASCII
+// html2canvas โหลดจาก CDN ไม่ได้ใน sandbox → ใส่ตัวแทนที่คืน canvas ตามขนาดจริง (ตัว lib จริงตรวจด้วยภาพแยกต่างหาก)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'summaryShot';
+{
+  const SS_FILE = 'index_preview.html';
+  const seedExam = (N, wrongNos, extra = {}) => {
+    const qs = [], pq = [], ans = {};
+    for (let i = 1; i <= N; i++) {
+      const c = String(100 + i), w = wrongNos.includes(i) ? String(900 + i) : null;
+      qs.push({ id: 'q' + i, no: i, number: i, page: Math.ceil(i / 5), correct: c, ...(extra.freeNo === i ? { isFree: true } : {}) });
+      ans['q' + i] = w || c;
+      pq.push({ qid: 'q' + i, no: i, page: Math.ceil(i / 5), chosen: w || c, correct: c, isCorrect: !w, elapsedMs: (i * 7 + 3) * 1000, visited: true, changes: i === 2 ? 1 : 0, unsure: (extra.unsureNos || []).includes(i), ...(extra.freeNo === i ? { isFree: true } : {}), ...(extra.skipNos && extra.skipNos.includes(i) ? { counted: false, chosen: null, isCorrect: false } : {}) });
+    }
+    const att = { id: 'att' + N, examId: 'e' + N, examTitle: 'ชุดทดสอบ ' + N, examSubject: 'คณิตศาสตร์', examType: 'fillblank-num', takerName: 'ณนนท์', startedAt: '2026-10-27T11:46:00.000Z', submittedAt: '2026-10-27T12:21:55.000Z', usedSeconds: 2132, score: N - wrongNos.length, total: N, answers: ans, perQuestion: pq, mood: 'ok', feeling: 'hard', prediction: Math.max(0, N - 2), difficulty: 'develop', ...(extra.att || {}) };
+    return { exam: { id: 'e' + N, title: 'ชุดทดสอบ ' + N, subject: 'คณิตศาสตร์', questionCount: N, published: true, order: 1, durationSeconds: 2700, examType: 'fillblank-num', numDigits: 4 }, qs, att };
+  };
+  const mkCache = (list) => baseCache({
+    exams: list.map(x => x.exam), questions: Object.fromEntries(list.map(x => [x.exam.id, x.qs])),
+    attempts: list.map(x => x.att), members: [{ pin: '1111', name: 'ณนนท์' }],
+  });
+  const stubH2c = (page, fail) => page.evaluate((fail) => {
+    window.__h2c = [];
+    window.html2canvas = async (el, opts) => {
+      if (fail) throw new Error('boom');
+      const h = el.getBoundingClientRect().height;
+      const c = document.createElement('canvas'); c.width = Math.round(720 * opts.scale); c.height = Math.round(h * opts.scale);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+      window.__h2c.push({ h, scale: opts.scale, w: el.getBoundingClientRect().width, text: el.textContent, qc: el.querySelectorAll('.shQc').length, qcFree: el.querySelectorAll('.shQc.f').length, qcSkip: el.querySelectorAll('.shQc.s').length, qcWrong: el.querySelectorAll('.shQc.r').length, wc: el.querySelectorAll('.shWc').length }); return c;
+    };
+  }, !!fail);
+  const openStats = async (page) => { await page.evaluate(() => navigate('stats')); await page.waitForTimeout(500); };
+
+  // 1) 10 ข้อ → ปุ่มบนการ์ด, 1 รูป, ข้อมูลครบตามภาพหน้าทบทวน
+  const e10 = seedExam(10, [1, 5]);
+  const { ctx, page } = await newSeededPage({ file: SS_FILE, cache: mkCache([e10]), viewport: { width: 390, height: 844 } });
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await stubH2c(page); await openStats(page);
+  const btnTxt = await page.evaluate(() => [...document.querySelectorAll('#statsRows .attempt-card [data-shot]')].map(b => b.textContent.trim()));
+  check('summaryShot: การ์ดผลสอบในหน้าผลการฝึกซ้อมมีปุ่ม "📸 บันทึกรูปสรุป" (ข้างปุ่มดูเฉลย)', btnTxt.length === 1 && btnTxt[0] === '📸 บันทึกรูปสรุป', JSON.stringify(btnTxt));
+  await page.click('#statsRows [data-shot]');
+  await page.waitForSelector('#shotModal .shotItem img');
+  const m10 = await page.evaluate(() => ({ n: document.querySelectorAll('#shotModal .shotItem').length, calls: window.__h2c.length, w: window.__h2c[0].w, scale: window.__h2c[0].scale, txt: window.__h2c[0].text.replace(/\s+/g, ' '), host: document.querySelectorAll('.shHost').length, btn: document.querySelector('#statsRows [data-shot]').textContent.trim(), dis: document.querySelector('#statsRows [data-shot]').disabled, shown: getComputedStyle(document.getElementById('shotModal')).display, share: document.getElementById('shotShareBtn').textContent, imgs: [...document.querySelectorAll('#shotModal img')].map(i => i.src.startsWith('blob:')) }));
+  check('summaryShot: 10 ข้อ → 1 รูป กว้าง 720px (scale 2), หน้าต่างตรวจรูปเปิด, ปุ่มกลับมาใช้ได้, ไม่เหลือตัวสร้างรูปค้างในหน้า', m10.n === 1 && m10.calls === 1 && m10.w === 720 && m10.scale === 2 && m10.shown === 'flex' && m10.btn === '📸 บันทึกรูปสรุป' && !m10.dis && m10.host === 0 && m10.imgs.every(Boolean), JSON.stringify(m10));
+  const need = ['คะแนน 8/10', 'ถูก 8/10 (80%) • ผิด 2 ข้อ', 'ผิดข้อ: 1, 5', 'วิชา: คณิตศาสตร์', 'ผู้ทำ: ณนนท์', 'ก่อนสอบ', 'หลังสอบ', 'Calibration', 'ทายไว้ 8/10 ข้อ', 'Anxiety Markers', 'Panic Changes', 'ข้อที่ผิดบ่อย TOP 5', 'ข้อ 1', 'ข้อ 5', '901', '101', 'ถูก', 'ผิด', '⏱ 00:10', 'กำหนด 45:00', 'คำอธิบาย'];
+  const miss = need.filter(t => !m10.txt.includes(t));
+  check('summaryShot: รูปมีข้อมูลครบ (คะแนน/ผิดข้อ/อารมณ์/Calibration/Anxiety/TOP 5/รายข้อ เลือก→เฉลย + เวลาต่อข้อ/เวลารวม/คำอธิบาย)', miss.length === 0, JSON.stringify(miss));
+  check('summaryShot: ปุ่มหลักเป็นดาวน์โหลด/แชร์ตามที่เบราว์เซอร์รองรับ (1 รูป) + มีปุ่มคัดลอก/ดาวน์โหลดใต้รูป', /รูป/.test(m10.share) && (await page.evaluate(() => document.querySelectorAll('#shotModal [data-dl]').length)) === 1, m10.share);
+  // ดาวน์โหลด → ชื่อไฟล์ ASCII
+  const dl = page.waitForEvent('download', { timeout: 6000 }).catch(() => null);
+  await page.click('#shotModal [data-dl="0"]');
+  const d = await dl;
+  check('summaryShot: ดาวน์โหลดได้ ชื่อไฟล์เป็น ASCII (exam-summary_วันที่_เวลา.png)', d && /^exam-summary_2026-10-27_\d{4}\.png$/.test(d.suggestedFilename()), d ? d.suggestedFilename() : 'no download');
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  const closed = await page.evaluate(() => ({ d: getComputedStyle(document.getElementById('shotModal')).display, body: document.getElementById('shotModalBody').innerHTML }));
+  check('summaryShot: Esc ปิดหน้าต่าง + ล้างรูป (คืนหน่วยความจำ)', closed.d === 'none' && closed.body === '', JSON.stringify(closed));
+
+  // 2) ตัวสรุป (pure): ขอบเขต 20/21 ข้อ, ไม่มีข้อผิด, ข้อฟรี/ข้าม/ไม่แน่ใจ, weighted
+  const sp = await page.evaluate(() => {
+    const s = Store.load(); const att = s.attempts[0];
+    const mk = (n) => { const a = JSON.parse(JSON.stringify(att)); a.perQuestion = Array.from({ length: n }, (_, i) => ({ qid: 'q' + (i + 1), no: i + 1, page: 1, chosen: '1', correct: '1', isCorrect: true })); const ss = JSON.parse(JSON.stringify(s)); ss.questions[a.examId] = Array.from({ length: n }, (_, i) => ({ id: 'q' + (i + 1), no: i + 1, page: 1, correct: '1' })); a.answers = {}; a.score = n; a.total = n; return renderSummaryPages(buildAttemptSummary(a, ss)); };
+    return { p20: mk(20).length, p21: mk(21).length, p21txt: mk(21)[0].replace(/<[^>]+>/g, ' ').includes('ไม่มีข้อที่ผิด') };
+  });
+  check('summaryShot: 20 ข้อ = 1 รูป, 21 ข้อ = 2 รูป (ไม่มีข้อผิด → "ไม่มีข้อที่ผิด")', sp.p20 === 1 && sp.p21 === 2 && sp.p21txt, JSON.stringify(sp));
+
+  // 3) 50 ข้อ → 2 รูป (ข้อฟรี/ไม่แน่ใจ/ข้าม) + แชร์รวมทุกรูป
+  const e50 = seedExam(50, [3, 8, 12, 17], { freeNo: 25, unsureNos: [8, 19], skipNos: [30], att: { halfMode: true, halfQuota: 49 } });
+  const { ctx: c2, page: p2 } = await newSeededPage({ file: SS_FILE, cache: mkCache([e50]), viewport: { width: 390, height: 844 } });
+  await stubH2c(p2); await openStats(p2);
+  // หน้าสถิติจัดคนละครึ่งไว้แท็บ "คนละครึ่ง" — คลิกแท็บก่อน
+  await p2.evaluate(() => { const t = document.querySelector('#statsTabBar [data-tab="half"]'); if (t) t.click(); });
+  await p2.waitForTimeout(300);
+  await p2.click('#statsRows [data-shot]');
+  await p2.waitForSelector('#shotModal .shotItem img');
+  const m50 = await p2.evaluate(() => ({ n: document.querySelectorAll('#shotModal .shotItem').length, t1: window.__h2c[0].text.replace(/\s+/g, ' '), t2: window.__h2c[1].text.replace(/\s+/g, ' '), h: window.__h2c.map(x => Math.round(x.h)), q2: window.__h2c[1].qc, free: window.__h2c[1].qcFree, skip: window.__h2c[1].qcSkip, wrong2: window.__h2c[1].qcWrong, wc1: window.__h2c[0].wc, cap: [...document.querySelectorAll('#shotModal figcaption')].map(f => f.textContent), share: document.getElementById('shotShareBtn').textContent, dl: document.querySelectorAll('#shotModal [data-dl]').length }));
+  check('summaryShot: 50 ข้อ → 2 รูป (ภาพ 1/2 สรุป+ข้อที่ผิด / ภาพ 2/2 ทุกข้อ) ป้ายกำกับและปุ่มแชร์รวมทุกรูป', m50.n === 2 && JSON.stringify(m50.cap) === JSON.stringify(['ภาพ 1/2', 'ภาพ 2/2']) && /2 รูป/.test(m50.share) && m50.dl === 2 && /ภาพ 1\/2/.test(m50.t1) && /ภาพ 2\/2/.test(m50.t2), JSON.stringify(m50));
+  check('summaryShot: รูป 1 มี "ข้อที่ผิด (4 ข้อ)" + 🤔 ไม่แน่ใจ + ชี้ไปภาพ 2; รูป 2 มีครบ 50 ข้อ, ข้อฟรี, ข้อข้าม, ความสูงแต่ละรูปไม่เกิน ~4,000px', /ข้อที่ผิด \(4 ข้อ\)/.test(m50.t1) && /🤔/.test(m50.t1) && /ดูในภาพที่ 2/.test(m50.t1) && m50.q2 === 50 && m50.free === 1 && m50.skip === 1 && m50.wrong2 === 4 && m50.wc1 === 4 && m50.h.every(h => h < 4000), JSON.stringify(m50));
+  await c2.close();
+
+  // 4) นักเรียนไม่เห็น Anxiety; เปิดแอปออฟไลน์/โหลด lib ไม่ได้ → toast + ปุ่มกลับมา ไม่มี error
+  const { ctx: c3, page: p3 } = await newSeededPage({ file: SS_FILE, role: 'student', name: 'ณนนท์', cache: mkCache([e10]), viewport: { width: 390, height: 844 } });
+  await stubH2c(p3); await openStats(p3);
+  await p3.click('#statsRows [data-shot]'); await p3.waitForSelector('#shotModal .shotItem img');
+  const stu = await p3.evaluate(() => window.__h2c[0].text);
+  check('summaryShot: บัญชีนักเรียนไม่เห็น Anxiety Markers ในรูป (เหมือนหน้าทบทวน) แต่ Calibration ยังอยู่', !/Anxiety/.test(stu) && /Calibration/.test(stu), '');
+  await c3.close();
+  const { ctx: c4, page: p4 } = await newSeededPage({ file: SS_FILE, cache: mkCache([e10]), viewport: { width: 390, height: 844 } });
+  const e4 = []; p4.on('pageerror', e => e4.push(e.message));
+  await stubH2c(p4, true); await openStats(p4);
+  await p4.click('#statsRows [data-shot]'); await p4.waitForTimeout(400);
+  const fail = await p4.evaluate(() => ({ toast: document.getElementById('toast').textContent, btn: document.querySelector('#statsRows [data-shot]').textContent.trim(), dis: document.querySelector('#statsRows [data-shot]').disabled, modal: getComputedStyle(document.getElementById('shotModal')).display, host: document.querySelectorAll('.shHost').length }));
+  check('summaryShot: สร้างรูปไม่สำเร็จ → แจ้ง toast, ปุ่มกลับมากดซ้ำได้, ไม่เปิดหน้าต่าง, ไม่เหลือตัวสร้างรูปค้าง', /สร้างรูปไม่สำเร็จ/.test(fail.toast) && fail.btn === '📸 บันทึกรูปสรุป' && !fail.dis && fail.modal === 'none' && fail.host === 0 && e4.length === 0, JSON.stringify([fail, e4]));
+  await c4.close();
+  check('summaryShot: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+  await ctx.close();
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
