@@ -5197,6 +5197,95 @@ currentSection = 'shareExam';
   check('shareExam: โหลดเสร็จแล้วยังไม่มีข้อสอบนี้จริง → "ไม่พบข้อสอบ"', /ไม่พบข้อสอบ/.test(await p4.evaluate(() => document.getElementById('examDetailWrap').textContent)), '');
   await c4.close();
   check('shareExam: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+
+  // 5) (v48.78p) ฝากการบ้านห้ามส่งซ้ำ: ส่งแล้วปุ่ม "ส่งให้" เปลี่ยนเป็น "ยกเลิก"
+  const cache5 = () => baseCache({
+    exams: [mk('sa1', "ชุด 'ทดสอบ' \"อัญประกาศ\"", true), mk('sa2', 'ชุดสอง', true), mk('sa3', 'ชุดสาม', true), mk('sa4', 'ชุดสี่', true)],
+    questions: { sa1: mkQ(), sa2: mkQ(), sa3: mkQ(), sa4: mkQ() },
+    members: [{ pin: '311257', name: 'ณนนท์' }, { pin: '222222', name: 'Tester' }],
+  });
+  const { ctx: c5, page: p5 } = await newSeededPage({ file: SH_FILE, cache: cache5(), viewport: { width: 1440, height: 900 } });
+  const errs5 = []; p5.on('pageerror', e => errs5.push(e.message));
+  await p5.evaluate(() => { window._homeRenders = 0; const r = window.renderHome; window.renderHome = function () { window._homeRenders++; return r && r.apply(this, arguments); }; });
+  const T1 = "ชุด 'ทดสอบ' \"อัญประกาศ\"";
+  const openM = (id, title) => p5.evaluate(([id, title]) => { _showAssignModal(id, title, 'วิทยาศาสตร์'); }, [id, title]);
+  const rowOf = (name) => p5.evaluate((name) => {
+    const m = document.getElementById('assignModal'); if (!m) return null;
+    const row = [...m.querySelectorAll('[data-asg-row]')].find(r => r.dataset.asgRow === name);
+    return row ? { txt: row.textContent.replace(/\s+/g, ' ').trim(), btns: [...row.querySelectorAll('button')].map(b => b.textContent.trim()) } : null;
+  }, name);
+  const clickIn = (name, label) => p5.evaluate(([name, label]) => {
+    const row = [...document.querySelectorAll('#assignModal [data-asg-row]')].find(r => r.dataset.asgRow === name);
+    [...row.querySelectorAll('button')].find(b => b.textContent.trim() === label).click();
+  }, [name, label]);
+  const pend = (ex) => p5.evaluate((ex) => (Store.load().assignments || []).filter(a => a.status === 'pending' && (!ex || a.examId === ex)).map(a => a.assignedTo), ex);
+
+  await openM('sa1', T1);
+  let r1 = await rowOf('ณนนท์');
+  check('assignDup: ยังไม่เคยส่ง → มีปุ่ม "ส่งให้" (ชื่อชุดมี \' และ " ปุ่มต้องไม่พัง)', r1 && r1.btns.length === 1 && r1.btns[0] === 'ส่งให้', JSON.stringify(r1));
+  await clickIn('ณนนท์', 'ส่งให้'); await p5.waitForTimeout(150);
+  const a1 = await p5.evaluate(() => (Store.load().assignments || []).map(a => [a.examId, a.examTitle, a.assignedTo, a.status]));
+  check('assignDup: กด "ส่งให้" บนชื่อชุดที่มี \' และ " → สร้างการบ้านถูก (ชื่อ/ชุดครบ)', a1.length === 1 && a1[0][0] === 'sa1' && a1[0][1] === T1 && a1[0][2] === 'ณนนท์' && a1[0][3] === 'pending', JSON.stringify(a1));
+
+  await openM('sa1', T1);
+  r1 = await rowOf('ณนนท์'); const rt = await rowOf('Tester');
+  check('assignDup: ส่งแล้ว → แถวเด็กเป็น "ส่งแล้ว" + ปุ่ม "ยกเลิก" เท่านั้น (ไม่มี "ส่งให้")', r1 && /ส่งแล้ว/.test(r1.txt) && r1.btns.length === 1 && r1.btns[0] === 'ยกเลิก', JSON.stringify(r1));
+  check('assignDup: เด็กคนอื่นที่ยังไม่ได้รับ ยังเห็น "ส่งให้" ตามเดิม', rt && rt.btns.length === 1 && rt.btns[0] === 'ส่งให้', JSON.stringify(rt));
+  await p5.evaluate(() => document.getElementById('assignModal').remove());
+  await openM('sa2', 'ชุดสอง');
+  check('assignDup: ข้อสอบอีกชุดที่ยังไม่ส่ง → ณนนท์ยังเห็น "ส่งให้"', (await rowOf('ณนนท์')).btns.join() === 'ส่งให้', '');
+  await p5.evaluate(() => document.getElementById('assignModal').remove());
+
+  // กันซ้ำที่ตัวสร้าง (กดรัว / modal ค้างจากอีกเครื่อง)
+  await p5.evaluate((t) => { _assignToStudent('ณนนท์', 'sa1', t, 'วิทยาศาสตร์'); _assignToStudent('ณนนท์', 'sa1', t, 'วิทยาศาสตร์'); }, T1);
+  const dupToast = await toastText(p5);
+  check('assignDup: เรียกส่งซ้ำชุดเดิม → ไม่สร้างซ้ำ (pending ชุดนั้นยังเท่ากับ 1) + toast บอกว่าส่งไปแล้ว', (await pend('sa1')).length === 1 && /ไปแล้ว/.test(dupToast), dupToast);
+
+  // ยกเลิกจาก modal
+  await openM('sa1', T1);
+  await p5.evaluate(() => { window.confirm = () => true; });
+  const hr0 = await p5.evaluate(() => window._homeRenders);
+  await clickIn('ณนนท์', 'ยกเลิก'); await p5.waitForTimeout(200);
+  const cs = await p5.evaluate(() => ({ st: (Store.load().assignments || []).map(a => a.status), modal: !!document.getElementById('assignModal'), hr: window._homeRenders, page: window._currentPage }));
+  check('assignDup: กด "ยกเลิก" (ยืนยัน) → การบ้านเป็น cancelled, modal ปิด, toast ยืนยัน, ไม่ re-render หน้าแรก', cs.st.length === 1 && cs.st[0] === 'cancelled' && !cs.modal && /ยกเลิกการบ้านแล้ว/.test(await toastText(p5)) && cs.hr === hr0, JSON.stringify([cs, hr0]));
+  await openM('sa1', T1);
+  check('assignDup: ยกเลิกแล้ว → กลับเป็นปุ่ม "ส่งให้" และส่งใหม่ได้ (ได้ pending ใหม่ 1 รายการ)', (await rowOf('ณนนท์')).btns.join() === 'ส่งให้', '');
+  await clickIn('ณนนท์', 'ส่งให้'); await p5.waitForTimeout(150);
+  check('assignDup: ส่งใหม่หลังยกเลิก → pending ชุดนี้ = 1', (await pend('sa1')).length === 1, JSON.stringify(await pend('sa1')));
+
+  // ปฏิเสธ confirm → ไม่ยกเลิก
+  await openM('sa1', T1);
+  await p5.evaluate(() => { window.confirm = () => false; });
+  await clickIn('ณนนท์', 'ยกเลิก'); await p5.waitForTimeout(150);
+  check('assignDup: ปฏิเสธ confirm → การบ้านยังอยู่ และ modal ยังเปิด', (await pend('sa1')).length === 1 && (await p5.evaluate(() => !!document.getElementById('assignModal'))), '');
+  await p5.evaluate(() => document.getElementById('assignModal').remove());
+
+  // ค้างครบ 3 ชุด: ชุดที่ส่งแล้วต้องยังเห็นปุ่มยกเลิก, ชุดใหม่เห็นข้อความเต็ม
+  await p5.evaluate(() => { _assignToStudent('ณนนท์', 'sa2', 'ชุดสอง', 'วิทยาศาสตร์'); _assignToStudent('ณนนท์', 'sa3', 'ชุดสาม', 'วิทยาศาสตร์'); });
+  await openM('sa1', T1);
+  const full1 = await rowOf('ณนนท์');
+  await p5.evaluate(() => document.getElementById('assignModal').remove());
+  await openM('sa4', 'ชุดสี่');
+  const full4 = await rowOf('ณนนท์');
+  await p5.evaluate(() => document.getElementById('assignModal').remove());
+  check('assignDup: ค้างครบ 3 ชุด → ชุดที่ส่งอยู่แล้วยังเห็น "ยกเลิก"; ชุดใหม่เห็น "มีการบ้านค้างอยู่ 3 ชุดแล้ว" (ไม่มีปุ่ม)', full1.btns.join() === 'ยกเลิก' && full4.btns.length === 0 && /ค้างอยู่ 3 ชุด/.test(full4.txt), JSON.stringify([full1, full4]));
+
+  // เด็กทำเสร็จ (done) แล้ว → ฝากทำซ้ำได้
+  await p5.evaluate(() => { const s = Store.load(); s.assignments.forEach(a => { if (a.examId === 'sa2') a.status = 'done'; }); Store.save(s); });
+  await openM('sa2', 'ชุดสอง');
+  check('assignDup: การบ้านที่เด็กทำเสร็จแล้ว (done) ไม่นับว่าส่งอยู่ → ฝากอีกรอบได้', (await rowOf('ณนนท์')).btns.join() === 'ส่งให้', '');
+  await p5.evaluate(() => document.getElementById('assignModal').remove());
+
+  // ปุ่มฝากการบ้านจากหน้ารายการข้อสอบของครู (#page-exams) ใช้ modal เดียวกัน
+  await p5.evaluate(() => navigate('exams')); await p5.waitForTimeout(400);
+  const hasBtn = await p5.evaluate(() => !!document.querySelector('#page-exams [onclick*="_showAssignModal"], #page-exams [data-assign]'));
+  if (hasBtn) {
+    await p5.evaluate(() => (document.querySelector('#page-exams [onclick*="_showAssignModal"], #page-exams [data-assign]')).click());
+    await p5.waitForTimeout(150);
+    check('assignDup: หน้ารายการข้อสอบของครู เปิด modal เดียวกัน (มีแถวเด็ก data-asg-row)', await p5.evaluate(() => document.querySelectorAll('#assignModal [data-asg-row]').length) === 2, '');
+  }
+  await c5.close();
+  check('assignDup: ไม่มี error ในหน้า', errs5.length === 0, JSON.stringify(errs5));
 }
 
 await browser.close();

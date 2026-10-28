@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.77p -->
+  <!-- APP_VERSION: v48.78p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1478,7 +1478,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.77p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.78p</div>
     </div>
   </div>
 </div>
@@ -5311,20 +5311,25 @@ function _showAssignModal(examId, examTitle, examSubject) {
   const s = Store.load();
   const assignments = s.assignments || [];
 
-  const itemsHtml = members.map(m => {
-    const pendingCount = assignments.filter(
-      a => a.assignedTo === m.name && a.status === 'pending'
-    ).length;
-    const blocked = pendingCount >= 3;
+  // v48.78p: เด็กที่ได้รับการบ้านชุดนี้ไปแล้ว (pending) → "ส่งแล้ว" + ปุ่มยกเลิก แทนปุ่ม "ส่งให้" (ห้ามส่งซ้ำ)
+  // ปุ่มใช้ data-* + listener (ไม่ฝังชื่อ/ชื่อชุดเป็นสตริงใน onclick — ชื่อที่มี ' หรือ " ทำให้ปุ่มพัง)
+  const itemsHtml = members.map((m, i) => {
+    const mine = assignments.filter(a => a.assignedTo === m.name && a.status === 'pending');
+    const sent = mine.find(a => a.examId === examId);
+    const blocked = mine.length >= 3;
     return `
-      <div style="display:flex;justify-content:space-between;align-items:center;
-        padding:10px 14px;border-bottom:1px solid #f3f4f6;">
+      <div data-asg-row="${esc(m.name)}" style="display:flex;justify-content:space-between;align-items:center;
+        padding:10px 14px;border-bottom:1px solid #f3f4f6;gap:8px;">
         <div style="font-size:14px;color:#374151;">${esc(m.name)}</div>
-        ${blocked
+        ${sent
+          ? `<div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:#6b7280;">✓ ส่งแล้ว</span>
+              <button class="btn" data-asg-cancel="${esc(sent.id)}" style="font-size:12px;padding:4px 12px;
+                color:#D70015;border-color:#D70015;">ยกเลิก</button>
+            </div>`
+          : blocked
           ? `<span style="font-size:12px;color:#9ca3af;">มีการบ้านค้างอยู่ 3 ชุดแล้ว</span>`
-          : `<button class="btn btnPrimary" style="font-size:12px;padding:4px 12px;"
-              onclick="_assignToStudent('${esc(m.name)}','${esc(examId)}','${esc(examTitle)}','${esc(examSubject)}')">
-              ส่งให้</button>`
+          : `<button class="btn btnPrimary" data-asg-to="${i}" style="font-size:12px;padding:4px 12px;">ส่งให้</button>`
         }
       </div>
     `;
@@ -5351,12 +5356,36 @@ function _showAssignModal(examId, examTitle, examSubject) {
     </div>
   `;
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelectorAll('[data-asg-to]').forEach(btn => btn.addEventListener('click', () => {
+    _assignToStudent(members[Number(btn.dataset.asgTo)].name, examId, examTitle, examSubject);
+  }));
+  modal.querySelectorAll('[data-asg-cancel]').forEach(btn => btn.addEventListener('click', () => {
+    _cancelAssignmentInModal(btn.dataset.asgCancel);
+  }));
   document.body.appendChild(modal);
+}
+
+// v48.78p: ยกเลิกการบ้านจาก modal ส่งการบ้าน (ถูกเรียกจากหน้าอื่นที่ไม่ใช่หน้าแรก จึงไม่ renderHome เหมือน _cancelAssignment ของกระดิ่ง)
+function _cancelAssignmentInModal(assignId) {
+  if (!confirm('ยกเลิกการบ้านนี้?')) return;
+  const s = Store.load();
+  const a = (s.assignments||[]).find(x => x.id === assignId);
+  if (a) { a.status = 'cancelled'; Store.save(s); }
+  const modal = document.getElementById('assignModal');
+  if (modal) modal.remove();
+  toast('✅ ยกเลิกการบ้านแล้ว');
 }
 
 function _assignToStudent(studentName, examId, examTitle, examSubject) {
   const s = Store.load();
   const assignments = s.assignments || [];
+  // v48.78p: ชุดนี้ส่งให้เด็กคนนี้ไปแล้ว (ยัง pending) → ไม่สร้างซ้ำ (กดรัว / modal ค้าง / ลิงก์เก่า)
+  if (assignments.some(a => a.assignedTo === studentName && a.examId === examId && a.status === 'pending')) {
+    const modal0 = document.getElementById('assignModal');
+    if (modal0) modal0.remove();
+    toast('ส่งการบ้านชุดนี้ให้ ' + studentName + ' ไปแล้ว');
+    return;
+  }
   const pendingCount = assignments.filter(
     a => a.assignedTo === studentName && a.status === 'pending'
   ).length;
@@ -16905,7 +16934,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.77p';
+  const CURRENT_VERSION = 'v48.78p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
