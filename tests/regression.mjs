@@ -5576,10 +5576,10 @@ currentSection = 'liveView';
     await T.waitForTimeout(3300);
     const after = await T.evaluate(() => document.querySelector('[data-lv-card$="ซ_aging"]').dataset.status);
     check('liveView: เงียบเกิน 45 วิ → การ์ดเปลี่ยนจาก active เป็น stale เอง (ไม่ต้องมีข้อมูลใหม่)', before === 'active' && after === 'stale', before + '→' + after);
-    // ออกจากหน้า admin → หยุดฟัง
-    await T.evaluate(() => navigate('home')); await T.waitForTimeout(300);
+    // ออกจากหน้า admin/admin_live/หน้าแรก → หยุดฟัง (v48.81p: หน้าแรกของครูฟังด้วย จึงทดสอบด้วยหน้าสถิติ)
+    await T.evaluate(() => navigate('stats')); await T.waitForTimeout(300);
     await put('ฌ_after', mkDoc('ฌ_after', { ts: Date.now() })); await T.waitForTimeout(500);
-    check('liveView: ออกจากหน้า admin/admin_live → หยุดฟังและเคลียร์ (ไม่โหลดเอกสารสดเมื่อไม่ได้ดู)', (await T.evaluate(() => LiveView._docs.size)) === 0, '');
+    check('liveView: ออกไปหน้าอื่น (ไม่ใช่ admin/admin_live/หน้าแรก) → หยุดฟังและเคลียร์ (ไม่โหลดเอกสารสดเมื่อไม่ได้ดู)', (await T.evaluate(() => LiveView._docs.size)) === 0, '');
     // หน้าว่าง
     await T.evaluate(() => { Object.keys(__fakeFS.all()).filter(k => k.includes('_live_')).forEach(k => __fakeFS.del(k)); navigate('admin_live'); }); await T.waitForTimeout(600);
     check('liveView: ไม่มีใครทำข้อสอบ → หน้าว่าง "ตอนนี้ไม่มีใครกำลังทำข้อสอบ" และแบนเนอร์ซ่อน', /ตอนนี้ไม่มีใครกำลังทำข้อสอบ/.test(await T.evaluate(() => document.getElementById('liveList').innerText)), '');
@@ -5599,6 +5599,55 @@ currentSection = 'liveView';
     await S.evaluate(() => navigate('admin_live')); await S.waitForTimeout(400);
     check('liveView: นักเรียนเปิดหน้าดูสดไม่ได้ → เด้งกลับหน้าแรก และไม่ฟังเอกสารสด', (await S.evaluate(() => [window._currentPage, LiveView._docs.size].join())) === 'home,0', await S.evaluate(() => window._currentPage));
     check('liveView: ไม่มี error ในหน้า (ฝั่งครู)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+
+  // ── 7) (v48.81p) กล่อง "กำลังทำข้อสอบ" สดบนหน้าแรกของครู ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const T = await openAs(ctx, 'teacher', 'Admin', errs);
+    const now = await T.evaluate(() => Date.now());
+    const mk = (name, over) => ({ v: 1, name, mode: 'timed', examId: 'e1', examTitle: 'ชุดหน้าแรก ' + name, subject: 'คณิตศาสตร์', examType: 'mc', weighted: false, startedAt: now - 600e3, pauseOffset: 60, durSec: 900, quota: 0, cur: 4, nos: [1, 2, 3, 4, 5, 6, 7, 8], ans: [1, 2, 3], ok: [1, 2], bad: [3], nk: [], free: [], unsure: [], skipped: [], changes: 0, score: 2, scoreTotal: 8, qElapsed: {}, state: 'active', awaySince: null, ts: Date.now(), ...over });
+    const put = (name, d) => T.evaluate(([id, d]) => __fakeFS.put(id, { _d: JSON.stringify(d), _ts: Date.now() }), [NSL + 'live_' + name, d]);
+    const box = () => T.evaluate(() => { const b = document.getElementById('homeLiveBox'); return b ? { items: b.querySelectorAll('.hlItem').length, txt: b.innerText.replace(/\s+/g, ' '), inCard: !!b.closest('#whoopSection'), shown: getComputedStyle(b).display !== 'none' } : null; });
+    await T.evaluate(() => navigate('home')); await T.waitForTimeout(700);
+    const b0 = await box();
+    check('homeLive: ไม่มีใครทำข้อสอบ → หน้าแรกครูไม่มีกล่องสด (ช่องว่าง/ซ่อน)', b0 && b0.items === 0 && !b0.shown, JSON.stringify(b0));
+    await put('ณนนท์', mk('ณนนท์')); await T.waitForTimeout(700);
+    const b1 = await box();
+    check('homeLive: เด็กเริ่มทำ → กล่องโผล่เองในการ์ดสมาชิก (ไม่ต้องรีเฟรช) พร้อมชื่อ/ชุด/ข้อ/ถูกผิด/เวลาที่เหลือ', b1.items === 1 && b1.inCard && b1.shown && /ณนนท์ กำลังทำข้อสอบ/.test(b1.txt) && /ชุดหน้าแรก ณนนท์/.test(b1.txt) && /ข้อ 4\/8/.test(b1.txt) && /✓2 ✗1/.test(b1.txt) && /เหลือ/.test(b1.txt) && /ดูสด/.test(b1.txt), JSON.stringify(b1));
+    const t1 = await T.evaluate(() => document.querySelector('#homeLiveBox [data-lv="rem"]').textContent);
+    await T.waitForTimeout(2100);
+    const t2 = await T.evaluate(() => document.querySelector('#homeLiveBox [data-lv="rem"]').textContent);
+    const sec = (t) => { const m = /(\d+):(\d+)/.exec(t); return m ? +m[1] * 60 + +m[2] : -1; };
+    check('homeLive: เวลาที่เหลือในกล่องเดินเองทุกวินาที', sec(t2) <= sec(t1) - 2 && Math.abs(sec(t1) - 360) <= 3, t1 + ' → ' + t2);
+    await T.evaluate(() => renderHome()); await T.waitForTimeout(200);
+    check('homeLive: หน้าแรกถูก render ใหม่ (soft refresh) → กล่องยังอยู่', (await box()).items === 1, '');
+    await T.evaluate(() => [...document.querySelectorAll('#whoopSection button')].find(b => b.textContent.trim() === 'Tester').click()); await T.waitForTimeout(300);
+    check('homeLive: กดแท็บสมาชิกคนอื่น → กล่องยังอยู่ (แสดงทุกคนที่กำลังทำ ไม่ขึ้นกับแท็บที่เลือก)', (await box()).items === 1, JSON.stringify(await box()));
+    await put('Tester', mk('Tester', { state: 'away', awaySince: Date.now() - 30e3, mode: 'practice', durSec: 0 })); await T.waitForTimeout(700);
+    const b2 = await box();
+    check('homeLive: 2 คนพร้อมกัน → 2 แถว; คนที่พับแอป → เหลือง "ออกจากแอป" + โหมดไม่จับเวลาแสดง "ใช้ไป"', b2.items === 2 && /Tester ออกจากแอป/.test(b2.txt) && /ใช้ไป/.test(b2.txt) && (await T.evaluate(() => document.querySelectorAll('#homeLiveBox .hlItem.away').length)) === 1, JSON.stringify(b2));
+    await put('ค_stale', mk('ค_stale', { ts: Date.now() - 120e3 }));
+    await put('ง_done', mk('ง_done', { state: 'done', attemptId: 'attZ' })); await T.waitForTimeout(700);
+    check('homeLive: ขาดการเชื่อมต่อ/ส่งแล้ว → ไม่แสดงในกล่องหน้าแรก (กันขึ้นค้าง)', (await box()).items === 2 && !/ค_stale|ง_done/.test((await box()).txt), JSON.stringify(await box()));
+    await put('จ_3', mk('จ_3')); await T.waitForTimeout(700);
+    const b3 = await box();
+    check('homeLive: เกิน 2 คน → แสดง 2 แถว + "อีก 1 คนกำลังทำข้อสอบ"', b3.items === 2 && /อีก 1 คนกำลังทำข้อสอบ/.test(b3.txt), JSON.stringify(b3));
+    await T.evaluate((ids) => ids.forEach(id => __fakeFS.del(id)), [NSL + 'live_จ_3', NSL + 'live_Tester']); await T.waitForTimeout(700);
+    check('homeLive: เด็กส่ง/ออก (เอกสารถูกลบ) → แถวหายเอง', (await box()).items === 1, JSON.stringify(await box()));
+    await T.evaluate(() => document.querySelector('#homeLiveBox .hlItem').click()); await T.waitForTimeout(500);
+    check('homeLive: กดกล่อง → เข้าหน้าดูสด (admin_live) ทันที', (await T.evaluate(() => window._currentPage)) === 'admin_live', await T.evaluate(() => window._currentPage));
+    // มือถือ 390: กล่องลงบรรทัดใหม่เต็มกว้าง ไม่ล้นจอ
+    await T.setViewportSize({ width: 390, height: 844 });
+    await T.evaluate(() => navigate('home')); await T.waitForTimeout(700);
+    const mob = await T.evaluate(() => { const b = document.getElementById('homeLiveBox'); const r = b.getBoundingClientRect(); const it = b.querySelector('.hlItem').getBoundingClientRect(); const card = document.getElementById('whoopSection').getBoundingClientRect(); const go = b.querySelector('.hlItem .tm').getBoundingClientRect(); return { ow: document.documentElement.scrollWidth - innerWidth, w: Math.round(r.width), items: b.querySelectorAll('.hlItem').length, itemRight: Math.round(it.right), goRight: Math.round(go.right), cardRight: Math.round(card.right) }; });
+    check('homeLive: มือถือ 390px → กล่องเต็มกว้างใต้คำคม อยู่ในขอบการ์ด (เห็นเวลาที่เหลือครบ) ไม่ล้นจอ', mob.items === 1 && mob.ow <= 0 && mob.w >= 280 && mob.itemRight <= mob.cardRight && mob.goRight <= mob.cardRight, JSON.stringify(mob));
+    // นักเรียน: ไม่มีกล่อง ไม่ฟัง
+    const S = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await S.evaluate(() => navigate('home')); await S.waitForTimeout(700);
+    check('homeLive: นักเรียนหน้าแรก → ไม่มีกล่องสด และไม่ฟังเอกสารสด', (await S.evaluate(() => [document.querySelectorAll('#homeLiveBox .hlItem').length, LiveView._docs.size].join())) === '0,0', '');
+    check('homeLive: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
     await ctx.close();
   }
 }

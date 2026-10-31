@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.64 -->
+  <!-- APP_VERSION: v48.65 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1437,6 +1437,24 @@
     .lvPill.cur{box-shadow:0 0 0 2px #fff,0 0 0 4px #2563eb;}
     .lvPill.cur:not(.ok):not(.bad):not(.nk):not(.fr){border-color:#2563eb;color:#2563eb;}
     .lvPill sup{position:absolute;top:-5px;right:-3px;font-size:9px;}
+    /* v48.65: กล่อง "กำลังทำข้อสอบ" สดบนหน้าแรกของครู */
+    .homeLive{flex:0 1 460px;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;}
+    .homeLive:empty{display:none;}
+    .hlItem{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:1px solid #bbf7d0;background:#f0fdf4;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit;}
+    .hlItem:hover{background:#dcfce7;}
+    .hlItem.away{border-color:#fde68a;background:#fffbeb;}
+    .hlItem .lvDot{animation:hlPulse 1.6s ease-in-out infinite;}
+    @keyframes hlPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+    @media (prefers-reduced-motion:reduce){ .hlItem .lvDot{animation:none;} }
+    .hlItem .t{flex:1;min-width:0;}
+    .hlItem .t b{font-size:14px;}
+    .hlItem .t span{display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .hlItem .tm{text-align:right;flex-shrink:0;}
+    .hlItem .tm small{display:block;font-size:11px;color:#6b7280;}
+    .hlItem .tm b{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;}
+    .hlItem .go{font-size:12px;font-weight:700;color:#166534;white-space:nowrap;flex-shrink:0;}
+    .hlMore{font-size:12px;color:#6b7280;padding-left:4px;cursor:pointer;}
+    @media (max-width:700px){ .homeQuoteRow{flex-wrap:wrap;} .homeLive{order:3;flex:1 1 100%;} .hlItem{padding:9px 12px;gap:10px;} .hlItem .t span{white-space:normal;} .hlItem .go{display:none;} }
     @media (max-width:1000px){ .lvPills{grid-template-columns:repeat(16,1fr);} .lvBig{font-size:48px;} }
     @media (max-width:760px){
       .lvMain{grid-template-columns:1fr;}
@@ -1522,7 +1540,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.64</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.65</div>
     </div>
   </div>
 </div>
@@ -5103,15 +5121,18 @@ function renderHome(){
       </div>
     `;
     const _quoteToday = getQuoteOfDay();
+    // v48.65: กล่อง "กำลังทำข้อสอบ" สด (ครูเท่านั้น — LiveView.homeHtml คืน '' ถ้าไม่ใช่ครู/ไม่มีใครทำ) วางระหว่างคำคมกับกระดิ่ง
+    const _liveHtml = (() => { try { return LiveView.homeHtml(); } catch (e) { return ''; } })();
     return `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 4px;gap:10px;">
-        <div style="min-width:0;display:flex;align-items:flex-start;gap:6px;">
+      <div class="homeQuoteRow" style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 4px;gap:10px;">
+        <div style="min-width:0;flex:1;display:flex;align-items:flex-start;gap:6px;">
           <span style="color:#8E8E93;flex-shrink:0;margin-top:2px;">${_icon(_ICONS.messageCircle, 14)}</span>
           <span>
             <span style="font-weight:700;font-size:14px;color:#1C1C1E;">${esc(userId)}</span>
             <span style="font-size:13px;color:#6E6E73;font-style:italic;">${esc(_quoteToday)}</span>
           </span>
         </div>
+        <div class="homeLive" id="homeLiveBox">${_liveHtml}</div>
         ${_bellHtml}
       </div>
     `;
@@ -10521,7 +10542,7 @@ function initPractice(params){
 }
 
 // ===================== LIVE VIEW — ฝั่งครู (v48.64) =====================
-// ฟัง live_* (เอกสารสถานะสดจาก LiveShare) เฉพาะตอนครูอยู่หน้า admin / admin_live
+// ฟัง live_* (เอกสารสถานะสดจาก LiveShare) เฉพาะตอนครูอยู่หน้า admin / admin_live / home (v48.65)
 // เวลาคำนวณจาก startedAt/durSec/pauseOffset ด้วยนาฬิกาเครื่องครูเอง ทุก 1 วิ (สูตรเดียวกับเครื่องลูก) → เดินต่อแม้ลูกพับแอป/สัญญาณหาย (ประมาณการ)
 const LiveView = (() => {
   const STALE_MS = 45000, HIDE_ACTIVE_MS = 6 * 3600e3, HIDE_DONE_MS = 2 * 3600e3;
@@ -10655,6 +10676,33 @@ const LiveView = (() => {
     }
   }
 
+  // v48.65: กล่องสดบนหน้าแรกของครู — นับเฉพาะคนที่กำลังทำจริง (เกณฑ์เดียวกับแบนเนอร์ Admin: ไม่รวมขาดการเชื่อมต่อ/ส่งแล้ว)
+  const _homeList = (now) => _list(now).filter(([, d]) => ['active', 'away', 'submitting'].includes(_status(d, now)));
+  function homeHtml() {
+    try {
+      if (!Auth.isTeacher()) return '';
+      const now = Date.now(), act = _homeList(now);
+      if (!act.length) return '';
+      const rows = act.slice(0, 2).map(([id, d]) => {
+        const st = _status(d, now), timed = _num(d.durSec) > 0, away = st === 'away';
+        const what = away ? 'ออกจากแอป (ยังอยู่ในข้อสอบ)' : (st === 'submitting' ? 'กำลังส่งคำตอบ' : 'กำลังทำข้อสอบ');
+        return `<button type="button" class="hlItem${away ? ' away' : ''}" data-hl-go="${esc(id)}" onclick="navigate('admin_live')">
+          <span class="lvDot${away ? ' am' : ''}"></span>
+          <span class="t"><b>${esc(d.name || '')} ${what}</b><span>${esc(d.examTitle || '')} · ข้อ ${d.cur == null ? '–' : esc(d.cur)}/${_arr(d.nos).length} · ✓${_arr(d.ok).length} ✗${_arr(d.bad).length}</span></span>
+          <span class="tm"><small>${timed ? 'เหลือ' : 'ใช้ไป'}</small><b data-lv="${timed ? 'rem' : 'el'}" data-id="${esc(id)}">${fmtTime(timed ? _remaining(d, now) : _elapsed(d, now))}</b></span>
+          <span class="go">ดูสด ›</span></button>`;
+      }).join('');
+      return rows + (act.length > 2 ? `<div class="hlMore" onclick="navigate('admin_live')">อีก ${act.length - 2} คนกำลังทำข้อสอบ — กดดูทั้งหมด</div>` : '');
+    } catch (e) { return ''; }
+  }
+  // เขียนกล่องใหม่เฉพาะเมื่อสถานะ/ข้อ/ถูกผิดเปลี่ยน (ตัวเลขเวลาเดินผ่าน _tickClocks อยู่แล้ว)
+  function renderHomeBox(force) {
+    const el = document.getElementById('homeLiveBox'); if (!el) return;
+    const now = Date.now();
+    const sig = _homeList(now).map(([id, d]) => [id, _status(d, now), d.cur, _arr(d.ok).length, _arr(d.bad).length, d.examTitle].join('|')).join(';');
+    if (!force && el.dataset.sig === sig) return;
+    el.dataset.sig = sig; el.innerHTML = homeHtml();
+  }
   // อัปเดตตัวเลขที่เดินทุกวินาที (ไม่ render ใหม่ทั้งหน้า) — ถ้าสถานะของใครเปลี่ยน (เช่น active → ขาดการเชื่อมต่อ) ค่อย render ใหม่
   function _tickClocks() {
     const now = Date.now();
@@ -10675,6 +10723,7 @@ const LiveView = (() => {
   function _rerender() {
     if (window._currentPage === 'admin_live') renderPage();
     else if (window._currentPage === 'admin') { try { renderBanner(); } catch (e) {} }
+    else if (window._currentPage === 'home') { try { renderHomeBox(true); } catch (e) {} }
   }
   function enter() {
     if (_unsub || !Auth.isTeacher()) return;
@@ -10684,19 +10733,19 @@ const LiveView = (() => {
       changes.forEach(c => { const id = String(c.id).slice(pre); if (c.type === 'removed' || !c.data) _docs.delete(id); else _docs.set(id, c.data); });
       _rerender();
     });
-    _clock = setInterval(() => { try { _tickClocks(); if (window._currentPage === 'admin') renderBanner(); } catch (e) {} }, 1000);
+    _clock = setInterval(() => { try { _tickClocks(); if (window._currentPage === 'admin') renderBanner(); else if (window._currentPage === 'home') renderHomeBox(); } catch (e) {} }, 1000);
   }
   function leave() {
     if (_unsub) { try { _unsub(); } catch (e) {} _unsub = null; }
     if (_clock) { clearInterval(_clock); _clock = null; }
     _docs.clear();
   }
-  function onNavigate(page) { if (page === 'admin' || page === 'admin_live') enter(); else leave(); }
+  function onNavigate(page) { if (page === 'admin' || page === 'admin_live' || page === 'home') enter(); else leave(); } // v48.65: + หน้าแรก (ครู)
   function remove(id) {
     _docs.delete(id); renderPage();
     Promise.resolve(FirebaseSync.deleteDoc(id)).catch(() => {});
   }
-  return { enter, leave, onNavigate, renderPage, renderBanner, remove, _docs };
+  return { enter, leave, onNavigate, renderPage, renderBanner, homeHtml, renderHomeBox, remove, _docs };
 })();
 function initAdminLive(){
   LiveView.enter();
@@ -17346,7 +17395,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.64';
+  const CURRENT_VERSION = 'v48.65';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
