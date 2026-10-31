@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.78p -->
+  <!-- APP_VERSION: v48.79p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1411,6 +1411,58 @@
       display: none; z-index: 9500;
     }
     #pdfAnnotateCursor.show { display: block; }
+
+    /* v48.79p: ดูสด (ครู) */
+    .lvChip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:700;border:1px solid;white-space:nowrap;}
+    .lvChip.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}
+    .lvChip.am{background:#fffbeb;border-color:#fde68a;color:#b45309;}
+    .lvChip.gr{background:#f3f4f6;border-color:#d1d5db;color:#4b5563;}
+    .lvChip.bl{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+    .lvDot{width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;flex-shrink:0;}
+    .lvDot.am{background:#f59e0b;}.lvDot.gr{background:#9ca3af;}
+    .lvBanner{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;border:1px solid #bbf7d0;background:#f0fdf4;margin-bottom:14px;}
+    .lvBanner .t{flex:1;min-width:0;}
+    .lvBanner .t b{font-size:16px;}
+    .lvBanner .time{font-variant-numeric:tabular-nums;font-weight:900;font-size:22px;text-align:right;}
+    .lvCard{margin-bottom:22px;}
+    .lvHead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+    .lvHero{padding:20px 22px;}
+    .lvBig{font-size:64px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1;}
+    .lvBar{height:10px;border-radius:5px;background:#e5e7eb;overflow:hidden;margin-top:14px;}
+    .lvBar i{display:block;height:100%;background:#111827;border-radius:5px;}
+    .lvStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;}
+    .lvStat{padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:#fff;}
+    .lvStat small{display:block;color:var(--muted);font-size:12.5px;margin-bottom:2px;}
+    .lvStat b{font-size:26px;font-weight:900;}
+    .lvStat span{font-size:13px;color:var(--muted);}
+    .lvCols{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-top:12px;align-items:start;}
+    .lvPills{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;}
+    .lvPill{aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:2px solid #e5e7eb;background:#fff;color:#9ca3af;position:relative;}
+    .lvPill.ok{background:#16a34a;border-color:#16a34a;color:#fff;}
+    .lvPill.bad{background:#ef4444;border-color:#ef4444;color:#fff;}
+    .lvPill.nk{background:#111827;border-color:#111827;color:#fff;}
+    .lvPill.fr{background:#fffbeb;border-color:#f59e0b;color:#b45309;}
+    .lvPill.sk{border:2px dashed #ef4444;color:#b91c1c;}
+    .lvPill.cur{box-shadow:0 0 0 3px #fff,0 0 0 5px #2563eb;}
+    .lvPill.cur:not(.ok):not(.bad):not(.nk):not(.fr){border-color:#2563eb;color:#2563eb;}
+    .lvPill sup{position:absolute;top:-6px;right:-3px;font-size:10px;}
+    .lvLegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:14px;}
+    .lvLegend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid #e5e7eb;}
+    .lvPace{padding:12px 14px;border-radius:12px;background:#f3f4f6;font-size:14px;}
+    .lvPace.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f;}
+    .lvSlow .r{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);}
+    .lvSlow .r:first-of-type{border-top:none;}
+    .lvSlow .n{width:30px;height:30px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+    .lvSlow .b{flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;}
+    .lvSlow .b i{display:block;height:100%;background:#e05555;}
+    @media (max-width:700px){
+      .lvBig{font-size:52px;}
+      .lvStats{grid-template-columns:1fr 1fr;gap:10px;}
+      .lvCols{grid-template-columns:1fr;}
+      .lvPills{grid-template-columns:repeat(8,1fr);gap:7px;}
+      .lvHero{padding:16px;}
+      .lvBanner{flex-wrap:wrap;}
+    }
   </style>
   <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1478,7 +1530,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.78p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.79p</div>
     </div>
   </div>
 </div>
@@ -2007,7 +2059,11 @@
         <span id="adminStorageBannerText"></span>
         <button type="button" class="btn" onclick="navigate('admin_backup')" style="font-size:12px;padding:6px 10px;white-space:nowrap;">ไปหน้าสำรองข้อมูล</button>
       </div>
+      <div id="adminLiveBanner" class="lvBanner" style="display:none;"></div>
       <div class="list" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="linkCard" onclick="navigate('admin_live')" style="border-color:#bbf7d0;">
+          <div style="font-weight:900;">🟢 ดูสด (กำลังทำข้อสอบ) <span id="adminLiveChip" class="lvChip ok" style="display:none;margin-left:6px;"></span></div>
+        </div>
         <div class="linkCard" onclick="navigate('admin_new')">
           <div style="font-weight:900;">➕ สร้างชุดข้อสอบใหม่</div>
         </div>
@@ -2031,6 +2087,20 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===================== PAGE: ADMIN LIVE (v48.79p) ===================== -->
+<div id="page-admin_live" class="page">
+  <div class="container" style="max-width:920px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="h1">🟢 ดูสด</h1>
+        <div class="muted" style="font-size:12px;margin-top:4px;">สถานะเด็กที่กำลังทำข้อสอบ — อัปเดตทันทีที่ตอบ/เปลี่ยนข้อ และทุก 10 วินาที (เห็นแค่ตอบแล้วหรือยัง/ถูกหรือผิด ไม่เห็นว่าเลือกตัวเลือกอะไร)</div>
+      </div>
+      <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
+    </div>
+    <div id="liveList" style="margin-top:16px;"></div>
   </div>
 </div>
 
@@ -3096,8 +3166,9 @@ const FirebaseSync = (() => {
   //   ออฟไลน์/ล้ม → false (ผู้เรียกใช้ syncPending ลองใหม่) — ไม่ใช้คิวเขียนออฟไลน์ของ SDK ซึ่งเป็น last-write-wins
   async function saveDoc(id, data, opts) {
     if (!_ready) return false;
+    const _q = !!(opts && opts.quiet); // v48.79p: quiet = ไม่แตะข้อความสถานะ sync (ใช้กับ live_* ที่เขียนถี่)
     try {
-      setStatus('saving', '💾 กำลัง sync...');
+      if (!_q) setStatus('saving', '💾 กำลัง sync...');
       if (opts && opts.cas) {
         const ref = _doc(id), res = {};
         const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('transaction timeout')), 25000));
@@ -3120,9 +3191,9 @@ const FirebaseSync = (() => {
         await _doc(id).set({ _d: JSON.stringify(data), _ts: ts });
         if (opts) opts.result = { ts, merged: null };
       }
-      setStatus('online', '☁️ sync แล้ว ' + new Date().toLocaleTimeString('th'));
+      if (!_q) setStatus('online', '☁️ sync แล้ว ' + new Date().toLocaleTimeString('th'));
       return true;
-    } catch(e) { console.warn('[FB] save err', e); setStatus('error', '⚠️ sync ล้มเหลว'); return false; }
+    } catch(e) { console.warn('[FB] save err', e); if (!_q) setStatus('error', '⚠️ sync ล้มเหลว'); return false; }
   }
 
   // Read once from Firestore — always from server to bypass offline cache
@@ -5697,6 +5768,7 @@ function navigate(page, params={}){
   _pageParams=params;
   window._currentPage=page;
   window._currentParams=params;
+  try{ LiveView.onNavigate(page); }catch(e){} // v48.79p: ฟังสถานะสดเฉพาะตอนครูอยู่หน้า admin / admin_live
 
   // init page
   if(page==='home'){ renderHome(); }
@@ -5719,6 +5791,7 @@ function navigate(page, params={}){
       admin_members: () => initAdminMembers(),
       admin_rewards: () => initAdminRewards(),
       admin_backup: () => initAdminBackup(),
+      admin_live: () => initAdminLive(),
     };
     if(ADMIN_INITS[page]) ADMIN_INITS[page]();
     else console.warn('unknown admin page:', page);
@@ -6599,6 +6672,84 @@ function initExamDetail(id){
   });
 }
 
+// ===================== LIVE SHARE (v48.79p) =====================
+// เครื่องลูกส่ง "สถานะสด" ขึ้น cloud ระหว่างทำข้อสอบ (เอกสารเดียวต่อเด็ก: live_<ชื่อ>) ให้ครูเปิดดูจากหน้า Admin
+// - ส่งเฉพาะสถานะ: ข้อที่อยู่, ตอบแล้ว/ถูก/ผิด/ข้าม/ไม่แน่ใจ (เป็นเลขข้อ), เวลาต่อข้อ — ไม่ส่งว่าเลือกตัวเลือกอะไร/เฉลย
+// - ห้ามกระทบการทำข้อสอบ: ทุกอย่างครอบ try/catch, ไม่ await ในเส้นทางหลัก, เขียนแบบ quiet (ไม่แตะสถานะ sync)
+// - ครอบทุกเส้นทางกรอกคำตอบด้วย "ลายเซ็น" (ข้อปัจจุบัน+คำตอบ+ไม่แน่ใจ) ที่ตัวจับเวลา 1 วิ เทียบ — ไม่ต้องแตะ handler ของแต่ละโหมด
+const LiveShare = (() => {
+  const BEAT_MS = 10000, MIN_GAP_MS = 1500;
+  let _ctx = null, _timer = null, _busy = false, _lastSig = '', _lastSend = 0, _bound = false;
+  const _docId = (name) => 'live_' + _sanitizeDiagName(name);
+
+  function _write(p, extra, force) {
+    if (!_ctx) return;
+    if (_busy && !force) return;
+    _busy = true; _lastSend = Date.now();
+    const doc = Object.assign({}, p, extra || {}, { v: 1, name: _ctx.name, state: _ctx.state, awaySince: _ctx.awaySince || null, ts: Date.now() });
+    let pr;
+    try { pr = Promise.resolve(FirebaseSync.saveDoc(_ctx.id, doc, { quiet: true })); } catch (e) { pr = Promise.resolve(false); }
+    return pr.catch(() => false).then(() => { _busy = false; });
+  }
+  function _build() { try { return _ctx.build(); } catch (e) { return null; } }
+  function _sigOf(p) { const q = Object.assign({}, p); delete q.qElapsed; return JSON.stringify(q) + '|' + _ctx.state; }
+
+  function _tick() {
+    if (!_ctx) return;
+    const p = _build(); if (!p) return;
+    const sig = _sigOf(p), now = Date.now();
+    if ((sig !== _lastSig && now - _lastSend >= MIN_GAP_MS) || now - _lastSend >= BEAT_MS) { _lastSig = sig; _write(p); }
+  }
+  function _flushNow() { // เปลี่ยนสถานะ (ออก/กลับเข้าแอป/กำลังส่ง) → ส่งทันที
+    if (!_ctx) return;
+    const p = _build(); if (!p) return;
+    _lastSig = _sigOf(p); _write(p, null, true);
+  }
+  function _onVis() {
+    if (!_ctx || _ctx.state === 'submitting') return;
+    if (document.visibilityState === 'hidden') { if (_ctx.state !== 'away') { _ctx.state = 'away'; _ctx.awaySince = Date.now(); _flushNow(); } }
+    else if (_ctx.state === 'away') { _ctx.state = 'active'; _ctx.awaySince = null; _flushNow(); }
+  }
+  function _clear() { if (_timer) { clearInterval(_timer); _timer = null; } _busy = false; }
+
+  // name = ชื่อผู้ทำ (ว่าง = ไม่ส่ง), build() = ฟังก์ชันคืน payload ของโหมดนั้น (ไม่ใส่ ts/state — โมดูลนี้ใส่ให้)
+  function start(name, build) {
+    try {
+      name = String(name || '').trim();
+      if (_ctx) _clear();
+      _ctx = null;
+      if (!name || typeof build !== 'function' || !FirebaseSync.ready()) return;
+      _ctx = { name, id: _docId(name), build, state: (document.visibilityState === 'hidden' ? 'away' : 'active'), awaySince: null };
+      if (_ctx.state === 'away') _ctx.awaySince = Date.now();
+      _lastSig = ''; _lastSend = 0;
+      if (!_bound) { _bound = true; document.addEventListener('visibilitychange', _onVis); window.addEventListener('pagehide', () => { try { if (_ctx && _ctx.state === 'active') { _ctx.state = 'away'; _ctx.awaySince = Date.now(); _flushNow(); } } catch (e) {} }); }
+      _timer = setInterval(() => { try { _tick(); } catch (e) {} }, 1000);
+      _tick();
+    } catch (e) { console.warn('[live] start err', e); _ctx = null; }
+  }
+  function submitting() { try { if (_ctx) { _ctx.state = 'submitting'; _ctx.awaySince = null; _flushNow(); } } catch (e) {} }
+  // ส่งข้อสอบสำเร็จ (บันทึกแล้ว) — เก็บ doc ไว้เป็น state:'done' ให้ครูกดดูผล
+  function done(extra) {
+    try {
+      if (!_ctx) return;
+      const c = _ctx; _clear();
+      const p = _build() || {};
+      _ctx.state = 'done'; _ctx.awaySince = null;
+      _write(p, extra, true);
+      _ctx = null;
+    } catch (e) { _ctx = null; }
+  }
+  // ออกจากข้อสอบโดยไม่ส่ง / ปิดหน้า — ลบ doc (ไม่มี ctx = ไม่ทำอะไร เช่นส่งไปแล้ว)
+  function stop() {
+    try {
+      if (!_ctx) return;
+      const id = _ctx.id; _clear(); _ctx = null;
+      Promise.resolve(FirebaseSync.deleteDoc(id)).catch(() => {});
+    } catch (e) { _ctx = null; }
+  }
+  return { start, submitting, done, stop, active: () => !!_ctx, docId: _docId };
+})();
+
 // ===================== TAKE PAGE =====================
 let _takeInterval=null;
 let _takeState=null;
@@ -6609,12 +6760,14 @@ function cleanupTake(){
   if(_takeStartTimer){clearTimeout(_takeStartTimer);_takeStartTimer=null;}
   // overlay ของรอบที่ทิ้งไปแล้วต้องไม่ค้างบนจอ (ไม่งั้นกดแล้วไปเริ่ม/ส่งข้อสอบ "ผี" ของ state เก่า)
   document.querySelectorAll('.takeOverlay,#_resumeOverlay').forEach(el=>el.remove());
+  LiveShare.stop(); // v48.79p: ออก/เปลี่ยนหน้า/เริ่มรอบใหม่ → ถอนสถานะสด (ส่งสำเร็จแล้ว LiveShare.done เคลียร์ ctx ไปก่อน จึงไม่ลบ)
   _takeState=null;
 }
 
 let _pracState=null;
 let _pracPdfViewer=null;
 function cleanupPractice(){
+  LiveShare.stop(); // v48.79p
   _pracState=null;
   _pracPdfViewer=null;
 }
@@ -7059,6 +7212,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     if(!st.started){toast('กดเริ่มทำข้อสอบก่อน');return;}
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
     leaveQuestion(); // flush current question time
+    LiveShare.submitting(); // v48.79p
     const _eType=exam.examType||'mc';
     // v48.12: โหมดคนละครึ่ง คิดคะแนนข้อละ 1 คะแนนเสมอ (ไม่ใช้ระบบถ่วงน้ำหนักจริง)
     // เพื่อกันเด็กเลือกเก็บเฉพาะข้อคะแนนสูงแล้วได้เปอร์เซ็นต์เกินจริง
@@ -7167,6 +7321,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
         return;
       }
       if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
+      LiveShare.done({attemptId:_mergedParent?_mergedParent.id:st.attemptId, score, total, usedSeconds, submittedAt:Date.now()}); // v48.79p: บันทึกสำเร็จแล้วเท่านั้น
       if (_mergedParent) {
         // นับจุดอ่อนเฉพาะข้อของครึ่งหลัง (ข้อของครึ่งแรกนับไปแล้วตอนส่งครึ่งแรก) — ใช้
         // pseudo-attempt ที่มีแค่ perQuestion ของเซตครึ่งหลัง กันนับซ้ำ
@@ -7268,6 +7423,40 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     return Math.max(0, _effDuration - elapsed);
   }
 
+  // v48.79p: สถานะสดสำหรับครู (ดู LiveShare) — คิดถูก/ผิด/คะแนนตามสูตรเดียวกับ submit() ทุกประการ
+  // (half: นับเฉพาะข้อที่ตอบ ข้อละ 1 / weighted: ถ่วงน้ำหนัก / ข้อฟรี: ถูกเสมอ / ไม่มีเฉลย: นับเป็น "ตอบแล้ว") ไม่ส่งตัวเลือกที่เลือก
+  function _liveBuild(){
+    const eType=exam.examType||'mc';
+    const weighted=!!exam.weighted && !_halfMode;
+    const nos=[],ans=[],ok=[],bad=[],nk=[],free=[],unsure=[],skipped=[],qElapsed={};
+    const cur=qsList[st.currentIndex]; const curNo=cur?(cur.no||cur.number):null;
+    const visited=new Set(st.visitOrder||[]);
+    let got=0,all=0,changes=0;
+    qsList.forEach(q=>{
+      const no=q.no||q.number; nos.push(no);
+      const a=st.answers[q.id]; const has=a!=='' && a!=null;
+      const pts=weighted?getQPoints(q):1;
+      all+=pts;
+      if(st.unsure[q.id]) unsure.push(no);
+      if(has) ans.push(no);
+      if(q.isFree){ free.push(no); if(!_halfMode||has) got+=pts; }
+      else if(has){
+        if(!q.correct) nk.push(no);
+        else if(isAnswerCorrect(a,q.correct,eType)){ ok.push(no); got+=pts; }
+        else bad.push(no);
+      } else if(visited.has(no) && no!==curNo) skipped.push(no);
+      let ms=st.qElapsedMs[q.id]||0;
+      if(cur && q.id===cur.id && st.qStartTs){ const d=Date.now()-st.qStartTs; if(d>0&&d<10*60*1000) ms+=d; }
+      if(ms>=1000) qElapsed[no]=Math.round(ms/1000);
+      changes+=st.answerChanges[q.id]||0;
+    });
+    return {mode:_practiceMode?'practice':(_half2Mode?'half2':(_halfMode?'half':'timed')),
+      examId:exam.id,examTitle:exam.title,subject:exam.subject||'',examType:eType,weighted,
+      startedAt:st.startedAt,pauseOffset:_pauseOffset,durSec:_practiceMode?0:_effDuration,quota:_halfMode?st.halfQuota:0,
+      cur:curNo,nos,ans,ok,bad,nk,free,unsure,skipped,changes,
+      score:Math.round(got*100)/100,scoreTotal:_halfMode?st.halfQuota:Math.round(all*100)/100,qElapsed};
+  }
+
   function doStart(restoredStartedAt, restoredOffset){
     if(st.started) return;
     if(_takeState!==st) return; // callback ของรอบที่ถูก cleanupTake/initTake ใหม่ทิ้งไปแล้ว — ห้ามเริ่มข้อสอบ "ผี"
@@ -7278,6 +7467,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     newSubmitBtn.disabled=false;
     enterQuestion();
     render();
+    LiveShare.start(st.takerName,_liveBuild); // v48.79p: เริ่มส่งสถานะสดให้ครู (ครอบ resume ด้วย เพราะผ่าน doStart เหมือนกัน)
     let _lastSaveTs = 0;
     _takeInterval=setInterval(()=>{
       const now = Date.now();
@@ -9950,6 +10140,23 @@ function initPractice(params){
     qElapsedMs:{},qStartTs:null};
   const st=_pracState;
   _pracEnterQuestion();
+  // v48.79p: สถานะสดสำหรับครู — ถูก/ผิดมาจากผลที่กดยืนยันแล้วของแต่ละข้อ (ไม่มีลิมิตเวลา → ครูเห็นเวลาที่ใช้นับขึ้น)
+  function _liveBuildPrac(){
+    const nos=[],ok=[],bad=[],qElapsed={};
+    queue.forEach((q,idx)=>{
+      const no=q.no||q.number; nos.push(no);
+      const r=st.results[idx]; if(r==='correct') ok.push(no); else if(r==='wrong') bad.push(no);
+      let ms=st.qElapsedMs[no]||0;
+      if(idx===st.currentIdx && st.qStartTs){ const d=Date.now()-st.qStartTs; if(d>0&&d<10*60*1000) ms+=d; }
+      if(ms>=1000) qElapsed[no]=Math.round(ms/1000);
+    });
+    const cq=queue[st.currentIdx];
+    return {mode:'weakness',examId:exam.id,examTitle:exam.title,subject:exam.subject||'',examType:exam.examType||'mc',weighted:false,
+      startedAt:new Date(st.startedAt).getTime(),pauseOffset:0,durSec:0,quota:0,
+      cur:cq?(cq.no||cq.number):null,nos,ans:[...ok,...bad],ok,bad,nk:[],free:[],unsure:[],skipped:[],changes:0,
+      score:ok.length,scoreTotal:queue.length,qElapsed};
+  }
+  LiveShare.start(userId,_liveBuildPrac);
 
   const labelMap=CHOICE_LABELS;
   const isGDrive=!!(exam.pdfUrl||'').match(/drive\.google\.com/);
@@ -10253,6 +10460,7 @@ function initPractice(params){
       _pracLineEndNotify(true);
       savePracticeSession().then(()=>{
         const correct=Object.values(st.results).filter(r=>r==='correct').length;
+        LiveShare.done({attemptId:st.attemptId,score:correct,total:queue.length,usedSeconds:Math.round((Date.now()-new Date(st.startedAt).getTime())/1000),submittedAt:Date.now()}); // v48.79p
         toast(`แก้จุดอ่อนเสร็จ ${correct}/${queue.length} ถูก 🎉`);
         cleanupPractice(); navigate('stats');
       });
@@ -10266,6 +10474,7 @@ function initPractice(params){
       _pracLineEndNotify(true);
       savePracticeSession().then(()=>{
         const correct=Object.values(st.results).filter(r=>r==='correct').length;
+        LiveShare.done({attemptId:st.attemptId,score:correct,total:queue.length,usedSeconds:Math.round((Date.now()-new Date(st.startedAt).getTime())/1000),submittedAt:Date.now()}); // v48.79p
         toast(`แก้จุดอ่อนเสร็จ ${correct}/${queue.length} ถูก 🎉`);
         cleanupPractice(); navigate('stats');
       });
@@ -10333,6 +10542,188 @@ function initPractice(params){
   renderPrac();
 }
 
+// ===================== LIVE VIEW — ฝั่งครู (v48.79p) =====================
+// ฟัง live_* (เอกสารสถานะสดจาก LiveShare) เฉพาะตอนครูอยู่หน้า admin / admin_live
+// เวลาคำนวณจาก startedAt/durSec/pauseOffset ด้วยนาฬิกาเครื่องครูเอง ทุก 1 วิ (สูตรเดียวกับเครื่องลูก) → เดินต่อแม้ลูกพับแอป/สัญญาณหาย (ประมาณการ)
+const LiveView = (() => {
+  const STALE_MS = 45000, HIDE_ACTIVE_MS = 6 * 3600e3, HIDE_DONE_MS = 2 * 3600e3;
+  const _docs = new Map(); // id สั้น (live_<ชื่อ>) → data
+  let _unsub = null, _clock = null;
+  const _arr = (x) => Array.isArray(x) ? x : [];
+  const _num = (x) => { x = Number(x); return Number.isFinite(x) ? x : 0; };
+  const MODE_LABEL = { practice: 'ฝึกซ้อม', half: 'คนละครึ่ง', half2: 'คนละครึ่ง (ครึ่งหลัง)', weakness: 'แก้จุดอ่อน' };
+
+  function _status(d, now) {
+    if (d.state === 'done') return 'done';
+    if (now - _num(d.ts) > STALE_MS) return 'stale';
+    return d.state === 'away' ? 'away' : (d.state === 'submitting' ? 'submitting' : 'active');
+  }
+  function _visible(d, now) { return (now - _num(d.ts)) < (d.state === 'done' ? HIDE_DONE_MS : HIDE_ACTIVE_MS); }
+  function _elapsed(d, now) { return d.state === 'done' ? _num(d.usedSeconds) : Math.max(0, Math.floor((now - _num(d.startedAt || now)) / 1000) - _num(d.pauseOffset)); }
+  function _remaining(d, now) { return _num(d.durSec) > 0 ? Math.max(0, _num(d.durSec) - _elapsed(d, now)) : null; }
+  function _list(now) {
+    return [..._docs.entries()].filter(([, d]) => d && _visible(d, now))
+      .sort((a, b) => (_status(a[1], now) === 'done') - (_status(b[1], now) === 'done') || _num(b[1].ts) - _num(a[1].ts));
+  }
+  const _ago = (sec) => sec < 60 ? sec + ' วิ' : Math.floor(sec / 60) + ' นาที ' + String(sec % 60).padStart(2, '0') + ' วิ';
+
+  function _card(id, d, now) {
+    const st = _status(d, now), nos = _arr(d.nos), n = nos.length;
+    const ok = _arr(d.ok), bad = _arr(d.bad), nk = _arr(d.nk), fr = _arr(d.free), un = _arr(d.unsure), sk = _arr(d.skipped), ans = _arr(d.ans);
+    const timed = _num(d.durSec) > 0, weak = d.mode === 'weakness';
+    const el = _elapsed(d, now), rem = _remaining(d, now), live = st !== 'done';
+    const contig = nos.every((x, i) => Number(x) === i + 1);
+    const curIdx = nos.indexOf(d.cur);
+    // ── หัว + สถานะ ──
+    let chip = '';
+    if (st === 'active') chip = `<span class="lvChip ok"><span class="lvDot"></span>กำลังทำ</span><span class="muted" style="font-size:12.5px;" data-lv="age" data-id="${esc(id)}"></span>`;
+    else if (st === 'away') chip = `<span class="lvChip am"><span class="lvDot am"></span>ออกจากแอป (พับ/ล็อกจอ) <span data-lv="away" data-id="${esc(id)}"></span></span>`;
+    else if (st === 'stale') chip = `<span class="lvChip gr"><span class="lvDot gr"></span>ขาดการเชื่อมต่อ</span><span class="muted" style="font-size:12.5px;" data-lv="age" data-id="${esc(id)}"></span>`;
+    else if (st === 'submitting') chip = `<span class="lvChip bl">กำลังส่งคำตอบ…</span>`;
+    else chip = `<span class="lvChip bl">✓ ส่งข้อสอบแล้ว</span>`;
+    const modeChip = MODE_LABEL[d.mode] ? `<span class="lvChip gr" style="margin-left:6px;">${MODE_LABEL[d.mode]}</span>` : '';
+    // ── เวลา ──
+    let hero = '';
+    const tilde = st === 'stale' ? '~' : '';
+    if (st === 'done') {
+      hero = `<div class="muted" style="font-size:12.5px;margin-bottom:6px;">ใช้เวลา</div><div class="lvBig">${fmtTime(el)}</div>`;
+    } else if (timed) {
+      const pct = Math.min(100, Math.round(el / _num(d.durSec) * 1000) / 10);
+      hero = `<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;">
+        <div><div class="muted" style="font-size:12.5px;margin-bottom:6px;">เวลาที่เหลือ${st === 'stale' ? ' (ประมาณการ)' : ''}</div><div class="lvBig" style="${st === 'stale' ? 'color:#9ca3af;' : ''}">${tilde}<span data-lv="rem" data-id="${esc(id)}">${fmtTime(rem)}</span></div></div>
+        <div style="text-align:right;"><div class="muted" style="font-size:12.5px;">ใช้ไปแล้ว</div><div style="font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;"><span data-lv="el" data-id="${esc(id)}">${fmtTime(el)}</span> <span class="muted" style="font-size:15px;font-weight:600;">/ ${fmtTime(_num(d.durSec))}</span></div></div></div>
+        <div class="lvBar"><i data-lv="bar" data-id="${esc(id)}" style="width:${pct}%"></i></div>`;
+    } else {
+      hero = `<div class="muted" style="font-size:12.5px;margin-bottom:6px;">ใช้เวลาไปแล้ว${st === 'stale' ? ' (ประมาณการ)' : ''}</div><div class="lvBig" style="${st === 'stale' ? 'color:#9ca3af;' : ''}">${tilde}<span data-lv="el" data-id="${esc(id)}">${fmtTime(el)}</span></div>`;
+    }
+    let note = '';
+    if (st === 'away' && timed) note = 'ลูกออกจากหน้าข้อสอบ — เวลา<b>ยังเดินอยู่</b> (ข้อสอบนับเวลาตามนาฬิกาจริง)';
+    else if (st === 'stale') note = 'ไม่ได้รับสัญญาณจากเครื่องลูก — อาจเน็ตหลุดหรือปิดแอป ถ้าลูกเปิดแอปใหม่ ระบบไม่นับเวลาช่วงที่ปิด ตัวเลขอาจเพิ่มกลับขึ้นมา';
+    // ── คะแนน + สถิติ ──
+    const answeredN = ans.length;
+    const judged = ok.length + bad.length;
+    const scoreLine = `<div class="lvStat" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><div><small>${st === 'done' ? 'คะแนน' : 'คะแนนตอนนี้'}${d.weighted ? ' (ถ่วงน้ำหนัก)' : ''}</small><b data-lv="score">${esc(_num(d.score))}</b> <span>/ ${esc(_num(d.scoreTotal))}</span></div><div style="text-align:right;"><span>ตอบแล้ว ${answeredN}${weak ? '' : ' / ' + (d.mode === 'half' && _num(d.quota) ? _num(d.quota) : n)} ข้อ${judged ? ' · ถูก ' + Math.round(ok.length / judged * 100) + '% ของที่ตรวจได้' : ''}</span></div></div>`;
+    const curBox = `<div class="lvStat"><small>ข้อปัจจุบัน</small><b>${d.cur == null ? '–' : esc(d.cur)}</b> <span>${contig ? '/ ' + n : '(ลำดับ ' + (curIdx + 1) + '/' + n + ')'}${(d.qElapsed && d.cur != null && d.qElapsed[d.cur] != null && live) ? ' · อยู่ข้อนี้ ' + fmtTime(_num(d.qElapsed[d.cur]) + (st === 'active' ? Math.max(0, Math.floor((now - _num(d.ts)) / 1000)) : 0)) : ''}</span></div>`;
+    const okBox = `<div class="lvStat"><small>ถูก ✓</small><b style="color:#16a34a;">${ok.length}</b> <span>${fr.length ? 'ข้อฟรี ' + fr.length : 'ข้อ'}</span></div>`;
+    const badBox = `<div class="lvStat"><small>ผิด ✗</small><b style="color:#dc2626;">${bad.length}</b> <span>${bad.length ? 'ข้อ ' + esc(bad.slice(0, 6).join(', ')) + (bad.length > 6 ? '…' : '') : 'ข้อ'}</span></div>`;
+    const remainQ = d.mode === 'half' && _num(d.quota) ? Math.max(0, _num(d.quota) - answeredN) : Math.max(0, n - answeredN - sk.length);
+    const lastBox = weak
+      ? `<div class="lvStat"><small>ยังไม่ได้ทำ</small><b>${Math.max(0, n - answeredN)}</b> <span>ข้อ</span></div>`
+      : `<div class="lvStat"><small>ข้ามไป</small><b style="color:#b91c1c;">${sk.length}</b> <span>${sk.length ? 'ข้อ ' + esc(sk.slice(0, 5).join(', ')) + (sk.length > 5 ? '…' : '') : 'ข้อ'}</span></div>`;
+    const extra = (un.length || _num(d.changes)) ? `<div class="muted" style="font-size:13px;margin-top:10px;">${un.length ? 'ไม่แน่ใจ 🤔 ' + un.length + ' ข้อ (' + esc(un.slice(0, 8).join(', ')) + (un.length > 8 ? '…' : '') + ')' : ''}${un.length && _num(d.changes) ? ' · ' : ''}${_num(d.changes) ? 'เปลี่ยนคำตอบ ' + _num(d.changes) + ' ครั้ง' : ''}${nk.length ? ' · ' + nk.length + ' ข้อยังไม่มีเฉลยในระบบ (ตรวจไม่ได้)' : ''}</div>` : (nk.length ? `<div class="muted" style="font-size:13px;margin-top:10px;">${nk.length} ข้อยังไม่มีเฉลยในระบบ (ตรวจไม่ได้)</div>` : '');
+    // ── ผังรายข้อ ──
+    const okS = new Set(ok), badS = new Set(bad), nkS = new Set(nk), frS = new Set(fr), skS = new Set(sk), unS = new Set(un);
+    const pills = nos.map(no => {
+      const c = ['lvPill'];
+      if (frS.has(no)) c.push('fr'); else if (okS.has(no)) c.push('ok'); else if (badS.has(no)) c.push('bad'); else if (nkS.has(no)) c.push('nk'); else if (skS.has(no)) c.push('sk');
+      if (live && no === d.cur) c.push('cur');
+      return `<div class="${c.join(' ')}">${esc(no)}${unS.has(no) ? '<sup>🤔</sup>' : ''}</div>`;
+    }).join('');
+    const legend = `<div class="lvLegend"><span><i style="background:#16a34a;border-color:#16a34a;"></i>ถูก</span><span><i style="background:#ef4444;border-color:#ef4444;"></i>ผิด</span>${weak ? '' : '<span><i style="background:#fff;border:2px dashed #ef4444;"></i>ข้าม</span><span><i style="background:#fffbeb;border-color:#f59e0b;"></i>ข้อฟรี</span>'}${nk.length ? '<span><i style="background:#111827;border-color:#111827;"></i>ตอบแล้ว (ยังไม่มีเฉลย)</span>' : ''}<span><i style="background:#fff;border-color:#2563eb;"></i>ข้อปัจจุบัน</span><span><i></i>ยังไม่ถึง</span></div>`;
+    // ── จังหวะเวลา / ข้อที่ใช้เวลานาน ──
+    let pace = '';
+    if (live && st !== 'stale' && timed && rem != null) {
+      const done_ = answeredN + sk.length, avg = done_ ? el / done_ : 0;
+      if (rem <= 0) pace = `<div class="lvPace warn"><b>หมดเวลาแล้ว</b> — กำลังส่งอัตโนมัติ</div>`;
+      else if (remainQ > 0) { const need = rem / remainQ; pace = `<div class="lvPace${avg > need ? ' warn' : ''}"><b>จังหวะเวลา</b><br>เหลือ ${remainQ} ข้อ ต้องเฉลี่ยไม่เกิน <b>${fmtTime(need).replace(/^0/, '')}/ข้อ</b>${avg ? ' · ที่ผ่านมาเฉลี่ย ' + fmtTime(avg).replace(/^0/, '') + '/ข้อ' : ''}</div>`; }
+    } else if (live && !timed && answeredN) pace = `<div class="lvPace"><b>เฉลี่ยต่อข้อ</b> ${fmtTime(el / Math.max(1, answeredN + sk.length)).replace(/^0/, '')}/ข้อ (ไม่มีลิมิตเวลา)</div>`;
+    const slow = Object.entries(d.qElapsed || {}).map(([k, v]) => [k, _num(v)]).filter(x => x[1] >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const slowBox = slow.length ? `<div class="card lvSlow" style="padding:16px 18px;"><h3 style="margin:0 0 6px;font-size:15px;font-weight:800;">ข้อที่ใช้เวลานานสุด</h3>${slow.map(([k, v]) => `<div class="r"><span class="n">${esc(k)}</span><span class="b"><i style="width:${Math.round(v / slow[0][1] * 100)}%"></i></span><span class="muted" style="width:46px;text-align:right;">${fmtTime(v)}</span></div>`).join('')}</div>` : '';
+    const actions = st === 'done'
+      ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">${d.attemptId ? `<button class="btn btnPrimary" data-lv-review="${esc(d.attemptId)}">ดูผลละเอียด →</button>` : ''}<button class="btn" data-lv-del="${esc(id)}">ลบรายการนี้</button></div>`
+      : (st === 'stale' ? `<div style="margin-top:12px;"><button class="btn" data-lv-del="${esc(id)}">ลบรายการนี้</button></div>` : '');
+    return `<div class="lvCard" data-lv-card="${esc(id)}" data-status="${st}">
+      <div class="lvHead"><div><div style="font-size:22px;font-weight:900;">ดูสด · ${esc(d.name || '')}${modeChip}</div><div class="muted" style="font-size:13px;">${esc(d.examTitle || '')}${d.subject ? ' · ' + esc(d.subject) : ''} · ${n} ข้อ${d.weighted ? ' · ถ่วงน้ำหนัก' : ''}</div></div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">${chip}</div></div>
+      <div class="card lvHero" style="${st === 'stale' ? 'background:#f9fafb;' : ''}">${hero}</div>
+      ${note ? `<div class="lvPace${st === 'away' ? ' warn' : ''}" style="margin-top:10px;font-size:13px;">${note}</div>` : ''}
+      ${scoreLine}
+      <div class="lvStats">${curBox}${okBox}${badBox}${lastBox}</div>
+      ${extra}
+      <div class="lvCols"><div class="card" style="padding:18px 20px;"><h3 style="margin:0 0 10px;font-size:15px;font-weight:800;">ภาพรวมรายข้อ</h3><div class="lvPills">${pills}</div>${legend}</div>
+      <div style="display:grid;gap:12px;align-content:start;">${pace}${slowBox}</div></div>
+      ${actions}</div>`;
+  }
+
+  function renderPage() {
+    const el = document.getElementById('liveList'); if (!el) return;
+    const now = Date.now(), rows = _list(now);
+    if (!rows.length) {
+      el.innerHTML = `<div class="card" style="padding:34px 20px;text-align:center;"><div style="font-size:30px;">🌙</div><div style="font-weight:800;margin-top:6px;">ตอนนี้ไม่มีใครกำลังทำข้อสอบ</div><div class="muted" style="font-size:13px;margin-top:4px;">พอลูกเริ่มทำข้อสอบ จะขึ้นที่นี่เอง และแบนเนอร์เขียวจะโผล่ในหน้า Admin</div></div>`;
+      return;
+    }
+    el.innerHTML = rows.map(([id, d]) => _card(id, d, now)).join('');
+    el.querySelectorAll('[data-lv-review]').forEach(b => b.addEventListener('click', () => navigate('review', { attemptId: b.dataset.lvReview })));
+    el.querySelectorAll('[data-lv-del]').forEach(b => b.addEventListener('click', () => remove(b.dataset.lvDel)));
+    _tickClocks();
+  }
+
+  function renderBanner() {
+    const now = Date.now();
+    const act = _list(now).filter(([, d]) => ['active', 'away', 'submitting'].includes(_status(d, now)));
+    const b = document.getElementById('adminLiveBanner'), chip = document.getElementById('adminLiveChip');
+    if (chip) { chip.style.display = act.length ? '' : 'none'; chip.textContent = act.length + ' คนกำลังทำ'; }
+    if (!b) return;
+    if (!act.length) { b.style.display = 'none'; b.innerHTML = ''; return; }
+    b.style.display = 'flex';
+    if (act.length === 1) {
+      const [id, d] = act[0], ok = _arr(d.ok).length, bad = _arr(d.bad).length, timed = _num(d.durSec) > 0;
+      const away = _status(d, now) === 'away';
+      b.innerHTML = `<span class="lvDot${away ? ' am' : ''}"></span><div class="t"><b>${esc(d.name || '')} กำลังทำข้อสอบอยู่${away ? ' (ออกจากแอป)' : ''}</b><div class="muted" style="font-size:13.5px;">${esc(d.examTitle || '')} · ข้อ ${d.cur == null ? '–' : esc(d.cur)}/${_arr(d.nos).length} · ตอบแล้ว ${_arr(d.ans).length} ข้อ · ถูก ${ok} ผิด ${bad}</div></div>
+        <div><div class="muted" style="font-size:12px;text-align:right;">${timed ? 'เวลาที่เหลือ' : 'ใช้เวลาไปแล้ว'}</div><div class="time" data-lv="${timed ? 'rem' : 'el'}" data-id="${esc(id)}">${fmtTime(timed ? _remaining(d, now) : _elapsed(d, now))}</div></div>
+        <button class="btn btnPrimary" onclick="navigate('admin_live')">ดูสด →</button>`;
+    } else {
+      b.innerHTML = `<span class="lvDot"></span><div class="t"><b>${act.length} คนกำลังทำข้อสอบอยู่</b><div class="muted" style="font-size:13.5px;">${esc(act.map(([, d]) => d.name).join(', '))}</div></div><button class="btn btnPrimary" onclick="navigate('admin_live')">ดูสด →</button>`;
+    }
+  }
+
+  // อัปเดตตัวเลขที่เดินทุกวินาที (ไม่ render ใหม่ทั้งหน้า) — ถ้าสถานะของใครเปลี่ยน (เช่น active → ขาดการเชื่อมต่อ) ค่อย render ใหม่
+  function _tickClocks() {
+    const now = Date.now();
+    document.querySelectorAll('#liveList [data-lv-card]').forEach(c => {
+      const d = _docs.get(c.dataset.lvCard);
+      if (d && _status(d, now) !== c.dataset.status) { renderPage(); }
+    });
+    document.querySelectorAll('[data-lv][data-id]').forEach(e => {
+      const d = _docs.get(e.dataset.id); if (!d) return;
+      const k = e.dataset.lv;
+      if (k === 'rem') e.textContent = fmtTime(_remaining(d, now));
+      else if (k === 'el') e.textContent = fmtTime(_elapsed(d, now));
+      else if (k === 'age') e.textContent = _status(d, now) === 'stale' ? 'ไม่ได้ยินมา ' + _ago(Math.floor((now - _num(d.ts)) / 1000)) : 'อัปเดตเมื่อ ' + _ago(Math.max(0, Math.floor((now - _num(d.ts)) / 1000))) + 'ที่แล้ว';
+      else if (k === 'away') e.textContent = d.awaySince ? _ago(Math.max(0, Math.floor((now - _num(d.awaySince)) / 1000))) : '';
+      else if (k === 'bar' && _num(d.durSec) > 0) e.style.width = Math.min(100, _elapsed(d, now) / _num(d.durSec) * 100) + '%';
+    });
+  }
+  function _rerender() {
+    if (window._currentPage === 'admin_live') renderPage();
+    else if (window._currentPage === 'admin') { try { renderBanner(); } catch (e) {} }
+  }
+  function enter() {
+    if (_unsub || !Auth.isTeacher()) return;
+    _docs.clear();
+    const pre = FirebaseSync.ns('').length;
+    _unsub = FirebaseSync.listenPrefix('live_', (changes) => {
+      changes.forEach(c => { const id = String(c.id).slice(pre); if (c.type === 'removed' || !c.data) _docs.delete(id); else _docs.set(id, c.data); });
+      _rerender();
+    });
+    _clock = setInterval(() => { try { _tickClocks(); if (window._currentPage === 'admin') renderBanner(); } catch (e) {} }, 1000);
+  }
+  function leave() {
+    if (_unsub) { try { _unsub(); } catch (e) {} _unsub = null; }
+    if (_clock) { clearInterval(_clock); _clock = null; }
+    _docs.clear();
+  }
+  function onNavigate(page) { if (page === 'admin' || page === 'admin_live') enter(); else leave(); }
+  function remove(id) {
+    _docs.delete(id); renderPage();
+    Promise.resolve(FirebaseSync.deleteDoc(id)).catch(() => {});
+  }
+  return { enter, leave, onNavigate, renderPage, renderBanner, remove, _docs };
+})();
+function initAdminLive(){
+  LiveView.enter();
+  LiveView.renderPage();
+}
+
 // ===================== ADMIN PAGE =====================
 // ขนาดข้อมูลทั้งแอปเทียบเพดาน 1 MiB ของ Firestore document (mainStore ถูกเขียนเป็น JSON.stringify ก้อนเดียว — ดู FirebaseSync.saveDoc)
 // เต็มแล้วทุกการบันทึกจะล้มเหลว จึงเตือนครูล่วงหน้า — คำนวณเฉพาะตอนเปิดหน้า Admin (ห้ามใส่ใน Store.save กัน stringify ทุกครั้งที่บันทึก)
@@ -10368,6 +10759,7 @@ function initAdmin(){
   document.getElementById('adminGate').innerHTML='';
   document.getElementById('adminContent').style.display='block';
   try{ renderAdminStorageUsage(); }catch(e){ console.warn('[admin] storage usage err', e); }
+  try{ LiveView.enter(); LiveView.renderBanner(); }catch(e){ console.warn('[admin] live err', e); } // v48.79p
 }
 
 // ── Admin Memes ──────────────────────────────────────────────
@@ -14187,7 +14579,7 @@ const _KNOWN_PAGES = new Set([
   'login','home','exams','exam','take','practice','review','stats','rewards',
   'entrance_stats','entrance_program','entrance_year','entrance_compare',
   'admin','admin_new','admin_editor','admin_benchmark','admin_exams',
-  'admin_memes','admin_members','admin_rewards','admin_backup'
+  'admin_memes','admin_members','admin_rewards','admin_backup','admin_live'
 ]);
 let _isPopstateNav = false; // กัน push ซ้ำตอน navigate ถูกเรียกจาก popstate handler เอง
 
@@ -16934,7 +17326,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.78p';
+  const CURRENT_VERSION = 'v48.79p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

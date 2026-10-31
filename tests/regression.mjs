@@ -5288,6 +5288,318 @@ currentSection = 'shareExam';
   check('assignDup: ไม่มี error ในหน้า', errs5.length === 0, JSON.stringify(errs5));
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: liveView (v48.79p) — "ดูสด" ระดับ 1: เครื่องลูกส่งสถานะขึ้น live_<ชื่อ> ระหว่างทำข้อสอบ, ครูดูจากหน้า Admin
+// ครอบทุกโหมด (จับเวลา mc/กรอกตัวเลข/ถ่วงน้ำหนัก/ข้อ 5 ตัวเลือก/ข้อฟรี, ฝึกซ้อม, คนละครึ่ง, ครึ่งหลัง, แก้จุดอ่อน),
+// resume, ออกจากแอป, ส่ง/ออก/ล้มเหลว, throttle, ไม่ส่งตัวเลือกที่เลือก, และฝั่งครูทุกสถานะ (Firestore ปลอม 2 หน้าใน context เดียว)
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'liveView';
+{
+  const LV_FILE = 'index_preview.html';
+  const NSL = '127_0_0_1_';
+  const FAKE = new URL('./fake-firestore.js', import.meta.url).pathname;
+  const mq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
+  const exams = [
+    mkExam('e1', 'ชุดทดสอบสด', 'คณิตศาสตร์', { questionCount: 6, durationSeconds: 600 }),
+    mkExam('e2', 'ชุดถ่วงน้ำหนัก', 'คณิตศาสตร์', { questionCount: 3, durationSeconds: 300, weighted: true }),
+    mkExam('e3', 'ชุดกรอกตัวเลข', 'คณิตศาสตร์', { questionCount: 3, durationSeconds: 300, examType: 'fillblank-num', numDigits: 3 }),
+  ];
+  const storeLV = () => baseCache({
+    exams,
+    questions: {
+      e1: [mq('q1', 1, 'A'), mq('q2', 2, 'B'), mq('q3', 3, 'C'), mq('q4', 4, ''), mq('q5', 5, 'A', { isFree: true }), mq('q6', 6, 'E', { optCount: 5 })],
+      e2: [mq('w1', 1, 'A', { points: 2 }), mq('w2', 2, 'B', { points: 3 }), mq('w3', 3, 'C', { points: 5 })],
+      e3: [mq('n1', 1, '12'), mq('n2', 2, '345'), mq('n3', 3, '7')],
+    },
+    members: [{ pin: '311257', name: 'ณนนท์' }, { pin: '222222', name: 'Tester' }],
+  });
+  async function newCtx() {
+    const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+    await ctx.route('**/firebasejs/**', r => r.abort());
+    await ctx.addInitScript({ path: FAKE });
+    await ctx.addInitScript(({ st, id }) => { if (localStorage.getItem('__fakeFS') === null) localStorage.setItem('__fakeFS', JSON.stringify({ [id]: { _d: JSON.stringify(st), _ts: 1 } })); }, { st: storeLV(), id: NSL + 'mainStore' });
+    return ctx;
+  }
+  async function openAs(ctx, role, name, errs) {
+    const page = await ctx.newPage(); page.on('dialog', d => d.accept());
+    if (errs) page.on('pageerror', e => errs.push(e.message));
+    await page.goto(BASE + '/' + LV_FILE, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof Store !== 'undefined' && Store._cloudLoaded === true, {}, { timeout: 8000 }).catch(() => {});
+    await page.evaluate(({ role, name }) => { sessionStorage.setItem('appSession', JSON.stringify({ role, name, ts: Date.now() })); document.getElementById('offlineBanner')?.remove(); MemeScore.show = (a, b, cb) => { if (cb) cb(); }; window.confirm = () => true; }, { role, name });
+    return page;
+  }
+  const take = async (page, params) => {
+    await page.evaluate((p) => navigate('take', p), params);
+    await page.waitForTimeout(700);
+    if (await page.$('.takeOverlay button[data-val="good"]')) { await page.click('.takeOverlay button[data-val="good"]'); }
+    await page.waitForTimeout(400);
+  };
+  const doc = (page, name = 'ณนนท์') => page.evaluate(([id]) => { const d = __fakeFS.get(id); return d ? JSON.parse(d._d) : null; }, [NSL + 'live_' + name]);
+  const pick = (page, i) => page.evaluate((i) => { [...document.querySelectorAll('#takeChoices .choice')][i].click(); }, i);
+  const nextQ = (page) => page.click('#takeNextBtn');
+  const WL = ['mode', 'examId', 'examTitle', 'subject', 'examType', 'weighted', 'startedAt', 'pauseOffset', 'durSec', 'quota', 'cur', 'nos', 'ans', 'ok', 'bad', 'nk', 'free', 'unsure', 'skipped', 'changes', 'score', 'scoreTotal', 'qElapsed', 'v', 'name', 'state', 'awaySince', 'ts'];
+
+  // ── 1) จับเวลาปกติ mc: ถูก/ผิด/ไม่มีเฉลย/ข้อฟรี/ข้อ 5 ตัวเลือก/ข้าม/ไม่แน่ใจ/เปลี่ยนคำตอบ ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const child = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(child, { id: 'e1', takerName: 'ณนนท์' });
+    const d0 = await doc(child);
+    check('liveView: เริ่มทำข้อสอบ → มีเอกสาร live_ณนนท์ สถานะ active (ชื่อชุด/จำนวนข้อ/เวลาตามชุด)', d0 && d0.state === 'active' && d0.mode === 'timed' && d0.durSec === 600 && d0.nos.length === 6 && d0.cur === 1 && d0.examTitle === 'ชุดทดสอบสด' && d0.name === 'ณนนท์', JSON.stringify(d0));
+    await pick(child, 0); await nextQ(child);            // ข้อ 1 ตอบ A (ถูก)
+    await nextQ(child);                                   // ข้อ 2 ข้าม
+    await pick(child, 0); await child.click('#takeUnsureBtn'); await nextQ(child); // ข้อ 3 ตอบ A (ผิด เฉลย C) + ไม่แน่ใจ
+    await pick(child, 1); await nextQ(child);            // ข้อ 4 ไม่มีเฉลยในระบบ → ตอบแล้ว (ตรวจไม่ได้)
+    await nextQ(child);                                   // ข้อ 5 ข้อฟรี ไม่ตอบ
+    await pick(child, 4);                                 // ข้อ 6 (5 ตัวเลือก) เลือก จ = ถูก
+    await child.waitForTimeout(2200);
+    const d1 = await doc(child);
+    check('liveView: ถูก/ผิด/ไม่มีเฉลย/ข้อฟรี/ข้าม/ไม่แน่ใจ ตรงกับสูตร submit (ok[1,6] bad[3] nk[4] free[5] skipped[2] unsure[3] ans[1,3,4,6] cur 6)', JSON.stringify([d1.ok, d1.bad, d1.nk, d1.free, d1.skipped, d1.unsure, d1.ans, d1.cur]) === JSON.stringify([[1, 6], [3], [4], [5], [2], [3], [1, 3, 4, 6], 6]), JSON.stringify(d1));
+    check('liveView: คะแนนสด = ถูก 2 + ข้อฟรี 1 = 3 จาก 6 (เหมือนสูตรตอนส่งจริง)', d1.score === 3 && d1.scoreTotal === 6, JSON.stringify([d1.score, d1.scoreTotal]));
+    check('liveView: เอกสารมีเฉพาะฟิลด์สถานะ — ไม่มีตัวเลือกที่เลือก/เฉลย/answers/chosen (กันรั่ว)', Object.keys(d1).every(k => WL.includes(k)) && !/"answers"|"chosen"|"correct"|"choices"/.test(JSON.stringify(d1)), Object.keys(d1).filter(k => !WL.includes(k)).join());
+    check('liveView: มีเวลาต่อข้อ (qElapsed) ของข้อที่แวะดู', d1.qElapsed && typeof d1.qElapsed === 'object', JSON.stringify(d1.qElapsed));
+    // เปลี่ยนคำตอบข้อ 1 → ถูกกลายเป็นผิด + นับจำนวนครั้งที่เปลี่ยน
+    await child.evaluate(() => document.querySelectorAll('#takeNums button')[0].click()); await child.waitForTimeout(150);
+    await pick(child, 1); await child.waitForTimeout(2200);
+    const d2 = await doc(child);
+    check('liveView: เปลี่ยนคำตอบข้อ 1 (A→B) → ย้ายจากถูกเป็นผิด + changes=1 + score ลด', JSON.stringify([d2.ok, d2.bad, d2.changes, d2.score]) === JSON.stringify([[6], [1, 3], 1, 2]), JSON.stringify(d2));
+    // กดซ้ำ = ยกเลิกคำตอบ → ออกจาก ans
+    await pick(child, 1); await child.waitForTimeout(2200);
+    check('liveView: ยกเลิกคำตอบ (กดซ้ำ) → ข้อนั้นออกจากตอบแล้ว', !(await doc(child)).ans.includes(1), '');
+    // ── สถานะ "ออกจากแอป" ──
+    await child.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis || 'visible' }); window.__vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange')); });
+    await child.waitForTimeout(400);
+    const da = await doc(child);
+    check('liveView: พับแอป/ล็อกจอ → state "away" ทันที + awaySince', da.state === 'away' && typeof da.awaySince === 'number', JSON.stringify([da.state, da.awaySince]));
+    await child.evaluate(() => { window.__vis = 'visible'; document.dispatchEvent(new Event('visibilitychange')); }); await child.waitForTimeout(400);
+    const db2 = await doc(child);
+    check('liveView: กลับเข้าแอป → กลับเป็น active และเคลียร์ awaySince', db2.state === 'active' && db2.awaySince === null, JSON.stringify([db2.state, db2.awaySince]));
+    // ── ส่งข้อสอบ: submitting → done ──
+    await child.click('#takeSubmitBtn'); await child.waitForTimeout(500);
+    check('liveView: กดส่ง → "กำลังส่งคำตอบ" (submitting) ระหว่างตอบอารมณ์หลังสอบ', (await doc(child)).state === 'submitting', '');
+    await child.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await child.waitForTimeout(300);
+    await child.evaluate(() => { document.querySelector('[data-n="3"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await child.waitForTimeout(1500);
+    const dd = await doc(child);
+    const attId = await child.evaluate(() => Store.load().attempts[0] && Store.load().attempts[0].id);
+    check('liveView: บันทึกผลสอบสำเร็จ → state "done" + attemptId ตรงกับผลสอบที่บันทึก + คะแนน', dd && dd.state === 'done' && dd.attemptId === attId && typeof dd.score === 'number' && dd.usedSeconds >= 0, JSON.stringify(dd && [dd.state, dd.attemptId, attId, dd.score]));
+    check('liveView: หลังส่งแล้วออกไปหน้ารีวิว → เอกสาร done ไม่ถูกลบ (ครูยังเห็นผล)', (await doc(child)) && (await child.evaluate(() => window._currentPage)) === 'review', await child.evaluate(() => window._currentPage));
+    // ฝั่งครู: การ์ด done + ปุ่มดูผล
+    const teacher = await openAs(ctx, 'teacher', 'Admin', errs);
+    await teacher.evaluate(() => navigate('admin_live')); await teacher.waitForTimeout(700);
+    const tcard = await teacher.evaluate(() => ({ txt: document.getElementById('liveList').innerText.replace(/\s+/g, ' '), btn: !!document.querySelector('[data-lv-review]') }));
+    check('liveView: ครูเห็นการ์ด "ส่งข้อสอบแล้ว" + ปุ่ม "ดูผลละเอียด" → เปิดหน้ารีวิวของผลสอบนั้น', /ส่งข้อสอบแล้ว/.test(tcard.txt) && tcard.btn, tcard.txt.slice(0, 160));
+    await teacher.click('[data-lv-review]'); await teacher.waitForTimeout(400);
+    check('liveView: กดดูผลละเอียด → หน้า review ของ attemptId นั้น', (await teacher.evaluate(() => [window._currentPage, window._currentParams && window._currentParams.attemptId])).join() === 'review,' + attId, '');
+    check('liveView: ไม่มี error ในหน้า (โหมดจับเวลา)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+
+  // ── 2) ถ่วงน้ำหนัก / กรอกตัวเลข ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const c1 = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(c1, { id: 'e2', takerName: 'ณนนท์' });
+    await pick(c1, 0); await nextQ(c1); await pick(c1, 0); await nextQ(c1); await pick(c1, 2); await c1.waitForTimeout(2200);
+    const w = await doc(c1);
+    check('liveView: ถ่วงน้ำหนัก → คะแนนสดเป็นแต้ม (ถูกข้อ 2 + 5 = 7 จาก 10) และตั้งธง weighted', w.weighted === true && w.score === 7 && w.scoreTotal === 10 && JSON.stringify(w.ok) === '[1,3]' && JSON.stringify(w.bad) === '[2]', JSON.stringify([w.weighted, w.score, w.scoreTotal, w.ok, w.bad]));
+    await c1.close();
+    const c2 = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(c2, { id: 'e3', takerName: 'ณนนท์' });
+    const key = (t) => c2.evaluate((t) => { [...document.querySelectorAll('.numKeypadBtn')].find(b => b.textContent === t).click(); }, t);
+    await key('1'); await key('2'); await nextQ(c2); await key('3'); await key('4'); await key('4'); await nextQ(c2);
+    await c2.waitForTimeout(2200);
+    const f = await doc(c2);
+    check('liveView: กรอกตัวเลข (คีย์แพด ไม่ผ่าน render) → ถูก [1] ผิด [2] ตามค่าตัวเลข และข้อที่ยังไม่กรอก = ไม่ตอบ', f.examType === 'fillblank-num' && JSON.stringify([f.ok, f.bad, f.ans]) === JSON.stringify([[1], [2], [1, 2]]) && f.cur === 3, JSON.stringify(f));
+    check('liveView: ไม่มี error ในหน้า (ถ่วงน้ำหนัก/กรอกตัวเลข)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+
+  // ── 3) ฝึกซ้อม / คนละครึ่ง / ครึ่งหลัง ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const pr = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(pr, { id: 'e1', takerName: 'ณนนท์', practice: true });
+    await pick(pr, 0); await pr.waitForTimeout(2200);
+    const dp = await doc(pr);
+    check('liveView: โหมดฝึกซ้อม → mode=practice ไม่มีลิมิตเวลา (durSec 0) แต่ยังส่งสถานะ/ถูกผิด', dp.mode === 'practice' && dp.durSec === 0 && JSON.stringify(dp.ok) === '[1]', JSON.stringify([dp.mode, dp.durSec, dp.ok]));
+    const tp = await openAs(ctx, 'teacher', 'Admin', errs);
+    await tp.evaluate(() => navigate('admin_live')); await tp.waitForTimeout(700);
+    const pt = await tp.evaluate(() => document.getElementById('liveList').innerText.replace(/\s+/g, ' '));
+    check('liveView: ครูเห็นโหมดฝึกซ้อม → "ใช้เวลาไปแล้ว" (นับขึ้น) ไม่มี "เวลาที่เหลือ"/จังหวะเวลา + ป้ายโหมด', /ฝึกซ้อม/.test(pt) && /ใช้เวลาไปแล้ว/.test(pt) && !/เวลาที่เหลือ/.test(pt) && !/จังหวะเวลา/.test(pt), pt.slice(0, 220));
+    await pr.close(); await tp.close();
+
+    const hf = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(hf, { id: 'e1', takerName: 'ณนนท์', half: true });
+    await pick(hf, 0); await nextQ(hf); await pick(hf, 0); await hf.waitForTimeout(2200);   // ข้อ 1 ถูก, ข้อ 2 ผิด
+    const dh = await doc(hf);
+    check('liveView: คนละครึ่ง → mode=half, โควตา=ครึ่งของ 6 = 3, เวลาครึ่งชุด 300 วิ, คะแนนเต็ม = โควตา', dh.mode === 'half' && dh.quota === 3 && dh.durSec === 300 && dh.scoreTotal === 3, JSON.stringify([dh.mode, dh.quota, dh.durSec, dh.scoreTotal]));
+    check('liveView: คนละครึ่ง → นับเฉพาะข้อที่ตอบ (ข้อฟรีที่ยังไม่ตอบไม่ได้แต้ม): ถูก 1 → คะแนน 1', dh.score === 1 && JSON.stringify(dh.bad) === '[2]', JSON.stringify([dh.score, dh.bad]));
+    const th = await openAs(ctx, 'teacher', 'Admin', errs);
+    await th.evaluate(() => navigate('admin_live')); await th.waitForTimeout(700);
+    const ht = await th.evaluate(() => document.getElementById('liveList').innerText.replace(/\s+/g, ' '));
+    check('liveView: ครูเห็นคนละครึ่ง → ป้าย "คนละครึ่ง" + "ตอบแล้ว 2 / 3 ข้อ" (นับตามโควตา)', /คนละครึ่ง/.test(ht) && /ตอบแล้ว 2 \/ 3 ข้อ/.test(ht), ht.slice(0, 260));
+    await hf.close(); await th.close();
+
+    const h2 = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(h2, { id: 'e1', takerName: 'ณนนท์', half2: true, qids: ['q4', 'q5', 'q6'], parentAttemptId: 'att_parent' });
+    await h2.waitForTimeout(1200);
+    const d2h = await doc(h2);
+    check('liveView: ครึ่งหลัง (qids ย่อย) → mode=half2 และรายข้อเป็นเฉพาะข้อที่เหลือ [4,5,6]', d2h.mode === 'half2' && JSON.stringify(d2h.nos) === '[4,5,6]' && d2h.cur === 4, JSON.stringify([d2h.mode, d2h.nos, d2h.cur]));
+    check('liveView: ไม่มี error ในหน้า (ฝึกซ้อม/คนละครึ่ง/ครึ่งหลัง)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+
+  // ── 4) แก้จุดอ่อน (initPractice) ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const w = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await w.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({ examId: 'e1', examTitle: 'ชุดทดสอบสด', examSubject: 'คณิตศาสตร์', takerName: 'ณนนท์', perQuestion: [1, 2].map(n => ({ no: n, isCorrect: false, chosen: 'D', correct: n === 1 ? 'A' : 'B', tags: [], subTags: [], topic: '' })) }));
+    const wc = await w.evaluate(() => WeaknessTracker.getActiveWeaknessesForUser('ณนนท์').length);
+    await w.evaluate(() => navigate('practice', { examId: 'e1' })); await w.waitForTimeout(900);
+    const d0 = await doc(w);
+    check('liveView: แก้จุดอ่อน → mode=weakness รายข้อ = ข้อจุดอ่อน, ไม่มีลิมิตเวลา (เตรียมจุดอ่อน ' + wc + ' ข้อ)', wc === 2 && d0 && d0.mode === 'weakness' && d0.durSec === 0 && JSON.stringify(d0.nos) === '[1,2]' && d0.state === 'active', JSON.stringify(d0));
+    await w.evaluate(() => { [...document.querySelectorAll('#pracChoices .choice')][0].click(); document.getElementById('pracConfirmBtn').click(); });   // ข้อ 1 ตอบ A ถูก
+    await w.waitForTimeout(2200);
+    const d1 = await doc(w);
+    check('liveView: แก้จุดอ่อน → ผลที่กดยืนยัน = ถูก [1], คะแนนสด 1/2', JSON.stringify([d1.ok, d1.bad, d1.score, d1.scoreTotal]) === JSON.stringify([[1], [], 1, 2]), JSON.stringify(d1));
+    await w.evaluate(() => document.getElementById('pracNextBtn').click()); await w.waitForTimeout(300);
+    await w.evaluate(() => { [...document.querySelectorAll('#pracChoices .choice')][0].click(); document.getElementById('pracConfirmBtn').click(); });   // ข้อ 2 ตอบ A ผิด
+    await w.waitForTimeout(2200);
+    check('liveView: แก้จุดอ่อน → ข้อที่ผิดขึ้นเป็นผิด [2]', JSON.stringify((await doc(w)).bad) === '[2]', '');
+    await w.evaluate(() => document.getElementById('pracNextBtn').click()); await w.waitForTimeout(1200);   // เสร็จสิ้น
+    const dd = await doc(w);
+    check('liveView: แก้จุดอ่อนเสร็จ → state done + attemptId ขึ้นต้น prac_ + คะแนน 1/2', dd && dd.state === 'done' && /^prac_/.test(dd.attemptId || '') && dd.score === 1 && dd.total === 2, JSON.stringify(dd && [dd.state, dd.attemptId, dd.score, dd.total]));
+    // ออกกลางคันไม่ส่ง → ลบ
+    const w2 = await openAs(ctx, 'student', 'Tester', errs);
+    await w2.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({ examId: 'e1', examTitle: 'ชุดทดสอบสด', examSubject: 'คณิตศาสตร์', takerName: 'Tester', perQuestion: [{ no: 1, isCorrect: false, chosen: 'D', correct: 'A', tags: [], subTags: [], topic: '' }] }));
+    await w2.evaluate(() => navigate('practice', { examId: 'e1' })); await w2.waitForTimeout(900);
+    const t0 = await doc(w2, 'Tester');
+    await w2.evaluate(() => document.getElementById('pracExitBtn').click()); await w2.waitForTimeout(500);
+    check('liveView: ออกจากแก้จุดอ่อนกลางคัน → เอกสารสดถูกลบ', t0 && !(await doc(w2, 'Tester')), '');
+    check('liveView: ไม่มี error ในหน้า (แก้จุดอ่อน)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+
+  // ── 5) resume / ออกกลางคัน / ครูทดสอบ / ล้มเหลวเงียบ / throttle / quiet ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const c = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await take(c, { id: 'e1', takerName: 'ณนนท์' });
+    await pick(c, 0); await c.waitForTimeout(2200);
+    const s0 = (await doc(c)).startedAt;
+    // resume: รีโหลดหน้า แล้วกด "ทำต่อ"
+    await c.reload({ waitUntil: 'domcontentloaded' });
+    await c.waitForFunction(() => typeof Store !== 'undefined' && Store._cloudLoaded === true, {}, { timeout: 8000 }).catch(() => {});
+    await c.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'student', name: 'ณนนท์', ts: Date.now() })); document.getElementById('offlineBanner')?.remove(); window.confirm = () => true; });
+    await c.evaluate(() => navigate('take', { id: 'e1', takerName: 'ณนนท์' })); await c.waitForTimeout(800);
+    const pop = await c.$('#_resumeOverlay');
+    await c.evaluate(() => [...document.querySelectorAll('#_resumeOverlay button')].find(b => /ทำต่อ/.test(b.textContent)).click()); await c.waitForTimeout(2200);
+    const dr = await doc(c);
+    check('liveView: resume (รีโหลดแล้ว "ทำต่อ") → ส่งสถานะต่อจากเดิม: startedAt เดิม + คำตอบเดิมยังอยู่ + active', !!pop && dr.state === 'active' && dr.startedAt === s0 && JSON.stringify(dr.ok) === '[1]' && dr.pauseOffset >= 0, JSON.stringify([!!pop, dr.state, dr.startedAt === s0, dr.ok]));
+    // ออกกลางคัน (ปุ่มออก) → ลบเอกสาร
+    await c.evaluate(() => document.getElementById('takeExitBtn').click()); await c.waitForTimeout(600);
+    check('liveView: กดออกจากการทำข้อสอบ → เอกสารสดถูกลบ', !(await doc(c)), '');
+    // เปลี่ยนหน้ากลางคัน → ลบ (ออกแล้วคำตอบยังค้างไว้ให้ resume → ล้างก่อนเริ่มรอบใหม่)
+    await c.evaluate(() => localStorage.removeItem('nanont:takeResume:ณนนท์'));
+    await take(c, { id: 'e1', takerName: 'ณนนท์' });
+    check('liveView: เริ่มรอบใหม่ → ส่งสถานะใหม่ (active)', (await doc(c)) && (await doc(c)).state === 'active', '');
+    await c.evaluate(() => navigate('home')); await c.waitForTimeout(500);
+    check('liveView: เปลี่ยนไปหน้าอื่นกลางคัน (navigate) → เอกสารสดถูกลบ', !(await doc(c)), '');
+    // throttle + quiet
+    await c.evaluate(() => localStorage.removeItem('nanont:takeResume:ณนนท์'));
+    await take(c, { id: 'e1', takerName: 'ณนนท์' });
+    await c.evaluate(() => { document.getElementById('fbSyncStatus').textContent = 'KEEP'; __fakeFS.log.length = 0; });
+    await c.waitForTimeout(3500);
+    const idle = await c.evaluate(() => __fakeFS.log.filter(l => l.op === 'set' && l.id.includes('_live_')).length);
+    check('liveView: ว่างเฉยๆ ไม่ส่งถี่ (3.5 วิ ≤ 2 ครั้ง — heartbeat ทุก 10 วิ)', idle <= 2, String(idle));
+    await c.evaluate(() => { __fakeFS.log.length = 0; });
+    for (let i = 0; i < 5; i++) { await pick(c, i % 4); await c.waitForTimeout(120); }
+    await c.waitForTimeout(2500);
+    const burst = await c.evaluate(() => __fakeFS.log.filter(l => l.op === 'set' && l.id.includes('_live_')).length);
+    check('liveView: กดตอบรัว 5 ครั้งใน 1 วิ → รวมส่งไม่เกิน 3 ครั้ง (debounce)', burst >= 1 && burst <= 3, String(burst));
+    check('liveView: เขียนแบบ quiet — ไม่แตะข้อความสถานะ sync (#fbSyncStatus)', (await c.evaluate(() => document.getElementById('fbSyncStatus').textContent)) === 'KEEP', '');
+    // เขียนล้มเหลว → ข้อสอบยังทำได้ปกติ ไม่มี error
+    await c.evaluate(() => { __fakeFS.failWrites = true; });
+    await pick(c, 2); await nextQ(c); await pick(c, 1); await c.waitForTimeout(2500);
+    const okLocal = await c.evaluate(() => Object.keys(_takeState.answers).length);
+    check('liveView: เขียนขึ้น cloud ล้มเหลว → ข้อสอบยังทำต่อได้ปกติ (บันทึกคำตอบในเครื่อง) และไม่มี error', okLocal >= 2 && errs.length === 0, JSON.stringify([okLocal, errs]));
+    await c.evaluate(() => { __fakeFS.failWrites = false; });
+    await c.close();
+    // ครูทดสอบทำข้อสอบเอง (ไม่มีชื่อผู้ทำ) → ไม่ส่งสถานะสด
+    const tch = await openAs(ctx, 'teacher', 'Admin', errs);
+    await tch.evaluate(() => { Object.keys(__fakeFS.all()).filter(k => k.includes('_live_')).forEach(k => __fakeFS.del(k)); }); // ล้างเอกสารสดที่ค้างจากเด็กที่ปิดหน้าไปเฉยๆ
+    await tch.evaluate(() => navigate('take', { id: 'e1' })); await tch.waitForTimeout(1500);
+    const anyLive = await tch.evaluate(() => Object.keys(__fakeFS.all()).filter(k => k.includes('_live_')).length);
+    check('liveView: ครูทดสอบทำข้อสอบเองโดยไม่มีชื่อผู้ทำ → ไม่สร้างเอกสารสด', anyLive === 0, String(anyLive));
+    await ctx.close();
+  }
+
+  // ── 6) ฝั่งครู: ทุกสถานะ / นาฬิกา / ซ่อน / ลบ / เรียลไทม์ / สิทธิ์ ──
+  {
+    const errs = []; const ctx = await newCtx();
+    const T = await openAs(ctx, 'teacher', 'Admin', errs);
+    const now = await T.evaluate(() => Date.now());
+    const mkDoc = (name, over) => ({ v: 1, name, mode: 'timed', examId: 'e1', examTitle: 'ชุดจำลอง ' + name, subject: 'คณิตศาสตร์', examType: 'mc', weighted: false, startedAt: now - 600e3, pauseOffset: 60, durSec: 900, quota: 0, cur: 4, nos: [1, 2, 3, 4, 5, 6, 7, 8], ans: [1, 2, 3], ok: [1, 2], bad: [3], nk: [], free: [], unsure: [2], skipped: [], changes: 2, score: 2, scoreTotal: 8, qElapsed: { 1: 20, 2: 95, 3: 40 }, state: 'active', awaySince: null, ts: now - 4e3, ...over });
+    const put = (name, d) => T.evaluate(([id, d]) => __fakeFS.put(id, { _d: JSON.stringify(d), _ts: Date.now() }), [NSL + 'live_' + name, d]);
+    await put('ก_active', mkDoc('ก_active'));
+    await put('ข_stale', mkDoc('ข_stale', { ts: now - 120e3 }));
+    await put('ค_done', mkDoc('ค_done', { state: 'done', ts: now - 60e3, attemptId: 'attX', usedSeconds: 700, score: 4, scoreTotal: 8 }));
+    await put('ง_old', mkDoc('ง_old', { ts: now - 7 * 3600e3 }));
+    await put('จ_olddone', mkDoc('จ_olddone', { state: 'done', ts: now - 3 * 3600e3, attemptId: 'attY' }));
+    await put('ฉ_away', mkDoc('ฉ_away', { state: 'away', awaySince: now - 70e3, ts: now - 3e3, examTitle: 'ชุดจำลอง ฉ_away' }));
+    await T.evaluate(() => navigate('admin')); await T.waitForTimeout(900);
+    const ban = await T.evaluate(() => ({ disp: getComputedStyle(document.getElementById('adminLiveBanner')).display, txt: document.getElementById('adminLiveBanner').innerText.replace(/\s+/g, ' '), chip: document.getElementById('adminLiveChip').innerText }));
+    check('liveView: ครู (หน้า Admin) → แบนเนอร์เขียว "2 คนกำลังทำข้อสอบอยู่" (active + away; ไม่นับ ขาดการเชื่อมต่อ/ส่งแล้ว/เก่า) + ชิปที่เมนู', ban.disp === 'flex' && /2 คนกำลังทำข้อสอบอยู่/.test(ban.txt) && ban.chip === '2 คนกำลังทำ', JSON.stringify(ban));
+    await T.evaluate(() => navigate('admin_live')); await T.waitForTimeout(700);
+    const pg = await T.evaluate(() => ({ cards: [...document.querySelectorAll('#liveList [data-lv-card]')].map(c => c.dataset.lvCard + ':' + c.dataset.status), txt: document.getElementById('liveList').innerText.replace(/\s+/g, ' '), rem: document.querySelector('[data-lv-card$="ก_active"] [data-lv="rem"]')?.textContent, remStale: document.querySelector('[data-lv-card$="ข_stale"] [data-lv="rem"]')?.parentElement.textContent }));
+    check('liveView: ครูเห็นการ์ดเฉพาะที่ยังไม่หมดอายุ (active/stale/done/away) — ซ่อน active เก่าเกิน 6 ชม. และ done เกิน 2 ชม.', pg.cards.length === 4 && pg.cards.some(c => /ก_active:active/.test(c)) && pg.cards.some(c => /ข_stale:stale/.test(c)) && pg.cards.some(c => /ค_done:done/.test(c)) && pg.cards.some(c => /ฉ_away:away/.test(c)) && !/ง_old|จ_olddone/.test(pg.cards.join()), JSON.stringify(pg.cards));
+    const remSec = (t) => { const m = /(\d+):(\d+)/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : -1; };
+    check('liveView: เวลาที่เหลือคำนวณจาก startedAt/durSec/pauseOffset (900 − (600 − 60) = 360 วิ ±3) และเดินต่อทุกวินาที', Math.abs(remSec(pg.rem) - 360) <= 3, pg.rem);
+    await T.waitForTimeout(2100);
+    check('liveView: นาฬิกาเดินลงเอง (ผ่าน ~2 วิ ลดลง ≥ 2)', remSec(await T.evaluate(() => document.querySelector('[data-lv-card$="ก_active"] [data-lv="rem"]').textContent)) <= remSec(pg.rem) - 2, '');
+    check('liveView: ขาดการเชื่อมต่อ (ไม่ได้ยินเกิน 45 วิ) → ป้ายเทา + เวลาเป็นค่าประมาณ (~)', /ขาดการเชื่อมต่อ/.test(pg.txt) && /ประมาณการ/.test(pg.txt) && /~/.test(pg.remStale || ''), (pg.remStale || '') + ' | ' + pg.txt.slice(0, 100));
+    check('liveView: ออกจากแอป → ป้ายเหลือง + บอกว่าเวลายังเดินอยู่', /ออกจากแอป \(พับ\/ล็อกจอ\)/.test(pg.txt) && /ยังเดินอยู่/.test(pg.txt), '');
+    check('liveView: การ์ดแสดงข้อปัจจุบัน/ถูก/ผิด/ผังรายข้อ/ข้อที่ใช้เวลานานสุด/จังหวะเวลา', /ถูก ✓/.test(pg.txt) && /ผิด ✗/.test(pg.txt) && /ภาพรวมรายข้อ/.test(pg.txt) && /ข้อที่ใช้เวลานานสุด/.test(pg.txt) && /จังหวะเวลา/.test(pg.txt), pg.txt.slice(0, 200));
+    const pills = await T.evaluate(() => { const c = document.querySelector('[data-lv-card$="ก_active"]'); return { ok: c.querySelectorAll('.lvPill.ok').length, bad: c.querySelectorAll('.lvPill.bad').length, cur: c.querySelectorAll('.lvPill.cur').length, unsure: c.querySelectorAll('.lvPill sup').length, total: c.querySelectorAll('.lvPill').length }; });
+    check('liveView: ผังรายข้อ: เขียว 2 / แดง 1 / ข้อปัจจุบัน 1 / ไม่แน่ใจ 1 / ทั้งหมด 8', JSON.stringify(pills) === JSON.stringify({ ok: 2, bad: 1, cur: 1, unsure: 1, total: 8 }), JSON.stringify(pills));
+    // ลบรายการ stale → ลบ doc จริง
+    await T.evaluate(() => document.querySelector('[data-lv-del$="ข_stale"]').click()); await T.waitForTimeout(400);
+    check('liveView: ครูกด "ลบรายการนี้" (ขาดการเชื่อมต่อ) → การ์ดหาย + เอกสารถูกลบจาก cloud', !(await T.evaluate((id) => __fakeFS.get(id), NSL + 'live_ข_stale')) && !(await T.evaluate(() => document.querySelector('[data-lv-card$="ข_stale"]'))), '');
+    // เรียลไทม์: เด็กใหม่โผล่ / เอกสารถูกลบแล้วหาย
+    await put('ช_new', mkDoc('ช_new', { ts: Date.now() })); await T.waitForTimeout(600);
+    check('liveView: เรียลไทม์ — เอกสารใหม่โผล่เป็นการ์ดเองโดยไม่ต้องรีเฟรช', !!(await T.evaluate(() => document.querySelector('[data-lv-card$="ช_new"]'))), '');
+    await T.evaluate((id) => __fakeFS.del(id), NSL + 'live_ช_new'); await T.waitForTimeout(600);
+    check('liveView: เรียลไทม์ — เอกสารถูกลบ → การ์ดหายเอง', !(await T.evaluate(() => document.querySelector('[data-lv-card$="ช_new"]'))), '');
+    // สถานะเปลี่ยนตามเวลา: active → ขาดการเชื่อมต่อ เองเมื่อเงียบเกิน 45 วิ
+    await put('ซ_aging', mkDoc('ซ_aging', { ts: Date.now() - 43e3 })); await T.waitForTimeout(500);
+    const before = await T.evaluate(() => document.querySelector('[data-lv-card$="ซ_aging"]').dataset.status);
+    await T.waitForTimeout(3300);
+    const after = await T.evaluate(() => document.querySelector('[data-lv-card$="ซ_aging"]').dataset.status);
+    check('liveView: เงียบเกิน 45 วิ → การ์ดเปลี่ยนจาก active เป็น stale เอง (ไม่ต้องมีข้อมูลใหม่)', before === 'active' && after === 'stale', before + '→' + after);
+    // ออกจากหน้า admin → หยุดฟัง
+    await T.evaluate(() => navigate('home')); await T.waitForTimeout(300);
+    await put('ฌ_after', mkDoc('ฌ_after', { ts: Date.now() })); await T.waitForTimeout(500);
+    check('liveView: ออกจากหน้า admin/admin_live → หยุดฟังและเคลียร์ (ไม่โหลดเอกสารสดเมื่อไม่ได้ดู)', (await T.evaluate(() => LiveView._docs.size)) === 0, '');
+    // หน้าว่าง
+    await T.evaluate(() => { Object.keys(__fakeFS.all()).filter(k => k.includes('_live_')).forEach(k => __fakeFS.del(k)); navigate('admin_live'); }); await T.waitForTimeout(600);
+    check('liveView: ไม่มีใครทำข้อสอบ → หน้าว่าง "ตอนนี้ไม่มีใครกำลังทำข้อสอบ" และแบนเนอร์ซ่อน', /ตอนนี้ไม่มีใครกำลังทำข้อสอบ/.test(await T.evaluate(() => document.getElementById('liveList').innerText)), '');
+    await T.evaluate(() => navigate('admin')); await T.waitForTimeout(500);
+    check('liveView: แบนเนอร์ซ่อนเมื่อไม่มีใครทำ + ชิปที่เมนูซ่อน', (await T.evaluate(() => [getComputedStyle(document.getElementById('adminLiveBanner')).display, getComputedStyle(document.getElementById('adminLiveChip')).display].join())) === 'none,none', '');
+    // มือถือ 390: ไม่ล้นจอ
+    await put('ฎ_m', mkDoc('ฎ_m', { ts: Date.now(), nos: Array.from({ length: 50 }, (_, i) => i + 1), ok: [1, 2, 3], bad: [4], ans: [1, 2, 3, 4, 5] }));
+    await T.setViewportSize({ width: 390, height: 844 });
+    await T.evaluate(() => navigate('admin_live')); await T.waitForTimeout(700);
+    const ov = await T.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    check('liveView: มือถือ 390px หน้าดูสด (50 ข้อ) ไม่ล้นจอแนวนอน', ov <= 0, String(ov));
+    // นักเรียนเข้า admin_live ไม่ได้
+    const S = await openAs(ctx, 'student', 'ณนนท์', errs);
+    await S.evaluate(() => navigate('admin_live')); await S.waitForTimeout(400);
+    check('liveView: นักเรียนเปิดหน้าดูสดไม่ได้ → เด้งกลับหน้าแรก และไม่ฟังเอกสารสด', (await S.evaluate(() => [window._currentPage, LiveView._docs.size].join())) === 'home,0', await S.evaluate(() => window._currentPage));
+    check('liveView: ไม่มี error ในหน้า (ฝั่งครู)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
