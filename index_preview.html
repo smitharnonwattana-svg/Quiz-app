@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.79p -->
+  <!-- APP_VERSION: v48.80p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1412,8 +1412,8 @@
     }
     #pdfAnnotateCursor.show { display: block; }
 
-    /* v48.79p: ดูสด (ครู) */
-    .lvChip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:700;border:1px solid;white-space:nowrap;}
+    /* v48.79p: ดูสด (ครู) — v48.80p: จัดใหม่ให้กระชับพอดีจอเดียว */
+    .lvChip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700;border:1px solid;white-space:nowrap;}
     .lvChip.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}
     .lvChip.am{background:#fffbeb;border-color:#fde68a;color:#b45309;}
     .lvChip.gr{background:#f3f4f6;border-color:#d1d5db;color:#4b5563;}
@@ -1424,43 +1424,65 @@
     .lvBanner .t{flex:1;min-width:0;}
     .lvBanner .t b{font-size:16px;}
     .lvBanner .time{font-variant-numeric:tabular-nums;font-weight:900;font-size:22px;text-align:right;}
-    .lvCard{margin-bottom:22px;}
-    .lvHead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
-    .lvHero{padding:20px 22px;}
-    .lvBig{font-size:64px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1;}
-    .lvBar{height:10px;border-radius:5px;background:#e5e7eb;overflow:hidden;margin-top:14px;}
-    .lvBar i{display:block;height:100%;background:#111827;border-radius:5px;}
-    .lvStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;}
-    .lvStat{padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:#fff;}
-    .lvStat small{display:block;color:var(--muted);font-size:12.5px;margin-bottom:2px;}
-    .lvStat b{font-size:26px;font-weight:900;}
-    .lvStat span{font-size:13px;color:var(--muted);}
-    .lvCols{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-top:12px;align-items:start;}
-    .lvPills{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;}
-    .lvPill{aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:2px solid #e5e7eb;background:#fff;color:#9ca3af;position:relative;}
+    .lvPage{max-width:1100px;padding-top:16px;padding-bottom:16px;}
+    .lvCard{margin-bottom:16px;}
+    .lvR1{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+    .lvR1 .t{font-size:17px;font-weight:900;}
+    .lvR1 .s{color:var(--muted);font-size:13px;margin-left:8px;}
+    .lvR1 .r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .lvMain{display:grid;grid-template-columns:1.05fr 1.7fr 1.05fr;padding:0;}
+    .lvMain>div{padding:14px 18px;min-width:0;}
+    .lvMain>div+div{border-left:1px solid var(--border);}
+    .lvLab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--muted);}
+    .lvLab b{color:#111827;font-variant-numeric:tabular-nums;}
+    .lvBig{font-size:54px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1.05;}
+    .lvBar{height:8px;border-radius:4px;background:#e5e7eb;overflow:hidden;margin-top:8px;}
+    .lvBar i{display:block;height:100%;background:#111827;border-radius:4px;}
+    .lvMx{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px;}
+    .lvM small{display:block;font-size:12px;color:var(--muted);}
+    .lvM b{font-size:24px;font-weight:900;line-height:1.15;}
+    .lvM b i{font-style:normal;font-size:12px;font-weight:600;color:var(--muted);}
+    .lvM span{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .lvPace{padding:8px 10px;border-radius:10px;background:#f3f4f6;font-size:13px;}
+    .lvPace.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f;}
+    .lvNote{margin-bottom:8px;font-size:13px;}
+    .lvSlow{margin-top:10px;font-size:12.5px;}
+    .lvSlow .h{font-weight:800;margin-bottom:2px;}
+    .lvSlow .r{display:flex;align-items:center;gap:8px;padding:2px 0;}
+    .lvSlow .n{width:24px;height:24px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;}
+    .lvSlow .b{flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;}
+    .lvSlow .b i{display:block;height:100%;background:#e05555;}
+    .lvPc{padding:12px 16px;margin-top:10px;}
+    .lvPc .h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+    .lvPc .h b{font-size:14px;}
+    .lvLegend{display:flex;gap:12px;font-size:11.5px;color:var(--muted);flex-wrap:wrap;}
+    .lvLegend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:2px solid #e5e7eb;}
+    .lvPills{display:grid;grid-template-columns:repeat(25,1fr);gap:6px;}
+    .lvPill{aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;border:2px solid #e5e7eb;background:#fff;color:#9ca3af;position:relative;}
     .lvPill.ok{background:#16a34a;border-color:#16a34a;color:#fff;}
     .lvPill.bad{background:#ef4444;border-color:#ef4444;color:#fff;}
     .lvPill.nk{background:#111827;border-color:#111827;color:#fff;}
     .lvPill.fr{background:#fffbeb;border-color:#f59e0b;color:#b45309;}
     .lvPill.sk{border:2px dashed #ef4444;color:#b91c1c;}
-    .lvPill.cur{box-shadow:0 0 0 3px #fff,0 0 0 5px #2563eb;}
+    .lvPill.cur{box-shadow:0 0 0 2px #fff,0 0 0 4px #2563eb;}
     .lvPill.cur:not(.ok):not(.bad):not(.nk):not(.fr){border-color:#2563eb;color:#2563eb;}
-    .lvPill sup{position:absolute;top:-6px;right:-3px;font-size:10px;}
-    .lvLegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:14px;}
-    .lvLegend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid #e5e7eb;}
-    .lvPace{padding:12px 14px;border-radius:12px;background:#f3f4f6;font-size:14px;}
-    .lvPace.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f;}
-    .lvSlow .r{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);}
-    .lvSlow .r:first-of-type{border-top:none;}
-    .lvSlow .n{width:30px;height:30px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
-    .lvSlow .b{flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;}
-    .lvSlow .b i{display:block;height:100%;background:#e05555;}
-    @media (max-width:700px){
-      .lvBig{font-size:52px;}
-      .lvStats{grid-template-columns:1fr 1fr;gap:10px;}
-      .lvCols{grid-template-columns:1fr;}
-      .lvPills{grid-template-columns:repeat(8,1fr);gap:7px;}
-      .lvHero{padding:16px;}
+    .lvPill sup{position:absolute;top:-5px;right:-3px;font-size:9px;}
+    @media (max-width:1000px){ .lvPills{grid-template-columns:repeat(16,1fr);} .lvBig{font-size:48px;} }
+    @media (max-width:760px){
+      .lvMain{grid-template-columns:1fr;}
+      .lvMain>div+div{border-left:none;border-top:1px solid var(--border);}
+      .lvMain>div{padding:10px 14px;}
+      .lvBig{font-size:42px;}
+      .lvM b{font-size:20px;}
+      .lvPills{grid-template-columns:repeat(10,1fr);gap:6px;}
+      .lvPc{padding:10px 12px;}
+      .lvPage{padding-left:12px;padding-right:12px;}
+      .lvPage .btn{white-space:nowrap;}
+      .lvHdrSub{display:none;}
+      .lvSlow{display:flex;flex-wrap:wrap;gap:2px 14px;align-items:center;margin-top:8px;}
+      .lvSlow .h{width:100%;}
+      .lvSlow .b{display:none;}
+      .lvSlow .r{gap:5px;}
       .lvBanner{flex-wrap:wrap;}
     }
   </style>
@@ -1530,7 +1552,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.79p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.80p</div>
     </div>
   </div>
 </div>
@@ -2092,15 +2114,12 @@
 
 <!-- ===================== PAGE: ADMIN LIVE (v48.79p) ===================== -->
 <div id="page-admin_live" class="page">
-  <div class="container" style="max-width:920px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
-      <div>
-        <h1 class="h1">🟢 ดูสด</h1>
-        <div class="muted" style="font-size:12px;margin-top:4px;">สถานะเด็กที่กำลังทำข้อสอบ — อัปเดตทันทีที่ตอบ/เปลี่ยนข้อ และทุก 10 วินาที (เห็นแค่ตอบแล้วหรือยัง/ถูกหรือผิด ไม่เห็นว่าเลือกตัวเลือกอะไร)</div>
-      </div>
+  <div class="container lvPage">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+      <div><h1 class="h1" style="display:inline;">🟢 ดูสด</h1><span class="muted lvHdrSub" style="font-size:12px;margin-left:10px;">อัปเดตสด · เห็นแค่ตอบแล้ว/ถูก-ผิด ไม่เห็นตัวเลือกที่เลือก</span></div>
       <button class="btn" onclick="navigate('admin')">กลับ Admin</button>
     </div>
-    <div id="liveList" style="margin-top:16px;"></div>
+    <div id="liveList"></div>
   </div>
 </div>
 
@@ -10574,43 +10593,54 @@ const LiveView = (() => {
     const el = _elapsed(d, now), rem = _remaining(d, now), live = st !== 'done';
     const contig = nos.every((x, i) => Number(x) === i + 1);
     const curIdx = nos.indexOf(d.cur);
-    // ── หัว + สถานะ ──
+    const answeredN = ans.length, judged = ok.length + bad.length;
+    const den = d.mode === 'half' && _num(d.quota) ? _num(d.quota) : n;
+    const idq = esc(id);
+    // ── แถวหัว: ชื่อ · ชุด · โหมด | สถานะ ──
     let chip = '';
-    if (st === 'active') chip = `<span class="lvChip ok"><span class="lvDot"></span>กำลังทำ</span><span class="muted" style="font-size:12.5px;" data-lv="age" data-id="${esc(id)}"></span>`;
-    else if (st === 'away') chip = `<span class="lvChip am"><span class="lvDot am"></span>ออกจากแอป (พับ/ล็อกจอ) <span data-lv="away" data-id="${esc(id)}"></span></span>`;
-    else if (st === 'stale') chip = `<span class="lvChip gr"><span class="lvDot gr"></span>ขาดการเชื่อมต่อ</span><span class="muted" style="font-size:12.5px;" data-lv="age" data-id="${esc(id)}"></span>`;
+    if (st === 'active') chip = `<span class="lvChip ok"><span class="lvDot"></span>กำลังทำ</span><span class="muted" style="font-size:12px;" data-lv="age" data-id="${idq}"></span>`;
+    else if (st === 'away') chip = `<span class="lvChip am"><span class="lvDot am"></span>ออกจากแอป (พับ/ล็อกจอ) <span data-lv="away" data-id="${idq}"></span></span>`;
+    else if (st === 'stale') chip = `<span class="lvChip gr"><span class="lvDot gr"></span>ขาดการเชื่อมต่อ</span><span class="muted" style="font-size:12px;" data-lv="age" data-id="${idq}"></span>`;
     else if (st === 'submitting') chip = `<span class="lvChip bl">กำลังส่งคำตอบ…</span>`;
     else chip = `<span class="lvChip bl">✓ ส่งข้อสอบแล้ว</span>`;
     const modeChip = MODE_LABEL[d.mode] ? `<span class="lvChip gr" style="margin-left:6px;">${MODE_LABEL[d.mode]}</span>` : '';
-    // ── เวลา ──
-    let hero = '';
-    const tilde = st === 'stale' ? '~' : '';
-    if (st === 'done') {
-      hero = `<div class="muted" style="font-size:12.5px;margin-bottom:6px;">ใช้เวลา</div><div class="lvBig">${fmtTime(el)}</div>`;
-    } else if (timed) {
+    const head = `<div class="lvR1"><div><span class="t">ดูสด · ${esc(d.name || '')}</span>${modeChip}<span class="s">${esc(d.examTitle || '')}${d.subject ? ' · ' + esc(d.subject) : ''} · ${n} ข้อ${d.weighted ? ' · ถ่วงน้ำหนัก' : ''}</span></div><div class="r">${chip}</div></div>`;
+    // ── คอลัมน์เวลา ──
+    const tilde = st === 'stale' ? '~' : '', gray = st === 'stale' ? 'color:#9ca3af;' : '';
+    let timeCol;
+    if (st === 'done') timeCol = `<div class="lvLab"><span>ใช้เวลา</span></div><div class="lvBig">${fmtTime(el)}</div>`;
+    else if (timed) {
       const pct = Math.min(100, Math.round(el / _num(d.durSec) * 1000) / 10);
-      hero = `<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;">
-        <div><div class="muted" style="font-size:12.5px;margin-bottom:6px;">เวลาที่เหลือ${st === 'stale' ? ' (ประมาณการ)' : ''}</div><div class="lvBig" style="${st === 'stale' ? 'color:#9ca3af;' : ''}">${tilde}<span data-lv="rem" data-id="${esc(id)}">${fmtTime(rem)}</span></div></div>
-        <div style="text-align:right;"><div class="muted" style="font-size:12.5px;">ใช้ไปแล้ว</div><div style="font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;"><span data-lv="el" data-id="${esc(id)}">${fmtTime(el)}</span> <span class="muted" style="font-size:15px;font-weight:600;">/ ${fmtTime(_num(d.durSec))}</span></div></div></div>
-        <div class="lvBar"><i data-lv="bar" data-id="${esc(id)}" style="width:${pct}%"></i></div>`;
-    } else {
-      hero = `<div class="muted" style="font-size:12.5px;margin-bottom:6px;">ใช้เวลาไปแล้ว${st === 'stale' ? ' (ประมาณการ)' : ''}</div><div class="lvBig" style="${st === 'stale' ? 'color:#9ca3af;' : ''}">${tilde}<span data-lv="el" data-id="${esc(id)}">${fmtTime(el)}</span></div>`;
-    }
-    let note = '';
-    if (st === 'away' && timed) note = 'ลูกออกจากหน้าข้อสอบ — เวลา<b>ยังเดินอยู่</b> (ข้อสอบนับเวลาตามนาฬิกาจริง)';
-    else if (st === 'stale') note = 'ไม่ได้รับสัญญาณจากเครื่องลูก — อาจเน็ตหลุดหรือปิดแอป ถ้าลูกเปิดแอปใหม่ ระบบไม่นับเวลาช่วงที่ปิด ตัวเลขอาจเพิ่มกลับขึ้นมา';
-    // ── คะแนน + สถิติ ──
-    const answeredN = ans.length;
-    const judged = ok.length + bad.length;
-    const scoreLine = `<div class="lvStat" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;"><div><small>${st === 'done' ? 'คะแนน' : 'คะแนนตอนนี้'}${d.weighted ? ' (ถ่วงน้ำหนัก)' : ''}</small><b data-lv="score">${esc(_num(d.score))}</b> <span>/ ${esc(_num(d.scoreTotal))}</span></div><div style="text-align:right;"><span>ตอบแล้ว ${answeredN}${weak ? '' : ' / ' + (d.mode === 'half' && _num(d.quota) ? _num(d.quota) : n)} ข้อ${judged ? ' · ถูก ' + Math.round(ok.length / judged * 100) + '% ของที่ตรวจได้' : ''}</span></div></div>`;
-    const curBox = `<div class="lvStat"><small>ข้อปัจจุบัน</small><b>${d.cur == null ? '–' : esc(d.cur)}</b> <span>${contig ? '/ ' + n : '(ลำดับ ' + (curIdx + 1) + '/' + n + ')'}${(d.qElapsed && d.cur != null && d.qElapsed[d.cur] != null && live) ? ' · อยู่ข้อนี้ ' + fmtTime(_num(d.qElapsed[d.cur]) + (st === 'active' ? Math.max(0, Math.floor((now - _num(d.ts)) / 1000)) : 0)) : ''}</span></div>`;
-    const okBox = `<div class="lvStat"><small>ถูก ✓</small><b style="color:#16a34a;">${ok.length}</b> <span>${fr.length ? 'ข้อฟรี ' + fr.length : 'ข้อ'}</span></div>`;
-    const badBox = `<div class="lvStat"><small>ผิด ✗</small><b style="color:#dc2626;">${bad.length}</b> <span>${bad.length ? 'ข้อ ' + esc(bad.slice(0, 6).join(', ')) + (bad.length > 6 ? '…' : '') : 'ข้อ'}</span></div>`;
+      timeCol = `<div class="lvLab"><span>เวลาที่เหลือ${st === 'stale' ? ' (ประมาณการ)' : ''}</span><span>ใช้ไป <b data-lv="el" data-id="${idq}">${fmtTime(el)}</b> / ${fmtTime(_num(d.durSec))}</span></div>
+        <div class="lvBig" style="${gray}">${tilde}<span data-lv="rem" data-id="${idq}">${fmtTime(rem)}</span></div>
+        <div class="lvBar"><i data-lv="bar" data-id="${idq}" style="width:${pct}%"></i></div>`;
+    } else timeCol = `<div class="lvLab"><span>ใช้เวลาไปแล้ว${st === 'stale' ? ' (ประมาณการ)' : ''}</span></div><div class="lvBig" style="${gray}">${tilde}<span data-lv="el" data-id="${idq}">${fmtTime(el)}</span></div>`;
+    // ── ตัวเลข 6 ช่อง ──
+    const qe = d.qElapsed && d.cur != null ? d.qElapsed[d.cur] : null;
+    const curSub = [contig ? '' : `ลำดับ ${curIdx + 1}/${n}`, (qe != null && live) ? 'อยู่ข้อนี้ ' + fmtTime(_num(qe) + (st === 'active' ? Math.max(0, Math.floor((now - _num(d.ts)) / 1000)) : 0)) : ''].filter(Boolean).join(' · ');
+    const lst = (a, k) => a.length ? 'ข้อ ' + esc(a.slice(0, k).join(',')) + (a.length > k ? '…' : '') : 'ข้อ';
+    const avg = (answeredN + sk.length) ? fmtTime(el / (answeredN + sk.length)).replace(/^0/, '') : '–';
+    const tiles = [
+      `<div class="lvM"><small>ข้อปัจจุบัน</small><b>${d.cur == null ? '–' : esc(d.cur)}${contig ? `<i> /${n}</i>` : ''}</b><span>${curSub || '&nbsp;'}</span></div>`,
+      `<div class="lvM"><small>${st === 'done' ? 'คะแนน' : 'คะแนนตอนนี้'}${d.weighted ? ' (ถ่วง)' : ''}</small><b data-lv="score">${esc(_num(d.score))}<i> /${esc(_num(d.scoreTotal))}</i></b><span>ตอบ ${answeredN}/${den}${judged ? ' · ถูก ' + Math.round(ok.length / judged * 100) + '%' : ''}</span></div>`,
+      `<div class="lvM"><small>ถูก ✓</small><b style="color:#16a34a;">${ok.length}</b><span>${fr.length ? '+ ข้อฟรี ' + fr.length : 'ข้อ'}</span></div>`,
+      `<div class="lvM"><small>ผิด ✗</small><b style="color:#dc2626;">${bad.length}</b><span>${lst(bad, 5)}</span></div>`,
+      weak ? `<div class="lvM"><small>ยังไม่ได้ทำ</small><b>${Math.max(0, n - answeredN)}</b><span>ข้อ</span></div>`
+           : `<div class="lvM"><small>ข้ามไป</small><b style="color:#b91c1c;">${sk.length}</b><span>${lst(sk, 4)}</span></div>`,
+      weak ? `<div class="lvM"><small>เฉลี่ยต่อข้อ</small><b>${avg}</b><span>นาที:วินาที</span></div>`
+           : `<div class="lvM"><small>ไม่แน่ใจ 🤔</small><b style="color:#b45309;">${un.length}</b><span>${_num(d.changes) ? 'เปลี่ยนคำตอบ ' + _num(d.changes) + ' ครั้ง' : 'ข้อ'}</span></div>`
+    ].join('');
+    // ── คอลัมน์ขวา: จังหวะเวลา + ข้อที่ใช้เวลานานสุด ──
     const remainQ = d.mode === 'half' && _num(d.quota) ? Math.max(0, _num(d.quota) - answeredN) : Math.max(0, n - answeredN - sk.length);
-    const lastBox = weak
-      ? `<div class="lvStat"><small>ยังไม่ได้ทำ</small><b>${Math.max(0, n - answeredN)}</b> <span>ข้อ</span></div>`
-      : `<div class="lvStat"><small>ข้ามไป</small><b style="color:#b91c1c;">${sk.length}</b> <span>${sk.length ? 'ข้อ ' + esc(sk.slice(0, 5).join(', ')) + (sk.length > 5 ? '…' : '') : 'ข้อ'}</span></div>`;
-    const extra = (un.length || _num(d.changes)) ? `<div class="muted" style="font-size:13px;margin-top:10px;">${un.length ? 'ไม่แน่ใจ 🤔 ' + un.length + ' ข้อ (' + esc(un.slice(0, 8).join(', ')) + (un.length > 8 ? '…' : '') + ')' : ''}${un.length && _num(d.changes) ? ' · ' : ''}${_num(d.changes) ? 'เปลี่ยนคำตอบ ' + _num(d.changes) + ' ครั้ง' : ''}${nk.length ? ' · ' + nk.length + ' ข้อยังไม่มีเฉลยในระบบ (ตรวจไม่ได้)' : ''}</div>` : (nk.length ? `<div class="muted" style="font-size:13px;margin-top:10px;">${nk.length} ข้อยังไม่มีเฉลยในระบบ (ตรวจไม่ได้)</div>` : '');
+    let pace = '';
+    if (live && st !== 'stale' && timed && rem != null) {
+      const avgS = (answeredN + sk.length) ? el / (answeredN + sk.length) : 0;
+      if (rem <= 0) pace = `<div class="lvPace warn"><b>หมดเวลาแล้ว</b> — กำลังส่งอัตโนมัติ</div>`;
+      else if (remainQ > 0) { const need = rem / remainQ; pace = `<div class="lvPace${avgS > need ? ' warn' : ''}"><b>จังหวะเวลา</b> เหลือ ${remainQ} ข้อ ต้องเฉลี่ย ≤ <b>${fmtTime(need).replace(/^0/, '')}/ข้อ</b>${avgS ? ' (ที่ผ่านมา ' + fmtTime(avgS).replace(/^0/, '') + ')' : ''}</div>`; }
+    } else if (live && !timed && answeredN) pace = `<div class="lvPace"><b>เฉลี่ยต่อข้อ</b> ${avg}/ข้อ (ไม่มีลิมิตเวลา)</div>`;
+    const slow = Object.entries(d.qElapsed || {}).map(([k, v]) => [k, _num(v)]).filter(x => x[1] >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const slowBox = slow.length ? `<div class="lvSlow"><div class="h">ข้อที่ใช้เวลานานสุด</div>${slow.map(([k, v]) => `<div class="r"><span class="n">${esc(k)}</span><span class="b"><i style="width:${Math.round(v / slow[0][1] * 100)}%"></i></span><span class="muted">${fmtTime(v)}</span></div>`).join('')}</div>` : '';
+    const nkNote = nk.length ? `<div class="muted" style="font-size:11.5px;margin-top:6px;">${nk.length} ข้อยังไม่มีเฉลยในระบบ (ตรวจไม่ได้)</div>` : '';
     // ── ผังรายข้อ ──
     const okS = new Set(ok), badS = new Set(bad), nkS = new Set(nk), frS = new Set(fr), skS = new Set(sk), unS = new Set(un);
     const pills = nos.map(no => {
@@ -10619,28 +10649,18 @@ const LiveView = (() => {
       if (live && no === d.cur) c.push('cur');
       return `<div class="${c.join(' ')}">${esc(no)}${unS.has(no) ? '<sup>🤔</sup>' : ''}</div>`;
     }).join('');
-    const legend = `<div class="lvLegend"><span><i style="background:#16a34a;border-color:#16a34a;"></i>ถูก</span><span><i style="background:#ef4444;border-color:#ef4444;"></i>ผิด</span>${weak ? '' : '<span><i style="background:#fff;border:2px dashed #ef4444;"></i>ข้าม</span><span><i style="background:#fffbeb;border-color:#f59e0b;"></i>ข้อฟรี</span>'}${nk.length ? '<span><i style="background:#111827;border-color:#111827;"></i>ตอบแล้ว (ยังไม่มีเฉลย)</span>' : ''}<span><i style="background:#fff;border-color:#2563eb;"></i>ข้อปัจจุบัน</span><span><i></i>ยังไม่ถึง</span></div>`;
-    // ── จังหวะเวลา / ข้อที่ใช้เวลานาน ──
-    let pace = '';
-    if (live && st !== 'stale' && timed && rem != null) {
-      const done_ = answeredN + sk.length, avg = done_ ? el / done_ : 0;
-      if (rem <= 0) pace = `<div class="lvPace warn"><b>หมดเวลาแล้ว</b> — กำลังส่งอัตโนมัติ</div>`;
-      else if (remainQ > 0) { const need = rem / remainQ; pace = `<div class="lvPace${avg > need ? ' warn' : ''}"><b>จังหวะเวลา</b><br>เหลือ ${remainQ} ข้อ ต้องเฉลี่ยไม่เกิน <b>${fmtTime(need).replace(/^0/, '')}/ข้อ</b>${avg ? ' · ที่ผ่านมาเฉลี่ย ' + fmtTime(avg).replace(/^0/, '') + '/ข้อ' : ''}</div>`; }
-    } else if (live && !timed && answeredN) pace = `<div class="lvPace"><b>เฉลี่ยต่อข้อ</b> ${fmtTime(el / Math.max(1, answeredN + sk.length)).replace(/^0/, '')}/ข้อ (ไม่มีลิมิตเวลา)</div>`;
-    const slow = Object.entries(d.qElapsed || {}).map(([k, v]) => [k, _num(v)]).filter(x => x[1] >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const slowBox = slow.length ? `<div class="card lvSlow" style="padding:16px 18px;"><h3 style="margin:0 0 6px;font-size:15px;font-weight:800;">ข้อที่ใช้เวลานานสุด</h3>${slow.map(([k, v]) => `<div class="r"><span class="n">${esc(k)}</span><span class="b"><i style="width:${Math.round(v / slow[0][1] * 100)}%"></i></span><span class="muted" style="width:46px;text-align:right;">${fmtTime(v)}</span></div>`).join('')}</div>` : '';
+    const legend = `<div class="lvLegend"><span><i style="background:#16a34a;border-color:#16a34a;"></i>ถูก</span><span><i style="background:#ef4444;border-color:#ef4444;"></i>ผิด</span>${weak ? '' : '<span><i style="border:2px dashed #ef4444;"></i>ข้าม</span><span><i style="background:#fffbeb;border-color:#f59e0b;"></i>ข้อฟรี</span>'}${nk.length ? '<span><i style="background:#111827;border-color:#111827;"></i>ตอบแล้ว (ไม่มีเฉลย)</span>' : ''}<span><i style="border-color:#2563eb;"></i>ปัจจุบัน</span><span><i></i>ยังไม่ถึง</span></div>`;
+    // ── หมายเหตุสถานะ + ปุ่ม ──
+    let note = '';
+    if (st === 'away' && timed) note = 'ลูกออกจากหน้าข้อสอบ — เวลา<b>ยังเดินอยู่</b> (ข้อสอบนับเวลาตามนาฬิกาจริง)';
+    else if (st === 'stale') note = 'ไม่ได้รับสัญญาณจากเครื่องลูก — อาจเน็ตหลุดหรือปิดแอป ถ้าลูกเปิดแอปใหม่ ระบบไม่นับเวลาช่วงที่ปิด ตัวเลขอาจเพิ่มกลับขึ้นมา';
     const actions = st === 'done'
-      ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">${d.attemptId ? `<button class="btn btnPrimary" data-lv-review="${esc(d.attemptId)}">ดูผลละเอียด →</button>` : ''}<button class="btn" data-lv-del="${esc(id)}">ลบรายการนี้</button></div>`
-      : (st === 'stale' ? `<div style="margin-top:12px;"><button class="btn" data-lv-del="${esc(id)}">ลบรายการนี้</button></div>` : '');
-    return `<div class="lvCard" data-lv-card="${esc(id)}" data-status="${st}">
-      <div class="lvHead"><div><div style="font-size:22px;font-weight:900;">ดูสด · ${esc(d.name || '')}${modeChip}</div><div class="muted" style="font-size:13px;">${esc(d.examTitle || '')}${d.subject ? ' · ' + esc(d.subject) : ''} · ${n} ข้อ${d.weighted ? ' · ถ่วงน้ำหนัก' : ''}</div></div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">${chip}</div></div>
-      <div class="card lvHero" style="${st === 'stale' ? 'background:#f9fafb;' : ''}">${hero}</div>
-      ${note ? `<div class="lvPace${st === 'away' ? ' warn' : ''}" style="margin-top:10px;font-size:13px;">${note}</div>` : ''}
-      ${scoreLine}
-      <div class="lvStats">${curBox}${okBox}${badBox}${lastBox}</div>
-      ${extra}
-      <div class="lvCols"><div class="card" style="padding:18px 20px;"><h3 style="margin:0 0 10px;font-size:15px;font-weight:800;">ภาพรวมรายข้อ</h3><div class="lvPills">${pills}</div>${legend}</div>
-      <div style="display:grid;gap:12px;align-content:start;">${pace}${slowBox}</div></div>
+      ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">${d.attemptId ? `<button class="btn btnPrimary" data-lv-review="${esc(d.attemptId)}">ดูผลละเอียด →</button>` : ''}<button class="btn" data-lv-del="${idq}">ลบรายการนี้</button></div>`
+      : (st === 'stale' ? `<div style="margin-top:10px;"><button class="btn" data-lv-del="${idq}">ลบรายการนี้</button></div>` : '');
+    return `<div class="lvCard" data-lv-card="${idq}" data-status="${st}">${head}
+      ${note ? `<div class="lvPace lvNote${st === 'away' ? ' warn' : ''}">${note}</div>` : ''}
+      <div class="card lvMain" style="${st === 'stale' ? 'background:#f9fafb;' : ''}"><div>${timeCol}</div><div><div class="lvMx">${tiles}</div></div><div>${pace}${slowBox}${nkNote}</div></div>
+      <div class="card lvPc"><div class="h"><b>ภาพรวมรายข้อ</b>${legend}</div><div class="lvPills">${pills}</div></div>
       ${actions}</div>`;
   }
 
@@ -17326,7 +17346,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.79p';
+  const CURRENT_VERSION = 'v48.80p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

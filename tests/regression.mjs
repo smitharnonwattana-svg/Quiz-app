@@ -5437,7 +5437,7 @@ currentSection = 'liveView';
     const th = await openAs(ctx, 'teacher', 'Admin', errs);
     await th.evaluate(() => navigate('admin_live')); await th.waitForTimeout(700);
     const ht = await th.evaluate(() => document.getElementById('liveList').innerText.replace(/\s+/g, ' '));
-    check('liveView: ครูเห็นคนละครึ่ง → ป้าย "คนละครึ่ง" + "ตอบแล้ว 2 / 3 ข้อ" (นับตามโควตา)', /คนละครึ่ง/.test(ht) && /ตอบแล้ว 2 \/ 3 ข้อ/.test(ht), ht.slice(0, 260));
+    check('liveView: ครูเห็นคนละครึ่ง → ป้าย "คนละครึ่ง" + "ตอบ 2/3" (นับตามโควตา)', /คนละครึ่ง/.test(ht) && /ตอบ 2\/3/.test(ht), ht.slice(0, 260));
     await hf.close(); await th.close();
 
     const h2 = await openAs(ctx, 'student', 'ณนนท์', errs);
@@ -5587,10 +5587,13 @@ currentSection = 'liveView';
     check('liveView: แบนเนอร์ซ่อนเมื่อไม่มีใครทำ + ชิปที่เมนูซ่อน', (await T.evaluate(() => [getComputedStyle(document.getElementById('adminLiveBanner')).display, getComputedStyle(document.getElementById('adminLiveChip')).display].join())) === 'none,none', '');
     // มือถือ 390: ไม่ล้นจอ
     await put('ฎ_m', mkDoc('ฎ_m', { ts: Date.now(), nos: Array.from({ length: 50 }, (_, i) => i + 1), ok: [1, 2, 3], bad: [4], ans: [1, 2, 3, 4, 5] }));
-    await T.setViewportSize({ width: 390, height: 844 });
-    await T.evaluate(() => navigate('admin_live')); await T.waitForTimeout(700);
-    const ov = await T.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-    check('liveView: มือถือ 390px หน้าดูสด (50 ข้อ) ไม่ล้นจอแนวนอน', ov <= 0, String(ov));
+    // v48.80p: จัดกระชับ — เด็ก 1 คน 50 ข้อ ต้องอยู่ในจอเดียว ไม่ต้องเลื่อนขึ้นลง (จอ Mac 1470×744 / iPad แนวนอน 1180×820 / มือถือ 390×844)
+    const fit = async (w, h) => { await T.setViewportSize({ width: w, height: h }); await T.evaluate(() => navigate('admin_live')); await T.waitForTimeout(600); return T.evaluate(() => ({ bottom: Math.round(document.querySelector('#liveList [data-lv-card]:last-child').getBoundingClientRect().bottom + scrollY), ih: innerHeight, ow: document.documentElement.scrollWidth - innerWidth, cards: document.querySelectorAll('#liveList [data-lv-card]').length })); };
+    const f1 = await fit(1470, 744), f2 = await fit(1180, 820), f3 = await fit(390, 844);
+    check('liveView: จอ Mac 1470×744 — หน้าดูสด (50 ข้อ) พอดีจอเดียว ไม่ต้องเลื่อนขึ้นลง', f1.cards === 1 && f1.bottom <= f1.ih && f1.ow <= 0, JSON.stringify(f1));
+    check('liveView: iPad แนวนอน 1180×820 — พอดีจอเดียว', f2.bottom <= f2.ih && f2.ow <= 0, JSON.stringify(f2));
+    check('liveView: มือถือ 390×844 — พอดีจอเดียวและไม่ล้นจอแนวนอน', f3.bottom <= f3.ih && f3.ow <= 0, JSON.stringify(f3));
+    const ov = f3.ow;
     // นักเรียนเข้า admin_live ไม่ได้
     const S = await openAs(ctx, 'student', 'ณนนท์', errs);
     await S.evaluate(() => navigate('admin_live')); await S.waitForTimeout(400);
