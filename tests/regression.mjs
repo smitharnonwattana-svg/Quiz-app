@@ -5289,13 +5289,13 @@ currentSection = 'shareExam';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: liveView (v48.79p) — "ดูสด" ระดับ 1: เครื่องลูกส่งสถานะขึ้น live_<ชื่อ> ระหว่างทำข้อสอบ, ครูดูจากหน้า Admin
+// Section: liveView (v48.79p/v48.80p → production v48.64, ชี้ index.html) — "ดูสด" ระดับ 1: เครื่องลูกส่งสถานะขึ้น live_<ชื่อ> ระหว่างทำข้อสอบ, ครูดูจากหน้า Admin
 // ครอบทุกโหมด (จับเวลา mc/กรอกตัวเลข/ถ่วงน้ำหนัก/ข้อ 5 ตัวเลือก/ข้อฟรี, ฝึกซ้อม, คนละครึ่ง, ครึ่งหลัง, แก้จุดอ่อน),
 // resume, ออกจากแอป, ส่ง/ออก/ล้มเหลว, throttle, ไม่ส่งตัวเลือกที่เลือก, และฝั่งครูทุกสถานะ (Firestore ปลอม 2 หน้าใน context เดียว)
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'liveView';
 {
-  const LV_FILE = 'index_preview.html';
+  const LV_FILE = 'index.html';
   const NSL = '127_0_0_1_';
   const FAKE = new URL('./fake-firestore.js', import.meta.url).pathname;
   const mq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
