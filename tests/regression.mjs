@@ -5833,6 +5833,85 @@ currentSection = 'hardMode';
     check('hardMode: ไม่มี error ในหน้า (หน้ากรอกเฉลย)', errs.length === 0, JSON.stringify(errs));
     await ctx.close();
   }
+
+  // 7) (v48.83p) ชุดประเภท "พิมพ์คำตอบ (โหมดยาก)" — โหมดยากอย่างเดียว เฉลยอยู่ใน q.correct
+  {
+    const errs = [];
+    const hoCache = () => baseCache({
+      exams: [mkExam('ho', 'ชุดพิมพ์ล้วน', 'คณิตศาสตร์', { questionCount: 3, durationSeconds: 600, examType: 'hard', pdfUrl: 'https://x/only.pdf' })],
+      questions: { ho: [{ id: 'k1', no: 1, number: 1, page: 1, correct: '12' }, { id: 'k2', no: 2, number: 2, page: 1, correct: '1/2|0.5' }, { id: 'k3', no: 3, number: 3, page: 1, correct: '' }] },
+      members: [{ pin: '311257', name: 'ณนนท์' }],
+    });
+    // 7a) หน้าสร้างข้อสอบ: ปุ่มประเภทที่ 3 → สร้างแบบไม่มีตัวเลือก
+    const { ctx: c0, page: p0 } = await newSeededPage({ file: HM_FILE, cache: baseCache({ subjectTopics: { 'คณิตศาสตร์': [] } }) });
+    p0.on('pageerror', e => errs.push(e.message));
+    await p0.evaluate(() => navigate('admin_new')); await p0.waitForTimeout(300);
+    const btns = await p0.evaluate(() => [...document.querySelectorAll('#newExamTypeBtns .examTypeBtn')].map(b => b.dataset.val));
+    await p0.evaluate(() => { document.querySelector('#newExamTypeBtns .examTypeBtn[data-val="hard"]').click(); const sel = document.getElementById('newSubjectSelect'); sel.value = 'คณิตศาสตร์'; if (window._onNewSubjectChange) window._onNewSubjectChange('คณิตศาสตร์'); document.getElementById('newTitle').value = 'ชุดใหม่พิมพ์ล้วน'; document.getElementById('newQCount').value = '4'; const ph = document.getElementById('newCreatePlaceholder'); if (ph) ph.checked = true; });
+    await p0.evaluate(() => document.getElementById('newCreateBtn').click()); await p0.waitForTimeout(400);
+    const made = await p0.evaluate(() => { const e = (Store._cache.exams || []).find(x => x.title === 'ชุดใหม่พิมพ์ล้วน'); return e && { type: e.examType, qs: (Store._cache.questions[e.id] || []).map(q => [q.correct, !!q.choices]) }; });
+    check('hardOnly: หน้าสร้างมีประเภทที่ 3 "พิมพ์คำตอบ" → สร้างชุด examType hard ไม่มีตัวเลือก เฉลยว่าง', JSON.stringify(btns) === JSON.stringify(['mc', 'fillblank-num', 'hard']) && made && made.type === 'hard' && made.qs.length === 4 && made.qs.every(x => x[0] === '' && !x[1]), JSON.stringify([btns, made]));
+    await c0.close();
+    // 7b) หน้ากรอกเฉลย: ช่องข้อความ + ∅ + ไม่มีส่วนพับโหมดยาก + ปุ่มลัด ก-ง ไม่ทำงาน
+    const { ctx: c1, page: p1 } = await newSeededPage({ file: HM_FILE, cache: hoCache(), viewport: { width: 1180, height: 820 } });
+    p1.on('pageerror', e => errs.push(e.message));
+    await p1.evaluate(() => { PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); document.getElementById('offlineBanner')?.remove(); });
+    await p1.evaluate(() => navigate('admin_editor', { id: 'ho' })); await p1.waitForTimeout(500);
+    const ed = await p1.evaluate(() => ({ inputs: [...document.querySelectorAll('input[data-field="correctText"]')].map(i => i.value), btns: document.querySelectorAll('.correctBtns').length, hardBox: getComputedStyle(document.getElementById('editorHardBox')).display, badge: document.getElementById('editorTypeBadge').textContent }));
+    check('hardOnly: หน้ากรอกเฉลย — ช่องเฉลยเป็นข้อความ (ค่าเดิม 12, 1/2|0.5) ไม่มีปุ่ม ก-ง, ไม่มีส่วนพับโหมดยาก, ป้ายประเภทพิมพ์คำตอบ', JSON.stringify(ed.inputs) === JSON.stringify(['12', '1/2|0.5', '']) && ed.btns === 0 && ed.hardBox === 'none' && /พิมพ์คำตอบ/.test(ed.badge), JSON.stringify(ed));
+    await p1.fill('input[data-field="correctText"] >> nth=2', '−3/4');
+    await p1.evaluate(() => { document.querySelectorAll('[data-field="correctNone"]')[0].click(); });
+    await p1.evaluate(() => { document.activeElement && document.activeElement.blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: '2', code: 'Digit2', bubbles: true })); });
+    await p1.click('#editorSave'); await p1.waitForTimeout(150);
+    const sv = await p1.evaluate(() => Store.load().questions.ho.map(q => q.correct));
+    check('hardOnly: พิมพ์เฉลยข้อความ + ∅ = "ไม่มี" + ปุ่มลัด 2 ไม่เปลี่ยนเฉลยเป็น B → บันทึกลง q.correct', JSON.stringify(sv) === JSON.stringify(['ไม่มี', '1/2|0.5', '−3/4']), JSON.stringify(sv));
+    await c1.close();
+    // 7c) หน้าเริ่มทำ + ทำข้อสอบ + จุดอ่อน
+    const { ctx: c2, page: p2 } = await newSeededPage({ file: HM_FILE, cache: hoCache(), role: 'student', name: 'ณนนท์' });
+    p2.on('pageerror', e => errs.push(e.message));
+    await stubPdf(p2);
+    await p2.evaluate(() => navigate('exam', { id: 'ho' })); await p2.waitForTimeout(200);
+    const dt = await p2.evaluate(() => ({ toggle: !!document.getElementById('examHardToggle'), half: getComputedStyle(document.getElementById('examStartHalfBtn')).display, t: document.getElementById('examStartBtn').textContent }));
+    check('hardOnly: หน้าเริ่มทำ — ไม่มีสวิตช์ ไม่มีปุ่มคนละครึ่ง ปุ่มเริ่มขึ้น "โหมดยาก"', !dt.toggle && dt.half === 'none' && /โหมดยาก/.test(dt.t), JSON.stringify(dt));
+    await p2.click('#examStartBtn'); await p2.waitForTimeout(500);
+    if (await p2.$('.takeOverlay button[data-val="good"]')) await p2.click('.takeOverlay button[data-val="good"]');
+    await p2.waitForTimeout(400);
+    check('hardOnly: หน้าทำ — PDF ไฟล์หลัก + แป้นพิมพ์ (ไม่มี ก-ง)', (await p2.evaluate(() => [window.__pdfUrls.includes('https://x/only.pdf'), !!document.querySelector('#takeChoices .hardAnsInput'), document.querySelectorAll('#takeChoices .choice').length, /^\[โหมดยาก\]/.test(document.getElementById('takeExamTitle').textContent)].join())) === 'true,true,0,true', '');
+    await key(p2, '1'); await key(p2, '3'); await nextQ(p2); await key(p2, '.'); await key(p2, '5'); await nextQ(p2); await key(p2, '9');
+    await p2.click('#takeSubmitBtn'); await p2.waitForTimeout(400);
+    await p2.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await p2.waitForTimeout(300);
+    await p2.evaluate(() => { document.querySelector('[data-n="1"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await p2.waitForTimeout(900);
+    const at = await p2.evaluate(() => { const a = Store.load().attempts.find(x => x.examId === 'ho'); return a && { hard: a.hardMode, only: a.hardOnly, type: a.examType, score: a.score, total: a.total, pq: a.perQuestion.map(p => [p.chosen, p.isCorrect, p.counted]) }; });
+    check('hardOnly: ส่งแล้ว → hardMode+hardOnly, เทียบกับ q.correct (13 ผิด, .5 = 0.5 ถูก), ข้อไม่มีเฉลย = รอตรวจ → 1/2', at && at.hard && at.only && at.type === 'hard' && at.score === 1 && at.total === 2 && JSON.stringify(at.pq) === JSON.stringify([['13', false, true], ['.5', true, true], ['9', false, false]]), JSON.stringify(at));
+    const wk = await p2.evaluate(() => WeaknessTracker.getActiveWeaknessesForUser('ณนนท์').filter(w => w.examId === 'ho').map(w => w.questionNo));
+    check('hardOnly: ข้อที่ผิดในชุดพิมพ์ล้วนสร้างจุดอ่อน (ข้อ 1) แต่ข้อรอตรวจไม่สร้าง', JSON.stringify(wk) === '[1]', JSON.stringify(wk));
+    // 7d) โหมดแก้จุดอ่อน: แป้นพิมพ์ + ไม่มีคำตอบ
+    await p2.evaluate(() => navigate('practice', { examId: 'ho' })); await p2.waitForTimeout(700);
+    const pr = await p2.evaluate(() => ({ inp: !!document.querySelector('#pracChoices .hardAnsInput'), none: !!document.querySelector('#pracChoices .hardNoneBtn'), choices: document.querySelectorAll('#pracChoices .choice').length, confirmDis: document.getElementById('pracConfirmBtn').disabled }));
+    check('hardOnly: แก้จุดอ่อน — แป้นพิมพ์ + ปุ่มไม่มีคำตอบ (ไม่มี ก-ง), ปุ่มยืนยันปิดจนพิมพ์', pr.inp && pr.none && pr.choices === 0 && pr.confirmDis, JSON.stringify(pr));
+    await p2.evaluate(() => { const k = t => [...document.querySelectorAll('#pracChoices .numKeypadBtn')].find(b => b.textContent === t).click(); k('1'); k('2'); document.getElementById('pracConfirmBtn').click(); });
+    await p2.waitForTimeout(300);
+    const pf = await p2.evaluate(() => ({ fb: document.getElementById('pracFeedback').textContent, res: _pracState && _pracState.results[0] }));
+    check('hardOnly: แก้จุดอ่อนพิมพ์ 12 ถูก → ✅ และผลเป็น correct', /ถูกต้อง/.test(pf.fb) && pf.res === 'correct', JSON.stringify(pf));
+    // 7e) คำนวณใหม่ใช้ q.correct ปัจจุบัน
+    await p2.evaluate(() => { _pracState && cleanupPractice(); sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })); const s = Store.load(); s.questions.ho.find(q => q.id === 'k3').correct = '9'; Store.save(s); });
+    const aid = await p2.evaluate(() => Store.load().attempts.find(x => x.examId === 'ho' && x.hardOnly).id);
+    await p2.evaluate((id) => navigate('review', { attemptId: id }), aid); await p2.waitForTimeout(500);
+    await p2.evaluate(() => document.getElementById('reviewRecalcBtn').click()); await p2.waitForTimeout(600);
+    check('hardOnly: คำนวณคะแนนใหม่ใช้เฉลยปัจจุบันใน q.correct (ข้อ 3 ได้เฉลย 9 → ถูก) → 2/3', JSON.stringify(await p2.evaluate((id) => { const a = Store.load().attempts.find(x => x.id === id); return [a.score, a.total]; }, aid)) === '[2,3]', '');
+    await c2.close();
+    // 7f) บันทึกย้อนหลัง
+    const { ctx: c3, page: p3 } = await newSeededPage({ file: HM_FILE, cache: hoCache() });
+    p3.on('pageerror', e => errs.push(e.message));
+    await p3.evaluate(() => { document.getElementById('offlineBanner')?.remove(); window.confirm = () => true; navigate('admin_exams'); }); await p3.waitForTimeout(400);
+    await p3.evaluate(() => document.querySelector('[data-backfill="ho"]').click()); await p3.waitForTimeout(300);
+    await p3.evaluate(() => { const t = document.getElementById('backfillTaker'); if (t && !t.value) { t.value = t.options[1] ? t.options[1].value : 'ณนนท์'; } const d = document.getElementById('backfillDate'); if (d && !d.value) d.value = '2026-10-01'; const ins = [...document.querySelectorAll('#backfillRows input[data-qid]')]; ins[0].value = '12'; ins[1].value = 'ไม่มี'; ins.forEach(i => i.dispatchEvent(new Event('input'))); });
+    await p3.evaluate(() => saveBackfillAttempt()); await p3.waitForTimeout(300);
+    const bf = await p3.evaluate(() => { const a = Store.load().attempts.find(x => x.examId === 'ho'); return a && { only: a.hardOnly, score: a.score, total: a.total, pending: a.perQuestion.filter(p => p.pending).length }; });
+    check('hardOnly: บันทึกย้อนหลัง — ช่องข้อความ, 12 ถูก / "ไม่มี" ผิด (เฉลย 1/2|0.5), ข้อไม่มีเฉลยรอตรวจ → 1/2', bf && bf.only && bf.score === 1 && bf.total === 2 && bf.pending === 1, JSON.stringify(bf));
+    await c3.close();
+    check('hardOnly: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+  }
 }
 
 await browser.close();
