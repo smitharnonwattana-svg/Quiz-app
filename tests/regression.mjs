@@ -4307,22 +4307,23 @@ currentSection = 'recDocs';
   check('pending: เขียนล้ม → ติดธง recPending; flush → เขียนสำเร็จ + ล้างธง', pend.id === 'rec_att_' + bkkMonth(Date.now()) + '_attPend' && pend.flagged[pend.id] === 'save' && pend.after === null && pend.doc, JSON.stringify(pend));
 
   // ── 9b) ชื่อ doc ผลสอบมีปี-เดือน (เวลาไทย) → โหลดเฉพาะเดือนได้ด้วย prefix (เตรียมไว้สำหรับโหลดแค่เดือนล่าสุดในอนาคต) ──
+  // ใช้ปี 2025 (เดือนในอดีตที่ไม่มีผลสอบอื่น) — เดิมใช้ ต.ค./พ.ย. 2026 แล้วพังเมื่อวันที่รันจริงเข้า พ.ย. 2026 (ผลสอบที่เทสต์สร้างวันนั้นตกเดือนเดียวกัน)
   const mon = await page.evaluate(async () => {
     const s = Store.load();
     const mk = (id, ts) => ({ id, examId: 'old1', examTitle: 'ชุดเก่า 1', takerName: 'นนท์', score: 1, total: 2, submittedAt: new Date(ts).toISOString(), perQuestion: [], _rec: 1, _recTs: ts });
-    s.attempts.unshift(mk('attOct', Date.UTC(2026, 9, 15, 3, 0)), mk('attNovBkk', Date.UTC(2026, 9, 31, 18, 0))); // 31 ต.ค. 18:00 UTC = 1 พ.ย. 01:00 เวลาไทย
+    s.attempts.unshift(mk('attOct', Date.UTC(2025, 9, 15, 3, 0)), mk('attNovBkk', Date.UTC(2025, 9, 31, 18, 0))); // 31 ต.ค. 18:00 UTC = 1 พ.ย. 01:00 เวลาไทย
     Store.save(s);
     await new Promise(r => setTimeout(r, 300));
-    const ids = Object.keys(__fakeFS.all()).filter(k => /_rec_att_2026_1[01]_att(Oct|NovBkk)$/.test(k));
-    const nov = await FirebaseSync.loadPrefix('rec_att_2026_11_');
+    const ids = Object.keys(__fakeFS.all()).filter(k => /_rec_att_2025_1[01]_att(Oct|NovBkk)$/.test(k));
+    const nov = await FirebaseSync.loadPrefix('rec_att_2025_11_');
     const inApp = ['attOct', 'attNovBkk'].every(id => Store.load().attempts.some(a => a.id === id));
     return { ids, nov: nov.map(d => d.data.id), inApp };
   });
-  check('month: doc ชื่อตามเดือนเวลาไทย (31 ต.ค. 18:00 UTC → 2026_11) และ query เฉพาะเดือนได้ / แอปยังโหลดครบ',
-    mon.ids.includes(NS + 'rec_att_2026_10_attOct') && mon.ids.includes(NS + 'rec_att_2026_11_attNovBkk') && mon.nov.join() === 'attNovBkk' && mon.inApp, JSON.stringify(mon));
+  check('month: doc ชื่อตามเดือนเวลาไทย (31 ต.ค. 18:00 UTC → 2025_11) และ query เฉพาะเดือนได้ / แอปยังโหลดครบ',
+    mon.ids.includes(NS + 'rec_att_2025_10_attOct') && mon.ids.includes(NS + 'rec_att_2025_11_attNovBkk') && mon.nov.join() === 'attNovBkk' && mon.inApp, JSON.stringify(mon));
   await page.evaluate(() => { Store.deleteRecords('attempts', ['attOct']); const s = Store.load(); s.attempts = s.attempts.filter(a => a.id !== 'attOct'); Store.save(s); });
   await page.waitForTimeout(300);
-  check('month: ลบผลสอบเดือนเก่า → ลบ doc ถูกชื่อ (เดือนของมัน)', !(await page.evaluate(() => !!__fakeFS.get('127_0_0_1_rec_att_2026_10_attOct'))) && (await page.evaluate(() => !!__fakeFS.get('127_0_0_1_rec_att_2026_11_attNovBkk'))));
+  check('month: ลบผลสอบเดือนเก่า → ลบ doc ถูกชื่อ (เดือนของมัน)', !(await page.evaluate(() => !!__fakeFS.get('127_0_0_1_rec_att_2025_10_attOct'))) && (await page.evaluate(() => !!__fakeFS.get('127_0_0_1_rec_att_2025_11_attNovBkk'))));
 
   // ── 10) backup แบ่งส่วน + กู้คืน ──
   const bk = await page.evaluate(async () => {
@@ -5648,6 +5649,188 @@ currentSection = 'liveView';
     await S.evaluate(() => navigate('home')); await S.waitForTimeout(700);
     check('homeLive: นักเรียนหน้าแรก → ไม่มีกล่องสด และไม่ฟังเอกสารสด', (await S.evaluate(() => [document.querySelectorAll('#homeLiveBox .hlItem').length, LiveView._docs.size].join())) === '0,0', '');
     check('homeLive: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Section: hardMode (v48.82p) — โหมดยาก "ซ่อนตัวเลือก": PDF โหมดยาก + พิมพ์คำตอบเทียบ hardAnswer, ปุ่ม "ไม่มีคำตอบ",
+// ข้อรอตรวจ (counted:false), ครูตรวจเอง, คำนวณใหม่, จุดอ่อน (ผิดไม่สร้าง), สถิติ "(hard mode)", resume, หน้ากรอกเฉลย
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'hardMode';
+{
+  const HM_FILE = 'index_preview.html';
+  const hq = (id, no, correct, hard) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...(hard != null ? { hardAnswer: hard } : {}) });
+  const cacheH = () => baseCache({
+    exams: [
+      mkExam('h1', 'ชุดยาก', 'คณิตศาสตร์', { questionCount: 5, durationSeconds: 600, pdfUrl: 'https://x/q.pdf', hardPdfUrl: 'https://x/hard.pdf' }),
+      mkExam('n1', 'ชุดปกติ', 'คณิตศาสตร์', { questionCount: 1, pdfUrl: 'https://x/n.pdf' }),
+    ],
+    questions: { h1: [hq('q1', 1, 'A', '12'), hq('q2', 2, 'B', '1/2|0.5'), hq('q3', 3, 'C', 'ไม่มี'), hq('q4', 4, 'D'), hq('q5', 5, 'A', '45')], n1: mkQ() },
+    members: [{ pin: '311257', name: 'ณนนท์' }],
+  });
+  const stubPdf = (page) => page.evaluate(() => { document.getElementById('offlineBanner')?.remove(); window.__pdfUrls = []; PdfViewer.create = () => ({ loadUrl: async (u) => { window.__pdfUrls.push(u); }, setPage() {}, destroy() {} }); window.confirm = () => true; MemeScore.show = (a, b, cb) => { if (cb) cb(); }; });
+  const key = (page, t) => page.evaluate((t) => { [...document.querySelectorAll('#takeChoices .numKeypadBtn')].find(b => b.textContent === t).click(); }, t);
+  const disp = (page) => page.evaluate(() => document.querySelector('#takeChoices .hardAnsInput').value);
+  const nextQ = (page) => page.click('#takeNextBtn');
+
+  // 1) ตัวเทียบคำตอบ
+  {
+    const { ctx, page } = await newSeededPage({ file: HM_FILE, cache: cacheH() });
+    const r = await page.evaluate(() => [
+      isAnswerCorrect('๑๒', '12', 'hard'), isAnswerCorrect(' 1 2 ', '12', 'hard'), isAnswerCorrect('0.50', '0.5', 'hard'), isAnswerCorrect('07', '7', 'hard'),
+      isAnswerCorrect('−5', '-5', 'hard'), isAnswerCorrect('1,000', '1000', 'hard'), isAnswerCorrect('0.5', '1/2|0.5', 'hard'), isAnswerCorrect('1/2', '1/2|0.5', 'hard'),
+      isAnswerCorrect('2/4', '1/2', 'hard'), isAnswerCorrect('', '12', 'hard'), isAnswerCorrect('12', '', 'hard'), isAnswerCorrect('NONE', 'ไม่มี', 'hard'),
+      isAnswerCorrect('NONE', 'none', 'hard'), isAnswerCorrect('NONE', '∅', 'hard'), isAnswerCorrect('-', 'ไม่มี', 'hard'), isAnswerCorrect('NONE', '0', 'hard'),
+      isAnswerCorrect('13', '12', 'hard'), isAnswerCorrect('A', 'A', 'mc'), isAnswerCorrect('12', '012', 'fillblank-num')]);
+    const exp = [true, true, true, true, true, true, true, true, false, false, false, true, true, true, false, false, false, true, true];
+    check('hardMode: ตัวเทียบคำตอบ — เลขไทย/ช่องว่าง/0.50=0.5/07=7/ลบทุกแบบ/ลูกน้ำพันหลัก/หลายแบบด้วย | /เศษส่วนไม่เทียบค่า/ว่าง=ผิด/"ไม่มีคำตอบ"/"-" ไม่ใช่ไม่มีคำตอบ; โหมดเดิมไม่เปลี่ยน', JSON.stringify(r) === JSON.stringify(exp), JSON.stringify(r));
+    await ctx.close();
+  }
+
+  // 2) หน้าเริ่มทำ: สวิตช์เฉพาะชุดที่มี PDF โหมดยาก
+  {
+    const { ctx, page } = await newSeededPage({ file: HM_FILE, cache: cacheH(), role: 'student', name: 'ณนนท์' });
+    await page.evaluate(() => navigate('exam', { id: 'n1' })); await page.waitForTimeout(200);
+    check('hardMode: ชุดที่ไม่มี PDF โหมดยาก → หน้าเริ่มทำไม่มีสวิตช์ (เหมือนเดิม)', !(await page.$('#examHardToggle')), '');
+    await page.evaluate(() => navigate('exam', { id: 'h1' })); await page.waitForTimeout(200);
+    await page.click('#examHardToggleRow');
+    const st = await page.evaluate(() => ({ on: document.getElementById('examHardToggle').checked, row: document.getElementById('examHardToggleRow').classList.contains('on'), half: document.getElementById('examStartHalfBtn').disabled, t: document.getElementById('examStartBtn').textContent }));
+    check('hardMode: เปิดสวิตช์ → ปุ่มจับเวลา/ฝึกซ้อมขึ้น "โหมดยาก", ปุ่มคนละครึ่งปิด', st.on && st.row && st.half && /โหมดยาก/.test(st.t), JSON.stringify(st));
+    await stubPdf(page);
+    await page.click('#examStartBtn'); await page.waitForTimeout(600);
+    check('hardMode: กดเริ่ม (สวิตช์เปิด) → เข้าหน้าทำข้อสอบด้วย hard:true', (await page.evaluate(() => [window._currentPage, !!(window._currentParams && window._currentParams.hard)].join())) === 'take,true', '');
+    await ctx.close();
+  }
+
+  // 3) ทำข้อสอบโหมดยาก (นักเรียน) → ส่ง → ผลสอบ
+  {
+    const errs = [];
+    const { ctx, page } = await newSeededPage({ file: HM_FILE, cache: cacheH(), role: 'student', name: 'ณนนท์' });
+    page.on('pageerror', e => errs.push(e.message));
+    await stubPdf(page);
+    await page.evaluate(() => navigate('take', { id: 'h1', takerName: 'ณนนท์', hard: true })); await page.waitForTimeout(500);
+    if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]');
+    await page.waitForTimeout(400);
+    const ui = await page.evaluate(() => ({ title: document.getElementById('takeExamTitle').textContent, pdf: window.__pdfUrls, keys: [...document.querySelectorAll('#takeChoices .numKeypadBtn')].map(b => b.textContent), none: !!document.querySelector('#takeChoices .hardNoneBtn'), choices: document.querySelectorAll('#takeChoices .choice').length }));
+    check('hardMode: หน้าทำ — หัว [โหมดยาก], โหลด PDF โหมดยาก (ไม่ใช่ไฟล์เดิม), ไม่มีตัวเลือก ก-ง, แป้นมี . / − ⌫ ล้าง + ปุ่มไม่มีคำตอบ', /^\[โหมดยาก\]/.test(ui.title) && ui.pdf.includes('https://x/hard.pdf') && !ui.pdf.includes('https://x/q.pdf') && ui.choices === 0 && ['.', '/', '−', '⌫', 'ล้าง', '0'].every(k => ui.keys.includes(k)) && ui.none, JSON.stringify(ui));
+    await key(page, '1'); await key(page, '2');
+    check('hardMode: พิมพ์ผ่านแป้น → ช่องแสดง 12 และปุ่มเลขข้อขึ้นว่าตอบแล้ว', (await disp(page)) === '12' && (await page.evaluate(() => document.querySelectorAll('#takeNums button')[0].style.background)).length > 0, await disp(page));
+    await nextQ(page);
+    await key(page, '−'); await key(page, '1'); await key(page, '−');
+    check('hardMode: เครื่องหมายลบใส่ได้เฉพาะตัวแรก', (await disp(page)) === '-1', await disp(page));
+    await key(page, 'ล้าง'); await key(page, '1'); await key(page, '/'); await key(page, '2');
+    await nextQ(page);
+    await page.click('#takeChoices .hardNoneBtn');
+    const n1 = await page.evaluate(() => ({ v: document.querySelector('#takeChoices .hardAnsInput').value, on: document.querySelector('#takeChoices .hardNoneBtn').classList.contains('on'), dim: document.querySelector('#takeChoices .numKeypad').classList.contains('isNone') }));
+    check('hardMode: กด "ไม่มีคำตอบ" → ช่องแสดง ∅ ไม่มีคำตอบ ปุ่มเป็นสถานะกด แป้นตัวเลขจาง', n1.v === '∅ ไม่มีคำตอบ' && n1.on && n1.dim, JSON.stringify(n1));
+    await key(page, '5');
+    check('hardMode: จาก "ไม่มีคำตอบ" กดเลข → เริ่มพิมพ์ใหม่ (5)', (await disp(page)) === '5', await disp(page));
+    await key(page, '⌫'); await page.click('#takeChoices .hardNoneBtn'); await page.click('#takeChoices .hardNoneBtn'); await page.click('#takeChoices .hardNoneBtn');
+    check('hardMode: กดซ้ำสลับเปิด/ปิด แล้วเปิดค้าง = ไม่มีคำตอบ', (await disp(page)) === '∅ ไม่มีคำตอบ', await disp(page));
+    await nextQ(page);
+    await key(page, '7'); await nextQ(page); // ข้อ 4 ยังไม่มีเฉลยโหมดยาก → รอตรวจ; ข้อ 5 ปล่อยว่าง
+    await page.evaluate(() => { window.__subTry = 1; }); await page.click('#takeSubmitBtn'); await page.waitForTimeout(400);
+    await page.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await page.waitForTimeout(300);
+    await page.evaluate(() => { document.querySelector('[data-n="3"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await page.waitForTimeout(900);
+    const att = await page.evaluate(() => { const a = Store.load().attempts.find(x => x.examId === 'h1'); return a && { id: a.id, hard: a.hardMode, type: a.examType, score: a.score, total: a.total, pq: a.perQuestion.map(p => [p.no, p.chosen, p.correct, p.isCorrect, p.counted, !!p.pending]) }; });
+    check('hardMode: ส่งแล้ว → ผลสอบ hardMode/examType hard, เฉลยที่บันทึก = hardAnswer, ไม่มีคำตอบเก็บเป็น NONE', att && att.hard === true && att.type === 'hard' && JSON.stringify(att.pq[0]) === JSON.stringify([1, '12', '12', true, true, false]) && att.pq[1][3] === true && att.pq[2][1] === 'NONE' && att.pq[2][3] === true, JSON.stringify(att));
+    check('hardMode: ข้อที่ยังไม่มีเฉลย = รอตรวจ (counted:false, pending) ไม่นับคะแนนและคะแนนเต็ม → 3/4', att && JSON.stringify(att.pq[3].slice(3)) === JSON.stringify([false, false, true]) && att.score === 3 && att.total === 4 && att.pq[4][3] === false && att.pq[4][4] === true, JSON.stringify(att && [att.score, att.total, att.pq[3], att.pq[4]]));
+    const weak = await page.evaluate(() => WeaknessTracker.getActiveWeaknessesForUser('ณนนท์').map(w => w.questionNo));
+    check('hardMode: ข้อที่ผิด/ข้าม/รอตรวจในโหมดยากไม่สร้างจุดอ่อนใหม่', weak.length === 0, JSON.stringify(weak));
+    check('hardMode: ไม่มี error ในหน้า (ทำข้อสอบ)', errs.length === 0, JSON.stringify(errs));
+    // จุดอ่อนเดิม: ถูกในโหมดยากช่วยปลดได้
+    await page.evaluate(() => { WeaknessTracker.updateWeaknessAfterSubmit({ examId: 'h1', examTitle: 'ชุดยาก', examSubject: 'คณิตศาสตร์', takerName: 'ณนนท์', submittedAt: '2026-01-01T00:00:00Z', perQuestion: [{ no: 1, isCorrect: false, chosen: 'B', correct: 'A', tags: [], subTags: [] }] }); });
+    const before = await page.evaluate(() => WeaknessTracker.getActiveWeaknessesForUser('ณนนท์').length);
+    await page.evaluate(() => WeaknessTracker.updateWeaknessAfterSubmit({ examId: 'h1', takerName: 'ณนนท์', hardMode: true, perQuestion: [{ no: 1, isCorrect: true, counted: true }, { no: 2, isCorrect: false, counted: true }] }));
+    const after = await page.evaluate(() => WeaknessTracker.getActiveWeaknessesForUser('ณนนท์').map(w => w.questionNo));
+    check('hardMode: ตอบถูกในโหมดยาก → ปลดจุดอ่อนเดิม (ข้อ 1) แต่ผิด (ข้อ 2) ไม่สร้างใหม่', before === 1 && after.length === 0, JSON.stringify([before, after]));
+    // 4) หน้าทบทวน + ครูตรวจเอง + คำนวณใหม่ + สถิติ
+    await page.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })); });
+    await page.evaluate((id) => navigate('review', { attemptId: id }), att.id); await page.waitForTimeout(500);
+    const rv = await page.evaluate(() => ({ title: document.getElementById('reviewTitle').textContent, score: document.getElementById('reviewScore').textContent, ticks: document.querySelectorAll('#reviewQList .hardTick').length, txt: document.getElementById('reviewQList').innerText.replace(/\s+/g, ' ') }));
+    check('hardMode: หน้าทบทวน (ครู) — "(hard mode)", คะแนนบอกรอตรวจ, แสดงที่ตอบ/เฉลยเป็นข้อความ (∅ ไม่มีคำตอบ, ยังไม่มีเฉลย, รอตรวจ) + ปุ่มตรวจเอง', /\(hard mode\)/.test(rv.title) && /3\/4/.test(rv.score) && /รอตรวจ 1 ข้อ/.test(rv.score) && rv.ticks === 5 && /∅ ไม่มีคำตอบ/.test(rv.txt) && /ยังไม่มีเฉลย/.test(rv.txt) && /รอตรวจ/.test(rv.txt), JSON.stringify(rv).slice(0, 400));
+    const tick = (no, v) => page.evaluate(([no, v]) => document.querySelector(`#reviewQList .hardTick[data-tick-no="${no}"] button[data-v="${v}"]`).click(), [no, v]);
+    const sc = () => page.evaluate((id) => { const a = Store.load().attempts.find(x => x.id === id); return [a.score, a.total, a.perQuestion.map(p => p.manual || '').join(',')]; }, att.id);
+    await tick(4, 'ok'); await page.waitForTimeout(200);
+    check('hardMode: ครูกด ✓ ข้อรอตรวจ → นับเป็นถูก คะแนน 4/5', JSON.stringify(await sc()) === JSON.stringify([4, 5, ',,,ok,']), JSON.stringify(await sc()));
+    await tick(4, 'clr'); await page.waitForTimeout(200);
+    check('hardMode: กดล้าง → กลับเป็นรอตรวจ คะแนน 3/4', JSON.stringify(await sc()) === JSON.stringify([3, 4, ',,,,']), JSON.stringify(await sc()));
+    await tick(1, 'bad'); await page.waitForTimeout(200);
+    check('hardMode: ครูกด ✗ ข้อที่ระบบให้ถูก → 2/4 และป้าย "ครูตรวจ: ผิด"', JSON.stringify(await sc()) === JSON.stringify([2, 4, 'bad,,,,']) && /ครูตรวจ: ผิด/.test(await page.evaluate(() => document.getElementById('reviewQList').innerText)), JSON.stringify(await sc()));
+    await page.evaluate(() => { const s = Store.load(); s.questions.h1.find(q => q.id === 'q4').hardAnswer = '7'; Store.save(s); });
+    await page.evaluate(() => document.getElementById('reviewRecalcBtn').click()); await page.waitForTimeout(600);
+    check('hardMode: คำนวณคะแนนใหม่ — ใช้เฉลยโหมดยากปัจจุบัน (ข้อ 4 ได้เฉลยแล้วถูก) และคงคำตัดสินที่ครูตรวจเอง (ข้อ 1 ผิด) → 3/5', JSON.stringify(await sc()) === JSON.stringify([3, 5, 'bad,,,,']), JSON.stringify(await sc()));
+    await page.evaluate(() => navigate('stats')); await page.waitForTimeout(600);
+    check('hardMode: หน้าสถิติ — ชื่อชุดมี "(hard mode)"', /ชุดยาก \(hard mode\)/.test(await page.evaluate(() => document.getElementById('page-stats').innerText)), '');
+    const shot = await page.evaluate((id) => { const m = buildAttemptSummary(Store.load().attempts.find(x => x.id === id), Store.load()); return [m.title, m.typeLabel, m.rows.find(r => r.no === 3).chosen]; }, att.id);
+    check('hardMode: รูปสรุปผลสอบ — ชื่อ "(hard mode)", ประเภท "พิมพ์คำตอบเอง (โหมดยาก)", แสดงไม่มีคำตอบเป็นข้อความ', /\(hard mode\)/.test(shot[0]) && /โหมดยาก/.test(shot[1]) && shot[2] === '∅ ไม่มีคำตอบ', JSON.stringify(shot));
+    // นักเรียนไม่เห็นปุ่มตรวจเอง
+    await page.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'student', name: 'ณนนท์', ts: Date.now() })); });
+    await page.evaluate((id) => navigate('review', { attemptId: id }), att.id); await page.waitForTimeout(400);
+    check('hardMode: นักเรียนดูหน้าทบทวน → ไม่มีปุ่มตรวจเอง', (await page.evaluate(() => document.querySelectorAll('#reviewQList .hardTick').length)) === 0, '');
+    await ctx.close();
+  }
+
+  // 5) ฝึกซ้อม + โหมดปกติไม่กระทบ + resume
+  {
+    const errs = [];
+    const { ctx, page } = await newSeededPage({ file: HM_FILE, cache: cacheH(), role: 'student', name: 'ณนนท์' });
+    page.on('pageerror', e => errs.push(e.message));
+    await stubPdf(page);
+    await page.evaluate(() => navigate('take', { id: 'h1', takerName: 'ณนนท์' })); await page.waitForTimeout(500);
+    if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]');
+    await page.waitForTimeout(400);
+    check('hardMode: ชุดเดียวกันเริ่มแบบปกติ → ตัวเลือก ก-ง + PDF เดิม (ไม่ใช่โหมดยาก)', (await page.evaluate(() => [document.querySelectorAll('#takeChoices .choice').length, window.__pdfUrls.includes('https://x/q.pdf'), !document.querySelector('#takeChoices .hardAnsInput')].join())) === '4,true,true', '');
+    await page.evaluate(() => { cleanupTake(); localStorage.removeItem('nanont:takeResume:ณนนท์'); navigate('take', { id: 'h1', takerName: 'ณนนท์', practice: true, hard: true }); }); await page.waitForTimeout(500);
+    if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]');
+    await page.waitForTimeout(400);
+    check('hardMode: ฝึกซ้อม + โหมดยาก → หัว [ฝึกซ้อม · โหมดยาก] + แป้นพิมพ์', (await page.evaluate(() => [/ฝึกซ้อม · โหมดยาก/.test(document.getElementById('takeExamTitle').textContent), !!document.querySelector('#takeChoices .hardAnsInput')].join())) === 'true,true', '');
+    await key(page, '4'); await key(page, '2'); await page.waitForTimeout(1300);
+    const rs = await page.evaluate(() => JSON.parse(localStorage.getItem('nanont:takeResume:ณนนท์') || 'null'));
+    check('hardMode: บันทึกทำค้างพร้อมธงโหมดยาก', rs && rs.hardMode === true && rs.practiceMode === true, JSON.stringify(rs && [rs.hardMode, rs.practiceMode]));
+    await page.evaluate(() => { cleanupTake(); navigate('take', { id: 'h1', takerName: 'ณนนท์', practice: true, hard: true }); }); await page.waitForTimeout(500);
+    const pop = !!(await page.$('#_resumeOverlay'));
+    await page.evaluate(() => [...document.querySelectorAll('#_resumeOverlay button')].find(b => /ทำต่อ/.test(b.textContent)).click()); await page.waitForTimeout(400);
+    check('hardMode: กลับมาทำต่อ (resume) โหมดเดิม → คำตอบเดิม 42 ยังอยู่ในโหมดยาก', pop && (await disp(page)) === '42', String(pop));
+    await page.evaluate(() => { cleanupTake(); navigate('take', { id: 'h1', takerName: 'ณนนท์', practice: true }); }); await page.waitForTimeout(500);
+    check('hardMode: ทำค้างโหมดยากแต่เริ่มแบบปกติ → ไม่เอาคำตอบโหมดยากมาปน (ถามก่อนเริ่มใหม่)', !(await page.$('#_resumeOverlay')) && (await page.evaluate(() => document.querySelectorAll('#takeChoices .choice').length)) === 4, '');
+    // มือถือ 390
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => { cleanupTake(); localStorage.removeItem('nanont:takeResume:ณนนท์'); navigate('take', { id: 'h1', takerName: 'ณนนท์', hard: true }); }); await page.waitForTimeout(500);
+    if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]');
+    await page.waitForTimeout(400);
+    const mob = await page.evaluate(() => { const kp = document.querySelector('#takeChoices .numKeypad'); const nb = document.querySelector('#takeChoices .hardNoneBtn').getBoundingClientRect(); return { cols: getComputedStyle(kp).gridTemplateColumns.split(' ').length, ow: document.documentElement.scrollWidth - innerWidth, noneRight: Math.round(nb.right), w: innerWidth }; });
+    check('hardMode: มือถือ 390px — แป้น 4 คอลัมน์ ปุ่มไม่มีคำตอบอยู่ในจอ ไม่ล้นแนวนอน', mob.cols === 4 && mob.ow <= 0 && mob.noneRight <= mob.w, JSON.stringify(mob));
+    const fitM = await page.evaluate(() => { const r = document.querySelector('#takeChoices .hardNoneBtn').getBoundingClientRect(); const right = document.querySelector('#page-take .takeRight').getBoundingClientRect(); return { noneBottom: Math.round(r.bottom), rightBottom: Math.round(right.bottom), isHard: document.querySelector('#page-take .takeRoot').classList.contains('isHard'), body: document.body.classList.contains('takeHard') }; });
+    check('hardMode: มือถือ — โซนล่างขยาย (isHard) จนปุ่มไม่มีคำตอบไม่ถูกตัด', fitM.isHard && fitM.body && fitM.noneBottom <= fitM.rightBottom, JSON.stringify(fitM));
+    await page.evaluate(() => { window.confirm = () => true; document.getElementById('takeExitBtn').click(); }); await page.waitForTimeout(300);
+    check('hardMode: ออกจากหน้าทำข้อสอบ → ล้างคลาสโหมดยากของหน้า (ปุ่มกระดาษทดกลับตำแหน่งเดิม)', !(await page.evaluate(() => document.body.classList.contains('takeHard'))), '');
+    check('hardMode: ไม่มี error ในหน้า (ฝึกซ้อม/resume/มือถือ)', errs.length === 0, JSON.stringify(errs));
+    await ctx.close();
+  }
+
+  // 6) หน้ากรอกเฉลย (ครู)
+  {
+    const errs = [];
+    const { ctx, page } = await newSeededPage({ file: HM_FILE, cache: baseCache({ exams: [mkExam('e5', 'ชุดตั้งค่า', 'คณิตศาสตร์', { questionCount: 3, pdfUrl: 'https://x/a.pdf' })], questions: { e5: [hq('a1', 1, 'A'), hq('a2', 2, 'B'), hq('a3', 3, 'C')] } }), viewport: { width: 1180, height: 820 } });
+    page.on('pageerror', e => errs.push(e.message));
+    await page.evaluate(() => { PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); window.confirm = () => true; });
+    await page.evaluate(() => navigate('admin_editor', { id: 'e5' })); await page.waitForTimeout(500);
+    await page.evaluate(() => { document.getElementById('offlineBanner')?.remove(); const box = document.getElementById('editorHardBox'); if (!box.offsetParent) document.getElementById('editorSetHead').click(); box.open = true; });
+    await page.waitForTimeout(150);
+    const c0 = await page.evaluate(() => [document.getElementById('editorHardCount').textContent, document.querySelectorAll('#editorHardList input[data-hard-i]').length]);
+    check('hardMode: หน้ากรอกเฉลยมีส่วน "โหมดยาก" — ตัวนับ "ยังไม่มี PDF · กรอกเฉลยแล้ว 0 / 3" + ช่องรายข้อ 3 ช่อง', /ยังไม่มี PDF/.test(c0[0]) && /0 \/ 3/.test(c0[0]) && c0[1] === 3, JSON.stringify(c0));
+    await page.fill('#editorHardPaste', '12\n1/2|0.5\n');
+    await page.click('#editorHardPasteBtn'); await page.waitForTimeout(150);
+    await page.evaluate(() => document.querySelector('#editorHardList [data-hard-none="2"]').click());
+    const vals = await page.evaluate(() => [...document.querySelectorAll('#editorHardList input[data-hard-i]')].map(i => i.value));
+    check('hardMode: วางหลายข้อ (บรรทัดละข้อ) เติมตามลำดับ + ปุ่ม ∅ ตั้งข้อ 3 เป็น "ไม่มี"', JSON.stringify(vals) === JSON.stringify(['12', '1/2|0.5', 'ไม่มี']) && (await page.evaluate(() => window._editorDirty)) === true, JSON.stringify(vals));
+    await page.fill('#editorHardPdfUrl', 'https://x/hard5.pdf'); await page.click('#editorHardPdfUrlBtn'); await page.waitForTimeout(150);
+    await page.click('#editorSave'); await page.waitForTimeout(150);
+    const saved = await page.evaluate(() => { const s = Store.load(); return [s.exams.find(e => e.id === 'e5').hardPdfUrl, s.questions.e5.map(q => q.hardAnswer), s.questions.e5.map(q => q.correct), document.getElementById('editorHardCount').textContent]; });
+    check('hardMode: บันทึก → PDF โหมดยาก + เฉลยโหมดยากรายข้อลง store, เฉลย ก-ง เดิมไม่เปลี่ยน, ตัวนับครบ', saved[0] === 'https://x/hard5.pdf' && JSON.stringify(saved[1]) === JSON.stringify(['12', '1/2|0.5', 'ไม่มี']) && JSON.stringify(saved[2]) === JSON.stringify(['A', 'B', 'C']) && /PDF ✓/.test(saved[3]) && /3 \/ 3/.test(saved[3]), JSON.stringify(saved));
+    check('hardMode: ไม่มี error ในหน้า (หน้ากรอกเฉลย)', errs.length === 0, JSON.stringify(errs));
     await ctx.close();
   }
 }
