@@ -5654,12 +5654,12 @@ currentSection = 'liveView';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: hardMode (v48.82p) — โหมดยาก "ซ่อนตัวเลือก": PDF โหมดยาก + พิมพ์คำตอบเทียบ hardAnswer, ปุ่ม "ไม่มีคำตอบ",
+// Section: hardMode (v48.82p/v48.83p → production v48.66) — โหมดยาก "ซ่อนตัวเลือก": PDF โหมดยาก + พิมพ์คำตอบเทียบ hardAnswer, ปุ่ม "ไม่มีคำตอบ",
 // ข้อรอตรวจ (counted:false), ครูตรวจเอง, คำนวณใหม่, จุดอ่อน (ผิดไม่สร้าง), สถิติ "(hard mode)", resume, หน้ากรอกเฉลย
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'hardMode';
 {
-  const HM_FILE = 'index_preview.html';
+  const HM_FILE = 'index.html';
   const hq = (id, no, correct, hard) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...(hard != null ? { hardAnswer: hard } : {}) });
   const cacheH = () => baseCache({
     exams: [

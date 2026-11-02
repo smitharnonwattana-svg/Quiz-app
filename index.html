@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.65 -->
+  <!-- APP_VERSION: v48.66 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -189,6 +189,13 @@
       /* ชุดที่มีข้อ 5 ตัวเลือก (ก ข / ค ง / จ = 3 แถว) → โซนปุ่มตอบสูงขึ้น */
       .takeRoot.has5 .takeLeft{ flex:0 0 76vh; height:76vh; }
       .takeRoot.has5 .takeRight{ flex:0 0 24vh; height:24vh; }
+      /* v48.66: โหมดยาก — แป้นพิมพ์คำตอบ + ปุ่มไม่มีคำตอบ ต้องการโซนล่างสูงกว่าปุ่ม ก-ง */
+      .takeRoot.isHard .takeLeft{ flex:0 0 54vh; height:54vh; }
+      .takeRoot.isHard .takeRight{ flex:0 0 46vh; height:46vh; }
+      .takeRoot.isHard .hardAnsInput{ height:40px; font-size:20px; }
+      .takeRoot.isHard .hardAnsInput.none{ font-size:16px; }
+      .takeRoot.isHard .hardNoneBtn{ padding:7px 0; }
+      .takeRoot.isHard .hardAnsBox{ gap:5px; padding:0; }
 
       /* ROW 1 — Header bar (stickyBar) */
       .takeRight .stickyBar {
@@ -1282,6 +1289,7 @@
        overlaps #takeUnsureBtn/#takeNextBtn. Does not touch .takeRight/.takeMobileNav rules. */
     @media (max-width: 900px) {
       #scratchToggleBtn { bottom: calc(20vh + 12px); right: 14px; }
+      body.takeHard #scratchToggleBtn { bottom: calc(46vh + 12px); } /* v48.66: โหมดยาก โซนล่างสูง 46vh */
     }
     /* Desktop/landscape: ย้ายปุ่มขึ้นไปแถบบนสุด กึ่งกลางฝั่ง PDF (.takeLeft กว้าง 80vw
        จุดกึ่งกลางคือ 40vw) แทนตำแหน่งเดิมใกล้ขอบขวา — เดิมเคยอยู่ใกล้ #pdfAnnotateToggleBtn
@@ -1437,6 +1445,47 @@
     .lvPill.cur{box-shadow:0 0 0 2px #fff,0 0 0 4px #2563eb;}
     .lvPill.cur:not(.ok):not(.bad):not(.nk):not(.fr){border-color:#2563eb;color:#2563eb;}
     .lvPill sup{position:absolute;top:-5px;right:-3px;font-size:9px;}
+    /* v48.66: โหมดยาก (ซ่อนตัวเลือก) */
+    .hardToggle{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fafafa;font-weight:800;cursor:pointer;user-select:none;}
+    .hardToggle input{position:absolute;opacity:0;width:1px;height:1px;}
+    .hardSw{width:38px;height:22px;border-radius:11px;background:#d1d5db;position:relative;flex-shrink:0;transition:background .15s;}
+    .hardSw:after{content:"";position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;}
+    .hardToggle.on{background:#111827;border-color:#111827;color:#fff;}
+    .hardToggle.on .hardSw{background:#16a34a;}
+    .hardToggle.on .hardSw:after{left:18px;}
+    .hardToggle input:focus-visible + .hardSw{outline:2px solid #2563eb;outline-offset:2px;}
+    #examStartHalfBtn:disabled{opacity:.5;cursor:not-allowed;}
+    .hardBox{margin-top:12px;border:1px solid var(--border);border-radius:12px;background:#fff;}
+    .hardBox[open]{border:2px solid #1f2937;}
+    .hardBox summary{padding:10px 12px;cursor:pointer;font-size:14px;list-style:revert;}
+    .hardCount{display:inline-flex;margin-left:8px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;background:#fffbeb;border:1px solid #fde68a;color:#b45309;}
+    .hardCount.full{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}
+    .hardBody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:0 12px 12px;}
+    .hardLbl{font-size:12px;font-weight:800;margin-bottom:6px;}
+    .hardPaste{width:100%;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:13px;resize:vertical;}
+    .hardList{max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:10px;}
+    .hardRow{display:grid;grid-template-columns:44px 52px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--border);}
+    .hardRow:first-child{border-top:none;}
+    .hardRow input{min-width:0;width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit;font-weight:700;}
+    .hardRow input.empty{background:#fffbeb;border-color:#fde68a;}
+    .hardRow button{padding:5px 8px;font-size:12px;}
+    @media (max-width:700px){ .hardBody{grid-template-columns:minmax(0,1fr);} }
+    .hardCorrectCell{display:flex;gap:6px;align-items:center;min-width:0;}
+    .hardCorrectCell input{flex:1;min-width:0;width:100%;max-width:220px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit;font-weight:700;}
+    .hardCorrectCell .btn{padding:5px 9px;font-size:13px;}
+    .hardTick{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0;}
+    .hardTick button{border:none;background:#fff;padding:4px 9px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:28px;min-height:28px;}
+    .hardTick button+button{border-left:1px solid var(--border);}
+    .hardTick button:disabled{color:#d1d5db;cursor:default;}
+    .hardTick button.on-ok{background:#16a34a;color:#fff;}
+    .hardTick button.on-bad{background:#dc2626;color:#fff;}
+    .hardAnsBox{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px;}
+    .hardAnsInput{width:100%;max-width:230px;height:46px;border:2px solid #111827;border-radius:12px;text-align:center;font-size:24px;font-weight:900;font-family:inherit;background:#fff;color:#111827;}
+    .hardAnsInput.none{font-size:18px;background:#f3f4f6;color:#374151;}
+    .numKeypadBtn.numKpSym{background:#eef2ff;border-color:#c7d2fe;color:#3730a3;}
+    .numKeypad.isNone .numKeypadBtn.d{opacity:.35;}
+    .hardNoneBtn{width:100%;max-width:230px;padding:9px 0;border:1.5px dashed #9ca3af;border-radius:11px;background:#fff;font-weight:800;font-size:14px;color:#374151;font-family:inherit;cursor:pointer;}
+    .hardNoneBtn.on{background:#111827;border:1.5px solid #111827;color:#fff;}
     /* v48.65: กล่อง "กำลังทำข้อสอบ" สดบนหน้าแรกของครู */
     .homeLive{flex:0 1 460px;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;}
     .homeLive:empty{display:none;}
@@ -1540,7 +1589,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.65</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.66</div>
     </div>
   </div>
 </div>
@@ -2426,9 +2475,10 @@
       </div>
       <div style="display:grid;gap:6px;">
         <span style="font-weight:900;">ประเภทข้อสอบ</span>
-        <div style="display:flex;gap:8px;" id="newExamTypeBtns">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="newExamTypeBtns">
           <button type="button" class="btn examTypeBtn active" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #c7d2fe;background:#eef2ff;font-weight:700;font-size:13px;color:#4338ca;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
           <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
+          <button type="button" class="btn examTypeBtn" data-val="hard" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">✍️ พิมพ์คำตอบ (โหมดยาก)</button>
         </div>
         <div id="newNumDigitsWrap" style="display:none;flex-direction:column;gap:6px;">
           <div style="display:flex;gap:8px;" id="newNumDigitsBtns">
@@ -2662,9 +2712,10 @@
           <!-- Row 1.6: ประเภทข้อสอบ -->
           <div style="margin-top:12px;">
             <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">ประเภทข้อสอบ</div>
-            <div style="display:flex;gap:8px;" id="editorExamTypeBtns">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;" id="editorExamTypeBtns">
               <button type="button" class="btn examTypeBtn" data-val="mc" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">📋 เลือกตอบ (ก/ข/ค/ง)</button>
               <button type="button" class="btn examTypeBtn" data-val="fillblank-num" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">🔢 กรอกตัวเลข</button>
+              <button type="button" class="btn examTypeBtn" data-val="hard" style="flex:1;padding:10px 8px;border-radius:12px;border:2px solid #e5e7eb;background:#fff;font-weight:700;font-size:13px;color:#6b7280;">✍️ พิมพ์คำตอบ (โหมดยาก)</button>
             </div>
             <div style="font-size:11px;color:#9ca3af;margin-top:4px;">⚠️ เปลี่ยนประเภทจะล้างเฉลยที่กรอกไว้ทั้งหมด (รูปแบบคำตอบข้ามประเภทกันไม่ได้)</div>
             <div id="editorNumDigitsWrap" style="display:none;margin-top:10px;">
@@ -2718,6 +2769,32 @@
             </div>
             <button id="editorWeightedToggleBtn" type="button" class="btn" style="font-size:11px;padding:5px 12px;font-weight:700;">⚖️ เปิดระบบคะแนน</button>
           </div>
+          <!-- v48.66: โหมดยาก (ซ่อนตัวเลือก) — PDF ที่ครูซ่อนตัวเลือกเอง + เฉลยแบบพิมพ์ (บันทึกพร้อมปุ่ม "บันทึกทั้งหมด") -->
+          <details id="editorHardBox" class="hardBox">
+            <summary><b>🔒 โหมดยาก (ซ่อนตัวเลือก)</b> <span id="editorHardCount" class="hardCount"></span></summary>
+            <div class="hardBody">
+              <div>
+                <div class="hardLbl">① PDF โหมดยาก (ไฟล์ที่ซ่อนตัวเลือกแล้ว)</div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                  <input id="editorHardPdfUrl" class="titleInput" type="text" placeholder="วาง URL หรืออัปโหลด" style="flex:1;min-width:100px;" />
+                  <button class="btn" id="editorHardPdfUrlBtn" type="button" title="ยืนยัน URL" style="padding:8px 14px;font-weight:700;">✓</button>
+                  <label class="btn" style="cursor:pointer;padding:8px 12px;font-weight:700;" title="อัปโหลด PDF โหมดยาก จากเครื่อง">📎 อัปโหลด<input id="editorHardPdfFile" type="file" accept="application/pdf" style="display:none;" /></label>
+                  <button class="btn" id="editorHardPdfClear" type="button" style="padding:8px 12px;color:#dc2626;border-color:#fca5a5;">ลบ</button>
+                </div>
+                <div id="editorHardPdfStatus" class="muted" style="font-size:12px;min-height:16px;margin-top:4px;">หน้าต้องเรียงเหมือนไฟล์โจทย์เดิม (เลขหน้าของแต่ละข้อใช้ร่วมกัน)</div>
+                <div class="hardLbl" style="margin-top:10px;">② วางเฉลยหลายข้อ (บรรทัดละข้อ เรียงตามเลขข้อ)</div>
+                <textarea id="editorHardPaste" rows="6" class="hardPaste" placeholder="12&#10;345&#10;1/2|0.5&#10;ไม่มี"></textarea>
+                <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                  <button type="button" class="btn btnPrimary" id="editorHardPasteBtn" style="padding:7px 12px;font-size:13px;">เติมตามลำดับ</button>
+                  <button type="button" class="btn" id="editorHardClearAll" style="padding:7px 12px;font-size:13px;">ล้างเฉลยโหมดยากทั้งหมด</button>
+                </div>
+              </div>
+              <div>
+                <div class="hardLbl">③ เฉลยโหมดยาก รายข้อ <span class="muted" style="font-weight:400;">(หลายแบบคั่นด้วย | · ข้อที่ว่าง = รอครูตรวจ)</span></div>
+                <div id="editorHardList" class="hardList"></div>
+              </div>
+            </div>
+          </details>
       </div>
         <div id="editorMsg" class="muted" style="padding:12px;display:none;"></div>
       </div>
@@ -6398,7 +6475,7 @@ function initExams(){
         const _fmt0 = String(Math.floor(_val0/60)).padStart(2,'0') + ':' + String(_val0%60).padStart(2,'0');
         const _label0 = _isPrac0 ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
         const _isHalf2_0 = _isHalf0 && !!_myResume.half2Mode;
-        const _title0 = _isPrac0 ? 'ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? 'ครึ่งหลังค้างอยู่' : _isHalf0 ? 'คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
+        const _title0 = (_isPrac0 ? 'ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? 'ครึ่งหลังค้างอยู่' : _isHalf0 ? 'คนละครึ่งค้างอยู่' : 'ทำค้างอยู่') + (_myResume.hardMode ? ' · โหมดยาก' : ''); // v48.66
         const _bg0 = _isPrac0 ? '#F0FBFC' : _isHalf0 ? '#ECECFC' : '#FFF3E0';
         const _border0 = _isPrac0 ? '#B2EBF2' : _isHalf0 ? '#D1D1F0' : '#FFD9A8';
         const _titleColor0 = _isPrac0 ? '#0E7C8C' : _isHalf0 ? '#5856D6' : '#A34E00';
@@ -6563,7 +6640,7 @@ function initExams(){
           // v48.15: ทำต่อ "ครึ่งหลัง" ค้างอยู่ — ต้องส่ง qids/parentAttemptId ตามที่บันทึกไว้
           // ตอน saveTakeResume ไม่งั้น initTake จะ rebuild qsList เป็นชุดเต็มแทน subset เดิม
           const _isHalf2 = _isHalf && _myResume && !!_myResume.half2Mode;
-          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:_isHalf2?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null});
+          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:_isHalf2?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode)}); // v48.66: + โหมดยาก
           return;
         }
         if(ev.target.closest('.half2-badge')){
@@ -6628,10 +6705,12 @@ function initExamDetail(id){
       <span class="badge ok">${esc(exam.subject||'ไม่ระบุ')}</span>
       <span class="muted" style="font-size:14px;">📝 ${exam.questionCount} ข้อ</span>
       <span class="muted" style="font-size:14px;">⏱ ${Math.round(exam.durationSeconds/60)} นาที</span>
+      ${exam.examType==='hard' ? `<span class="badge" style="background:#111827;border-color:#111827;color:#fff;">✍️ พิมพ์คำตอบ (โหมดยาก)</span>` : ''}
     </div>
     <div class="hr"></div>
     <div class="card" style="padding:20px;display:grid;gap:10px;max-width:480px;">
       <input id="detailTakerName" class="btn" style="text-align:left;padding:12px 14px;font-size:15px;border-radius:14px;" placeholder="ชื่อผู้ทำ (ไม่บังคับ)" />
+      ${(exam.hardPdfUrl && exam.examType!=='hard') ? `<label class="hardToggle" id="examHardToggleRow"><input type="checkbox" id="examHardToggle"><span class="hardSw" aria-hidden="true"></span><span>🔒 โหมดยาก (ซ่อนตัวเลือก)</span></label>` : ''}
       <button class="btn btnPrimary" id="examStartBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;">▶ เริ่มทำ (จับเวลา)</button>
       <button class="btn" id="examStartPracticeBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;color:#0891b2;border-color:#67e8f9;">📝 ฝึกซ้อม (ไม่จับเวลา)</button>
       <button class="btn" id="examStartHalfBtn" style="padding:12px 20px;font-size:15px;border-radius:14px;color:#7c3aed;border-color:#c4b5fd;">🤝 คนละครึ่ง (${Math.ceil((exam.questionCount||0)/2)} ข้อ · ${Math.ceil(exam.durationSeconds/2/60)} นาที)</button>
@@ -6650,17 +6729,35 @@ function initExamDetail(id){
     takerEl.value = localStorage.getItem(LAST_TAKER_KEY) || '';
   }
 
+  // v48.66: โหมดยาก (ซ่อนตัวเลือก) — สวิตช์มีเฉพาะชุดที่ครูใส่ PDF โหมดยากแล้ว; เปิดแล้วจับเวลา/ฝึกซ้อมเข้าโหมดยาก คนละครึ่งปิด
+  const _hardEl = document.getElementById('examHardToggle');
+  const _isHard = () => !!(_hardEl && _hardEl.checked);
+  // v48.66: ชุดประเภท "พิมพ์คำตอบ" = โหมดยากอย่างเดียว — ไม่มีสวิตช์/คนละครึ่ง เริ่มเป็นโหมดยากเสมอ
+  if (exam.examType === 'hard') {
+    document.getElementById('examStartBtn').textContent = '▶ เริ่มทำ (จับเวลา) · โหมดยาก';
+    document.getElementById('examStartPracticeBtn').textContent = '📝 ฝึกซ้อม (ไม่จับเวลา) · โหมดยาก';
+    document.getElementById('examStartHalfBtn').style.display = 'none';
+  }
+  if (_hardEl) _hardEl.addEventListener('change', () => {
+    const on = _isHard(), half = document.getElementById('examStartHalfBtn');
+    document.getElementById('examHardToggleRow').classList.toggle('on', on);
+    document.getElementById('examStartBtn').textContent = '▶ เริ่มทำ (จับเวลา)' + (on ? ' · โหมดยาก' : '');
+    document.getElementById('examStartPracticeBtn').textContent = '📝 ฝึกซ้อม (ไม่จับเวลา)' + (on ? ' · โหมดยาก' : '');
+    half.disabled = on;
+    half.textContent = on ? '🤝 คนละครึ่ง — ใช้กับโหมดยากไม่ได้' : `🤝 คนละครึ่ง (${Math.ceil((exam.questionCount||0)/2)} ข้อ · ${Math.ceil(exam.durationSeconds/2/60)} นาที)`;
+  });
   document.getElementById('examStartBtn').onclick=()=>{
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
-    navigate('take', {id:exam.id, takerName:name});
+    navigate('take', _isHard() ? {id:exam.id, takerName:name, hard:true} : {id:exam.id, takerName:name});
   };
   document.getElementById('examStartPracticeBtn').onclick=()=>{
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
-    navigate('take', {id:exam.id, takerName:name, practice:true});
+    navigate('take', _isHard() ? {id:exam.id, takerName:name, practice:true, hard:true} : {id:exam.id, takerName:name, practice:true});
   };
   document.getElementById('examStartHalfBtn').onclick=()=>{
+    if(_isHard() || exam.examType==='hard') return;
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
     navigate('take', {id:exam.id, takerName:name, half:true});
@@ -6759,6 +6856,7 @@ function cleanupTake(){
   if(_takeStartTimer){clearTimeout(_takeStartTimer);_takeStartTimer=null;}
   // overlay ของรอบที่ทิ้งไปแล้วต้องไม่ค้างบนจอ (ไม่งั้นกดแล้วไปเริ่ม/ส่งข้อสอบ "ผี" ของ state เก่า)
   document.querySelectorAll('.takeOverlay,#_resumeOverlay').forEach(el=>el.remove());
+  document.body.classList.remove('takeHard'); // v48.66
   LiveShare.stop(); // v48.64: ออก/เปลี่ยนหน้า/เริ่มรอบใหม่ → ถอนสถานะสด (ส่งสำเร็จแล้ว LiveShare.done เคลียร์ ctx ไปก่อน จึงไม่ลบ)
   _takeState=null;
 }
@@ -6784,12 +6882,17 @@ function initTake(id){
   // ทำจากครึ่งแรก — ระบบเดิม (navigate ด้วย index, ผูก identity ด้วย q.id) ไม่สนใจว่าข้อ
   // เรียง 1..N ต่อเนื่องหรือไม่อยู่แล้ว จึงกรองตรงนี้จุดเดียวพอ (เหมือน initPractice)
   const _qidSubset = (Array.isArray(_pageParams.qids) && _pageParams.qids.length) ? new Set(_pageParams.qids) : null;
+  // v48.66: โหมดยาก (ซ่อนตัวเลือก) — ใช้ PDF โหมดยาก + พิมพ์คำตอบเทียบ hardAnswer (เฉพาะจับเวลา/ฝึกซ้อม ไม่รวมคนละครึ่ง)
+  // map correct=hardAnswer ตรงนี้จุดเดียว → submit/คะแนน/ดูสด ที่อ่าน q.correct ใช้ต่อได้ทั้งหมด; ข้อที่ยังไม่มี hardAnswer = รอตรวจ (ไม่นับ)
+  // v48.66: ชุดประเภท "พิมพ์คำตอบ" (examType 'hard') = โหมดยากอย่างเดียว — เฉลยอยู่ใน q.correct, PDF ไฟล์หลัก
+  const _hardOnly = exam.examType === 'hard';
+  const _hardMode = _hardOnly || (!!_pageParams.hard && !!exam.hardPdfUrl && !_pageParams.half && !_pageParams.half2);
   // normalize questions: ensure .no field
-  const qsList=(s.questions[id]||[]).map(q=>({...q, no: q.no??q.number??0}))
+  const qsList=(s.questions[id]||[]).map(q=>({...q, no: q.no??q.number??0, ...((_hardMode && !_hardOnly) ? {correct: String(q.hardAnswer||'').trim()} : (_hardOnly ? {correct: String(q.correct||'').trim()} : {}))}))
     .filter(q=>!_qidSubset || _qidSubset.has(q.id));
   const total=qsList.length;
   // ชุดที่มีข้อ 5 ตัวเลือก: มือถือเพิ่มความสูงโซนปุ่มตอบทั้งชุด (กัน PDF กระโดดตอนสลับข้อ) — ดู .takeRoot.has5 ใน CSS
-  { const _tr=document.querySelector('#page-take .takeRoot'); if(_tr) _tr.classList.toggle('has5', qsList.some(q=>q.optCount===5)); }
+  { const _tr=document.querySelector('#page-take .takeRoot'); if(_tr){ _tr.classList.toggle('has5', !_hardMode && qsList.some(q=>q.optCount===5)); _tr.classList.toggle('isHard', _hardMode); } document.body.classList.toggle('takeHard', _hardMode); } // v48.66: isHard
   const attemptId='att_'+Math.random().toString(16).slice(2);
   const LAST_TAKER_KEY='nanont:lastTakerName';
   // รับชื่อจาก params (กรอกมาจากหน้า detail แล้ว)
@@ -6799,14 +6902,14 @@ function initTake(id){
   // แล้ว (ดู qsList ข้างบน) — แต่ยังนับเป็น _halfMode ด้วย (union) เพื่อให้ logic เดิมทั้งหมด
   // (จุดอ่อนนับเฉพาะข้อตอบจริง, บังคับ weighted:false, แท็บสถิติ, badge รีวิว ฯลฯ) ใช้ต่อได้
   // โดยไม่ต้องแก้ซ้ำ — ครึ่งหลังแค่ไม่มีโควตาบล็อก (ตอบได้ทุกข้อที่เหลือ จึงตั้ง quota=total)
-  const _half2Mode = !!_pageParams.half2;
-  const _halfMode = !!_pageParams.half || _half2Mode;
+  const _half2Mode = !!_pageParams.half2 && !_hardOnly;
+  const _halfMode = (!!_pageParams.half && !_hardOnly) || _half2Mode;
   const _halfQuota = _half2Mode ? total : (_halfMode ? Math.ceil(total/2) : 0);
   const _effDuration = _halfMode ? Math.ceil(exam.durationSeconds/2/60)*60 : exam.durationSeconds;
   const _parentAttemptId = _half2Mode ? (_pageParams.parentAttemptId||null) : null;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
   // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
-  if(!_practiceMode) lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title });
+  if(!_practiceMode) lineNotify({ type: 'start', name: _takerName||'ไม่ระบุ', examTitle: exam.title + (_hardMode ? ' (Hard)' : '') });
 
   _takeState={s,exam,qsList,total,attemptId,
     currentIndex:0,answers:{},unsure:{},
@@ -6815,6 +6918,7 @@ function initTake(id){
     started:false,startedAt:null,createdAt:Date.now(),
     takerName:_takerName,
     practiceMode:_practiceMode,
+    hardMode:_hardMode,
     halfMode:_halfMode,
     halfQuota:_halfQuota,
     half2Mode:_half2Mode,
@@ -6830,7 +6934,7 @@ function initTake(id){
     }).length;
   }
 
-  document.getElementById('takeExamTitle').textContent=(_practiceMode ? '[ฝึกซ้อม] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
   // #page-take ไม่ได้ถูกสร้างใหม่จาก HTML ทุกครั้งที่ navigate('take') — เนื้อหาคงค้างข้าม
   // รอบก่อนหน้า ถ้ารอบก่อนเป็นโหมดคนละครึ่ง #takeQNoWrap จะถูกเขียนทับด้วย .textContent=
   // (ทำลาย span ลูก #takeQNo/#takeQTotal ทิ้ง) ต้อง reset โครงสร้างกลับก่อนเสมอ
@@ -6866,14 +6970,15 @@ function initTake(id){
   }
 
   // ตรวจว่าเป็น Google Drive URL ไหม
-  const _isGDrive = !!(exam.pdfUrl||'').match(/drive\.google\.com/);
+  const _takePdfSrc = ((_hardMode && !_hardOnly) ? exam.hardPdfUrl : exam.pdfUrl) || ''; // v48.66: โหมดยาก ใช้ PDF ที่ครูซ่อนตัวเลือกแล้ว
+  const _isGDrive = !!_takePdfSrc.match(/drive\.google\.com/);
 
   // โหลด PDF ครั้งแรกเท่านั้น — ไม่ auto-scroll ตอนทำข้อสอบ (ผู้ใช้เลื่อนเอง)
   async function loadPdfOnce(){
     if(_takePdfLoaded) return;
     _takePdfLoaded = true;
     try{
-      let pdfUrl = exam.pdfUrl||'';
+      let pdfUrl = _takePdfSrc;
       if(pdfUrl.startsWith('./') || pdfUrl.startsWith('../')){
         pdfUrl = new URL(pdfUrl, window.location.href).href;
       }
@@ -6907,7 +7012,7 @@ function initTake(id){
     // v48.48: fillblank-num เท่านั้น — เทียบค่าคำตอบตอนเข้า vs ตอนออกจากข้อ (ไม่นับทุก
     // keystroke ที่พิมพ์ระหว่างทาง) กัน Panic Changes สูงเทียมจากการพิมพ์เลขหลายหลักตามปกติ
     // (ดูเหตุผลเต็มใน _setAns()/input handler ด้านล่าง — MC ไม่ต้องแก้ เพราะนับถูกอยู่แล้ว)
-    if((exam.examType||'mc')==='fillblank-num' && st.qEnterVal!=null){
+    if(((exam.examType||'mc')==='fillblank-num' || _hardMode) && st.qEnterVal!=null){
       const finalVal=st.answers[q.id];
       if(st.qEnterVal!=='' && finalVal!=null && finalVal!=='' && finalVal!==st.qEnterVal){
         st.answerChanges[q.id]=(st.answerChanges[q.id]||0)+1;
@@ -7006,7 +7111,37 @@ function initTake(id){
     setPdfPage(q.page||1);
     const wrap=document.getElementById('takeChoices');
     wrap.innerHTML='';
-    if(exam.examType==='fillblank-num'){
+    if(_hardMode){
+      // v48.66: โหมดยาก — พิมพ์คำตอบผ่านแป้นของแอป (0-9 . / − ⌫ ล้าง) + ปุ่ม "ไม่มีคำตอบ" ทุกอุปกรณ์
+      // (ไม่เปิดคีย์บอร์ดระบบ: แป้นตัวเลข iOS ไม่มี / และ −); อัปเดตเฉพาะช่องแสดง/ปุ่มเลข ไม่ render ใหม่ทั้งข้อ
+      wrap.style.setProperty('grid-template-columns','1fr','important');
+      wrap.style.setProperty('grid-template-rows','auto','important');
+      wrap.style.setProperty('align-content','start','important');
+      const box=document.createElement('div'); box.className='hardAnsBox';
+      const disp=document.createElement('input');
+      disp.type='text'; disp.readOnly=true; disp.inputMode='none'; disp.placeholder='ตอบ'; disp.className='hardAnsInput';
+      disp.setAttribute('aria-label','คำตอบ');
+      const noneBtn=document.createElement('button'); noneBtn.type='button'; noneBtn.className='hardNoneBtn';
+      const _cur=()=>{ const v=st.answers[q.id]; return (v==null)?'':String(v); };
+      const _set=(v)=>{ if(!st.started) return; if(v==='') delete st.answers[q.id]; else st.answers[q.id]=v; _show(); setNumStyles(); };
+      const _isPhone=window.matchMedia&&window.matchMedia('(max-width:600px)').matches;
+      const kp=createHardKeypad(_isPhone,
+        k=>{ let c=_cur(); if(c===HARD_NONE) c=''; if(c.length>=12) return; if(k==='-' && c!=='') return; _set(c+k); },
+        ()=>{ const c=_cur(); _set(c===HARD_NONE?'':c.slice(0,-1)); },
+        ()=>{ _set(''); });
+      function _show(){
+        const v=_cur(), none=v===HARD_NONE;
+        disp.value=fmtHardAns(v); disp.classList.toggle('none',none);
+        noneBtn.classList.toggle('on',none); noneBtn.textContent=none?'∅ ไม่มีคำตอบ ✓':'∅ ไม่มีคำตอบ';
+        noneBtn.setAttribute('aria-pressed',none?'true':'false');
+        kp.classList.toggle('isNone',none);
+      }
+      noneBtn.addEventListener('click',()=>{ _set(_cur()===HARD_NONE?'':HARD_NONE); });
+      _show();
+      if(!st.started){ box.style.opacity='0.5'; box.style.pointerEvents='none'; }
+      box.appendChild(disp); box.appendChild(kp); box.appendChild(noneBtn);
+      wrap.appendChild(box);
+    } else if(exam.examType==='fillblank-num'){
       // กรอกตัวเลข
       const _numDigits=exam.numDigits||3;
       wrap.style.setProperty('grid-template-columns','1fr','important');
@@ -7212,21 +7347,25 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     if(_takeInterval){clearInterval(_takeInterval);_takeInterval=null;}
     leaveQuestion(); // flush current question time
     LiveShare.submitting(); // v48.64
-    const _eType=exam.examType||'mc';
+    const _eType=_hardMode?'hard':(exam.examType||'mc'); // v48.66
     // v48.12: โหมดคนละครึ่ง คิดคะแนนข้อละ 1 คะแนนเสมอ (ไม่ใช้ระบบถ่วงน้ำหนักจริง)
     // เพื่อกันเด็กเลือกเก็บเฉพาะข้อคะแนนสูงแล้วได้เปอร์เซ็นต์เกินจริง
     const _isWeighted=!!exam.weighted && !_halfMode;
+    // v48.66: โหมดยาก — ข้อที่ครูยังไม่ใส่เฉลยโหมดยาก = รอตรวจ ไม่นับคะแนน/ไม่นับในคะแนนเต็ม (counted:false ที่สถิติทุกหน้ารองรับอยู่แล้ว)
+    const _pendingHard=q=>_hardMode && !q.isFree && !q.correct;
     const _counted=q=>{
+      if(_pendingHard(q)) return false;
       if(!_halfMode) return true;
       const v=st.answers[q.id];
       return v!=='' && v!=null;
     };
     let score=0;
-    let total=_halfMode?st.halfQuota:qsList.length;
+    let total=_halfMode?st.halfQuota:(_hardMode?qsList.filter(_counted).length:qsList.length);
     if(_isWeighted){
       // weighted: total = sum points, score = sum points where correct
       let _sumAll=0,_sumOk=0;
       qsList.forEach(q=>{
+        if(!_counted(q)) return;
         const pts=getQPoints(q);
         _sumAll+=pts;
         if(q.isFree||(st.answers[q.id]&&isAnswerCorrect(st.answers[q.id],q.correct,_eType))) _sumOk+=pts;
@@ -7247,7 +7386,8 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       const _pq={qid:q.id,no:q.no||q.number,page:q.page,tags:_finalTags,subTags:_finalSubTags,topic:_finalTags[0]||'',chosen,correct,isCorrect,isFree,unsure:!!st.unsure[q.id],
         visited,elapsedMs:st.qElapsedMs[q.id]||0,changes:st.answerChanges[q.id]||0};
       if(_isWeighted) _pq.points=getQPoints(q);
-      if(_halfMode) _pq.counted=_counted(q);
+      if(_halfMode||_hardMode) _pq.counted=_counted(q);
+      if(_pendingHard(q)) _pq.pending=true; // v48.66: รอครูตรวจ (ปุ่มตรวจเองในหน้าทบทวน)
       return _pq;
     });
     // หัก _pauseOffset ออกด้วย (เวลาที่ออกจากแอปไประหว่างทำค้าง) — เหมือนสูตรเดียวกับ
@@ -7261,7 +7401,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     // (v47.94: เคลียร์ก่อนเซฟ = ปิดแอประหว่าง check-in modal แล้วคำตอบหายทั้ง attempt)
     function _doSave(feeling, prediction){
       const savedS=Store.load();
-      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:exam.examType||'mc',weighted:_isWeighted,takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null,_rec:1,_recTs:Date.now()}; // v48.55: _rec = เก็บเป็น doc แยก (ดู Store._syncRecs)
+      const _newAttempt={id:st.attemptId,examId:exam.id,examTitle:exam.title,examSubject:exam.subject||'ไม่ระบุ',examType:_eType,weighted:_isWeighted,...(_hardMode?{hardMode:true}:{}),...(_hardOnly?{hardOnly:true}:{}),takerName,startedAt:new Date(st.startedAt??st.createdAt).toISOString(),submittedAt:new Date().toISOString(),usedSeconds,score,total,answers:{...st.answers},perQuestion,practiceMode:!!st.practiceMode,halfMode:!!st.halfMode,halfQuota:st.halfQuota||0,visitOrder:[...st.visitOrder],difficulty:exam.difficulty||'develop',mood:st.mood||null,feeling:feeling||null,prediction:prediction!=null?prediction:null,_rec:1,_recTs:Date.now()}; // v48.55: _rec = เก็บเป็น doc แยก (ดู Store._syncRecs)
       // v48.22p: ครึ่งหลัง — แทนที่จะสร้าง attempt ใหม่แยกแล้วเชื่อมด้วย parentAttemptId
       // (แบบเดิม v48.15) ให้รวมคำตอบเข้ากับ attempt ครึ่งแรกแล้วคำนวณคะแนนใหม่ทั้งชุดเลย
       // (สูตรเดียวกับปุ่ม "คำนวณคะแนนใหม่") เก็บเป็น attempt เดียวจริง ไม่มี record คู่กันอีก —
@@ -7361,7 +7501,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           Store.save(_s3);
         }
       }
-      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title, score, total, usedSeconds, halfMode: !!st.halfMode, halfPart: st.half2Mode?2:(st.halfMode?1:undefined) });
+      lineNotify({ type: 'finish', name: takerName||'ไม่ระบุ', examTitle: exam.title + (_hardMode ? ' (Hard)' : ''), score, total, usedSeconds, halfMode: !!st.halfMode, halfPart: st.half2Mode?2:(st.halfMode?1:undefined) });
       MemeScore.show(score, total, () => {
         navigate('review', {attemptId: _mergedParent ? _mergedParent.id : st.attemptId});
       });
@@ -7425,7 +7565,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // v48.64: สถานะสดสำหรับครู (ดู LiveShare) — คิดถูก/ผิด/คะแนนตามสูตรเดียวกับ submit() ทุกประการ
   // (half: นับเฉพาะข้อที่ตอบ ข้อละ 1 / weighted: ถ่วงน้ำหนัก / ข้อฟรี: ถูกเสมอ / ไม่มีเฉลย: นับเป็น "ตอบแล้ว") ไม่ส่งตัวเลือกที่เลือก
   function _liveBuild(){
-    const eType=exam.examType||'mc';
+    const eType=_hardMode?'hard':(exam.examType||'mc');
     const weighted=!!exam.weighted && !_halfMode;
     const nos=[],ans=[],ok=[],bad=[],nk=[],free=[],unsure=[],skipped=[],qElapsed={};
     const cur=qsList[st.currentIndex]; const curNo=cur?(cur.no||cur.number):null;
@@ -7435,7 +7575,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       const no=q.no||q.number; nos.push(no);
       const a=st.answers[q.id]; const has=a!=='' && a!=null;
       const pts=weighted?getQPoints(q):1;
-      all+=pts;
+      if(!(_hardMode && !q.isFree && !q.correct)) all+=pts; // v48.66: โหมดยาก ข้อรอตรวจไม่นับในคะแนนเต็ม
       if(st.unsure[q.id]) unsure.push(no);
       if(has) ans.push(no);
       if(q.isFree){ free.push(no); if(!_halfMode||has) got+=pts; }
@@ -7451,6 +7591,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     });
     return {mode:_practiceMode?'practice':(_half2Mode?'half2':(_halfMode?'half':'timed')),
       examId:exam.id,examTitle:exam.title,subject:exam.subject||'',examType:eType,weighted,
+      ...(_hardMode?{hard:true}:{}),
       startedAt:st.startedAt,pauseOffset:_pauseOffset,durSec:_practiceMode?0:_effDuration,quota:_halfMode?st.halfQuota:0,
       cur:curNo,nos,ans,ok,bad,nk,free,unsure,skipped,changes,
       score:Math.round(got*100)/100,scoreTotal:_halfMode?st.halfQuota:Math.round(all*100)/100,qElapsed};
@@ -7495,7 +7636,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
   // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
   const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
-  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode) ? _rawResume : null;
+  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode && !!_rawResume.hardMode === !!_hardMode) ? _rawResume : null;
   if (_resume) {
 
     // คำนวณเวลา ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
@@ -7516,7 +7657,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
     const _resumeLabel = _practiceMode ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
-    const _resumeTitle = _practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : _half2Mode ? '🤝 ครึ่งหลังค้างอยู่' : _halfMode ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่';
+    const _resumeTitle = (_practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : _half2Mode ? '🤝 ครึ่งหลังค้างอยู่' : _halfMode ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่') + (_hardMode ? ' · โหมดยาก' : '');
     _resumeBox.innerHTML = `
       <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
       <div style="font-size:18px;font-weight:800;margin-bottom:6px;">${_resumeTitle}</div>
@@ -7559,9 +7700,9 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   } else {
     // มี resume ค้างอยู่ที่ไม่ตรงกับรอบนี้ (คนละชุด หรือชุดเดิมแต่คนละโหมด) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
     if (_rawResume && _rawResume.examId && _rawResume.startedAt &&
-        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode || !!_rawResume.half2Mode !== !!_half2Mode)) {
+        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode || !!_rawResume.half2Mode !== !!_half2Mode || !!_rawResume.hardMode !== !!_hardMode)) {
       const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
-      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : _rawResume.half2Mode ? ' (คนละครึ่ง ครึ่งหลัง)' : _rawResume.halfMode ? ' (คนละครึ่ง)' : ' (จับเวลา)');
+      const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : _rawResume.half2Mode ? ' (คนละครึ่ง ครึ่งหลัง)' : _rawResume.halfMode ? ' (คนละครึ่ง)' : ' (จับเวลา)') + (_rawResume.hardMode ? ' · โหมดยาก' : '');
       if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
         navigate('exams');
         return;
@@ -7634,9 +7775,10 @@ function initReview(attemptId){
   // attempt ที่กรอกย้อนหลัง (ไม่ใช่ทำสดผ่านแอปจริง) — usedSeconds/mood จะว่างเสมอ
   // ต้องบอกไว้ชัดๆ กันดูเหมือนบั๊ก
   const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':att.manualEntry?' 🕰️ (บันทึกย้อนหลัง)':'';
-  document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}`;
+  document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}${att.hardMode?' 🔒 (hard mode)':''}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
-  document.getElementById('reviewScore').textContent=isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`;
+  document.getElementById('reviewScore').textContent=(isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`)
+    +(att.hardMode?(()=>{ const n=(att.perQuestion||[]).filter(p=>p&&p.pending&&!p.manual).length; return n?` · รอตรวจ ${n} ข้อ (ยังไม่นับ)`:''; })():''); // v48.66
 
   // v48.15: โหมดคนละครึ่ง — บรรทัดสรุปคะแนนรวม (ครึ่งแรก+ครึ่งหลัง) เมื่อทำครบทั้งสองครึ่งแล้ว
   // และปุ่ม "ทำครึ่งหลังต่อ" / "ขอดูเฉลยเลย" (แสดงเฉพาะตอนดูรีวิวของครึ่งแรกที่ยังค้างอยู่)
@@ -7733,7 +7875,7 @@ function initReview(attemptId){
       // กรองเหลือ [] — ถ้าปล่อยผ่านไป computeHalfAwareScoring จะคืน score 0/perQuestion ว่าง
       // แล้ว Store.save เขียนทับ กลายเป็นลบประวัติรายข้อของ attempt นี้ทิ้งทั้งหมดเงียบๆ
       if (!qs2.length) { toast('⚠️ ข้อสอบชุดนี้ถูกแก้/สร้างใหม่จนไม่ตรงกับตอนที่ทำ — คำนวณคะแนนใหม่ไม่ได้'); return; }
-      const _result2 = computeHalfAwareScoring(exam2, qs2, att2.answers||{}, _halfMode2, att2.halfQuota, att2.perQuestion);
+      const _result2 = computeHalfAwareScoring(exam2, qs2, att2.answers||{}, _halfMode2, att2.halfQuota, att2.perQuestion, { hard: !!att2.hardMode || exam2.examType==='hard', hardOnly: !!att2.hardOnly || exam2.examType==='hard' });
       att2.score = _result2.score;
       att2.total = _result2.total;
       att2.perQuestion = _result2.perQuestion;
@@ -7881,7 +8023,7 @@ function initReview(attemptId){
   }
   // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) — แยกจาก "ผิด" จริง
   function isCountedQ(q){
-    if(!att.halfMode) return true;
+    if(!att.halfMode && !att.hardMode) return true; // v48.66: โหมดยาก ข้อรอตรวจ = counted:false
     const no=Number(q.no)||0;
     if(Array.isArray(att.perQuestion)&&att.perQuestion.length){
       const p=att.perQuestion.find(x=>Number(x.no)===no);
@@ -7925,7 +8067,8 @@ function initReview(attemptId){
       ? att.perQuestion.find(p=>Number(p.no)===Number(q.no))
       : null;
     const chosen=(answers[q.id]??answers[String(q.id)]??pq?.chosen??null);
-    const correct=(q.correct==null)?null:String(q.correct).trim();
+    // v48.66: โหมดยาก — เฉลยคือ hardAnswer ที่บันทึกไว้กับผลสอบ (pq.correct) ไม่ใช่ตัวอักษร ก-ง ของชุด
+    const correct=att.hardMode ? ((pq&&pq.correct!=null&&String(pq.correct).trim()!=='')?String(pq.correct).trim():null) : ((q.correct==null)?null:String(q.correct).trim());
     const isCorrect=isCorrectQ(q);
     const isUns=isUnsureQ(q);
     const isFree=!!(q.isFree||pq?.isFree);
@@ -7935,7 +8078,8 @@ function initReview(attemptId){
     const timeBadgeHtml=(pq?.elapsedMs>0)
       ? `<span style="font-size:11px;color:#9ca3af;white-space:nowrap;">⏱ ${_fmtQTime(pq.elapsedMs/1000)}</span>`
       : '';
-    const _isFillNum=_reviewExamType==='fillblank-num';
+    const _isFillNum=_reviewExamType==='fillblank-num'||_reviewExamType==='hard'||!!att.hardMode; // v48.66/v48.66: โหมดยากแสดงแบบ "ที่ตอบ → เฉลย" เหมือนกรอกตัวเลข
+    const _hp=!!(att.hardMode&&pq&&pq.pending&&!pq.manual), _hm=!!(att.hardMode&&pq&&pq.manual);
     // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) แสดง "ไม่ได้เลือก" สีเทา
     // แยกจาก "ผิด" สีแดง — เพราะเด็กไม่เคยตัดสินใจกับข้อนี้จริง
     const isSkippedQ = !isCountedQ(q);
@@ -7959,10 +8103,12 @@ function initReview(attemptId){
     if(_hideAns){
       pillsHtml=`<div style="font-size:12px;color:#9ca3af;">🔒 ยังไม่ได้ตอบ</div>`;
     } else if(_isFillNum){
-      const chosenDisp=chosen!=null&&String(chosen).trim()!==''?String(chosen):'—';
-      const correctDisp=correct||'—';
+      const chosenDisp=chosen!=null&&String(chosen).trim()!==''?((att.hardMode||_reviewExamType==='hard')?fmtHardAns(chosen):String(chosen)):'—';
+      const correctDisp=correct?((att.hardMode||_reviewExamType==='hard')?correct.split('|').map(x=>fmtHardAns(x.trim())).join(' | '):correct):'—';
       if(isFree){
         pillsHtml=`<div style="font-size:12px;color:#d97706;font-weight:700;">ฟรี</div>`;
+      } else if(att.hardMode && !correct){
+        pillsHtml=`<div style="display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;"><span style="font-weight:900;">${esc(chosenDisp)}</span><span style="color:#9ca3af;">— ยังไม่มีเฉลย —</span></div>`;
       } else if(isCorrect){
         pillsHtml=`<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:900;color:#16a34a;">${esc(chosenDisp)}</div>`;
       } else {
@@ -7988,8 +8134,12 @@ function initReview(attemptId){
     }
 
     // badge
-    const badgeCls = isFree?'skip':isSkippedQ?'skip':isCorrect?'good':'bad';
-    const badgeTxt = isFree?'ฟรี':isSkippedQ?'— ไม่ได้เลือก':isCorrect?'✓ ถูก':(chosen?'✗ ผิด':'— ไม่ตอบ');
+    const badgeCls = isFree?'skip':_hp?'skip':isSkippedQ?'skip':isCorrect?'good':'bad';
+    const badgeTxt = isFree?'ฟรี':_hp?'รอตรวจ':_hm?(isCorrect?'✓ ครูตรวจ: ถูก':'✗ ครูตรวจ: ผิด'):isSkippedQ?'— ไม่ได้เลือก':isCorrect?'✓ ถูก':(chosen?'✗ ผิด':'— ไม่ตอบ');
+    // v48.66: ครูตรวจเอง (เฉพาะครู + ผลสอบโหมดยาก) — ✓ / ✗ / ล้าง ต่อข้อ
+    const tickHtml=(Auth.isTeacher()&&att.hardMode&&!isFree&&pq)
+      ? `<span class="hardTick" data-tick-no="${esc(q.no)}"><button type="button" data-v="ok" class="${pq.manual==='ok'?'on-ok':''}" title="ครูตรวจ: ถูก" aria-label="ครูตรวจ ข้อ ${esc(q.no)} ถูก">✓</button><button type="button" data-v="bad" class="${pq.manual==='bad'?'on-bad':''}" title="ครูตรวจ: ผิด" aria-label="ครูตรวจ ข้อ ${esc(q.no)} ผิด">✗</button><button type="button" data-v="clr" ${pq.manual?'':'disabled'} title="ล้าง — กลับไปใช้ผลของระบบ">ล้าง</button></span>`
+      : '';
 
     // answer summary (shown in row)
     wrap.innerHTML=`
@@ -8000,6 +8150,7 @@ function initReview(attemptId){
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
           ${timeBadgeHtml}
           <span class="qBadge ${badgeCls}">${badgeTxt}</span>
+          ${tickHtml}
         </div>
         ${hasText?'<span style="font-size:11px;color:#9ca3af;margin-left:2px;">▾</span>':''}
       </div>
@@ -8028,6 +8179,12 @@ function initReview(attemptId){
 
     list.appendChild(wrap);
   });
+  // v48.66: ปุ่มครูตรวจเอง (โหมดยาก) — กันคลิกทะลุไปกาง/หุบแถว
+  list.querySelectorAll('.hardTick button').forEach(btn=>btn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const no=btn.closest('.hardTick').dataset.tickNo;
+    setHardManual(attemptId, no, btn.dataset.v);
+  }));
 
   // PDF viewer for review page — ใช้ iframe เหมือน take page
   const reviewViewerEl = document.getElementById('reviewPdfViewer');
@@ -8630,7 +8787,7 @@ function _shotLetter(v){
 function buildAttemptSummary(att,s){
   const exam=(s.exams||[]).find(e=>e.id===att.examId)||null;
   const examType=att.examType||(exam&&exam.examType)||'mc';
-  const isFillNum=examType==='fillblank-num';
+  const isFillNum=examType==='fillblank-num'||examType==='hard'; // v48.66: โหมดยากแสดงแบบพิมพ์คำตอบ
   const pqAll=Array.isArray(att.perQuestion)?att.perQuestion:[];
   let qs=((s.questions&&s.questions[att.examId])||[]).map(q=>({...q,no:q.no??q.number}));
   if(!qs.length&&pqAll.length) qs=pqAll.map(p=>({id:p.qid||String(p.no),no:p.no,page:p.page||1,correct:p.correct||null}));
@@ -8641,13 +8798,17 @@ function buildAttemptSummary(att,s){
     const no=Number(q.no)||idx+1;
     const pq=pqAll.find(p=>Number(p.no)===no)||null;
     const rawChosen=answers[q.id]??answers[String(q.id)]??(pq?pq.chosen:null)??null;
-    const chosen=(rawChosen==null||String(rawChosen).trim()==='')?null:String(rawChosen).trim();
-    const correct=(q.correct==null||String(q.correct).trim()==='')?null:String(q.correct).trim();
+    let chosen=(rawChosen==null||String(rawChosen).trim()==='')?null:String(rawChosen).trim();
+    let correct=(q.correct==null||String(q.correct).trim()==='')?null:String(q.correct).trim();
+    if(att.hardMode){ // v48.66: เฉลยโหมดยาก = ที่บันทึกกับผลสอบ, แสดง "ไม่มีคำตอบ" เป็นข้อความ
+      correct=(pq&&pq.correct!=null&&String(pq.correct).trim()!=='')?String(pq.correct).trim().split('|').map(x=>fmtHardAns(x.trim())).join(' | '):null;
+      if(chosen!=null) chosen=fmtHardAns(chosen);
+    }
     return {
       no, page:q.page||(pq&&pq.page)||null, chosen, correct,
       ok:pq?!!pq.isCorrect:isAnswerCorrect(chosen,q.correct,examType),
       free:!!(q.isFree||(pq&&pq.isFree)),
-      skipped:!!(att.halfMode&&pq&&pq.counted===false),
+      skipped:!!((att.halfMode||att.hardMode)&&pq&&pq.counted===false),
       unsure:!!(pq&&pq.unsure),
       sec:(pq&&pq.elapsedMs>0)?pq.elapsedMs/1000:null,
     };
@@ -8655,7 +8816,7 @@ function buildAttemptSummary(att,s){
   const weighted=isWeightedAttempt(att);
   const total=Number(att.total||rows.length||0);
   const score=Number.isFinite(Number(att.score))?Number(att.score):0;
-  const totalItems=att.halfMode?(att.halfQuota||0):(pqAll.length||rows.length);
+  const totalItems=att.halfMode?(att.halfQuota||0):att.hardMode?pqAll.filter(p=>p&&p.counted!==false).length:(pqAll.length||rows.length);
   const correctCount=pqAll.length?pqAll.filter(p=>p&&p.isCorrect&&p.counted!==false).length:(weighted?0:score);
   const wrongNos=Array.from(new Set(
     pqAll.length?pqAll.filter(p=>!p.isCorrect&&p.counted!==false).map(p=>Number(p.no)||0).filter(n=>n>0)
@@ -8677,9 +8838,9 @@ function buildAttemptSummary(att,s){
   const anxiety=Auth.isTeacher()?calcAnxietyMarkers(att):null; // เฉพาะบัญชีครู เหมือนหน้าทบทวน
   const dur=Number(att.usedSeconds)>0?_shotMmss(att.usedSeconds)+((exam&&exam.durationSeconds&&!att.practiceMode)?` (กำหนด ${_shotMmss(exam.durationSeconds)})`:''):null;
   return {
-    att, title:att.examTitle||(exam&&exam.title)||'ข้อสอบ', subject:att.examSubject||(exam&&exam.subject)||'ไม่ระบุ',
+    att, title:(att.examTitle||(exam&&exam.title)||'ข้อสอบ')+(att.hardMode?' (hard mode)':''), subject:att.examSubject||(exam&&exam.subject)||'ไม่ระบุ',
     taker:(att.takerName||'').trim()||'ไม่ระบุ', isFillNum, weighted,
-    typeLabel:isFillNum?'กรอกตัวเลข':'เลือกตอบ ก–ง',
+    typeLabel:att.hardMode?'พิมพ์คำตอบเอง (โหมดยาก)':isFillNum?'กรอกตัวเลข':'เลือกตอบ ก–ง',
     diffLabel:SHOT_DIFF[att.difficulty||(exam&&exam.difficulty)]||null,
     modeLabel:att.halfMode?(att.halfPart===2?'🤝 คนละครึ่ง (ครึ่งหลัง)':'🤝 คนละครึ่ง'):att.mode==='weakness_practice'?'🎯 แก้จุดอ่อน':att.practiceMode?'📝 ฝึกซ้อม':att.manualEntry?'🕰️ บันทึกย้อนหลัง':'⏱ สอบจริง',
     submitted:att.submittedAt?(()=>{try{return new Date(att.submittedAt).toLocaleString('th-TH');}catch(e){return att.submittedAt;}})():null,
@@ -9042,7 +9203,7 @@ function _renderDashAttempts(attempts,isTeacher){
     return`<div class="attempt-card" onclick="navigate('review',{attemptId:'${esc(a.id)}'})" style="cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
         <div style="min-width:0;">
-          <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.examTitle||'ข้อสอบ')}</div>
+          <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc((a.examTitle||'ข้อสอบ')+(a.hardMode?' (hard mode)':''))}</div>
           <div class="muted" style="font-size:12px;margin-top:2px;">${[a.examSubject,isTeacher?a.takerName:null,dateStr].filter(Boolean).map(esc).join(' · ')}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
@@ -9295,7 +9456,7 @@ function initStats(){
     const recentHtml=`<div class="sd-rh">ล่าสุด</div><div class="sd-recent">${sorted.slice(0,5).map(a=>{
       const p=pctOf(a);
       const mode=a.halfMode?'คนละครึ่ง':a.practiceMode?'ฝึกซ้อม':'จริง';
-      const title=a.examTitle||getExamTitleById(s,a.examId);
+      const title=(a.examTitle||getExamTitleById(s,a.examId))+(a.hardMode?' (hard mode)':''); // v48.66
       return `<button type="button" class="sd-rc" data-sdreview="${esc(a.id)}"><div class="sd-rd">${fmtD(a)} · ${mode}</div><div class="sd-rt">${esc(title)}</div><div class="sd-rs"><b class="sd-${band(p)}t">${fp(a.score||0)}</b><span>/${fp(a.total||0)}</span></div></button>`;
     }).join('')}</div>`;
 
@@ -9666,7 +9827,7 @@ function initStats(){
 
     function buildCardHtml(a,uid){
       const exam=(s.exams||[]).find(e=>e.id===a.examId);
-      const examTitle=exam?.title||a.examTitle||'—';
+      const examTitle=(exam?.title||a.examTitle||'—')+(a.hardMode?' (hard mode)':''); // v48.66
       const examSubject=a.examSubject||exam?.subject||'ไม่ระบุ';
       const takerName=a.takerName||'—';
       const started=a.startedAt?new Date(a.startedAt):null;
@@ -10253,6 +10414,7 @@ function initPractice(params){
 
     const _pType=exam.examType||'mc';
     const _isFillNum=_pType==='fillblank-num';
+    const _isHardT=_pType==='hard'; // v48.66: ชุดพิมพ์คำตอบ — แก้จุดอ่อนด้วยแป้นพิมพ์ + ปุ่มไม่มีคำตอบ
     const _numDigits=exam.numDigits||3;
 
     // If this question already answered in this session, show result
@@ -10262,14 +10424,14 @@ function initPractice(params){
         st.confirmed=true;
         const wrap=document.getElementById('pracChoices');
         wrap.innerHTML='';
-        if(_isFillNum){
+        if(_isFillNum||_isHardT){
           wrap.style.setProperty('grid-template-columns','1fr','important');
           wrap.style.setProperty('grid-template-rows','auto','important');
           wrap.style.setProperty('align-content','start','important');
           const box=document.createElement('div');
           box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px;';
           const inp=document.createElement('input');
-          inp.type='text';inp.value=prevAnswer.chosen||'';inp.disabled=true;
+          inp.type='text';inp.value=_isHardT?fmtHardAns(prevAnswer.chosen):(prevAnswer.chosen||'');inp.disabled=true;
           inp.className='numAnsInput';
           inp.style.borderColor=prevAnswer.isCorrect?'#16a34a':'#dc2626';
           inp.style.color=prevAnswer.isCorrect?'#16a34a':'#dc2626';
@@ -10278,7 +10440,7 @@ function initPractice(params){
           if(!prevAnswer.isCorrect){
             const ans=document.createElement('div');
             ans.style.cssText='font-size:13px;color:#16a34a;font-weight:800;';
-            ans.textContent='เฉลย: '+(q.correct||'—');
+            ans.textContent='เฉลย: '+(_isHardT?String(q.correct||'—').split('|').map(x=>fmtHardAns(x.trim())).join(' | '):(q.correct||'—'));
             box.appendChild(ans);
           }
           wrap.appendChild(box);
@@ -10314,7 +10476,27 @@ function initPractice(params){
     // Fresh question — render selectable choices / numeric input
     const wrap=document.getElementById('pracChoices');
     wrap.innerHTML='';
-    if(_isFillNum){
+    if(_isHardT){
+      wrap.style.setProperty('grid-template-columns','1fr','important');
+      wrap.style.setProperty('grid-template-rows','auto','important');
+      wrap.style.setProperty('align-content','start','important');
+      const box=document.createElement('div'); box.className='hardAnsBox';
+      const disp=document.createElement('input');
+      disp.type='text'; disp.readOnly=true; disp.inputMode='none'; disp.placeholder='ตอบ'; disp.className='hardAnsInput'; disp.setAttribute('aria-label','คำตอบ');
+      const noneBtn=document.createElement('button'); noneBtn.type='button'; noneBtn.className='hardNoneBtn';
+      let cur='';
+      const _show=()=>{ const none=cur===HARD_NONE; disp.value=fmtHardAns(cur); disp.classList.toggle('none',none); noneBtn.classList.toggle('on',none); noneBtn.textContent=none?'∅ ไม่มีคำตอบ ✓':'∅ ไม่มีคำตอบ'; kp.classList.toggle('isNone',none);
+        st.selected=cur||null; confirmBtn.disabled=!cur; confirmBtn.style.opacity=cur?'1':'0.5'; };
+      const _isPhone=window.matchMedia&&window.matchMedia('(max-width:600px)').matches;
+      const kp=createHardKeypad(_isPhone,
+        k=>{ if(st.confirmed) return; let c=cur===HARD_NONE?'':cur; if(c.length>=12) return; if(k==='-' && c!=='') return; cur=c+k; _show(); },
+        ()=>{ if(st.confirmed) return; cur=cur===HARD_NONE?'':cur.slice(0,-1); _show(); },
+        ()=>{ if(st.confirmed) return; cur=''; _show(); });
+      noneBtn.addEventListener('click',()=>{ if(st.confirmed) return; cur=cur===HARD_NONE?'':HARD_NONE; _show(); });
+      box.appendChild(disp); box.appendChild(kp); box.appendChild(noneBtn);
+      wrap.appendChild(box);
+      _show();
+    } else if(_isFillNum){
       wrap.style.setProperty('grid-template-columns','1fr','important');
       wrap.style.setProperty('grid-template-rows','auto','important');
       wrap.style.setProperty('align-content','start','important');
@@ -10400,7 +10582,7 @@ function initPractice(params){
       i.style.borderColor=isCorrect?'#16a34a':'#dc2626';
       i.style.color=isCorrect?'#16a34a':'#dc2626';
     });
-    document.getElementById('pracChoices').querySelectorAll('.numKeypad').forEach(k=>{
+    document.getElementById('pracChoices').querySelectorAll('.numKeypad,.hardNoneBtn').forEach(k=>{
       k.style.pointerEvents='none';
       k.style.opacity='0.4';
     });
@@ -10583,7 +10765,7 @@ const LiveView = (() => {
     else if (st === 'stale') chip = `<span class="lvChip gr"><span class="lvDot gr"></span>ขาดการเชื่อมต่อ</span><span class="muted" style="font-size:12px;" data-lv="age" data-id="${idq}"></span>`;
     else if (st === 'submitting') chip = `<span class="lvChip bl">กำลังส่งคำตอบ…</span>`;
     else chip = `<span class="lvChip bl">✓ ส่งข้อสอบแล้ว</span>`;
-    const modeChip = MODE_LABEL[d.mode] ? `<span class="lvChip gr" style="margin-left:6px;">${MODE_LABEL[d.mode]}</span>` : '';
+    const modeChip = (MODE_LABEL[d.mode] ? `<span class="lvChip gr" style="margin-left:6px;">${MODE_LABEL[d.mode]}</span>` : '') + (d.hard ? `<span class="lvChip" style="margin-left:6px;background:#111827;border-color:#111827;color:#fff;">🔒 โหมดยาก</span>` : ''); // v48.66
     const head = `<div class="lvR1"><div><span class="t">ดูสด · ${esc(d.name || '')}</span>${modeChip}<span class="s">${esc(d.examTitle || '')}${d.subject ? ' · ' + esc(d.subject) : ''} · ${n} ข้อ${d.weighted ? ' · ถ่วงน้ำหนัก' : ''}</span></div><div class="r">${chip}</div></div>`;
     // ── คอลัมน์เวลา ──
     const tilde = st === 'stale' ? '~' : '', gray = st === 'stale' ? 'color:#9ca3af;' : '';
@@ -10685,7 +10867,7 @@ const LiveView = (() => {
       if (!act.length) return '';
       const rows = act.slice(0, 2).map(([id, d]) => {
         const st = _status(d, now), timed = _num(d.durSec) > 0, away = st === 'away';
-        const what = away ? 'ออกจากแอป (ยังอยู่ในข้อสอบ)' : (st === 'submitting' ? 'กำลังส่งคำตอบ' : 'กำลังทำข้อสอบ');
+        const what = (away ? 'ออกจากแอป (ยังอยู่ในข้อสอบ)' : (st === 'submitting' ? 'กำลังส่งคำตอบ' : 'กำลังทำข้อสอบ')) + (d.hard ? ' (โหมดยาก)' : '');
         return `<button type="button" class="hlItem${away ? ' away' : ''}" data-hl-go="${esc(id)}" onclick="navigate('admin_live')">
           <span class="lvDot${away ? ' am' : ''}"></span>
           <span class="t"><b>${esc(d.name || '')} ${what}</b><span>${esc(d.examTitle || '')} · ข้อ ${d.cur == null ? '–' : esc(d.cur)}/${_arr(d.nos).length} · ✓${_arr(d.ok).length} ✗${_arr(d.bad).length}</span></span>
@@ -11090,12 +11272,15 @@ function openBackfillModal(examId) {
   dateInput.value = new Date().toISOString().slice(0, 10);
 
   const labelMap = CHOICE_LABELS;
-  const isFillNum = exam.examType === 'fillblank-num';
+  const isHardT = exam.examType === 'hard'; // v48.66: ชุดพิมพ์คำตอบ — ช่องข้อความ (ไม่กรองตัวเลข)
+  const isFillNum = exam.examType === 'fillblank-num' || isHardT;
   const numDigits = exam.numDigits || 3;
   const rowsEl = document.getElementById('backfillRows');
   rowsEl.innerHTML = qs.map((q, idx) => {
-    const correctHint = q.isFree ? '★ ข้อฟรี' : (isFillNum ? esc(q.correct || '-') : (labelMap[q.correct] || '-'));
-    const inputHtml = isFillNum
+    const correctHint = q.isFree ? '★ ข้อฟรี' : isHardT ? (q.correct ? esc(String(q.correct).split('|').map(x => fmtHardAns(x.trim())).join(' | ')) : 'รอตรวจ') : (isFillNum ? esc(q.correct || '-') : (labelMap[q.correct] || '-'));
+    const inputHtml = isHardT
+      ? `<input type="text" maxlength="40" data-qid="${esc(q.id)}" placeholder="ตอบ / ไม่มี" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-weight:700;" />`
+      : isFillNum
       ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${numDigits}}" maxlength="${numDigits}" data-qid="${esc(q.id)}" placeholder="ตอบ" style="width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;" />`
       : `<div class="correctBtns" data-qid="${esc(q.id)}">${getQLetters(q).map(v => `<button type="button" class="correctBtn" data-val="${v}">${labelMap[v]}</button>`).join('')}</div>`;
     // ปุ่ม "ไม่แน่ใจ" ต่อข้อ — สไตล์เดียวกับ #takeUnsureBtn ในหน้าทำข้อสอบจริง
@@ -11116,9 +11301,10 @@ function openBackfillModal(examId) {
     let score = 0, total = 0;
     qs.forEach(q => {
       const pts = getQPoints(q);
+      if (isHardT && !q.isFree && !q.correct) return; // รอตรวจ — ไม่นับ
       total += exam.weighted ? pts : 1;
       const chosen = isFillNum
-        ? rowsEl.querySelector(`input[data-qid="${CSS.escape(q.id)}"]`)?.value || ''
+        ? rowsEl.querySelector(`input[data-qid="${CSS.escape(q.id)}"]`)?.value.trim() || ''
         : rowsEl.querySelector(`.correctBtns[data-qid="${CSS.escape(q.id)}"] .correctBtn.selected`)?.getAttribute('data-val') || '';
       if (q.isFree || (chosen && isAnswerCorrect(chosen, q.correct, exam.examType || 'mc'))) score += exam.weighted ? pts : 1;
     });
@@ -11150,8 +11336,8 @@ function openBackfillModal(examId) {
   });
   rowsEl.querySelectorAll('input[data-qid]').forEach(inp => {
     inp.addEventListener('input', () => {
-      const v = inp.value.replace(/[^\d]/g, '').slice(0, numDigits);
-      if (v !== inp.value) inp.value = v;
+      const v = isHardT ? inp.value.trim() : inp.value.replace(/[^\d]/g, '').slice(0, numDigits);
+      if (!isHardT && v !== inp.value) inp.value = v;
       // ไฮไลท์เขียว/แดงทันทีตามถูก/ผิด เหมือนปุ่ม ก/ข/ค/ง ด้านบน
       const q = qs.find(qq => qq.id === inp.getAttribute('data-qid'));
       if (v) {
@@ -11201,21 +11387,25 @@ function saveBackfillAttempt() {
   // เที่ยงวันตามเวลาท้องถิ่น — กันปัญหา timezone ทำให้วันที่เลื่อนไปอีกวันตอนแปลงเป็น ISO
   const submittedAt = new Date(dateVal + 'T12:00:00').toISOString();
 
-  const isFillNum = exam.examType === 'fillblank-num';
+  const isHardT = exam.examType === 'hard'; // v48.66
+  const isFillNum = exam.examType === 'fillblank-num' || isHardT;
   const qs = (s.questions[examId] || []).map(q => ({ ...q, no: q.no ?? q.number ?? 0 })).sort((a, b) => a.no - b.no);
   const rowsEl = document.getElementById('backfillRows');
   const isWeighted = !!exam.weighted;
   let score = 0, total = 0;
   const perQuestion = qs.map(q => {
     const chosen = isFillNum
-      ? rowsEl.querySelector(`input[data-qid="${CSS.escape(q.id)}"]`)?.value || null
+      ? rowsEl.querySelector(`input[data-qid="${CSS.escape(q.id)}"]`)?.value.trim() || null
       : rowsEl.querySelector(`.correctBtns[data-qid="${CSS.escape(q.id)}"] .correctBtn.selected`)?.getAttribute('data-val') || null;
     const correct = q.correct || null;
     const isFree = !!q.isFree;
     const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, exam.examType || 'mc') : false);
     const pts = getQPoints(q);
-    total += isWeighted ? pts : 1;
-    if (isCorrect) score += isWeighted ? pts : 1;
+    const pending = isHardT && !isFree && !correct; // v48.66: ยังไม่มีเฉลย = รอตรวจ (ไม่นับ)
+    if (!pending) {
+      total += isWeighted ? pts : 1;
+      if (isCorrect) score += isWeighted ? pts : 1;
+    }
     const finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
     const finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
     // อ่านสถานะปุ่ม "ไม่แน่ใจ" ต่อข้อจริง แทนการ hardcode false
@@ -11223,6 +11413,7 @@ function saveBackfillAttempt() {
     const pq = { qid: q.id, no: q.no, page: q.page, tags: finalTags, subTags: finalSubTags, topic: finalTags[0] || '',
       chosen, correct, isCorrect, isFree, unsure, visited: true, elapsedMs: 0, changes: 0 };
     if (isWeighted) pq.points = pts;
+    if (isHardT) { pq.counted = !pending; if (pending) pq.pending = true; }
     return pq;
   });
   const scoreDisplay = isWeighted ? fmtPts(score) : score;
@@ -11235,6 +11426,7 @@ function saveBackfillAttempt() {
   const attempt = {
     id: 'att_' + Math.random().toString(16).slice(2),
     examId: exam.id, examTitle: exam.title, examSubject: exam.subject || 'ไม่ระบุ', examType: exam.examType || 'mc',
+    ...(isHardT ? { hardMode: true, hardOnly: true } : {}), // v48.66
     weighted: isWeighted, takerName, startedAt: submittedAt, submittedAt, usedSeconds: 0,
     score: isWeighted ? Math.round(score * 100) / 100 : score, total: isWeighted ? Math.round(total * 100) / 100 : total,
     answers, perQuestion, practiceMode: false, halfMode: false, halfQuota: 0, visitOrder: [],
@@ -12820,6 +13012,10 @@ function initAdminNew(){
         btn.style.background='#eef2ff';
         btn.style.borderColor='#c7d2fe';
         btn.style.color='#4338ca';
+      } else if(btn.dataset.val==='hard'){ // v48.66: ประเภทพิมพ์คำตอบ (โหมดยากอย่างเดียว)
+        btn.style.background='#111827';
+        btn.style.borderColor='#111827';
+        btn.style.color='#fff';
       } else {
         btn.style.background='#fef3c7';
         btn.style.borderColor='#fcd34d';
@@ -12886,7 +13082,7 @@ function initAdminNew(){
     const _emptyCorrect='';
     s.questions[id]=createPlaceholder?Array.from({length:qCount}).map((_,i)=>{
       const _q={id:'q'+(i+1),number:i+1,no:i+1,page:Math.max(1,Math.ceil((i+1)/5)),correct:_emptyCorrect};
-      if(examType!=='fillblank-num') _q.choices={A:'',B:'',C:'',D:''};
+      if(examType==='mc') _q.choices={A:'',B:'',C:'',D:''}; // v48.66: กรอกตัวเลข/พิมพ์คำตอบ ไม่มีตัวเลือก
       return _q;
     }):[];
     // apply excel data ถ้ามี
@@ -12937,6 +13133,7 @@ function initEditor(examId){
   // examType — default 'mc' for legacy exams
   if(!exam.examType) exam.examType='mc';
   const _isFillNum=exam.examType==='fillblank-num';
+  const _isHardType=exam.examType==='hard'; // v48.66: ชุดโหมดยากอย่างเดียว — เฉลยเป็นข้อความใน q.correct
   // numDigits — default 3 หลักสำหรับข้อสอบเก่าที่ยังไม่มี field นี้ (legacy fallback)
   if(!exam.numDigits) exam.numDigits=3;
   const _numDigits=exam.numDigits;
@@ -12945,7 +13142,12 @@ function initEditor(examId){
   document.getElementById('editorMeta').textContent=`เวลา ${Math.round(exam.durationSeconds/60)} นาที • PDF: ${exam.pdfUrl} • วิชา: ${exam.subject||'ทั่วไป'}`;
   const _typeBadge=document.getElementById('editorTypeBadge');
   if(_typeBadge){
-    if(_isFillNum){
+    if(_isHardType){
+      _typeBadge.textContent='✍️ ประเภท: พิมพ์คำตอบ (โหมดยาก)';
+      _typeBadge.style.background='#111827';
+      _typeBadge.style.color='#fff';
+      _typeBadge.style.border='1px solid #111827';
+    } else if(_isFillNum){
       _typeBadge.textContent='🔢 ประเภท: กรอกตัวเลข';
       _typeBadge.style.background='#fef3c7';
       _typeBadge.style.color='#b45309';
@@ -13086,7 +13288,9 @@ function initEditor(examId){
   const _examTypeBtns=document.querySelectorAll('#editorExamTypeBtns .examTypeBtn');
   function _syncExamTypeBtnStyle(btn, active){
     btn.classList.toggle('active', active);
-    if(active){
+    if(active && btn.dataset.val==='hard'){
+      btn.style.background='#111827'; btn.style.borderColor='#111827'; btn.style.color='#fff';
+    } else if(active){
       btn.style.background = btn.dataset.val==='fillblank-num' ? '#fef3c7' : '#eef2ff';
       btn.style.borderColor = btn.dataset.val==='fillblank-num' ? '#fcd34d' : '#c7d2fe';
       btn.style.color = btn.dataset.val==='fillblank-num' ? '#b45309' : '#4338ca';
@@ -13104,7 +13308,7 @@ function initEditor(examId){
         ? 'เปลี่ยนประเภทข้อสอบ? เฉลยที่กรอกไว้ทั้งหมดจะถูกล้าง (รูปแบบคำตอบข้ามประเภทกันไม่ได้)'
         : 'เปลี่ยนประเภทข้อสอบ?')) return;
       exam.examType=newType;
-      list.forEach(q=>{ q.correct=''; if(newType==='fillblank-num') delete q.optCount; });
+      list.forEach(q=>{ q.correct=''; if(newType!=='mc') delete q.optCount; });
       s.questions[examId]=list;
       Store.save(s); _setDirty(false);
       toast('เปลี่ยนประเภทข้อสอบแล้ว');
@@ -13298,6 +13502,7 @@ function initEditor(examId){
   }
 
   function renderTable(){
+    if(typeof _renderHardList==='function') { try{ _renderHardList(); }catch(e){} } // v48.66
     const tbody=document.getElementById('editorTbody');
     tbody.innerHTML='';
     // clear refs
@@ -13319,7 +13524,9 @@ function initEditor(examId){
       // ต้องเติมเป็น option พิเศษ ไม่งั้น dropdown จะเด้งไปค่าว่างแล้วลบ tag เดิมทิ้งเงียบๆ
       const _tagOptsList=(_curTag&&!_subjTopicsForSel.includes(_curTag))?[..._subjTopicsForSel,_curTag]:_subjTopicsForSel;
       const _tagOptsHtml='<option value="">— ไม่มี —</option>'+_tagOptsList.map(t=>`<option value="${esc(t)}"${t===_curTag?' selected':''}>${esc(t)}</option>`).join('');
-      const _correctCellHtml=_isFillNum
+      const _correctCellHtml=_isHardType
+        ? `<div class="hardCorrectCell"><input type="text" maxlength="40" value="${esc(q.correct||'')}" placeholder="เช่น 12, 1/2|0.5, ไม่มี" data-field="correctText" aria-label="เฉลยข้อ ${esc(q.number||q.no)}" /><button type="button" class="btn" data-field="correctNone" title="ตั้งเป็น ไม่มีคำตอบ">∅</button></div>`
+        : _isFillNum
         ? `<input type="text" inputmode="numeric" pattern="[0-9]{1,${_numDigits}}" maxlength="${_numDigits}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" data-field="correctNum" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;text-align:center;letter-spacing:2px;" />`
         : `<div class="correctBtns" data-field="correct"></div>`;
       const _ptsCellHtml=exam.weighted
@@ -13343,7 +13550,17 @@ function initEditor(examId){
           });
         }
       }
-      if(_isFillNum){
+      if(_isHardType){
+        // v48.66: พิมพ์เฉลยเป็นข้อความ (ไม่กรองตัวเลข) + ∅ = ไม่มีคำตอบ
+        const txt=tr.querySelector('input[data-field="correctText"]');
+        const noneB=tr.querySelector('[data-field="correctNone"]');
+        txt.addEventListener('focus',()=>select(idx));
+        txt.addEventListener('input',()=>{ q.correct=txt.value.trim(); _setDirty(true); });
+        txt.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); _gotoRow(idx+1,true); } });
+        noneB.addEventListener('click',(e)=>{ e.stopPropagation(); select(idx); q.correct='ไม่มี'; txt.value='ไม่มี'; _setDirty(true); });
+        refs[`${idx}:correctText`]=txt;
+        rowPaint[idx]=()=>{ txt.value=q.correct||''; };
+      } else if(_isFillNum){
         const numInput=tr.querySelector('input[data-field="correctNum"]');
         if(numInput){
           numInput.addEventListener('focus',()=>select(idx));
@@ -13658,6 +13875,82 @@ function initEditor(examId){
     s.questions[examId]=list;exam.questionCount=list.length;Store.save(s);_setDirty(false);toast('บันทึกแล้ว');
   };
 
+  // ═══════ v48.66: โหมดยาก (ซ่อนตัวเลือก) — PDF โหมดยากบันทึกทันที (แบบ PDF เฉลย), เฉลยรายข้อเก็บใน list → บันทึกด้วยปุ่มเดิม ═══════
+  const _hardUrlEl=document.getElementById('editorHardPdfUrl');
+  const _hardStatusEl=document.getElementById('editorHardPdfStatus');
+  const _hardListEl=document.getElementById('editorHardList');
+  const _hardCountEl=document.getElementById('editorHardCount');
+  if(_hardUrlEl) _hardUrlEl.value=(exam.hardPdfUrl && !exam.hardPdfUrl.startsWith('localpdf:')) ? exam.hardPdfUrl : '';
+  { const hb=document.getElementById('editorHardBox'); if(hb) hb.style.display=_isHardType?'none':''; } // v48.66: ชุดโหมดยากอย่างเดียวไม่ใช้สวิตช์/PDF แยก
+  { const kh=document.querySelector('.editorKeyHint'); // v48.66: คำแนะนำปุ่มลัด ก-จ ไม่ใช้กับชุดพิมพ์คำตอบ
+    if(kh){ if(kh.dataset.orig==null) kh.dataset.orig=kh.innerHTML;
+      kh.innerHTML=_isHardType?'<span>พิมพ์เฉลยในช่อง แล้ว <kbd>Enter</kbd> ไปข้อถัดไป</span><span><kbd>∅</kbd> = ไม่มีคำตอบ</span><span>หลายแบบคั่นด้วย <kbd>|</kbd></span><span><kbd>↑</kbd><kbd>↓</kbd> เลื่อนข้อ</span>':kh.dataset.orig; } }
+  function _hardCount(){
+    if(!_hardCountEl) return;
+    const done=list.filter(q=>String(q.hardAnswer||'').trim()).length;
+    _hardCountEl.textContent=(exam.hardPdfUrl?'PDF ✓':'ยังไม่มี PDF')+` · กรอกเฉลยแล้ว ${done} / ${list.length}`;
+    _hardCountEl.classList.toggle('full', !!exam.hardPdfUrl && done===list.length && list.length>0);
+  }
+  function _renderHardList(){
+    if(!_hardListEl) return;
+    _hardListEl.innerHTML=list.map((q,i)=>`<div class="hardRow"><b>${esc(q.no||i+1)}</b><span class="muted" style="font-size:12px;">หน้า ${esc(q.page||1)}</span><input type="text" data-hard-i="${i}" value="${esc(q.hardAnswer||'')}" class="${String(q.hardAnswer||'').trim()?'':'empty'}" placeholder="รอตรวจ" aria-label="เฉลยโหมดยาก ข้อ ${esc(q.no||i+1)}"><button type="button" class="btn" data-hard-none="${i}" title="ตั้งเป็น ไม่มีคำตอบ">∅ ไม่มีคำตอบ</button></div>`).join('')||'<div class="muted" style="padding:10px;">ยังไม่มีข้อ</div>';
+    _hardListEl.querySelectorAll('input[data-hard-i]').forEach(inp=>inp.addEventListener('input',()=>{
+      const q=list[Number(inp.dataset.hardI)]; if(!q) return;
+      q.hardAnswer=inp.value.trim(); inp.classList.toggle('empty',!q.hardAnswer); _setDirty(true); _hardCount();
+    }));
+    _hardListEl.querySelectorAll('[data-hard-none]').forEach(b=>b.addEventListener('click',()=>{
+      const i=Number(b.dataset.hardNone), q=list[i]; if(!q) return;
+      q.hardAnswer='ไม่มี'; const inp=_hardListEl.querySelector(`input[data-hard-i="${i}"]`); if(inp){ inp.value='ไม่มี'; inp.classList.remove('empty'); }
+      _setDirty(true); _hardCount();
+    }));
+    _hardCount();
+  }
+  function _updateHardPdf(url){
+    exam.hardPdfUrl=url;
+    s.questions[examId]=list; Store.save(s); // บันทึกพร้อมเฉลยที่กรอกค้างไว้ (เหมือนจุดอื่นที่ flush list)
+    _setDirty(false); _hardCount();
+    toast(url?'✅ บันทึก PDF โหมดยากแล้ว':'ลบ PDF โหมดยากแล้ว — สวิตช์โหมดยากจะไม่แสดง');
+  }
+  const _hardUrlBtn=document.getElementById('editorHardPdfUrlBtn');
+  if(_hardUrlBtn) _hardUrlBtn.onclick=(e)=>{ e.preventDefault(); const url=(_hardUrlEl?.value||'').trim(); if(!url){ toast('กรุณากรอก URL'); return; } _updateHardPdf(url); if(_hardStatusEl) _hardStatusEl.textContent='✅ บันทึก URL แล้ว'; };
+  const _hardClearBtn=document.getElementById('editorHardPdfClear');
+  if(_hardClearBtn) _hardClearBtn.onclick=(e)=>{ e.preventDefault(); if(!exam.hardPdfUrl) return; if(!confirm('ลบ PDF โหมดยาก? (เฉลยโหมดยากที่กรอกไว้ยังอยู่)')) return; if(_hardUrlEl) _hardUrlEl.value=''; _updateHardPdf(''); };
+  const _hardFileIn=document.getElementById('editorHardPdfFile');
+  if(_hardFileIn){
+    const _hf=_hardFileIn.cloneNode(true); _hardFileIn.parentNode.replaceChild(_hf,_hardFileIn);
+    _hf.addEventListener('change', async(e)=>{
+      const f=e.target.files && e.target.files[0]; if(!f) return;
+      if(f.type && f.type!=='application/pdf'){ toast('กรุณาเลือกไฟล์ PDF'); return; }
+      try{
+        if(_hardStatusEl) _hardStatusEl.textContent='⏳ กำลังอัปโหลด...';
+        const url=await FirebaseSync.uploadPdf(f, pct=>{ if(_hardStatusEl) _hardStatusEl.textContent=`⏳ อัปโหลด ${pct}%...`; });
+        if(_hardUrlEl) _hardUrlEl.value=url;
+        _updateHardPdf(url);
+        if(_hardStatusEl) _hardStatusEl.textContent='✅ อัปโหลด PDF โหมดยากสำเร็จ';
+      }catch(err){ if(_hardStatusEl) _hardStatusEl.textContent='❌ '+(err?.message||err); }
+    });
+  }
+  const _hardPasteBtn=document.getElementById('editorHardPasteBtn');
+  if(_hardPasteBtn) _hardPasteBtn.onclick=(e)=>{
+    e.preventDefault();
+    const ta=document.getElementById('editorHardPaste');
+    const lines=String(ta?.value||'').replace(/\r/g,'').split('\n');
+    while(lines.length && !lines[lines.length-1].trim()) lines.pop(); // ตัดบรรทัดว่างท้ายสุด
+    if(!lines.length){ toast('วางเฉลยบรรทัดละข้อก่อน'); return; }
+    const n=Math.min(lines.length, list.length);
+    for(let i=0;i<n;i++) list[i].hardAnswer=lines[i].trim();
+    _renderHardList(); _setDirty(true);
+    toast(`เติมเฉลยโหมดยาก ${n} ข้อแล้ว`+(lines.length>list.length?` (ตัด ${lines.length-list.length} บรรทัดที่เกินจำนวนข้อ)`:'')+' — กดบันทึกทั้งหมด');
+  };
+  const _hardClearAll=document.getElementById('editorHardClearAll');
+  if(_hardClearAll) _hardClearAll.onclick=(e)=>{
+    e.preventDefault();
+    if(!list.some(q=>q.hardAnswer)) return;
+    if(!confirm('ล้างเฉลยโหมดยากทุกข้อ? (ยังไม่บันทึกจนกว่าจะกดบันทึกทั้งหมด)')) return;
+    list.forEach(q=>{ delete q.hardAnswer; }); _renderHardList(); _setDirty(true);
+  };
+  _renderHardList();
+
   // bind excel import สำหรับ editor (นำเข้าแล้วยังไม่บันทึก → ธง "ยังไม่บันทึก")
   bindEditorExcel(examId, list, ()=>{ renderTable(); _setDirty(true); }, exam.examType, ()=>!!exam.weighted, exam.subject, _numDigits);
 
@@ -13862,7 +14155,14 @@ function initEditor(examId){
     const no=q.number||q.no, pg=Math.max(1,Number(q.page)||1);
     const nav=`<div class="esaNav"><button type="button" class="esaArr" data-esa="prev" aria-label="ข้อก่อนหน้า"${selectedIndex<=0?' disabled':''}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>`+
       `<span><b>ข้อ ${no}</b> · หน้า ${pg}</span><button type="button" class="esaArr" data-esa="next" aria-label="ข้อถัดไป"${selectedIndex>=list.length-1?' disabled':''}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
-    if(_isFillNum){
+    if(_isHardType){
+      box.innerHTML=nav+`<div class="esaNum"><input type="text" maxlength="40" aria-label="เฉลยข้อ ${no}" value="${esc(q.correct||'')}" placeholder="เช่น 12, 1/2|0.5, ไม่มี" /><button type="button" class="btn" data-esa="none" title="ไม่มีคำตอบ">∅</button><button type="button" class="btn btnPrimary" data-esa="numNext">ถัดไป</button></div>`;
+      const inp=box.querySelector('input');
+      const commit=()=>{ const v=inp.value.trim(); if(v!==(q.correct||'')){ q.correct=v; _setDirty(true); if(rowPaint[selectedIndex]) rowPaint[selectedIndex](); } };
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); _gotoRow(selectedIndex+1); const n=box.querySelector('input'); if(n) n.focus(); } });
+      box.querySelector('[data-esa="none"]').onclick=()=>{ inp.value='ไม่มี'; commit(); };
+      box.querySelector('[data-esa="numNext"]').onclick=()=>{ commit(); _gotoRow(selectedIndex+1); };
+    } else if(_isFillNum){
       box.innerHTML=nav+`<div class="esaNum"><input type="text" inputmode="numeric" maxlength="${_numDigits}" aria-label="เฉลยข้อ ${no}" value="${esc(q.correct||'')}" placeholder="0-${'9'.repeat(_numDigits)}" /><button type="button" class="btn btnPrimary" data-esa="numNext">ถัดไป</button></div>`;
       const inp=box.querySelector('input');
       const commit=()=>{ const v=inp.value.replace(/[^\d]/g,'').slice(0,_numDigits); if(v!==(q.correct||'')){ q.correct=v; _setDirty(true); if(rowPaint[selectedIndex]) rowPaint[selectedIndex](); } };
@@ -13922,7 +14222,7 @@ function initEditor(examId){
     if(!list.length) return;
     const q=list[selectedIndex];
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); _gotoRow(selectedIndex+(e.key==='ArrowDown'?1:-1)); return; }
-    if(_isFillNum){
+    if(_isFillNum||_isHardType){
       if(e.key==='Enter'){ e.preventDefault(); _gotoRow(selectedIndex,true); }
       return;
     }
@@ -13995,8 +14295,8 @@ function downloadExcelTemplate(qCount, filename, topics, examType, weighted, num
   const _isFillNum=examType==='fillblank-num';
   const _isWeighted=!!weighted;
   const _numDigits=numDigits||3;
-  const _correctHeader=_isFillNum?`เฉลย (ตัวเลข 0-${'9'.repeat(_numDigits)})`:'เฉลย (1/2/3/4 หรือ 5=จ)';
-  const _correctSample=_isFillNum?(_numDigits<=3?42:Number('4'.repeat(_numDigits))):1;
+  const _correctHeader=examType==='hard'?'เฉลย (พิมพ์คำตอบ เช่น 12, 1/2|0.5, ไม่มี)':_isFillNum?`เฉลย (ตัวเลข 0-${'9'.repeat(_numDigits)})`:'เฉลย (1/2/3/4 หรือ 5=จ)';
+  const _correctSample=examType==='hard'?'12':_isFillNum?(_numDigits<=3?42:Number('4'.repeat(_numDigits))):1;
   const _header=['ข้อที่', 'หน้า PDF', _correctHeader, 'เนื้อหา', 'ฟรี (ใส่ 1 ถ้าฟรี)'];
   if(_isWeighted) _header.push('คะแนน (ค่าเริ่มต้น 1)');
   const rows = [_header];
@@ -14108,8 +14408,28 @@ function isAnswerCorrect(answer, correct, examType){
     if(!Number.isFinite(an)||!Number.isFinite(cn)) return false;
     return an===cn;
   }
+  if(examType==='hard'){
+    // v48.66: โหมดยาก — เทียบข้อความที่พิมพ์กับเฉลยที่ครูพิมพ์ (หลายแบบคั่นด้วย |) หลังปรับรูปแล้ว
+    const a=normHardAns(answer); if(!a) return false;
+    return String(correct).split('|').map(normHardAns).filter(Boolean).includes(a);
+  }
   return String(answer)===String(correct);
 }
+
+// v48.66: โหมดยาก — ค่าพิเศษ "ไม่มีคำตอบ" (ปุ่มบนแป้น) + ตัวปรับรูปคำตอบก่อนเทียบ
+const HARD_NONE='NONE';
+function normHardAns(v){
+  let s=String(v??'').trim();
+  if(!s) return '';
+  s=s.replace(/[๐-๙]/g,c=>String(c.charCodeAt(0)-0x0E50))       // เลขไทย → อารบิก
+     .replace(/[−–—﹣－]/g,'-')            // ลบทุกแบบ → -
+     .replace(/\s+/g,'').replace(/,/g,'').toLowerCase();          // ช่องว่าง/ลูกน้ำพันหลัก
+  if(['none','ไม่มี','ไม่มีคำตอบ','∅','ø'].includes(s)) return HARD_NONE.toLowerCase();
+  // เลขล้วน/ทศนิยม → เทียบตามค่า (0.50=0.5, 07=7, -0=0); เศษส่วน/อื่นๆ เทียบตามตัวอักษร (2/4 ≠ 1/2)
+  if(/^-?(\d+\.?\d*|\.\d+)$/.test(s)){ const n=Number(s); if(Number.isFinite(n)) return String(n===0?0:n); }
+  return s;
+}
+function fmtHardAns(v){ return String(v??'')===HARD_NONE ? '∅ ไม่มีคำตอบ' : String(v??''); }
 
 // ── Weighted scoring helpers ──
 function getQPoints(q){
@@ -14137,32 +14457,76 @@ function isWeightedAttempt(att){
 // counted (เฉพาะ halfMode) derive จาก "มีคำตอบใน answers ไหม" เสมอ ไม่ใช่อ่าน counted เก่า
 // จาก perQuestion เดิม — ให้ผลเหมือนเดิมทุกกรณีที่ไม่ใช่การ merge เพราะ counted ตอน submit()
 // ก็มาจากนิยามเดียวกันนี้อยู่แล้ว (oldPerQuestion ใช้แค่สืบทอด unsure/visited/elapsedMs/changes)
-function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, oldPerQuestion){
-  const _eType = exam.examType || 'mc';
+// v48.66: โหมดยาก — ครูตรวจเองต่อข้อ ('ok' | 'bad' | 'clr') แล้วคิดคะแนน/คะแนนเต็มใหม่จาก perQuestion ทันที
+// เก็บผลอัตโนมัติเดิมไว้ใน autoIsCorrect ("ล้าง" = กลับไปใช้ผลเดิม; ข้อรอตรวจกลับเป็นไม่นับ); ไม่แตะจุดอ่อน/แต้ม
+function rescoreHardAttempt(a){
+  const pq=(a.perQuestion||[]).filter(p=>p&&p.counted!==false);
+  if(a.weighted){
+    a.total=Math.round(pq.reduce((t,p)=>t+(Number(p.points)||1),0)*100)/100;
+    a.score=Math.round(pq.filter(p=>p.isCorrect).reduce((t,p)=>t+(Number(p.points)||1),0)*100)/100;
+  } else {
+    a.total=pq.length;
+    a.score=pq.filter(p=>p.isCorrect).length;
+  }
+}
+function setHardManual(attemptId, no, v){
+  if(!Auth.isTeacher()) return;
+  const s=Store.load();
+  const a=(s.attempts||[]).find(x=>x.id===attemptId);
+  if(!a||!a.hardMode) return;
+  const p=(a.perQuestion||[]).find(x=>Number(x.no)===Number(no));
+  if(!p||p.isFree) return;
+  if(v==='clr'){
+    if(!p.manual) return;
+    p.isCorrect=!!p.autoIsCorrect; delete p.manual; delete p.autoIsCorrect;
+    if(p.pending) p.counted=false;
+  } else if(v==='ok'||v==='bad'){
+    if(p.manual===v) return;
+    if(!p.manual) p.autoIsCorrect=!!p.isCorrect;
+    p.manual=v; p.isCorrect=(v==='ok'); p.counted=true;
+  } else return;
+  rescoreHardAttempt(a);
+  if(!Store.save(s)){ toast('⚠️ บันทึกไม่สำเร็จ กรุณาลองใหม่'); return; }
+  toast(v==='clr'?'ล้างการตรวจเองแล้ว (กลับไปใช้ผลของระบบ)':(v==='ok'?'✓ ครูตรวจ: ถูก':'✗ ครูตรวจ: ผิด')+` — ข้อ ${no}`);
+  initReview(attemptId);
+}
+
+function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, oldPerQuestion, opts){
+  // v48.66: opts.hard = ผลสอบโหมดยาก — เทียบกับ hardAnswer ปัจจุบัน, ข้อไม่มีเฉลย = รอตรวจ (counted:false),
+  // คงคำตัดสินที่ครูตรวจเอง (manual) จาก perQuestion เดิมไว้เหนือผลอัตโนมัติ
+  const _hard = !!(opts && opts.hard);
+  if (_hard) qsFull = qsFull.map(q => ({ ...q, correct: String((opts.hardOnly ? q.correct : q.hardAnswer)||'').trim() })); // v48.66: hardOnly ใช้ q.correct
+  const _eType = _hard ? 'hard' : (exam.examType || 'mc');
   const _isWeighted = !!exam.weighted && !halfMode;
   const _oldPQFor = q => Array.isArray(oldPerQuestion) ? oldPerQuestion.find(p => p && (p.qid === q.id || p.no === (q.no??q.number))) : null;
-  const _isCountedFor = q => { if (!halfMode) return true; const v = answers[q.id]; return v!=null && v!==''; };
-  let score = 0, total = halfMode ? (halfQuota||0) : qsFull.length;
+  const _manualFor = q => { if (!_hard) return null; const o = _oldPQFor(q); return (o && (o.manual === 'ok' || o.manual === 'bad')) ? o.manual : null; };
+  const _pendingFor = q => _hard && !q.isFree && !q.correct && !_manualFor(q);
+  const _okFor = q => { const m = _manualFor(q); if (m) return m === 'ok'; return !!(q.isFree || (answers[q.id] && isAnswerCorrect(answers[q.id], q.correct, _eType))); };
+  const _isCountedFor = q => { if (_pendingFor(q)) return false; if (!halfMode) return true; const v = answers[q.id]; return v!=null && v!==''; };
+  let score = 0, total = halfMode ? (halfQuota||0) : (_hard ? qsFull.filter(_isCountedFor).length : qsFull.length);
   if (_isWeighted) {
     let _sumAll = 0, _sumOk = 0;
     qsFull.forEach(q => {
+      if (!_isCountedFor(q)) return;
       const pts = getQPoints(q);
       _sumAll += pts;
-      if (q.isFree || (answers[q.id] && isAnswerCorrect(answers[q.id], q.correct, _eType))) _sumOk += pts;
+      if (_okFor(q)) _sumOk += pts;
     });
     total = Math.round(_sumAll * 100) / 100;
     score = Math.round(_sumOk * 100) / 100;
   } else {
     qsFull.forEach(q => {
       if (!_isCountedFor(q)) return;
-      if (q.isFree || (answers[q.id] && isAnswerCorrect(answers[q.id], q.correct, _eType))) score++;
+      if (_okFor(q)) score++;
     });
   }
   const perQuestion = qsFull.map(q => {
     const chosen = answers[q.id] || null;
     const correct = q.correct || null;
     const isFree = !!q.isFree;
-    const isCorrect = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, _eType) : false);
+    const _autoOk = isFree || (chosen && correct ? isAnswerCorrect(chosen, correct, _eType) : false);
+    const _man = _manualFor(q);
+    const isCorrect = _man ? _man === 'ok' : _autoOk;
     const _finalTags = Array.isArray(q.tags) && q.tags.length ? q.tags : (q.topic ? [q.topic] : []);
     const _finalSubTags = Array.isArray(q.subTags) ? q.subTags : [];
     const _old = _oldPQFor(q);
@@ -14175,10 +14539,34 @@ function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, old
       changes: _old ? (_old.changes||0) : 0,
     };
     if (_isWeighted) _pq.points = getQPoints(q);
-    if (halfMode) _pq.counted = _isCountedFor(q);
+    if (halfMode || _hard) _pq.counted = _isCountedFor(q);
+    if (_hard) {
+      if (!q.isFree && !q.correct) _pq.pending = true;
+      if (_man) { _pq.manual = _man; _pq.autoIsCorrect = _autoOk; }
+    }
     return _pq;
   });
   return { score, total, perQuestion, weighted: _isWeighted };
+}
+
+// v48.66: แป้นโหมดยาก — ตัวเลข + . / − ⌫ ล้าง (มือถือ 4 คอลัมน์, จอใหญ่ 3 คอลัมน์ ตามตำแหน่งในภาพที่ผู้ใช้เลือก)
+function createHardKeypad(isPhone, onKey, onDelete, onClear){
+  const grid=document.createElement('div');
+  grid.className='numKeypad hardKeypad';
+  if(isPhone) grid.style.gridTemplateColumns='repeat(4,1fr)';
+  const mk=(label,handler,cls)=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='numKeypadBtn'+(cls?' '+cls:''); b.textContent=label;
+    b.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();handler();});
+    return b;
+  };
+  const D=d=>mk(d,()=>onKey(d),'d'), S=(lab,k)=>mk(lab,()=>onKey(k),'numKpSym d');
+  const DEL=()=>mk('⌫',()=>onDelete(),'numKpDel'), CLR=()=>mk('ล้าง',()=>onClear(),'numKpClear');
+  const order=isPhone
+    ? [D('1'),D('2'),D('3'),S('.','.'),D('4'),D('5'),D('6'),S('/','/'),D('7'),D('8'),D('9'),S('−','-'),CLR(),D('0'),DEL()]
+    : [D('1'),D('2'),D('3'),D('4'),D('5'),D('6'),D('7'),D('8'),D('9'),S('.','.'),D('0'),S('/','/'),S('−','-'),DEL(),CLR()];
+  order.forEach(b=>grid.appendChild(b));
+  return grid;
 }
 
 // สร้าง numeric keypad inline สำหรับข้อสอบกรอกตัวเลข
@@ -14232,7 +14620,7 @@ function parseExcelFile(file, examType, weighted, numDigits) {
           const row = rows[i];
           const no = parseInt(row[0]);
           const page = parseInt(row[1]) || 1;
-          const correct=_isFillNum?normalizeNumericAnswer(row[2],_numDigits):normalizeAnswer(row[2]);
+          const correct=examType==='hard'?(String(row[2]??'').trim()||null):_isFillNum?normalizeNumericAnswer(row[2],_numDigits):normalizeAnswer(row[2]); // v48.66: พิมพ์คำตอบ = เก็บข้อความดิบ
           const topic = String(row[3]||'').trim();
           const isFreeVal = String(row[4]||'').trim();
           const isFree = isFreeVal==='1'||isFreeVal.toLowerCase()==='true'||isFreeVal==='ฟรี';
@@ -14244,7 +14632,7 @@ function parseExcelFile(file, examType, weighted, numDigits) {
             else points=1;
           }
           if (!isNaN(no) && no > 0 && (correct||isFree)) {
-            const _defaultCorrect=_isFillNum?'':'A';
+            const _defaultCorrect=(_isFillNum||examType==='hard')?'':'A';
             const entry={ no, page, correct: (correct==null?_defaultCorrect:correct), topic: topic||'', isFree };
             if(_isWeighted) entry.points=points;
             result.push(entry);
@@ -14763,6 +15151,7 @@ function saveTakeResume(state) {
       takerName: state.takerName,
       attemptId: state.attemptId,
       practiceMode: !!state.practiceMode,
+      hardMode: !!state.hardMode, // v48.66
       halfMode: !!state.halfMode,
       // v48.15: "ครึ่งหลัง" ต้องเก็บ qids ด้วย ไม่งั้น refresh กลางคันแล้ว initTake จะ
       // rebuild qsList เป็นชุดเต็มแทนที่จะเป็น subset เดิม (เพราะ _pageParams หายไปตอน reload)
@@ -14857,6 +15246,8 @@ const WeaknessTracker = (() => {
       // (ไม่ใช่ resolved ด้วย — เด็กไม่เคยเห็น/ตัดสินใจกับข้อนี้จริง ระบบมองไม่เห็นเลย)
       // โหมดอื่น/ข้อมูลเก่าไม่มีฟิลด์นี้ (undefined) จึงไม่กระทบพฤติกรรมเดิม
       if (q.counted === false) return;
+      // v48.66: โหมดยาก — ถูกช่วยปลดจุดอ่อนได้ แต่ผิดไม่สร้าง/ไม่เพิ่มจุดอ่อน (อาจผิดแค่รูปแบบการพิมพ์ และโหมดแก้จุดอ่อนเป็นโจทย์แบบมีตัวเลือก)
+      if (attempt.hardMode && !attempt.hardOnly && !q.isCorrect) return; // v48.66: ชุดโหมดยากอย่างเดียว (hardOnly) ผิดสร้างจุดอ่อนตามปกติ
       const no = q.no ?? q.number;
       if (no == null) return;
       const key = _itemKey(examId, no);
@@ -17395,7 +17786,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.65';
+  const CURRENT_VERSION = 'v48.66';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
