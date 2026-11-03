@@ -6219,6 +6219,164 @@ currentSection = 'scratchGallery';
   await ctx.close();
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: bugfix1103 (v48.88p, ชี้ index_preview.html) — บั๊กจากรอบทดสอบหาบั๊ก 3 พ.ย.: ดูทดหลังอัปโหลด, พับแอปแล้วรอยทดหาย,
+// resume รอบเก่าข้ามเป้า, วาดเร็วก่อนโหลดรอยเดิม, เริ่มชุดใหม่ไม่ปิดเซ็ตเดิม, การบ้านปิดเร็ว, สรุปโหมดยาก, ผล 0/0, ครูล้างตรวจ, ลบผลแล้วยังอัปโหลด, คิวติด
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'bugfix1103';
+{
+  const BF_FILE = 'index_preview.html';
+  const bq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
+  const bex = (id, extra = {}) => mkExam(id, 'ชุด ' + id, 'คณิตศาสตร์', { questionCount: 4, durationSeconds: 1200, pdfUrl: 'https://x/q.pdf', ...extra });
+  const STUB = () => {
+    const st = document.createElement('style'); st.textContent = '#offlineBanner{display:none!important;pointer-events:none!important}'; document.head.appendChild(st);
+    PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); window.confirm = () => true;
+    window.__meme = []; MemeScore.show = (s, t, cb) => { window.__meme.push([s, t]); if (cb) cb(); };
+    window.__toasts = []; const t0 = window.toast; window.toast = (m) => { window.__toasts.push(m); return t0 && t0(m); };
+    localStorage.removeItem('nanont:scratchPending');
+  };
+  const openB = async (cache, opts = {}) => { const r = await newSeededPage({ file: BF_FILE, cache, role: opts.role || 'student', name: opts.name || 'ณนนท์', viewport: { width: 1280, height: 800 } }); r.errs = []; r.page.on('pageerror', e => r.errs.push(e.message)); await r.page.evaluate(STUB); return r; };
+  const mood = async (p) => { await p.waitForTimeout(450); if (await p.$('.takeOverlay button[data-val="good"]')) await p.click('.takeOverlay button[data-val="good"]'); await p.waitForTimeout(300); };
+  const pick = (p, l) => p.evaluate((l) => { [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === ({ A: 'ก', B: 'ข', C: 'ค', D: 'ง' })[l]).click(); }, l);
+  const next = (p) => p.evaluate(() => document.getElementById('takeNextBtn').click());
+  const submit = async (p) => { await p.evaluate(() => document.getElementById('takeSubmitBtn').click()); await p.waitForTimeout(400); await p.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await p.waitForTimeout(300); await p.evaluate(() => { (document.querySelector('[data-n="1"]') || document.querySelector('[data-n="0"]'))?.click(); document.querySelector('#_predConfirm')?.click(); }); await p.waitForTimeout(900); };
+  const startSet = async (p, ex, n, m, beforeStart) => {
+    await p.evaluate((ex) => navigate('exam', { id: ex }), ex); await p.waitForTimeout(250);
+    await p.evaluate(() => document.getElementById('examStartPracticeBtn').click()); await p.waitForTimeout(150);
+    if (beforeStart) await p.evaluate(beforeStart);
+    await p.evaluate(([n, m]) => { if (n != null) { const a = document.getElementById('psN'); a.value = n; a.dispatchEvent(new Event('change')); } if (m != null) { const b = document.getElementById('psM'); b.value = m; b.dispatchEvent(new Event('change')); } document.getElementById('psStart').click(); }, [n == null ? null : String(n), m == null ? null : String(m)]); await mood(p);
+  };
+  const inkJs = () => { const c = document.getElementById('scratchCanvas'); if (!c || !c.width) return 0; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; };
+  const drawOn = async (page, x0, y0) => { const r = await page.evaluate(() => { const b = document.getElementById('scratchCanvas').getBoundingClientRect(); return { x: b.left, y: b.top }; }); await page.mouse.move(r.x + x0, r.y + y0); await page.mouse.down(); for (let i = 1; i <= 6; i++) await page.mouse.move(r.x + x0 + i * 12, r.y + y0 + i * 5); await page.mouse.up(); };
+  const openPad = async (p) => { if (!(await p.evaluate(() => document.getElementById('scratchPad').classList.contains('open')))) await p.click('#scratchToggleBtn'); await p.waitForTimeout(300); };
+  const PNG1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+  const errsAll = [];
+
+  // 1) "ดูทด" หลังอัปโหลดเสร็จ (หน้าทบทวนเปิดค้าง)
+  {
+    const { ctx, page, errs } = await openB(baseCache({ exams: [bex('b1')], questions: { b1: [bq('q1', 1, 'A'), bq('q2', 2, 'B')] }, members: [{ pin: '1', name: 'ณนนท์' }] }));
+    await page.evaluate((png) => { FirebaseSync.ready = () => true; FirebaseSync.saveDoc = async () => true; FirebaseSync.uploadBlob = async () => png; }, PNG1);
+    await page.evaluate(() => navigate('take', { id: 'b1', takerName: 'ณนนท์' })); await mood(page);
+    await openPad(page); await drawOn(page, 60, 60); await pick(page, 'A');
+    await submit(page); await page.waitForTimeout(2000);
+    await page.evaluate(() => document.querySelector('#reviewQList .scratchViewBtn')?.click()); await page.waitForTimeout(400);
+    const v = await page.evaluate(() => ({ viewer: !!document.getElementById('scratchViewer'), toasts: window.__toasts.filter(t => /ไม่พบรูป/.test(t)) }));
+    check('bugfix1103: ดูทดหลังรูปขึ้น cloud เสร็จ (หน้าทบทวนเปิดค้าง) → เปิดรูปได้ ไม่ขึ้น "ไม่พบรูปกระดาษทด"', v.viewer && !v.toasts.length, JSON.stringify(v));
+    errsAll.push(...errs); await ctx.close();
+  }
+  // 2) โหมดยาก มีข้อรอตรวจ → สรุป "ถูก 6/8"
+  {
+    const pqs = [], qs = [];
+    for (let i = 1; i <= 10; i++) { pqs.push({ qid: 'q' + i, no: i, page: 1, chosen: '1', correct: i <= 8 ? (i <= 6 ? '1' : '2') : null, isCorrect: i <= 6, isFree: false, counted: i <= 8, ...(i > 8 ? { pending: true } : {}) }); qs.push(bq('q' + i, i, 'A', i <= 8 ? { hardAnswer: i <= 6 ? '1' : '2' } : {})); }
+    const a = { id: 'ha', examId: 'hx', examTitle: 'ยาก', examSubject: 'คณิตศาสตร์', examType: 'hard', hardMode: true, takerName: 'ณนนท์', submittedAt: new Date().toISOString(), usedSeconds: 60, score: 6, total: 8, answers: {}, perQuestion: pqs, practiceMode: false, halfMode: false };
+    const { ctx, page, errs } = await openB(baseCache({ exams: [bex('hx', { hardPdfUrl: 'https://x/h.pdf', questionCount: 10 })], questions: { hx: qs }, attempts: [a] }));
+    await page.evaluate(() => navigate('review', { attemptId: 'ha' })); await page.waitForTimeout(500);
+    const sum = await page.evaluate(() => document.getElementById('reviewSummaryLine').textContent);
+    check('bugfix1103: โหมดยากมีข้อรอตรวจ 2 ข้อ → บรรทัดสรุปหน้าทบทวน "ถูก 6/8"', /ถูก 6\/8/.test(sum), sum);
+    errsAll.push(...errs); await ctx.close();
+  }
+  // 3) เริ่มชุดใหม่ทั้งหมด → เซ็ตเดิมปิด / 6) การบ้านไม่ปิดจนเซ็ตครบ / 8ก) ไม่ตอบสักข้อ → ไม่บันทึก
+  {
+    const c = baseCache({ exams: [bex('b3'), bex('b6')], questions: { b3: [bq('q1', 1, 'A'), bq('q2', 2, 'B'), bq('q3', 3, 'C')], b6: [bq('q1', 1, 'A'), bq('q2', 2, 'B')] }, members: [{ pin: '1', name: 'ณนนท์' }], assignments: [{ id: 'as1', examId: 'b6', examTitle: 'ชุด b6', assignedTo: 'ณนนท์', status: 'pending', createdAt: new Date().toISOString() }] });
+    const { ctx, page, errs } = await openB(c);
+    // 8ก
+    await startSet(page, 'b3', 2, 3); await submit(page);
+    const z = await page.evaluate(() => ({ n: Store.load().attempts.filter(a => a.examId === 'b3').length, meme: window.__meme.length, page: window._currentPage, toast: window.__toasts.some(t => /ยังไม่ได้ตอบ/.test(t)) }));
+    check('bugfix1103: ฝึกตั้งเป้าไม่ได้ตอบสักข้อแล้วส่ง → ไม่บันทึกผล 0/0, ไม่ขึ้นหน้าคะแนน, มีข้อความแจ้ง', z.n === 0 && z.meme === 0 && z.toast && z.page !== 'review', JSON.stringify(z));
+    // 3
+    await startSet(page, 'b3', 1, 3); await pick(page, 'A'); await submit(page);
+    await page.evaluate(() => navigate('exam', { id: 'b3' })); await page.waitForTimeout(250);
+    await page.evaluate(() => document.getElementById('examStartPracticeBtn').click()); await page.waitForTimeout(150);
+    await page.evaluate(() => document.getElementById('psRestart').click()); await page.waitForTimeout(150);
+    await page.evaluate(() => document.getElementById('psWhole').click()); await mood(page);
+    await page.evaluate(() => document.getElementById('takeExitBtn').click()); await page.waitForTimeout(300);
+    const still = await page.evaluate(() => !!findPendingPractice(Store.load(), 'b3', 'ณนนท์'));
+    check('bugfix1103: "เริ่มชุดใหม่ทั้งหมด" แล้วเลือกฝึกทั้งชุด → เซ็ตเดิมปิด (ไม่ค้าง/เปิดเฉลย)', !still, '');
+    await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('nanont:takeResume')).forEach(k => localStorage.removeItem(k)));
+    // 6
+    await startSet(page, 'b6', 1, 3); await pick(page, 'A'); await submit(page);
+    const as1 = await page.evaluate(() => Store.load().assignments[0].status);
+    await startSet(page, 'b6', 1, 3); await pick(page, 'B'); await submit(page);
+    const as2 = await page.evaluate(() => Store.load().assignments[0].status);
+    check('bugfix1103: การบ้าน + ฝึกตั้งเป้า → ยังค้างหลังรอบแรก, ปิดเมื่อทำครบเซ็ต', as1 === 'pending' && as2 === 'done', JSON.stringify([as1, as2]));
+    errsAll.push(...errs); await ctx.close();
+  }
+  // 4) resume รอบเก่าไม่ถูกใช้กับเป้าใหม่
+  {
+    const { ctx, page, errs } = await openB(baseCache({ exams: [bex('b4')], questions: { b4: [bq('q1', 1, 'A'), bq('q2', 2, 'B'), bq('q3', 3, 'C'), bq('q4', 4, 'D')] }, members: [{ pin: '1', name: 'ณนนท์' }] }));
+    await startSet(page, 'b4', 2, 5); await pick(page, 'A'); await page.waitForTimeout(1300);
+    await page.evaluate(() => document.getElementById('takeExitBtn').click()); await page.waitForTimeout(300);
+    await startSet(page, 'b4', 4, 20);
+    await page.waitForTimeout(300);
+    const s = await page.evaluate(() => ({ pop: !!document.getElementById('_resumeOverlay'), n: _takeState.qsList.length, ans: Object.keys(_takeState.answers).length, setMin: _takeState.setMin }));
+    check('bugfix1103: ออกกลางรอบ (2 ข้อ 5 นาที) แล้วตั้งเป้าใหม่ 4 ข้อ 20 นาที → ไม่เด้ง "ทำต่อ" รอบเก่า, เริ่มใหม่ไม่มีคำตอบเก่า', !s.pop && s.n === 4 && s.ans === 0 && s.setMin === 20, JSON.stringify(s));
+    errsAll.push(...errs); await ctx.close();
+  }
+  // 5) พับแอปขณะทดข้อปัจจุบัน → เปิดใหม่ทำต่อ รอยทดยังอยู่ / 7) วาดเร็วก่อนรอยเดิมโหลดเสร็จ → รอยเดิมไม่หาย
+  {
+    const c = baseCache({ exams: [bex('b5')], questions: { b5: [bq('q1', 1, 'A'), bq('q2', 2, 'B')] }, members: [{ pin: '1', name: 'ณนนท์' }] });
+    const { ctx, page, errs } = await openB(c);
+    await page.evaluate(() => navigate('take', { id: 'b5', takerName: 'ณนนท์' })); await mood(page);
+    await openPad(page); await pick(page, 'A'); await drawOn(page, 60, 60); await page.waitForTimeout(1300);
+    const ink1 = await page.evaluate(inkJs);
+    await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
+    await page.waitForTimeout(400);
+    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(1800);
+    await page.evaluate((c) => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'student', name: 'ณนนท์', ts: Date.now() })); Store._cloudLoaded = true; Store._cache = c; }, c);
+    await page.evaluate(STUB);
+    await page.evaluate(() => { const g = PdfDB.get; PdfDB.get = (k) => new Promise(r => setTimeout(() => r(g(k)), 700)); });
+    await page.evaluate(() => navigate('take', { id: 'b5', takerName: 'ณนนท์' })); await page.waitForTimeout(600);
+    await page.evaluate(() => [...document.querySelectorAll('#_resumeOverlay button')].find(b => /ทำต่อ/.test(b.textContent))?.click()); await page.waitForTimeout(200);
+    await openPad(page);
+    await drawOn(page, 250, 250); // วาดทันทีก่อนรอยเดิม (โหลดช้า 700ms) เสร็จ
+    await page.waitForTimeout(1400);
+    const ink2 = await page.evaluate(inkJs);
+    check('bugfix1103: พับแอปขณะทดข้อปัจจุบัน → เปิดใหม่ทำต่อ รอยเดิมยังอยู่ + วาดทันทีก่อนโหลดเสร็จรอยเดิมไม่หาย', ink1 > 0 && ink2 > ink1 * 1.5, JSON.stringify({ ink1, ink2 }));
+    errsAll.push(...errs); await ctx.close();
+  }
+  // 9) ครูกด ✓ แล้ว "ล้าง" ข้อที่ยังไม่ได้ทำ (โหมดยาก+ตั้งเป้า)
+  {
+    const c = baseCache({ exams: [bex('b9', { hardPdfUrl: 'https://x/h.pdf' })], questions: { b9: [bq('q1', 1, 'A', { hardAnswer: '1' }), bq('q2', 2, 'B', { hardAnswer: '2' }), bq('q3', 3, 'C', { hardAnswer: '3' })] }, members: [{ pin: '1', name: 'ณนนท์' }] });
+    const { ctx, page, errs } = await openB(c);
+    await page.evaluate(() => navigate('exam', { id: 'b9' })); await page.waitForTimeout(250);
+    await page.evaluate(() => { document.getElementById('examHardToggle').click(); document.getElementById('examStartPracticeBtn').click(); }); await page.waitForTimeout(150);
+    await page.evaluate(() => { const a = document.getElementById('psN'); a.value = '1'; a.dispatchEvent(new Event('change')); document.getElementById('psStart').click(); }); await mood(page);
+    await page.evaluate(() => [...document.querySelectorAll('#takeChoices .numKeypadBtn')].find(b => b.textContent === '1').click());
+    await submit(page);
+    const id = await page.evaluate(() => Store.load().attempts[0].id);
+    const before = await page.evaluate((id) => { const a = Store.load().attempts.find(x => x.id === id); return [a.score, a.total]; }, id);
+    await page.evaluate(() => sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })));
+    await page.evaluate((id) => navigate('review', { attemptId: id }), id); await page.waitForTimeout(400);
+    await page.evaluate(() => document.querySelector('#reviewQList .hardTick[data-tick-no="2"] button[data-v="ok"]')?.click()); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#reviewQList .hardTick[data-tick-no="2"] button[data-v="clr"]')?.click()); await page.waitForTimeout(300);
+    const after = await page.evaluate((id) => { const a = Store.load().attempts.find(x => x.id === id); return [a.score, a.total, a.perQuestion.find(p => p.no === 2).counted]; }, id);
+    check('bugfix1103: ครูกด ✓ แล้ว "ล้าง" ข้อที่ลูกยังไม่ได้ทำ (ฝึกตั้งเป้า) → คะแนนกลับเท่าเดิม ข้อนั้นไม่นับ', after[0] === before[0] && after[1] === before[1] && after[2] === false, JSON.stringify({ before, after }));
+    errsAll.push(...errs); await ctx.close();
+  }
+  // 10) ลบผลสอบที่รูปทดยังค้างคิว → ไม่อัปโหลด / 11) คิวไม่ติด: รูปแรกล้ม รูปถัดไปยังขึ้น / 8ข) ค่าเฉลี่ยสถิติข้ามผล 0/0
+  {
+    const att0 = (id, total, score) => ({ id, examId: 'bx', examTitle: 'ชุด bx', examSubject: 'คณิตศาสตร์', examType: 'mc', takerName: 'ณนนท์', submittedAt: new Date().toISOString(), usedSeconds: 60, score, total, answers: {}, perQuestion: [], practiceMode: false, halfMode: false });
+    const c = baseCache({ exams: [bex('bx')], questions: { bx: [bq('q1', 1, 'A')] }, attempts: [att0('k1', 4, 3), att0('k2', 4, 2), att0('k0', 0, 0)], members: [{ pin: '1', name: 'ณนนท์' }] });
+    const { ctx, page, errs } = await openB(c);
+    const r = await page.evaluate(async (png) => {
+      const cv = document.createElement('canvas'); cv.width = 200; cv.height = 80; const x = cv.getContext('2d'); x.fillStyle = '#111'; x.fillRect(10, 10, 60, 30);
+      const rec = { data: cv.toDataURL('image/png'), w: 200, h: 80, no: 1, ts: Date.now() };
+      await PdfDB.put(scratchKey('gone', 'q1'), rec); await PdfDB.put(scratchKey('k1', 'q1'), rec); await PdfDB.put(scratchKey('k2', 'q1'), rec);
+      localStorage.setItem('nanont:scratchPending', JSON.stringify([{ aid: 'gone', owner: 'deleted_att', qid: 'q1', no: 1 }, { aid: 'k1', owner: 'k1', qid: 'q1', no: 1 }, { aid: 'k2', owner: 'k2', qid: 'q1', no: 1 }]));
+      window.__up = []; FirebaseSync.ready = () => true; FirebaseSync.saveDoc = async () => true;
+      FirebaseSync.uploadBlob = async (b, name) => { window.__up.push(name); if (name.includes('k1')) { const e = new Error('denied'); e.code = 'storage/unauthorized'; throw e; } return png; };
+      await ScratchSync.flush();
+      return { up: window.__up, pend: JSON.parse(localStorage.getItem('nanont:scratchPending') || '[]').map(x => x.owner), goneIdb: !!(await PdfDB.get(scratchKey('gone', 'q1'))), k2: !!(Store.load().attempts.find(a => a.id === 'k2').scratch || {}).q1 };
+    }, PNG1);
+    check('bugfix1103: คิวรูปทด — ผลสอบถูกลบแล้วไม่อัปโหลด (ทิ้งจากคิว+เครื่อง), รูปที่ล้มไม่ขวางรูปถัดไป', !r.up.some(n => n.includes('deleted_att')) && !r.goneIdb && r.k2 && JSON.stringify(r.pend) === '["k1"]', JSON.stringify(r));
+    await page.evaluate(() => navigate('stats')); await page.waitForTimeout(500);
+    const avg = await page.evaluate(() => { const m = document.body.innerText.match(/(\d+)%\s*\n\s*เฉลี่ย ·/); return m ? m[1] : ''; });
+    check('bugfix1103: หน้าสถิติ — ค่าเฉลี่ยข้ามผล 0/0 (3/4 กับ 2/4 → 63%)', avg === '63', String(avg));
+    errsAll.push(...errs); await ctx.close();
+  }
+  check('bugfix1103: ไม่มี error ในหน้า', errsAll.length === 0, JSON.stringify(errsAll));
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
