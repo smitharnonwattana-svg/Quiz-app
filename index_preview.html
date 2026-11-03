@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.84p -->
+  <!-- APP_VERSION: v48.85p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1411,6 +1411,9 @@
       display: none; z-index: 10;
     }
     #scratchCursor.show { display: block; }
+    /* v48.85p: กระดาษทดรายข้อในหน้าทบทวน */
+    .scratchViewBtn { font-size:12px; font-weight:700; padding:4px 8px; border-radius:8px; border:1.5px solid #fbbf24; background:#fffbeb; color:#92400e; cursor:pointer; white-space:nowrap; }
+    .chipScrDot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#f59e0b; margin-left:2px; vertical-align:super; }
     #pdfAnnotateCursor {
       position: fixed; pointer-events: none;
       border: 1.5px solid #ef4444; border-radius: 50%;
@@ -1619,7 +1622,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.84p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.85p</div>
     </div>
   </div>
 </div>
@@ -3555,7 +3558,15 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, loadPrefix, listenPrefix, deleteDoc, ready: () => _ready, ns: _ns };
+  // v48.85p: อัปโหลดไฟล์ทั่วไป (รูปกระดาษทด) ไปที่ scratch/<origin>_<name> — คืน download URL
+  async function uploadBlob(blob, name, contentType) {
+    if (!_ready || !storage) throw new Error('Firebase Storage ยังไม่พร้อม');
+    const ref = storage.ref('scratch/' + _origin + '_' + String(name).replace(/[^A-Za-z0-9_.-]/g, '_'));
+    const snap = await ref.put(blob, { contentType: contentType || blob.type || 'application/octet-stream' });
+    return await snap.ref.getDownloadURL();
+  }
+
+  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, uploadBlob, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, loadPrefix, listenPrefix, deleteDoc, ready: () => _ready, ns: _ns };
 })();
 
 function _updateBellBadge() {
@@ -4133,6 +4144,7 @@ const Store = {
   deleteRecords(kind,ids){
     const k=kind==='exams'?'exam':'att', map=k==='exam'?this._recExam:this._recAtt;
     const arr=this._cache?(k==='exam'?this._cache.exams:this._cache.attempts):null;
+    if(k==='att'&&Array.isArray(arr)) (ids||[]).forEach(id=>{ const a=arr.find(x=>x&&x.id===id); if(a&&a.scratch) Object.values(a.scratch).forEach(u=>{ try{ FirebaseSync.deleteStoragePdf(u); }catch(e){} }); }); // v48.85p: ลบรูปกระดาษทดด้วย
     (ids||[]).forEach(id=>{
       if(!id) return;
       const isRec=map.has(id)||(Array.isArray(arr)&&arr.some(x=>x&&x.id===id&&x._rec));
@@ -4482,7 +4494,7 @@ const Store = {
     this._listenRecs();
     _updateOfflineBanner();
     setInterval(_updateOfflineBanner, 5000);
-    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
+    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} try { ScratchSync.flush(); } catch(e){} }, 30000); // v48.85p: + รูปกระดาษทดที่ค้างอัปโหลด
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
       this.flushPendingSync();
@@ -4604,6 +4616,80 @@ const PdfDB=(()=>{
     if(blobUrlCache[key]){ URL.revokeObjectURL(blobUrlCache[key]); delete blobUrlCache[key]; }
   }
   return{put,get,del,getPdfBlobUrl,revokePdfBlobUrl};
+})();
+
+// ===================== SCRATCH SYNC (v48.85p) =====================
+// กระดาษทดแยกรายข้อ: ระหว่างทำเก็บใน IndexedDB (PdfDB) key scratch:<attemptId รอบที่ทำ>:<qid> → หลังส่งข้อสอบสำเร็จเข้าคิว
+// แล้วอัปโหลดเป็น JPEG (ครอบเฉพาะส่วนที่เขียน, พื้นขาว, กว้าง ≤ 900px) ไป Firebase Storage → URL เก็บใน attempt.scratch[qid]
+// อัปโหลดไม่ได้ (ออฟไลน์/กฎ Storage) → คิวค้างใน localStorage ลองใหม่ทุก 30 วิ; ระหว่างนั้นหน้าทบทวนบนเครื่องนี้แสดงจากเครื่องได้เลย
+function scratchKey(aid, qid) { return 'scratch:' + aid + ':' + qid; }
+const ScratchSync = (() => {
+  const LS = 'nanont:scratchPending';
+  let _busy = false;
+  const _list = () => { try { const v = JSON.parse(localStorage.getItem(LS) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+  const _setList = l => { try { localStorage.setItem(LS, JSON.stringify(l)); } catch (e) {} };
+  const _remove = it => _setList(_list().filter(x => !(x.aid === it.aid && x.qid === it.qid)));
+  // aid = attemptId ของรอบที่ทำ, owner = ผลสอบที่เก็บจริง (ครึ่งหลัง/ฝึกรอบต่อ = ผลเดิม), qids = ข้อของรอบ
+  let _lastQueue = Promise.resolve();
+  function queue(aid, owner, qids) { _lastQueue = _queue(aid, owner, qids).catch(() => {}); return _lastQueue; }
+  async function _queue(aid, owner, qids) {
+    try { if (typeof window.scratchSaveNow === 'function') await window.scratchSaveNow(); } catch (e) {}
+    const l = _list();
+    for (const qid of (qids || [])) {
+      let rec = null; try { rec = await PdfDB.get(scratchKey(aid, qid)); } catch (e) {}
+      if (rec && !l.some(x => x.aid === aid && x.qid === qid)) l.push({ aid, owner, qid, no: rec.no || null });
+    }
+    _setList(l);
+    flush();
+  }
+  function toJpeg(rec) {
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const W = img.naturalWidth, H = img.naturalHeight, sx = (rec.w || W) / W; // sx = CSS px ต่อพิกเซลภาพ
+          const t = document.createElement('canvas'); t.width = W; t.height = H;
+          const tx = t.getContext('2d'); tx.drawImage(img, 0, 0);
+          const d = tx.getImageData(0, 0, W, H).data;
+          let x0 = W, y0 = H, x1 = -1, y1 = -1;
+          for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (d[(y * W + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          if (x1 < 0) return res(null);
+          const pad = Math.round(24 / sx);
+          x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W, x1 + pad); y1 = Math.min(H, y1 + pad);
+          const cw = x1 - x0, ch = y1 - y0, sc = Math.min(1, 900 / (cw * sx)) * sx;
+          const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(cw * sc)); c.height = Math.max(1, Math.round(ch * sc));
+          const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+          x.drawImage(t, x0, y0, cw, ch, 0, 0, c.width, c.height);
+          c.toBlob(b => res(b), 'image/jpeg', 0.6);
+        } catch (e) { res(null); }
+      };
+      img.onerror = () => res(null);
+      img.src = rec.data;
+    });
+  }
+  async function flush() {
+    if (_busy) return;
+    if (!_list().length || !FirebaseSync.ready()) return;
+    _busy = true;
+    try {
+      for (const it of _list()) {
+        const k = scratchKey(it.aid, it.qid);
+        let rec = null; try { rec = await PdfDB.get(k); } catch (e) {}
+        if (!rec) { _remove(it); continue; }
+        const blob = await toJpeg(rec);
+        if (!blob) { _remove(it); PdfDB.del(k).catch(() => {}); continue; }
+        let url = null;
+        try { url = await FirebaseSync.uploadBlob(blob, 'scratch_' + it.owner + '_' + it.qid + '.jpg', 'image/jpeg'); } catch (e) { console.warn('[ScratchSync] upload failed — retry later', e && (e.code || e.message)); break; }
+        const s = Store.load(); const a = (s.attempts || []).find(x => x.id === it.owner);
+        if (a) { a.scratch = Object.assign({}, a.scratch || {}, { [it.qid]: url }); if (!Store.save(s)) break; }
+        _remove(it); PdfDB.del(k).catch(() => {});
+      }
+    } finally { _busy = false; }
+  }
+  // หน้าทบทวน: รูปที่ยังรออัปโหลดในเครื่องนี้ ของผลสอบ owner → {qid: item}
+  function localFor(owner) { const m = {}; _list().forEach(x => { if (x.owner === owner) m[x.qid] = x; }); return m; }
+  async function localImage(it) { try { const r = await PdfDB.get(scratchKey(it.aid, it.qid)); if (!r) return null; const b = await toJpeg(r); return b ? URL.createObjectURL(b) : r.data; } catch (e) { return null; } } // ครอบเฉพาะส่วนที่เขียนเหมือนรูปที่อัปโหลด
+  return { queue, flush, localFor, localImage, toJpeg, whenQueued: () => _lastQueue };
 })();
 
 // ===================== LINE NOTIFICATION =====================
@@ -7185,6 +7271,7 @@ function initTake(id){
     const qno=q.no||q.number;
     const last=st.visitOrder[st.visitOrder.length-1];
     if(last!==qno) st.visitOrder.push(qno);
+    if(typeof window.scratchSetQuestion==='function') window.scratchSetQuestion(st.attemptId, q.id, qno); // v48.85p: กระดาษทดแยกรายข้อ
   }
   function gotoQuestion(idx){
     leaveQuestion();
@@ -7645,6 +7732,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       LiveShare.done({attemptId:_mergedParent?_mergedParent.id:st.attemptId, score, total, usedSeconds, submittedAt:Date.now()}); // v48.79p: บันทึกสำเร็จแล้วเท่านั้น
       if (st.practiceSet && (_mergedParent||_newAttempt).setDoneAt) toast('🎉 ฝึกครบทั้งชุดแล้ว — ดูเฉลยได้ทุกข้อ'); // v48.84p
+      try { ScratchSync.queue(st.attemptId, _mergedParent ? _mergedParent.id : st.attemptId, qsList.map(q => q.id)); } catch (e) {} // v48.85p: ส่งรูปกระดาษทดรายข้อขึ้น cloud (ไม่รอ)
       if (_mergedParent) {
         // นับจุดอ่อนเฉพาะข้อของครึ่งหลัง (ข้อของครึ่งแรกนับไปแล้วตอนส่งครึ่งแรก) — ใช้
         // pseudo-attempt ที่มีแค่ perQuestion ของเซตครึ่งหลัง กันนับซ้ำ
@@ -7901,6 +7989,23 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะยังถูกบันทึกไว้')){cleanupTake();navigate('exams');}};
 
   render();
+}
+
+// v48.85p: หน้าต่างดูรูปกระดาษทด (หน้าทบทวน) — กดพื้นหลัง/✕ ปิด
+function openScratchViewer(title, src) {
+  const old = document.getElementById('scratchViewer'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'scratchViewer';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;padding:14px;max-width:min(960px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><b style="font-size:15px;">${esc(title)}</b><button type="button" class="btn" id="scratchViewerClose" style="padding:6px 12px;border-radius:10px;font-size:13px;">✕ ปิด</button></div>
+    <div style="overflow:auto;min-height:0;border:1px solid #e5e7eb;border-radius:10px;background:#fff;"><img alt="${esc(title)}" style="display:block;max-width:100%;height:auto;margin:0 auto;"></div>
+  </div>`;
+  ov.querySelector('img').src = src;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector('#scratchViewerClose').onclick = close;
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
 }
 
 // ===================== REVIEW PAGE =====================
@@ -8238,6 +8343,10 @@ function initReview(attemptId){
     return true;
   }
 
+  // v48.85p: กระดาษทดรายข้อ — จาก cloud (att.scratch) หรือรูปที่ยังรออัปโหลดในเครื่องนี้
+  const _scrRemote=att.scratch||{}, _scrLocal=ScratchSync.localFor(att.id);
+  const _hasScr=q=>!!(_scrRemote[q.id]||_scrLocal[q.id]);
+  const _scrBtnHtml=q=>`<button type="button" class="scratchViewBtn" data-scr-qid="${esc(q.id)}" data-scr-no="${esc(q.no)}" aria-label="ดูกระดาษทด ข้อ ${esc(q.no)}">✏️ ดูทด</button>`;
   // Nav chips
   const nav=document.getElementById('reviewNavChips');
   nav.innerHTML='';
@@ -8247,7 +8356,7 @@ function initReview(attemptId){
     const skipped=!isCountedQ(q);
     const b=document.createElement('button');
     b.className='chip '+(skipped?'skip':(ok?'good':'bad'));
-    b.innerHTML=q.no+(isUns?'<span style="font-size:9px;margin-left:1px;vertical-align:super;">🤔</span>':'');
+    b.innerHTML=q.no+(isUns?'<span style="font-size:9px;margin-left:1px;vertical-align:super;">🤔</span>':'')+(_hasScr(q)?'<span class="chipScrDot" title="มีกระดาษทด"></span>':'');
     if(isUns){ b.title='🤔 ติ๊กไม่แน่ใจ'; }
     else if(skipped){ b.title=att.practiceSet?'— ยังไม่ได้ทำ':'— ไม่ได้เลือก (คนละครึ่ง)'; }
     b.onclick=()=>{
@@ -8353,7 +8462,8 @@ function initReview(attemptId){
         <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}${isUns?' <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;border:1px solid #fde68a;">🤔 ไม่แน่ใจ</span>':''}</span>
         <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${(Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[])).map(t=>`<span style='color:#6366f1;font-size:10px;background:#ede9fe;border-radius:4px;padding:0 3px;margin-left:2px;'>${esc(t)}</span>`).join('')}${(Array.isArray(q.subTags)?q.subTags:[]).map(t=>`<span style='color:#7c3aed;font-size:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:4px;padding:0 3px;margin-left:2px;'>↳${esc(t)}</span>`).join('')}</span>
         <div class="qRowPills">${pillsHtml}</div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+        <div class="qRowRight" style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+          ${_hasScr(q)?_scrBtnHtml(q):''}
           ${timeBadgeHtml}
           <span class="qBadge ${badgeCls}">${badgeTxt}</span>
           ${tickHtml}
@@ -8384,6 +8494,27 @@ function initReview(attemptId){
     });
 
     list.appendChild(wrap);
+  });
+  // v48.85p: ปุ่มดูกระดาษทด — กันคลิกทะลุไปกาง/หุบแถว
+  const _bindScrBtn=btn=>btn.addEventListener('click',async (e)=>{
+    e.stopPropagation();
+    const qid=btn.dataset.scrQid, title=`กระดาษทด ข้อ ${btn.dataset.scrNo}`;
+    if(_scrRemote[qid]) return openScratchViewer(title, _scrRemote[qid]);
+    const src=_scrLocal[qid]?await ScratchSync.localImage(_scrLocal[qid]):null;
+    if(src) openScratchViewer(title+' (ยังไม่ขึ้น cloud)', src); else toast('ไม่พบรูปกระดาษทด');
+  });
+  list.querySelectorAll('.scratchViewBtn').forEach(_bindScrBtn);
+  // เพิ่งส่งข้อสอบ: คิวรูปทดเขียนเสร็จหลังหน้านี้ render → เติมปุ่ม/จุดของข้อที่เพิ่งเข้าคิว
+  ScratchSync.whenQueued().then(()=>{
+    if(window._currentPage!=='review' || !window._currentParams || window._currentParams.attemptId!==attemptId) return;
+    Object.assign(_scrLocal, ScratchSync.localFor(att.id));
+    qs.forEach((q,idx)=>{
+      if(!_hasScr(q)) return;
+      const right=document.querySelector(`#rq-${q.no} .qRowRight`);
+      if(right && !right.querySelector('.scratchViewBtn')){ right.insertAdjacentHTML('afterbegin', _scrBtnHtml(q)); _bindScrBtn(right.querySelector('.scratchViewBtn')); }
+      const chip=nav.children[idx];
+      if(chip && !chip.querySelector('.chipScrDot')) chip.insertAdjacentHTML('beforeend','<span class="chipScrDot" title="มีกระดาษทด"></span>');
+    });
   });
   // v48.82p: ปุ่มครูตรวจเอง (โหมดยาก) — กันคลิกทะลุไปกาง/หุบแถว
   list.querySelectorAll('.hardTick button').forEach(btn=>btn.addEventListener('click',(e)=>{
@@ -17954,7 +18085,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.84p';
+  const CURRENT_VERSION = 'v48.85p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
@@ -18049,6 +18180,7 @@ function initEntranceCompare(params) {
   pad.innerHTML =
     '<div id="scratchPadHeader">' +
       '<span class="scratch-title">📝 กระดาษทด</span>' +
+      '<span id="scratchQLabel" style="font-size:12px;font-weight:800;background:#fbbf24;color:#111;border-radius:8px;padding:2px 8px;display:none;"></span>' +
       '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
       '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
       '<span id="scratchEraserSizes">' +
@@ -18072,6 +18204,8 @@ function initEntranceCompare(params) {
   let dpr = window.devicePixelRatio || 1;
   let penSize = 2;
   let eraserSize = 28;
+  let _sq = null, _dirty = false, _pendingRec = null; // v48.85p: ข้อที่ผูกอยู่ {aid,qid,no} / มีการขีดตั้งแต่โหลด / ภาพที่รอวาดตอนเปิดแผ่น
+  const _mem = {};
 
   function resizeCanvas(preserve) {
     const w = Math.max(10, Math.floor(window.innerWidth));
@@ -18123,6 +18257,7 @@ function initEntranceCompare(params) {
     }
   }
   function drawDot(x, y) {
+    _dirty = true; // v48.85p: มีการขีด/ลบ → ต้องบันทึกของข้อนี้
     applyStrokeStyle();
     const r = (tool === 'eraser' ? eraserSize : penSize) / 2;
     ctx.beginPath();
@@ -18130,6 +18265,7 @@ function initEntranceCompare(params) {
     ctx.fill();
   }
   function drawSegment(x, y) {
+    _dirty = true;
     applyStrokeStyle();
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -18253,7 +18389,7 @@ function initEntranceCompare(params) {
     });
   });
   document.getElementById('scratchClearBtn').addEventListener('click', () => {
-    if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
+    if (confirm(_sq ? 'ล้างกระดาษทดของข้อนี้?' : 'ล้างกระดาษทดทั้งหมด?')) { clearCanvas(); _dirty = true; }
   });
   // ให้ .takeGrid หด/คืนพื้นที่ตามสถานะ open/full ปัจจุบันของกระดาษทด — เปิดปกติ
   // (ไม่เต็มจอ) เท่านั้นที่ split (ดูโจทย์ไม่ถูกบัง), เต็มจอ/ปิด ไม่ split (พฤติกรรมเดิม)
@@ -18319,7 +18455,7 @@ function initEntranceCompare(params) {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
     _syncScratchSplit();
-    if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
+    if (willOpen) requestAnimationFrame(() => { resizeCanvas(true); if (_pendingRec) { const r = _pendingRec; _pendingRec = null; clearCanvas(); _drawRec(r); } });
   });
   window.addEventListener('resize', () => {
     if (pad.classList.contains('open')) resizeCanvas(true);
@@ -18331,8 +18467,51 @@ function initEntranceCompare(params) {
     btn.classList.remove('visible');
     pad.classList.remove('open');
     _syncScratchSplit();
-    clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
+    _saveCurrent(); // v48.85p: เก็บแผ่นของข้อปัจจุบันก่อน (ส่วนที่อ่านภาพทำแบบ sync ก่อนล้าง)
+    _sq = null; _pendingRec = null; _setLabel();
+    clearCanvas(); // แผ่นบนจอว่างเมื่อออกจากข้อสอบ — ภาพรายข้อเก็บไว้ใน IndexedDB แล้วส่งขึ้น cloud หลังส่งข้อสอบ
   };
+
+  // ── v48.85p: กระดาษทดแยกรายข้อ — 1 ข้อ = 1 แผ่น; เปลี่ยนข้อ = เก็บแผ่นเดิม (IndexedDB key scratch:<attemptId>:<qid>) แล้วโหลดแผ่นของข้อใหม่ ──
+  function _setLabel() { const el = document.getElementById('scratchQLabel'); if (!el) return; el.style.display = _sq ? '' : 'none'; el.textContent = _sq ? ('ข้อ ' + _sq.no) : ''; }
+  function _isBlank() {
+    if (!canvas.width || !canvas.height) return true;
+    try { const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return false; } catch (e) { return false; }
+    return true;
+  }
+  function _saveCurrent() {
+    if (!_sq || !_dirty) return Promise.resolve();
+    _dirty = false;
+    const k = scratchKey(_sq.aid, _sq.qid);
+    if (_isBlank()) { delete _mem[k]; return PdfDB.del(k).catch(() => {}); }
+    let data = ''; try { data = canvas.toDataURL('image/png'); } catch (e) { return Promise.resolve(); }
+    const rec = { data, w: canvas.width / dpr, h: canvas.height / dpr, no: _sq.no, ts: Date.now() };
+    _mem[k] = rec;
+    return PdfDB.put(k, rec).catch(() => {});
+  }
+  function _drawRec(rec) {
+    if (!pad.classList.contains('open') || !canvas.width) { _pendingRec = rec; return; } // แผ่นยังไม่เปิด → วาดตอนเปิด (ขนาดจริง)
+    const want = _sq ? scratchKey(_sq.aid, _sq.qid) : '';
+    const i = new Image();
+    i.onload = () => {
+      if (!_sq || scratchKey(_sq.aid, _sq.qid) !== want) return;
+      ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.drawImage(i, 0, 0, rec.w, rec.h); ctx.restore();
+    };
+    i.src = rec.data;
+  }
+  window.scratchSetQuestion = function(aid, qid, no) {
+    if (!aid || !qid) return;
+    if (_sq && _sq.aid === aid && _sq.qid === qid) return;
+    _saveCurrent();
+    clearCanvas(); _pendingRec = null; _dirty = false;
+    _sq = { aid, qid, no };
+    _setLabel();
+    const k = scratchKey(aid, qid);
+    const done = rec => { if (rec && _sq && scratchKey(_sq.aid, _sq.qid) === k && !_dirty) _drawRec(rec); };
+    if (_mem[k]) done(_mem[k]);
+    else PdfDB.get(k).then(rec => { if (rec) { _mem[k] = rec; done(rec); } }).catch(() => {});
+  };
+  window.scratchSaveNow = function() { return _saveCurrent(); };
 })();
 
 // ── PDF ANNOTATE — เขียน/Highlight ทับ PDF ข้อสอบ (desktop/iPad ≥901px เท่านั้น) ──

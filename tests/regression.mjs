@@ -6070,6 +6070,97 @@ currentSection = 'practiceSet';
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: scratchSave (v48.85p, ชี้ index_preview.html) — กระดาษทดแยกรายข้อ: 1 ข้อ = 1 แผ่น (กลับมาข้อเดิมเห็นรอยเดิม),
+// เก็บ IndexedDB ระหว่างทำ (resume ได้), หลังส่ง → คิวอัปโหลด JPEG ครอบส่วนที่เขียน → attempt.scratch[qid], หน้าทบทวนปุ่ม "ดูทด" + จุดบนชิป
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'scratchSave';
+{
+  const SC_FILE = 'index_preview.html';
+  const sq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
+  const cacheS = () => baseCache({
+    exams: [mkExam('s1', 'ชุดทด', 'คณิตศาสตร์', { questionCount: 3, durationSeconds: 900, pdfUrl: 'https://x/q.pdf' })],
+    questions: { s1: [sq('q1', 1, 'A'), sq('q2', 2, 'B'), sq('q3', 3, 'C')] },
+    members: [{ pin: '311257', name: 'ณนนท์' }],
+  });
+  const errs = [];
+  const { ctx, page } = await newSeededPage({ file: SC_FILE, cache: cacheS(), role: 'student', name: 'ณนนท์' });
+  page.on('pageerror', e => errs.push(e.message));
+  await page.evaluate(() => { const st = document.createElement('style'); st.textContent = '#offlineBanner{display:none!important;pointer-events:none!important}'; document.head.appendChild(st); PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); window.confirm = () => true; MemeScore.show = (a, b, cb) => { if (cb) cb(); }; localStorage.removeItem('nanont:scratchPending'); });
+  const mood = async () => { await page.waitForTimeout(450); if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]'); await page.waitForTimeout(300); };
+  const ink = () => page.evaluate(() => { const c = document.getElementById('scratchCanvas'); if (!c || !c.width) return 0; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; });
+  const draw = async (x0, y0) => { const r = await page.evaluate(() => { const b = document.getElementById('scratchCanvas').getBoundingClientRect(); return { x: b.left, y: b.top }; }); await page.mouse.move(r.x + x0, r.y + y0); await page.mouse.down(); for (let i = 1; i <= 8; i++) await page.mouse.move(r.x + x0 + i * 12, r.y + y0 + i * 6); await page.mouse.up(); };
+  const label = () => page.evaluate(() => document.getElementById('scratchQLabel')?.textContent || '');
+
+  await page.evaluate(() => navigate('take', { id: 's1', takerName: 'ณนนท์' })); await mood();
+  const hasPad = await page.evaluate(() => !!document.getElementById('scratchToggleBtn') && document.getElementById('scratchToggleBtn').classList.contains('visible'));
+  check('scratchSave: หน้าทำมีปุ่มกระดาษทด (เบราว์เซอร์คอม)', hasPad, '');
+  await page.click('#scratchToggleBtn'); await page.waitForTimeout(300);
+  check('scratchSave: เปิดแผ่นทด → หัวแผ่นบอก "ข้อ 1"', (await label()) === 'ข้อ 1', await label());
+  await draw(60, 60);
+  const ink1 = await ink();
+  await page.evaluate(() => document.querySelector('#takeNextBtn').click()); await page.waitForTimeout(250);
+  const ink2a = await ink();
+  check('scratchSave: ไปข้อ 2 → แผ่นใหม่ว่าง หัวบอก "ข้อ 2"', ink1 > 0 && ink2a === 0 && (await label()) === 'ข้อ 2', JSON.stringify([ink1, ink2a, await label()]));
+  await draw(120, 140);
+  await page.evaluate(() => document.querySelector('#takePrevBtn').click()); await page.waitForTimeout(400);
+  const back1 = await ink();
+  check('scratchSave: กลับข้อ 1 → เห็นรอยเดิมของข้อ 1', back1 > 0 && Math.abs(back1 - ink1) / ink1 < 0.2, JSON.stringify([ink1, back1]));
+  await page.evaluate(() => document.querySelector('#takeNextBtn').click()); await page.evaluate(() => document.querySelector('#takeNextBtn').click()); await page.waitForTimeout(250);
+  check('scratchSave: ข้อ 3 (ไม่ได้ทด) แผ่นว่าง', (await ink()) === 0, '');
+  // ตอบแล้วส่ง (ยังไม่มี cloud → รอในคิว)
+  await page.evaluate(() => { [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === 'ค').click(); });
+  await page.evaluate(() => document.querySelector('#takeSubmitBtn').click()); await page.waitForTimeout(400);
+  await page.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await page.waitForTimeout(300);
+  await page.evaluate(() => { document.querySelector('[data-n="1"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await page.waitForTimeout(1200);
+  const att = await page.evaluate(() => Store.load().attempts.find(a => a.examId === 's1'));
+  const pend = await page.evaluate(() => JSON.parse(localStorage.getItem('nanont:scratchPending') || '[]'));
+  check('scratchSave: ส่งแล้ว (ยังไม่มี cloud) → เข้าคิวเฉพาะข้อที่ทด (ข้อ 1, 2) ผูกกับผลสอบนี้', pend.length === 2 && pend.every(p => p.owner === att.id) && JSON.stringify(pend.map(p => p.qid).sort()) === '["q1","q2"]', JSON.stringify(pend));
+  const rv = await page.evaluate(() => ({ page: window._currentPage, btns: [...document.querySelectorAll('#reviewQList .scratchViewBtn')].map(b => b.dataset.scrQid), dots: document.querySelectorAll('#reviewNavChips .chipScrDot').length, padOpen: document.getElementById('scratchPad').classList.contains('open') }));
+  check('scratchSave: หน้าทบทวน — ปุ่ม "ดูทด" เฉพาะข้อ 1, 2 + จุดบนชิป 2 ข้อ (จากเครื่องนี้) แผ่นทดปิด', rv.page === 'review' && JSON.stringify(rv.btns) === '["q1","q2"]' && rv.dots === 2 && !rv.padOpen, JSON.stringify(rv));
+  await page.click('#reviewQList .scratchViewBtn[data-scr-qid="q2"]'); await page.waitForTimeout(300);
+  const vw = await page.evaluate(() => { const v = document.getElementById('scratchViewer'); return v && { t: v.textContent, src: v.querySelector('img').src.slice(0, 22), rowExp: !!document.querySelector('#rq-2.expanded') }; });
+  check('scratchSave: กด "ดูทด" → หน้าต่างรูปกระดาษทดข้อ 2 (จากเครื่อง ยังไม่ขึ้น cloud)', vw && /กระดาษทด ข้อ 2/.test(vw.t) && /ยังไม่ขึ้น cloud/.test(vw.t) && vw.src.startsWith('blob:'), JSON.stringify(vw));
+  await page.click('#scratchViewerClose');
+
+  // อัปโหลดล้ม → ค้างคิว; สำเร็จ → URL เข้า attempt.scratch, ล้างคิว/IndexedDB
+  await page.evaluate(() => { FirebaseSync.ready = () => true; FirebaseSync.saveDoc = async () => true; window.__up = []; FirebaseSync.uploadBlob = async () => { throw new Error('storage/unauthorized'); }; });
+  await page.evaluate(() => ScratchSync.flush()); await page.waitForTimeout(300);
+  check('scratchSave: อัปโหลดล้ม (เช่นกฎ Storage) → ยังค้างในคิวครบ ไม่หาย', (await page.evaluate(() => JSON.parse(localStorage.getItem('nanont:scratchPending') || '[]').length)) === 2, '');
+  await page.evaluate(() => { FirebaseSync.uploadBlob = async (blob, name, type) => { const bm = await createImageBitmap(blob); window.__up.push({ name, type, btype: blob.type, size: blob.size, w: bm.width, h: bm.height }); return 'https://img.test/' + name; }; });
+  await page.evaluate(() => ScratchSync.flush()); await page.waitForTimeout(500);
+  const up = await page.evaluate(() => window.__up);
+  const after = await page.evaluate((id) => ({ scratch: Store.load().attempts.find(a => a.id === id).scratch, pend: JSON.parse(localStorage.getItem('nanont:scratchPending') || '[]').length }), att.id);
+  const idb = await page.evaluate(async (id) => [await PdfDB.get(scratchKey(id, 'q1')), await PdfDB.get(scratchKey(id, 'q2'))].filter(Boolean).length, att.id);
+  check('scratchSave: อัปโหลดสำเร็จ → JPEG ครอบเฉพาะส่วนที่เขียน (กว้าง ≤ 900, เล็กกว่าแผ่นเต็ม) 2 ไฟล์', up.length === 2 && up.every(u => u.btype === 'image/jpeg' && u.type === 'image/jpeg' && u.w <= 900 && u.w < 400 && u.h < 300 && u.size > 0) && up.every(u => u.name.includes(att.id)), JSON.stringify(up));
+  check('scratchSave: URL เก็บใน attempt.scratch[qid], คิวว่าง, ลบจาก IndexedDB แล้ว', after.scratch && /img\.test/.test(after.scratch.q1) && /img\.test/.test(after.scratch.q2) && after.pend === 0 && idb === 0, JSON.stringify([after, idb]));
+  await page.evaluate((id) => navigate('review', { attemptId: id }), att.id); await page.waitForTimeout(400);
+  await page.click('#reviewQList .scratchViewBtn[data-scr-qid="q1"]'); await page.waitForTimeout(200);
+  check('scratchSave: หน้าทบทวนหลังขึ้น cloud → ดูทดจาก URL', (await page.evaluate(() => document.querySelector('#scratchViewer img').src)) === 'https://img.test/scratch_' + att.id + '_q1.jpg', '');
+  await page.click('#scratchViewerClose');
+  // ลบผลสอบ → ลบไฟล์ทดใน Storage
+  await page.evaluate((id) => { window.__del = []; FirebaseSync.deleteStoragePdf = async (u) => { window.__del.push(u); }; Store.deleteRecords('attempts', [id]); }, att.id);
+  check('scratchSave: ลบผลสอบ → สั่งลบรูปกระดาษทดทั้ง 2 ไฟล์', (await page.evaluate(() => window.__del.length)) === 2, '');
+
+  // resume: ทดข้อ 2 แล้วออก → กลับมาทำต่อ เห็นรอยเดิม
+  await page.evaluate(() => { FirebaseSync.ready = () => false; });
+  await page.evaluate(() => navigate('take', { id: 's1', takerName: 'ณนนท์' })); await mood();
+  await page.evaluate(() => document.querySelector('#takeNextBtn').click()); await page.waitForTimeout(200);
+  if (!(await page.evaluate(() => document.getElementById('scratchPad').classList.contains('open')))) await page.click('#scratchToggleBtn');
+  await page.waitForTimeout(300);
+  await draw(80, 80);
+  await page.evaluate(() => { [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === 'ข').click(); });
+  await page.waitForTimeout(1300); // ให้ saveTakeResume บันทึก
+  await page.evaluate(() => document.querySelector('#takeExitBtn').click()); await page.waitForTimeout(400);
+  await page.evaluate(() => navigate('take', { id: 's1', takerName: 'ณนนท์' })); await page.waitForTimeout(500);
+  await page.evaluate(() => [...document.querySelectorAll('#_resumeOverlay button')].find(b => /ทำต่อ/.test(b.textContent)).click()); await page.waitForTimeout(300);
+  if (!(await page.evaluate(() => document.getElementById('scratchPad').classList.contains('open')))) await page.click('#scratchToggleBtn');
+  await page.waitForTimeout(500);
+  check('scratchSave: ออกกลางคันแล้ว "ทำต่อ" → กลับมาข้อ 2 เห็นรอยทดเดิม', (await label()) === 'ข้อ 2' && (await ink()) > 0, JSON.stringify([await label(), await ink()]));
+  check('scratchSave: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+  await ctx.close();
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
