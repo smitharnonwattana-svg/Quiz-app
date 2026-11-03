@@ -5914,6 +5914,162 @@ currentSection = 'hardMode';
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: practiceSet (v48.84p, ชี้ index_preview.html) — ฝึกซ้อมแบบ "ตั้งเป้าเอง": ปุ่มฝึกซ้อมเปิดแผ่นเลือก (ทั้งชุด/ตั้งเป้า N ข้อ M นาที),
+// หน้าทำเฉพาะข้อของรอบ นับถอยหลัง หมดเวลาส่งเอง, คะแนนนับเฉพาะข้อที่ทำ, ข้อที่ยังไม่ทำซ่อนเฉลย, ทำต่อรวมเป็นผลเดียว, ขอดูเฉลยเลย, resume
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'practiceSet';
+{
+  const PS_FILE = 'index_preview.html';
+  const pq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
+  const cacheP = () => baseCache({
+    exams: [
+      mkExam('p1', 'ชุดฝึก', 'คณิตศาสตร์', { questionCount: 6, durationSeconds: 1200, pdfUrl: 'https://x/q.pdf' }),
+      mkExam('p2', 'ชุดสอง', 'คณิตศาสตร์', { questionCount: 2, durationSeconds: 600, pdfUrl: 'https://x/q2.pdf' }),
+    ],
+    questions: { p1: [pq('q1', 1, 'A'), pq('q2', 2, 'B'), pq('q3', 3, 'C'), pq('q4', 4, 'D'), pq('q5', 5, 'A'), pq('q6', 6, 'B')], p2: [pq('r1', 1, 'A'), pq('r2', 2, 'B')] },
+    members: [{ pin: '311257', name: 'ณนนท์' }],
+  });
+  const stubPdf = (page) => page.evaluate(() => { const st = document.createElement('style'); st.textContent = '#offlineBanner{display:none!important;pointer-events:none!important}'; document.head.appendChild(st); PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); window.confirm = () => true; MemeScore.show = (a, b, cb) => { if (cb) cb(); }; });
+  const mood = async (page) => { await page.waitForTimeout(450); await page.evaluate(() => document.getElementById('offlineBanner')?.remove()); if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]'); await page.waitForTimeout(300); };
+  const pick = (page, l) => page.evaluate((l) => { [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === ({ A: 'ก', B: 'ข', C: 'ค', D: 'ง' })[l]).click(); }, l);
+  const nextQ = (page) => page.click('#takeNextBtn');
+  const submit = async (page) => {
+    await page.click('#takeSubmitBtn'); await page.waitForTimeout(400);
+    await page.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await page.waitForTimeout(300);
+    await page.evaluate(() => { document.querySelector('[data-n="1"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await page.waitForTimeout(900);
+  };
+  const setAtt = (page, ex) => page.evaluate((ex) => { const l = Store.load().attempts.filter(a => a.examId === ex); const a = l[0]; return a && { n: l.length, id: a.id, set: a.practiceSet, prac: a.practiceMode, score: a.score, total: a.total, pqLen: a.perQuestion.length, uncounted: a.perQuestion.filter(p => p.counted === false).map(p => p.no), rounds: a.practiceRounds, done: !!a.setDoneAt, used: a.usedSeconds }; }, ex);
+  const toExams = async (page) => { await page.evaluate(() => navigate('exams')); await page.waitForTimeout(300); await page.evaluate(() => { document.getElementById('offlineBanner')?.remove(); document.querySelector('#examsSubjGrid [data-subj="คณิตศาสตร์"]')?.click(); }); await page.waitForTimeout(300); };
+  const errs = [];
+  const { ctx, page } = await newSeededPage({ file: PS_FILE, cache: cacheP(), role: 'student', name: 'ณนนท์' });
+  page.on('pageerror', e => errs.push(e.message));
+  await stubPdf(page);
+
+  // 1) แผ่นเลือกโหมดฝึกซ้อม
+  await page.evaluate(() => navigate('exam', { id: 'p1' })); await page.waitForTimeout(200);
+  await page.click('#examStartPracticeBtn'); await page.waitForTimeout(150);
+  const sh = await page.evaluate(() => ({ open: !!document.getElementById('practiceSetSheet'), whole: !!document.getElementById('psWhole'), n: document.getElementById('psN').value, m: document.getElementById('psM').value, page: window._currentPage }));
+  check('practiceSet: กดฝึกซ้อม → เปิดแผ่นเลือก (ยังไม่เข้าหน้าทำ) มี "ฝึกทั้งชุด" + ตั้งเป้า ค่าเริ่มต้น 6 ข้อ (ไม่เกินชุด) / 20 นาที (ตามเวลาชุด)', sh.open && sh.whole && sh.n === '6' && sh.m === '20' && sh.page === 'exam', JSON.stringify(sh));
+  for (let i = 0; i < 3; i++) await page.click('#psNMinus');
+  const sh2 = await page.evaluate(() => ({ n: document.getElementById('psN').value, m: document.getElementById('psM').value, btn: document.getElementById('psStart').textContent }));
+  check('practiceSet: ลดเหลือ 3 ข้อ → เวลาแนะนำปรับตาม (10 นาที) ปุ่ม "เริ่ม 3 ข้อ · 10 นาที"', sh2.n === '3' && sh2.m === '10' && /เริ่ม 3 ข้อ · 10 นาที/.test(sh2.btn), JSON.stringify(sh2));
+  await page.click('#psMPlus');
+  check('practiceSet: กด + เวลา → 15 นาที (ตั้งเองแล้วเปลี่ยนจำนวนข้อไม่ทับ)', await page.evaluate(() => { document.getElementById('psNPlus').click(); document.getElementById('psNMinus').click(); return document.getElementById('psM').value; }) === '15', '');
+  await page.click('#psMMinus');
+
+  // 2) ทำรอบ 1: ข้อ 1-3 ใน 10 นาที
+  await page.click('#psStart'); await mood(page);
+  const tk = await page.evaluate(() => ({ page: window._currentPage, title: document.getElementById('takeExamTitle').textContent, tot: document.getElementById('takeQTotal')?.textContent, timer: document.getElementById('takeTimer').textContent, sheet: !!document.getElementById('practiceSetSheet') }));
+  check('practiceSet: เริ่ม → หน้าทำเฉพาะ 3 ข้อ หัว "[ฝึกซ้อม · 3 ข้อ 10 นาที]" นาฬิกานับถอยหลังจาก 10:00, แผ่นปิด', tk.page === 'take' && /ฝึกซ้อม · 3 ข้อ 10 นาที/.test(tk.title) && tk.tot === '3' && /^(10:00|09:5\d)$/.test(tk.timer) && !tk.sheet, JSON.stringify(tk));
+  await pick(page, 'A'); await nextQ(page); await pick(page, 'C'); // ข้อ 1 ถูก, ข้อ 2 ผิด, ข้อ 3 ข้าม
+  await submit(page);
+  let a = await setAtt(page, 'p1');
+  check('practiceSet: ส่งรอบ 1 → ผลเดียว practiceSet ครอบทุกข้อ (6) คะแนนนับเฉพาะข้อที่ทำ 1/2, ข้อ 3-6 counted:false', a && a.set === true && a.prac === true && a.score === 1 && a.total === 2 && a.pqLen === 6 && JSON.stringify(a.uncounted) === '[3,4,5,6]' && a.rounds === 1 && !a.done, JSON.stringify(a));
+  const weak = await page.evaluate(() => WeaknessTracker.getActiveWeaknessesForUser('ณนนท์').filter(w => w.examId === 'p1').map(w => w.questionNo));
+  check('practiceSet: จุดอ่อน = เฉพาะข้อที่ทำผิด (ข้อ 2) ข้อที่ยังไม่ทำไม่นับ', JSON.stringify(weak) === '[2]', JSON.stringify(weak));
+  const rv = await page.evaluate(() => ({ page: window._currentPage, locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display !== 'none' ? document.getElementById('reviewSetContinueBtn').textContent : '', reveal: getComputedStyle(document.getElementById('reviewRevealBtn')).display !== 'none' ? document.getElementById('reviewRevealBtn').textContent : '', line: document.getElementById('reviewHalfCombinedLine').textContent, title: document.getElementById('reviewTitle').textContent }));
+  check('practiceSet: หน้าทบทวน (เด็ก) — ข้อที่ยังไม่ทำ 4 ข้อล็อกเฉลย, ปุ่ม "ทำต่อ (4 ข้อ)" + "ขอดูเฉลยเลย", บรรทัด "ทำแล้ว 2/6 · ค้าง 4"', rv.page === 'review' && rv.locks === 4 && /ค้าง \(4 ข้อ\)/.test(rv.cont) && /ขอดูเฉลยเลย/.test(rv.reveal) && /ทำแล้ว 2\/6 ข้อ · ค้าง 4 ข้อ/.test(rv.line) && /ตั้งเป้า/.test(rv.title), JSON.stringify(rv));
+
+  // 3) การ์ดข้อสอบ → pill ทำต่อ → แผ่นโหมดทำต่อ → รอบ 2 (ข้อ 3-6)
+  await toExams(page);
+  const pill = await page.evaluate(() => { const b = document.querySelector('.pset-badge[data-examid="p1"]'); return b ? b.textContent.replace(/\s+/g, ' ').trim() : null; });
+  check('practiceSet: การ์ดข้อสอบมี pill "ฝึกค้าง เหลือ 4 ข้อ ทำต่อ"', pill && /เหลือ 4 ข้อ/.test(pill), String(pill));
+  await page.click('.pset-badge[data-examid="p1"]'); await page.waitForTimeout(300);
+  const sh3 = await page.evaluate(() => ({ page: window._currentPage, open: !!document.getElementById('practiceSetSheet'), whole: !!document.getElementById('psWhole'), info: document.getElementById('psPendingInfo')?.textContent, n: document.getElementById('psN').value, btn: document.getElementById('psStart').textContent }));
+  check('practiceSet: กด pill → หน้าเริ่มทำเปิดแผ่น "ทำต่อ" (ทำแล้ว 2/6 · ค้าง 4) ไม่มีปุ่มฝึกทั้งชุด ค่าเริ่ม 4 ข้อ', sh3.page === 'exam' && sh3.open && !sh3.whole && /ทำแล้ว 2\/6 ข้อ · ค้าง 4 ข้อ/.test(sh3.info) && sh3.n === '4' && /ทำต่อ 4 ข้อ/.test(sh3.btn), JSON.stringify(sh3));
+  for (let i = 0; i < 2; i++) await page.click('#psNMinus'); // ทำรอบนี้ 2 ข้อ (ข้อ 3-4)
+  await page.click('#psStart'); await mood(page);
+  const tk2 = await page.evaluate(() => ({ tot: document.getElementById('takeQTotal')?.textContent, ids: _takeState.qsList.map(q => q.no), parent: _takeState.setParentId }));
+  check('practiceSet: รอบ 2 = ข้อค้างแรกตามลำดับ (ข้อ 3, 4) ผูกกับเซ็ตเดิม', tk2.tot === '2' && JSON.stringify(tk2.ids) === '[3,4]' && tk2.parent === a.id, JSON.stringify(tk2));
+  await pick(page, 'C'); await nextQ(page); await pick(page, 'A'); // ข้อ 3 ถูก, ข้อ 4 ผิด
+  await submit(page);
+  a = await setAtt(page, 'p1');
+  check('practiceSet: ส่งรอบ 2 → รวมเข้าผลเดิม (ไม่มีผลใหม่) คะแนน 2/4, ค้างข้อ 5-6, 2 รอบ, เวลารวม', a && a.n === 1 && a.score === 2 && a.total === 4 && JSON.stringify(a.uncounted) === '[5,6]' && a.rounds === 2 && !a.done && a.used >= 0, JSON.stringify(a));
+
+  // 4) resume กลางรอบ: เริ่มรอบ 3 (ข้อ 5-6) ตอบข้อ 5 แล้วออก → การ์ดมี "ฝึกซ้อมค้างอยู่" นับถอยหลัง → ทำต่อได้ข้อเดิม
+  await page.evaluate(() => navigate('exam', { id: 'p1', practiceSheet: true })); await page.waitForTimeout(300);
+  await page.click('#psStart'); await mood(page);
+  await pick(page, 'A'); await page.waitForTimeout(1200);
+  await page.click('#takeExitBtn'); await page.waitForTimeout(400); await toExams(page);
+  const rb = await page.evaluate(() => { const b = document.querySelector('.resume-badge[data-resumeid="p1"]'); return b ? { t: b.textContent.replace(/\s+/g, ' '), set: b.dataset.setsec } : null; });
+  check('practiceSet: ออกกลางรอบ → การ์ดมี "ฝึกซ้อมค้างอยู่ · เวลาเหลือ" (นับถอยหลังตามเวลาที่ตั้ง) และไม่มี pill ซ้ำ', rb && /ฝึกซ้อมค้างอยู่/.test(rb.t) && /เวลาเหลือ/.test(rb.t) && Number(rb.set) > 0 && !(await page.$('.pset-badge[data-examid="p1"]')), JSON.stringify(rb));
+  await page.click('.resume-badge[data-resumeid="p1"]'); await page.waitForTimeout(500);
+  await page.evaluate(() => [...document.querySelectorAll('#_resumeOverlay button')].find(b => /ทำต่อ/.test(b.textContent)).click()); await page.waitForTimeout(400);
+  const rs = await page.evaluate(() => ({ ids: _takeState.qsList.map(q => q.no), ans: _takeState.answers, set: _takeState.practiceSet, timer: document.getElementById('takeTimer').textContent }));
+  check('practiceSet: ทำต่อจาก resume → ได้ข้อเดิม (5, 6) คำตอบเดิม และยังเป็นเซ็ตนับถอยหลัง', JSON.stringify(rs.ids) === '[5,6]' && rs.ans.q5 === 'A' && rs.set === true && /^\d\d:\d\d$/.test(rs.timer) && rs.timer !== '00:00', JSON.stringify(rs));
+  await nextQ(page); await pick(page, 'B');
+  await submit(page);
+  a = await setAtt(page, 'p1');
+  check('practiceSet: ครบทุกข้อ → setDoneAt, 3 รอบ, คะแนน 4/6', a && a.n === 1 && a.done && a.rounds === 3 && a.score === 4 && a.total === 6 && a.uncounted.length === 0, JSON.stringify(a));
+  const rv2 = await page.evaluate(() => ({ locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display, line: document.getElementById('reviewHalfCombinedLine').textContent }));
+  check('practiceSet: หน้าทบทวนหลังครบ — เห็นเฉลยทุกข้อ ไม่มีปุ่มทำต่อ "ฝึกครบทั้งชุดแล้ว (3 รอบ)"', rv2.locks === 0 && rv2.cont === 'none' && /ฝึกครบทั้งชุดแล้ว \(3 รอบ\)/.test(rv2.line), JSON.stringify(rv2));
+  await toExams(page);
+  check('practiceSet: ครบแล้ว pill หายจากการ์ด', !(await page.$('.pset-badge[data-examid="p1"]')), '');
+
+  // 5) ขอดูเฉลยเลย (ชุด p2) + หมดเวลาส่งเอง
+  await page.evaluate(() => navigate('exam', { id: 'p2' })); await page.waitForTimeout(200);
+  await page.click('#examStartPracticeBtn'); await page.click('#psNMinus'); await page.click('#psStart'); await mood(page);
+  await pick(page, 'A');
+  await page.evaluate(() => { _takeState.startedAt -= 6 * 60 * 1000; }); await page.waitForTimeout(800); // 5 นาที (1 ข้อของชุด 10 นาที/2 ข้อ) → หมดเวลา
+  await page.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await page.waitForTimeout(300);
+  await page.evaluate(() => { document.querySelector('[data-n="1"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await page.waitForTimeout(900);
+  let b = await setAtt(page, 'p2');
+  check('practiceSet: หมดเวลา → ส่งอัตโนมัติ (ผล 1/1, ค้างข้อ 2)', b && b.set && b.score === 1 && b.total === 1 && JSON.stringify(b.uncounted) === '[2]', JSON.stringify(b));
+  await page.evaluate((id) => navigate('review', { attemptId: id }), b.id); await page.waitForTimeout(400);
+  await page.click('#reviewRevealBtn'); await page.waitForTimeout(400);
+  const rv3 = await page.evaluate((id) => ({ rev: !!Store.load().attempts.find(x => x.id === id).revealedAt, locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display, pend: !!findPendingPractice(Store.load(), 'p2', 'ณนนท์') }), b.id);
+  check('practiceSet: "ขอดูเฉลยเลย" → เปิดเฉลยข้อที่ยังไม่ทำ, จบเซ็ต (ไม่ค้าง ไม่มีปุ่มทำต่อ)', rv3.rev && rv3.locks === 0 && rv3.cont === 'none' && !rv3.pend, JSON.stringify(rv3));
+
+  // 6) ฝึกทั้งชุดแบบเดิมไม่เปลี่ยน
+  await page.evaluate(() => navigate('exam', { id: 'p2' })); await page.waitForTimeout(200);
+  await page.click('#examStartPracticeBtn'); await page.click('#psWhole'); await mood(page);
+  const wh = await page.evaluate(() => ({ title: document.getElementById('takeExamTitle').textContent, tot: document.getElementById('takeQTotal')?.textContent, set: _takeState.practiceSet, prac: _takeState.practiceMode, timer: document.getElementById('takeTimer').textContent }));
+  check('practiceSet: "ฝึกทั้งชุด" = ฝึกซ้อมแบบเดิม (ทั้งชุด, นับขึ้นจาก 00:00, ไม่ใช่เซ็ต)', /^\[ฝึกซ้อม\] /.test(wh.title) && wh.tot === '2' && wh.prac && !wh.set && /^00:0\d$/.test(wh.timer), JSON.stringify(wh));
+  await page.click('#takeExitBtn'); await page.waitForTimeout(200);
+  await page.evaluate(() => { localStorage.removeItem(Object.keys(localStorage).find(k => k.startsWith('nanont:takeResume:')) || '_'); });
+
+  // 7) ครูเปิดหน้าทบทวนเซ็ตที่ยังค้าง → เห็นทุกข้อ
+  await page.evaluate(() => navigate('exam', { id: 'p2', practiceSheet: true })); await page.waitForTimeout(300);
+  await page.click('#psStart'); await mood(page); await pick(page, 'B'); await submit(page);
+  b = await setAtt(page, 'p2');
+  await page.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })); });
+  await page.evaluate((id) => navigate('review', { attemptId: id }), b.id); await page.waitForTimeout(400);
+  const tv = await page.evaluate(() => ({ locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display }));
+  check('practiceSet: เซ็ตใหม่หลังเปิดเฉลยเซ็ตเก่า → ค้างได้อีก; ครูเปิดดู → เห็นเฉลยทุกข้อ ไม่มีปุ่มทำต่อ', b.n === 2 && b.set && JSON.stringify(b.uncounted) === '[2]' && tv.locks === 0 && tv.cont === 'none', JSON.stringify([b, tv]));
+  check('practiceSet: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+  await ctx.close();
+
+  // 8) มือถือ 390: แผ่นไม่ล้นจอ
+  {
+    const { ctx: c2, page: p2 } = await newSeededPage({ file: PS_FILE, cache: cacheP(), role: 'student', name: 'ณนนท์', viewport: { width: 390, height: 844 } });
+    await stubPdf(p2);
+    await p2.evaluate(() => navigate('exam', { id: 'p1' })); await p2.waitForTimeout(200);
+    await p2.click('#examStartPracticeBtn'); await p2.waitForTimeout(150);
+    const m = await p2.evaluate(() => { const box = document.querySelector('#practiceSetSheet > div').getBoundingClientRect(); const st = document.getElementById('psStart').getBoundingClientRect(); return { l: box.left, r: box.right, sw: document.documentElement.scrollWidth, stB: st.bottom }; });
+    check('practiceSet: มือถือ 390 — แผ่นอยู่ในจอ ไม่ล้นแนวนอน ปุ่มเริ่มมองเห็น', m.l >= 0 && m.r <= 390 && m.sw <= 390 && m.stB <= 844, JSON.stringify(m));
+    await c2.close();
+  }
+
+  // 9) โหมดยาก (สวิตช์) + ตั้งเป้า
+  {
+    const hc = cacheP(); hc.exams[0].hardPdfUrl = 'https://x/hard.pdf'; hc.questions.p1.forEach((q, i) => { q.hardAnswer = String(i + 1); });
+    const { ctx: c3, page: p3 } = await newSeededPage({ file: PS_FILE, cache: hc, role: 'student', name: 'ณนนท์' });
+    const e3 = []; p3.on('pageerror', e => e3.push(e.message));
+    await stubPdf(p3);
+    await p3.evaluate(() => navigate('exam', { id: 'p1' })); await p3.waitForTimeout(200);
+    await p3.click('#examHardToggleRow'); await p3.click('#examStartPracticeBtn');
+    for (let i = 0; i < 4; i++) await p3.click('#psNMinus');
+    await p3.click('#psStart'); await mood(p3);
+    const h = await p3.evaluate(() => ({ hard: _takeState.hardMode, set: _takeState.practiceSet, n: _takeState.qsList.length, title: document.getElementById('takeExamTitle').textContent }));
+    await p3.evaluate(() => { [...document.querySelectorAll('#takeChoices .numKeypadBtn')].find(b => b.textContent === '1').click(); });
+    await submit(p3);
+    const ha = await p3.evaluate(() => { const a = Store.load().attempts.find(x => x.examId === 'p1'); return a && { hard: a.hardMode, set: a.practiceSet, score: a.score, total: a.total, pend: findPendingPractice(Store.load(), 'p1', 'ณนนท์').qids.length }; });
+    check('practiceSet: โหมดยาก + ตั้งเป้า (2 ข้อ) → หน้าทำโหมดยาก, ผลเป็นเซ็ตโหมดยาก 1/1 ค้าง 5 ข้อ', h.hard && h.set && h.n === 2 && /โหมดยาก/.test(h.title) && ha && ha.hard && ha.set && ha.score === 1 && ha.total === 1 && ha.pend === 5 && e3.length === 0, JSON.stringify([h, ha, e3]));
+    await c3.close();
+  }
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
