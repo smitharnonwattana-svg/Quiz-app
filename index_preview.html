@@ -1833,7 +1833,6 @@
             <div id="reviewWrongListText" class="wrongText"></div>
           </div>
           <button class="btn" id="reviewRecalcBtn" style="display:none;margin-top:10px;width:100%;font-size:12px;" title="คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน — ใช้ตอนแก้เฉลยผิดในหน้า editor แล้วอยากให้คะแนนของครั้งนี้ตรงตาม">🔄 คำนวณคะแนนใหม่จากเฉลยปัจจุบัน</button>
-          <button class="btn" id="reviewScrGalBtn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;color:#92400e;background:#fffbeb;border-color:#fbbf24;"></button>
           <button class="btn btnPrimary" id="reviewSetContinueBtn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;background:#0891b2;border-color:#0891b2;"></button>
           <button class="btn btnPrimary" id="reviewHalf2Btn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;">🤝 ทำครึ่งหลังต่อ</button>
           <button class="btn" id="reviewRevealBtn" style="display:none;margin-top:8px;width:100%;font-size:12px;color:#b91c1c;border-color:#fca5a5;" title="ดูเฉลยข้อที่ยังไม่ได้ทำได้เลย แต่จะหมดโอกาสทำครึ่งหลังต่อ">👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)</button>
@@ -8001,82 +8000,20 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
 }
 
 // v48.85p: หน้าต่างดูรูปกระดาษทด (หน้าทบทวน) — กดพื้นหลัง/✕ ปิด
-// v48.86p: list/idx = เลื่อน ‹ › ไปข้ออื่นในชุดเดียวกัน (จากหน้าต่างรวม) + คีย์บอร์ด ←/→/Esc
-function openScratchViewer(title, src, list, idx) {
-  const old = document.getElementById('scratchViewer'); if (old) { if (old._off) old._off(); old.remove(); }
-  const hasNav = Array.isArray(list) && list.length > 1;
+function openScratchViewer(title, src) {
+  const old = document.getElementById('scratchViewer'); if (old) old.remove();
   const ov = document.createElement('div');
   ov.id = 'scratchViewer';
   ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
-  const navBtn = (id, label, dis) => `<button type="button" class="btn" id="${id}" ${dis ? 'disabled' : ''} style="padding:6px 12px;border-radius:10px;font-size:15px;font-weight:800;${dis ? 'opacity:.4;' : ''}">${label}</button>`;
   ov.innerHTML = `<div style="background:#fff;border-radius:16px;padding:14px;max-width:min(960px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><b style="font-size:15px;">${esc(title)}</b>
-      <div style="display:flex;gap:6px;">${hasNav ? navBtn('scratchViewerPrev', '‹', idx <= 0) + navBtn('scratchViewerNext', '›', idx >= list.length - 1) : ''}<button type="button" class="btn" id="scratchViewerClose" style="padding:6px 12px;border-radius:10px;font-size:13px;">✕ ปิด</button></div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><b style="font-size:15px;">${esc(title)}</b><button type="button" class="btn" id="scratchViewerClose" style="padding:6px 12px;border-radius:10px;font-size:13px;">✕ ปิด</button></div>
     <div style="overflow:auto;min-height:0;border:1px solid #e5e7eb;border-radius:10px;background:#fff;"><img alt="${esc(title)}" style="display:block;max-width:100%;height:auto;margin:0 auto;"></div>
   </div>`;
   ov.querySelector('img').src = src;
   document.body.appendChild(ov);
-  const go = i => { if (hasNav && i >= 0 && i < list.length) openScratchViewer(list[i].title, list[i].src, list, i); };
-  const onKey = e => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') go(idx - 1); else if (e.key === 'ArrowRight') go(idx + 1); };
-  const close = () => { ov._off(); ov.remove(); };
-  ov._off = () => document.removeEventListener('keydown', onKey);
-  document.addEventListener('keydown', onKey);
+  const close = () => ov.remove();
   ov.querySelector('#scratchViewerClose').onclick = close;
-  if (hasNav) { ov.querySelector('#scratchViewerPrev').onclick = () => go(idx - 1); ov.querySelector('#scratchViewerNext').onclick = () => go(idx + 1); }
   ov.addEventListener('click', e => { if (e.target === ov) close(); });
-}
-
-// v48.86p: รูปกระดาษทดของผลสอบ (cloud + ที่ยังรออัปโหลดในเครื่องนี้) — ใช้ทั้งการ์ดหน้าผลการฝึกซ้อมและหน้าทบทวน
-function scratchCountOf(att) {
-  if (!att) return 0;
-  return new Set([...Object.keys(att.scratch || {}), ...Object.keys(ScratchSync.localFor(att.id))]).size;
-}
-// หน้าต่างรวมกระดาษทดทุกข้อของผลสอบ: รูปย่อเรียงตามเลขข้อ + ป้ายถูก/ผิด, กรองเฉพาะข้อผิด, กดรูป → ภาพใหญ่ (‹ › เลื่อนข้อ)
-async function openScratchGallery(att) {
-  const old = document.getElementById('scratchGallery'); if (old) old.remove();
-  if (!att) return;
-  const remote = att.scratch || {}, local = ScratchSync.localFor(att.id), pqs = att.perQuestion || [];
-  const qs = (Store.load().questions || {})[att.examId] || [];
-  const ST = { ok: ['✓ ถูก', '#16a34a', '#dcfce7'], bad: ['✗ ผิด', '#dc2626', '#fee2e2'], blank: ['— ไม่ได้ตอบ', '#dc2626', '#fee2e2'], skip: ['ยังไม่ได้ทำ', '#6b7280', '#f3f4f6'], pending: ['รอตรวจ', '#92400e', '#fef3c7'], free: ['ฟรี', '#d97706', '#fef3c7'], '': ['', '#6b7280', '#f3f4f6'] };
-  const items = await Promise.all([...new Set([...Object.keys(remote), ...Object.keys(local)])].map(async qid => {
-    const p = pqs.find(x => x && x.qid === qid) || null, q = qs.find(x => x.id === qid);
-    const no = Number(p ? p.no : (q ? (q.no ?? q.number) : 0)) || 0;
-    const st = !p ? '' : p.isFree ? 'free' : p.counted === false ? ((p.pending && !p.manual) ? 'pending' : 'skip') : p.isCorrect ? 'ok' : (p.chosen ? 'bad' : 'blank');
-    const src = remote[qid] || (local[qid] ? await ScratchSync.localImage(local[qid]) : null);
-    return { qid, no, st, src, local: !remote[qid] };
-  }));
-  const all = items.filter(x => x.src).sort((a, b) => a.no - b.no);
-  if (!all.length) { toast('ยังไม่มีรูปกระดาษทดของผลสอบนี้'); return; }
-  const isWrong = x => x.st === 'bad' || x.st === 'blank';
-  const nWrong = all.filter(isWrong).length;
-  let onlyWrong = false;
-  const ov = document.createElement('div');
-  ov.id = 'scratchGallery';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;';
-  ov.innerHTML = `<div style="background:#fff;border-radius:18px;padding:16px;width:min(1080px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:0;"><div style="font-size:17px;font-weight:800;">✏️ กระดาษทด (${all.length} ข้อ)</div><div class="muted" style="font-size:12px;overflow-wrap:anywhere;">${esc(att.examTitle || '')} · ${esc(att.takerName || '')}</div></div>
-      ${nWrong ? `<button type="button" class="btn" id="scrGalWrong" style="padding:6px 12px;border-radius:10px;font-size:13px;color:#b91c1c;border-color:#fca5a5;">เฉพาะข้อผิด (${nWrong})</button>` : ''}
-      <button type="button" class="btn" id="scrGalClose" style="padding:6px 12px;border-radius:10px;font-size:13px;">✕ ปิด</button>
-    </div>
-    <div id="scrGalGrid" style="overflow:auto;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:10px;"></div>
-  </div>`;
-  document.body.appendChild(ov);
-  const grid = ov.querySelector('#scrGalGrid');
-  const paint = () => {
-    const shown = onlyWrong ? all.filter(isWrong) : all;
-    const list = shown.map(x => ({ title: `กระดาษทด ข้อ ${x.no}${ST[x.st][0] ? ' · ' + ST[x.st][0] : ''}${x.local ? ' (ยังไม่ขึ้น cloud)' : ''}`, src: x.src }));
-    grid.innerHTML = shown.map((x, i) => `<button type="button" class="scrGalItem" data-i="${i}" style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;cursor:pointer;text-align:left;min-width:0;">
-      <span style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;"><b style="font-size:14px;">ข้อ ${x.no}</b>${ST[x.st][0] ? `<span style="font-size:11px;font-weight:800;color:${ST[x.st][1]};background:${ST[x.st][2]};border-radius:6px;padding:2px 6px;">${ST[x.st][0]}</span>` : ''}</span>
-      <span style="display:flex;align-items:center;justify-content:center;width:100%;height:150px;border:1px solid #f3f4f6;border-radius:8px;overflow:hidden;background:#fff;"><img alt="กระดาษทด ข้อ ${x.no}" src="${esc(x.src)}" style="max-width:100%;max-height:100%;object-fit:contain;"></span>
-    </button>`).join('');
-    grid.querySelectorAll('.scrGalItem').forEach(b => b.onclick = () => { const i = Number(b.dataset.i); openScratchViewer(list[i].title, list[i].src, list, i); });
-  };
-  paint();
-  const wb = ov.querySelector('#scrGalWrong');
-  if (wb) wb.onclick = () => { onlyWrong = !onlyWrong; wb.style.background = onlyWrong ? '#fee2e2' : ''; wb.textContent = onlyWrong ? `แสดงทุกข้อ (${all.length})` : `เฉพาะข้อผิด (${nWrong})`; paint(); };
-  ov.querySelector('#scrGalClose').onclick = () => ov.remove();
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
 }
 
 // ===================== REVIEW PAGE =====================
@@ -8417,9 +8354,6 @@ function initReview(attemptId){
   // v48.85p: กระดาษทดรายข้อ — จาก cloud (att.scratch) หรือรูปที่ยังรออัปโหลดในเครื่องนี้
   const _scrRemote=att.scratch||{}, _scrLocal=ScratchSync.localFor(att.id);
   const _hasScr=q=>!!(_scrRemote[q.id]||_scrLocal[q.id]);
-  const _galBtn=document.getElementById('reviewScrGalBtn'); // v48.86p: ปุ่มเปิดกระดาษทดทุกข้อ
-  const _paintGal=()=>{ const n=scratchCountOf(att); if(!_galBtn) return; _galBtn.style.display=n?'':'none'; _galBtn.textContent=`✏️ กระดาษทดทั้งหมด (${n} ข้อ)`; _galBtn.onclick=()=>openScratchGallery(att); };
-  _paintGal();
   const _scrBtnHtml=q=>`<button type="button" class="scratchViewBtn" data-scr-qid="${esc(q.id)}" data-scr-no="${esc(q.no)}" aria-label="ดูกระดาษทด ข้อ ${esc(q.no)}">✏️ ดูทด</button>`;
   // Nav chips
   const nav=document.getElementById('reviewNavChips');
@@ -8582,7 +8516,6 @@ function initReview(attemptId){
   ScratchSync.whenQueued().then(()=>{
     if(window._currentPage!=='review' || !window._currentParams || window._currentParams.attemptId!==attemptId) return;
     Object.assign(_scrLocal, ScratchSync.localFor(att.id));
-    _paintGal();
     qs.forEach((q,idx)=>{
       if(!_hasScr(q)) return;
       const right=document.querySelector(`#rq-${q.no} .qRowRight`);
@@ -10317,7 +10250,6 @@ function initStats(){
           <div style="display:flex;gap:8px;">
             <button class="btn" style="padding:6px 12px;font-size:12px;" data-review="${a.id}">📋 ดูเฉลย</button>
             <button class="btn" style="padding:6px 12px;font-size:12px;color:#fff;background:#111;border-color:#111;font-weight:700;" data-shot="${esc(a.id)}" title="สร้างรูปสรุปผลสอบครั้งนี้ — ส่งให้ AI วิเคราะห์ต่อได้">📸 บันทึกรูปสรุป</button>
-            ${scratchCountOf(a)?`<button class="btn" style="padding:6px 12px;font-size:12px;color:#92400e;background:#fffbeb;border-color:#fbbf24;font-weight:700;" data-scrgal="${esc(a.id)}">✏️ กระดาษทด (${scratchCountOf(a)})</button>`:''}
             ${_tagsSorted.length?`<button class="btn" id="${_tagCollapseId}_btn" style="padding:6px 12px;font-size:12px;color:#6366f1;border-color:#a5b4fc;">▸ เนื้อหา</button>`:''}
           </div>
           ${Auth.isTeacher()?`<button class="btn-delete" style="padding:6px 12px;" data-del="${a.id}">ลบ</button>`:''}
@@ -10385,7 +10317,6 @@ function initStats(){
     rowsEl.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',()=>openConfirm(btn.getAttribute('data-del'))));
     rowsEl.querySelectorAll('[data-review]').forEach(btn=>btn.addEventListener('click',()=>navigate('review',{attemptId:btn.getAttribute('data-review')})));
     rowsEl.querySelectorAll('[data-shot]').forEach(btn=>btn.addEventListener('click',()=>captureAttemptSummary(btn.getAttribute('data-shot'),btn))); // v48.76p
-    rowsEl.querySelectorAll('[data-scrgal]').forEach(btn=>btn.addEventListener('click',()=>{ const id=btn.getAttribute('data-scrgal'); openScratchGallery((Store.load().attempts||[]).find(x=>x.id===id)); })); // v48.86p: หน้าต่างรวมกระดาษทด
     _cardUids.forEach(uid=>{
       const btn=rowsEl.querySelector(`#atag_${uid}_btn`);
       const panel=rowsEl.querySelector(`#atag_${uid}`);

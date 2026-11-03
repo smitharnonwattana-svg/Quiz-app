@@ -6162,19 +6162,19 @@ currentSection = 'scratchSave';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: scratchGallery (v48.86p, ชี้ index_preview.html) — ปุ่มกระดาษทดบนจอใหญ่มีข้อความ, ปุ่ม "กระดาษทด (N)" บนการ์ดหน้าผลการฝึกซ้อม,
-// หน้าต่างรวมรูปทดทุกข้อ (ป้ายถูก/ผิด, กรองเฉพาะข้อผิด, ภาพใหญ่ ‹ › + คีย์บอร์ด), ปุ่ม "กระดาษทดทั้งหมด" ในหน้าทบทวน
+// Section: scratchGallery (v48.86p, ชี้ index_preview.html) — ปุ่มกระดาษทดจอใหญ่มีข้อความ (จอแคบเป็นไอคอน), หน้าผลการฝึกซ้อมไม่มีปุ่มรวมกระดาษทด,
+// ส่งรูปทดที่ค้างในเครื่องทันทีเมื่อกลับเข้าแอป
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'scratchGallery';
 {
   const SG_FILE = 'index_preview.html';
   const gq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
   const pqOf = (qid, no, chosen, correct) => ({ qid, no, page: 1, tags: [], subTags: [], topic: '', chosen, correct, isCorrect: chosen === correct, isFree: false, unsure: false, visited: true, elapsedMs: 3000, changes: 0 });
-  const mkAtt = (id, scratch) => ({ id, examId: 'g1', examTitle: 'ชุดทดรูป', examSubject: 'คณิตศาสตร์', examType: 'mc', weighted: false, takerName: 'ณนนท์', startedAt: '2026-11-01T01:00:00Z', submittedAt: id === 'ga1' ? '2026-11-01T02:00:00Z' : '2026-10-30T02:00:00Z', usedSeconds: 300, score: 1, total: 3, answers: { q1: 'A', q2: 'B' }, perQuestion: [pqOf('q1', 1, 'A', 'A'), pqOf('q2', 2, 'B', 'A'), pqOf('q3', 3, null, 'C')], practiceMode: true, halfMode: false, halfQuota: 0, visitOrder: [1, 2, 3], difficulty: 'develop', mood: null, feeling: null, prediction: null, ...(scratch ? { scratch } : {}) });
+  const mkAtt = (id) => ({ id, examId: 'g1', examTitle: 'ชุดทดรูป', examSubject: 'คณิตศาสตร์', examType: 'mc', weighted: false, takerName: 'ณนนท์', startedAt: '2026-11-01T01:00:00Z', submittedAt: '2026-11-01T02:00:00Z', usedSeconds: 300, score: 1, total: 3, answers: { q1: 'A', q2: 'B' }, perQuestion: [pqOf('q1', 1, 'A', 'A'), pqOf('q2', 2, 'B', 'A'), pqOf('q3', 3, null, 'C')], practiceMode: true, halfMode: false, halfQuota: 0, visitOrder: [1, 2, 3], difficulty: 'develop', mood: null, feeling: null, prediction: null });
   const cacheG = () => baseCache({
     exams: [mkExam('g1', 'ชุดทดรูป', 'คณิตศาสตร์', { questionCount: 3, pdfUrl: 'https://x/q.pdf' })],
     questions: { g1: [gq('q1', 1, 'A'), gq('q2', 2, 'A'), gq('q3', 3, 'C')] },
-    attempts: [mkAtt('ga1', null), mkAtt('ga2', null)], members: [{ pin: '311257', name: 'ณนนท์' }],
+    attempts: [mkAtt('ga2')], members: [{ pin: '311257', name: 'ณนนท์' }],
   });
   const errs = [];
   const { ctx, page } = await newSeededPage({ file: SG_FILE, cache: cacheG(), role: 'student', name: 'ณนนท์', viewport: { width: 1280, height: 800 } });
@@ -6183,51 +6183,22 @@ currentSection = 'scratchGallery';
     const st = document.createElement('style'); st.textContent = '#offlineBanner{display:none!important;pointer-events:none!important}'; document.head.appendChild(st);
     PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); window.confirm = () => true; MemeScore.show = (a, b, cb) => { if (cb) cb(); };
     localStorage.removeItem('nanont:scratchPending');
-    const img = (t) => { const c = document.createElement('canvas'); c.width = 200; c.height = 80; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 200, 80); x.fillStyle = '#111'; x.font = '30px sans-serif'; x.fillText(t, 10, 50); return c.toDataURL('image/png'); };
-    Store._cache.attempts.find(a => a.id === 'ga1').scratch = { q1: img('1+1'), q2: img('2x3'), q3: img('9-4') };
   });
-  // 1) หน้าผลการฝึกซ้อม: ปุ่มบนการ์ดเฉพาะผลที่มีรูปทด
-  await page.evaluate(() => navigate('stats')); await page.waitForTimeout(500);
-  const cb = await page.evaluate(() => [...document.querySelectorAll('#statsRows .attempt-card [data-scrgal]')].map(b => [b.dataset.scrgal, b.textContent.trim()]));
-  check('scratchGallery: การ์ดผลสอบที่มีรูปทดมีปุ่ม "✏️ กระดาษทด (3)" (ผลที่ไม่มีรูปทดไม่มีปุ่ม)', cb.length === 1 && cb[0][0] === 'ga1' && /กระดาษทด \(3\)/.test(cb[0][1]), JSON.stringify(cb));
-  await page.click('#statsRows [data-scrgal="ga1"]'); await page.waitForTimeout(400);
-  const g = await page.evaluate(() => ({ open: !!document.getElementById('scratchGallery'), items: [...document.querySelectorAll('#scratchGallery .scrGalItem')].map(b => b.textContent.replace(/\s+/g, ' ').trim()), imgs: [...document.querySelectorAll('#scratchGallery .scrGalItem img')].filter(i => i.complete && i.naturalWidth > 0).length }));
-  check('scratchGallery: หน้าต่างรวม — รูปทด 3 ข้อเรียงตามเลขข้อ ป้าย ✓ ถูก / ✗ ผิด / ไม่ได้ตอบ และรูปโหลดได้', g.open && g.items.length === 3 && /ข้อ 1.*ถูก/.test(g.items[0]) && /ข้อ 2.*ผิด/.test(g.items[1]) && /ข้อ 3.*ไม่ได้ตอบ/.test(g.items[2]) && g.imgs === 3, JSON.stringify(g));
-  await page.click('#scrGalWrong'); await page.waitForTimeout(150);
-  const gw = await page.evaluate(() => [...document.querySelectorAll('#scratchGallery .scrGalItem b')].map(b => b.textContent));
-  check('scratchGallery: "เฉพาะข้อผิด" → เหลือข้อ 2, 3 (ข้อผิด + ไม่ได้ตอบ)', JSON.stringify(gw) === '["ข้อ 2","ข้อ 3"]', JSON.stringify(gw));
-  await page.click('#scratchGallery .scrGalItem[data-i="0"]'); await page.waitForTimeout(200);
-  const vt = () => page.evaluate(() => document.querySelector('#scratchViewer b')?.textContent || '');
-  const v1 = await vt();
-  await page.click('#scratchViewerNext'); await page.waitForTimeout(150);
-  const v2 = await vt();
-  await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(150);
-  const v3 = await vt();
-  check('scratchGallery: กดรูป → ภาพใหญ่ข้อ 2, › ไปข้อ 3, ปุ่มลูกศรซ้ายกลับข้อ 2', /ข้อ 2/.test(v1) && /ข้อ 3/.test(v2) && /ข้อ 2/.test(v3), JSON.stringify([v1, v2, v3]));
-  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-  check('scratchGallery: Esc ปิดภาพใหญ่ (หน้าต่างรวมยังอยู่) → ✕ ปิดหน้าต่างรวม', !(await page.$('#scratchViewer')) && !!(await page.$('#scratchGallery')) && await page.evaluate(() => { document.getElementById('scrGalClose').click(); return !document.getElementById('scratchGallery'); }), '');
-  // 2) หน้าทบทวน: ปุ่มกระดาษทดทั้งหมด
-  await page.evaluate(() => navigate('review', { attemptId: 'ga1' })); await page.waitForTimeout(400);
-  const rb = await page.evaluate(() => { const b = document.getElementById('reviewScrGalBtn'); return { show: getComputedStyle(b).display !== 'none', t: b.textContent }; });
-  await page.click('#reviewScrGalBtn'); await page.waitForTimeout(300);
-  check('scratchGallery: หน้าทบทวนมีปุ่ม "กระดาษทดทั้งหมด (3 ข้อ)" เปิดหน้าต่างรวม', rb.show && /กระดาษทดทั้งหมด \(3 ข้อ\)/.test(rb.t) && (await page.evaluate(() => document.querySelectorAll('#scratchGallery .scrGalItem').length)) === 3, JSON.stringify(rb));
-  await page.evaluate(() => document.getElementById('scrGalClose').click());
-  await page.evaluate(() => navigate('review', { attemptId: 'ga2' })); await page.waitForTimeout(300);
-  check('scratchGallery: ผลที่ไม่มีรูปทด → ไม่มีปุ่มในหน้าทบทวน', (await page.evaluate(() => getComputedStyle(document.getElementById('reviewScrGalBtn')).display)) === 'none', '');
-  // 3) ปุ่มกระดาษทดบนหน้าทำ: จอใหญ่มีข้อความ
+  // 1) ปุ่มกระดาษทดบนหน้าทำ: จอใหญ่มีข้อความ, จอแคบเป็นไอคอน
   await page.evaluate(() => navigate('take', { id: 'g1', takerName: 'ณนนท์', practice: true })); await page.waitForTimeout(500);
   if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]');
   await page.waitForTimeout(300);
   const tb = await page.evaluate(() => { const b = document.getElementById('scratchToggleBtn'); const s = b.querySelector('.scrBtnTxt'); return { vis: getComputedStyle(b).display !== 'none', txt: s && getComputedStyle(s).display !== 'none' ? s.textContent : '', w: b.getBoundingClientRect().width }; });
   check('scratchGallery: จอ 1280 — ปุ่มกระดาษทดบนหน้าทำเป็นแคปซูลมีข้อความ "กระดาษทด"', tb.vis && tb.txt === 'กระดาษทด' && tb.w > 80, JSON.stringify(tb));
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(200);
-  const tbm = await page.evaluate(() => { const s = document.querySelector('#scratchToggleBtn .scrBtnTxt'); return getComputedStyle(s).display; });
+  const tbm = await page.evaluate(() => getComputedStyle(document.querySelector('#scratchToggleBtn .scrBtnTxt')).display);
   check('scratchGallery: จอแคบ (390) — ปุ่มเป็นไอคอนเดิม ไม่มีข้อความ', tbm === 'none', tbm);
   await page.evaluate(() => document.getElementById('takeExitBtn').click()); await page.waitForTimeout(300);
-  await page.evaluate(() => navigate('stats')); await page.waitForTimeout(500);
-  const ov = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, card: (() => { const c = document.querySelector('#statsRows .attempt-card'); return c ? c.scrollWidth <= c.clientWidth + 1 : null; })() }));
-  check('scratchGallery: มือถือ 390 — หน้าผลการฝึกซ้อมไม่ล้นจอ (การ์ดที่มีปุ่มเพิ่ม)', ov.sw <= 390 && ov.card !== false, JSON.stringify(ov));
-  // 4) รูปที่ค้างในเครื่อง ส่งทันทีเมื่อกลับเข้าแอป (ไม่ต้องรอรอบ 30 วิ)
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // 2) หน้าผลการฝึกซ้อมไม่มีปุ่มรวมกระดาษทด (ผู้ใช้ไม่ต้องการ)
+  await page.evaluate(() => { Store._cache.attempts[0].scratch = { q1: 'https://img.test/a.jpg' }; navigate('stats'); }); await page.waitForTimeout(500);
+  check('scratchGallery: การ์ดหน้าผลการฝึกซ้อมไม่มีปุ่มกระดาษทดรวม (มีเฉพาะดูเฉลย/รูปสรุป)', !(await page.$('#statsRows [data-scrgal]')) && !!(await page.$('#statsRows [data-review]')), '');
+  // 3) รูปที่ค้างในเครื่อง ส่งทันทีเมื่อกลับเข้าแอป (ไม่ต้องรอรอบ 30 วิ)
   const fl = await page.evaluate(async () => {
     const c = document.createElement('canvas'); c.width = 300; c.height = 120; const x = c.getContext('2d'); x.fillStyle = '#111'; x.fillRect(20, 20, 80, 30);
     await PdfDB.put(scratchKey('gx', 'q1'), { data: c.toDataURL('image/png'), w: 300, h: 120, no: 1, ts: Date.now() });
@@ -6239,6 +6210,10 @@ currentSection = 'scratchGallery';
     return { up: window.__up2, pend: JSON.parse(localStorage.getItem('nanont:scratchPending') || '[]').length, url: (Store.load().attempts.find(a => a.id === 'ga2').scratch || {}).q1 || '' };
   });
   check('scratchGallery: รูปค้างในเครื่อง → กลับเข้าแอป (visibilitychange) ส่งขึ้นทันที + ลิงก์เข้าผลสอบ', fl.up.length === 1 && fl.pend === 0 && /img\.test/.test(fl.url), JSON.stringify(fl));
+  // 4) มือถือ 390: หน้าผลการฝึกซ้อมไม่ล้นจอ
+  await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300);
+  await page.evaluate(() => navigate('stats')); await page.waitForTimeout(500);
+  check('scratchGallery: มือถือ 390 — หน้าผลการฝึกซ้อมไม่ล้นจอ', (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, '');
   check('scratchGallery: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
   await ctx.close();
 }
