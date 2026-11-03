@@ -6162,12 +6162,12 @@ currentSection = 'scratchSave';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: scratchGallery (v48.86p, ชี้ index_preview.html) — ปุ่มกระดาษทดจอใหญ่มีข้อความ (จอแคบเป็นไอคอน), หน้าผลการฝึกซ้อมไม่มีปุ่มรวมกระดาษทด,
+// Section: scratchGallery (v48.86p → production v48.68, ชี้ index.html) — ปุ่มกระดาษทดจอใหญ่มีข้อความ (จอแคบเป็นไอคอน), หน้าผลการฝึกซ้อมไม่มีปุ่มรวมกระดาษทด,
 // ส่งรูปทดที่ค้างในเครื่องทันทีเมื่อกลับเข้าแอป
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'scratchGallery';
 {
-  const SG_FILE = 'index_preview.html';
+  const SG_FILE = 'index.html';
   const gq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
   const pqOf = (qid, no, chosen, correct) => ({ qid, no, page: 1, tags: [], subTags: [], topic: '', chosen, correct, isCorrect: chosen === correct, isFree: false, unsure: false, visited: true, elapsedMs: 3000, changes: 0 });
   const mkAtt = (id) => ({ id, examId: 'g1', examTitle: 'ชุดทดรูป', examSubject: 'คณิตศาสตร์', examType: 'mc', weighted: false, takerName: 'ณนนท์', startedAt: '2026-11-01T01:00:00Z', submittedAt: '2026-11-01T02:00:00Z', usedSeconds: 300, score: 1, total: 3, answers: { q1: 'A', q2: 'B' }, perQuestion: [pqOf('q1', 1, 'A', 'A'), pqOf('q2', 2, 'B', 'A'), pqOf('q3', 3, null, 'C')], practiceMode: true, halfMode: false, halfQuota: 0, visitOrder: [1, 2, 3], difficulty: 'develop', mood: null, feeling: null, prediction: null });

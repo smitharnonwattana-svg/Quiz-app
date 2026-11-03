@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.67 -->
+  <!-- APP_VERSION: v48.68 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1283,6 +1283,7 @@
       touch-action: manipulation;
     }
     #scratchToggleBtn.visible { display: block; }
+    #scratchToggleBtn .scrBtnTxt { display: none; } /* v48.68: ข้อความโชว์เฉพาะจอ ≥901px (ดู media ด้านล่าง) */
     #scratchToggleBtn:active { transform: scale(0.95); }
     /* Mobile/portrait take-page layout pins .takeRight nav controls to the bottom 20vh band
        (see @media max-width:900px above) — float the toggle above that band so it never
@@ -1306,6 +1307,9 @@
          หลุดจากตำแหน่งกึ่งกลางไปทางขวาชั่วขณะ (เห็นเป็นปุ่ม "ขยับ" ตอนกด) ต้องรวม
          translateX ไว้ในนี้ด้วยเฉพาะ desktop (มือถือไม่ใช้ translateX เลยไม่ต้องแตะ) */
       #scratchToggleBtn:active { transform: translateX(-50%) scale(0.95); }
+      /* v48.68: จอใหญ่ (PC/iPad แนวนอน) เป็นแคปซูลมีข้อความ — ไอคอนเดียวมองไม่ออกว่าเป็นกระดาษทด */
+      #scratchToggleBtn { width: auto; padding: 0 14px; border-radius: 20px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+      #scratchToggleBtn .scrBtnTxt { display: inline; margin-left: 6px; }
     }
     #scratchPad {
       /* width ใช้ min() แทน max-width แยก property — max-width เดิมค่าเป็น
@@ -1592,7 +1596,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.67</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.68</div>
     </div>
   </div>
 </div>
@@ -4465,6 +4469,10 @@ const Store = {
     _updateOfflineBanner();
     setInterval(_updateOfflineBanner, 5000);
     setInterval(() => { try { Store.flushPendingSync(); } catch(e){} try { ScratchSync.flush(); } catch(e){} }, 30000); // v48.67: + รูปกระดาษทดที่ค้างอัปโหลด
+    // v48.68: ส่งรูปกระดาษทดที่ค้างทันทีที่เปิดแอป/กลับเข้าแอป/เน็ตกลับมา (ไม่ต้องรอรอบ 30 วิ) — ครูบนเครื่องอื่นจะเห็นเร็วขึ้น
+    setTimeout(() => { try { ScratchSync.flush(); } catch(e){} }, 3000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { try { ScratchSync.flush(); } catch(e){} } });
+    window.addEventListener('online', () => { try { ScratchSync.flush(); } catch(e){} });
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
       this.flushPendingSync();
@@ -18085,7 +18093,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.67';
+  const CURRENT_VERSION = 'v48.68';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
@@ -18175,7 +18183,7 @@ function initEntranceCompare(params) {
   btn.id = 'scratchToggleBtn';
   btn.type = 'button';
   btn.title = 'กระดาษทด (Apple Pencil / เมาส์)';
-  btn.textContent = '📝';
+  btn.innerHTML = '📝<span class="scrBtnTxt">กระดาษทด</span>'; // v48.68: ข้อความโชว์เฉพาะจอ ≥901px
   document.body.appendChild(btn);
 
   const pad = document.createElement('div');
