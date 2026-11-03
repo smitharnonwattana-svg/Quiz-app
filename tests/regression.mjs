@@ -705,8 +705,9 @@ currentSection = 'scratchpad';
   }, sel);
   const pen = await box('#pdfAnnotateToggleBtn');
   const scratch = await box('#scratchToggleBtn');
-  check('v48.10: pen + scratch buttons centered over PDF pane (40vw), not overlapping',
-    Math.abs(pen.cx - (1280 * 0.4 - 26)) < 5 && Math.abs(scratch.cx - (1280 * 0.4 + 26)) < 5 && pen.right < scratch.left,
+  // v48.68: ปุ่มกระดาษทดเป็นแคปซูลมีข้อความ (กว้างขึ้น) → ชิดซ้ายที่ 40vw+6px แทนจัดกึ่งกลางที่ 40vw+26px — ยังต้องไม่ทับปุ่มปากกา
+  check('v48.10: pen + scratch buttons around PDF-pane center (40vw), not overlapping',
+    Math.abs(pen.cx - (1280 * 0.4 - 26)) < 5 && Math.abs(scratch.left - (1280 * 0.4 + 6)) < 5 && pen.right < scratch.left,
     JSON.stringify({ pen, scratch }));
 
   await page.evaluate(() => document.getElementById('scratchToggleBtn').click());

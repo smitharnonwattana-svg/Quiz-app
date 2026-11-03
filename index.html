@@ -1309,6 +1309,9 @@
       #scratchToggleBtn:active { transform: translateX(-50%) scale(0.95); }
       /* v48.68: จอใหญ่ (PC/iPad แนวนอน) เป็นแคปซูลมีข้อความ — ไอคอนเดียวมองไม่ออกว่าเป็นกระดาษทด */
       #scratchToggleBtn { width: auto; padding: 0 14px; border-radius: 20px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+      /* v48.68: แคปซูลกว้างกว่าปุ่มกลมเดิม — ชิดซ้ายที่ 40vw+6px (ขวาของปุ่มปากกา PDF ที่อยู่ 40vw−26px) แทนจัดกึ่งกลาง กันทับกัน */
+      #scratchToggleBtn { left: calc(40vw + 6px); transform: none; }
+      #scratchToggleBtn:active { transform: scale(0.95); }
       #scratchToggleBtn .scrBtnTxt { display: inline; margin-left: 6px; }
     }
     #scratchPad {
