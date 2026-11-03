@@ -6220,12 +6220,12 @@ currentSection = 'scratchGallery';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: bugfix1103 (v48.88p, ชี้ index_preview.html) — บั๊กจากรอบทดสอบหาบั๊ก 3 พ.ย.: ดูทดหลังอัปโหลด, พับแอปแล้วรอยทดหาย,
+// Section: bugfix1103 (v48.88p → production v48.69, ชี้ index.html) — บั๊กจากรอบทดสอบหาบั๊ก 3 พ.ย.: ดูทดหลังอัปโหลด, พับแอปแล้วรอยทดหาย,
 // resume รอบเก่าข้ามเป้า, วาดเร็วก่อนโหลดรอยเดิม, เริ่มชุดใหม่ไม่ปิดเซ็ตเดิม, การบ้านปิดเร็ว, สรุปโหมดยาก, ผล 0/0, ครูล้างตรวจ, ลบผลแล้วยังอัปโหลด, คิวติด
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'bugfix1103';
 {
-  const BF_FILE = 'index_preview.html';
+  const BF_FILE = 'index.html';
   const bq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
   const bex = (id, extra = {}) => mkExam(id, 'ชุด ' + id, 'คณิตศาสตร์', { questionCount: 4, durationSeconds: 1200, pdfUrl: 'https://x/q.pdf', ...extra });
   const STUB = () => {
