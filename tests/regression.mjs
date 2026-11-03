@@ -5915,12 +5915,12 @@ currentSection = 'hardMode';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: practiceSet (v48.84p, ชี้ index_preview.html) — ฝึกซ้อมแบบ "ตั้งเป้าเอง": ปุ่มฝึกซ้อมเปิดแผ่นเลือก (ทั้งชุด/ตั้งเป้า N ข้อ M นาที),
+// Section: practiceSet (v48.84p → production v48.67, ชี้ index.html) — ฝึกซ้อมแบบ "ตั้งเป้าเอง": ปุ่มฝึกซ้อมเปิดแผ่นเลือก (ทั้งชุด/ตั้งเป้า N ข้อ M นาที),
 // หน้าทำเฉพาะข้อของรอบ นับถอยหลัง หมดเวลาส่งเอง, คะแนนนับเฉพาะข้อที่ทำ, ข้อที่ยังไม่ทำซ่อนเฉลย, ทำต่อรวมเป็นผลเดียว, ขอดูเฉลยเลย, resume
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'practiceSet';
 {
-  const PS_FILE = 'index_preview.html';
+  const PS_FILE = 'index.html';
   const pq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
   const cacheP = () => baseCache({
     exams: [
@@ -6071,12 +6071,12 @@ currentSection = 'practiceSet';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: scratchSave (v48.85p, ชี้ index_preview.html) — กระดาษทดแยกรายข้อ: 1 ข้อ = 1 แผ่น (กลับมาข้อเดิมเห็นรอยเดิม),
+// Section: scratchSave (v48.85p → production v48.67, ชี้ index.html) — กระดาษทดแยกรายข้อ: 1 ข้อ = 1 แผ่น (กลับมาข้อเดิมเห็นรอยเดิม),
 // เก็บ IndexedDB ระหว่างทำ (resume ได้), หลังส่ง → คิวอัปโหลด JPEG ครอบส่วนที่เขียน → attempt.scratch[qid], หน้าทบทวนปุ่ม "ดูทด" + จุดบนชิป
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'scratchSave';
 {
-  const SC_FILE = 'index_preview.html';
+  const SC_FILE = 'index.html';
   const sq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
   const cacheS = () => baseCache({
     exams: [mkExam('s1', 'ชุดทด', 'คณิตศาสตร์', { questionCount: 3, durationSeconds: 900, pdfUrl: 'https://x/q.pdf' })],

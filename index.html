@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.66 -->
+  <!-- APP_VERSION: v48.67 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1381,6 +1381,9 @@
       display: none; z-index: 10;
     }
     #scratchCursor.show { display: block; }
+    /* v48.67: กระดาษทดรายข้อในหน้าทบทวน */
+    .scratchViewBtn { font-size:12px; font-weight:700; padding:4px 8px; border-radius:8px; border:1.5px solid #fbbf24; background:#fffbeb; color:#92400e; cursor:pointer; white-space:nowrap; }
+    .chipScrDot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#f59e0b; margin-left:2px; vertical-align:super; }
     #pdfAnnotateCursor {
       position: fixed; pointer-events: none;
       border: 1.5px solid #ef4444; border-radius: 50%;
@@ -1589,7 +1592,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.66</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.67</div>
     </div>
   </div>
 </div>
@@ -1796,6 +1799,7 @@
             <div id="reviewWrongListText" class="wrongText"></div>
           </div>
           <button class="btn" id="reviewRecalcBtn" style="display:none;margin-top:10px;width:100%;font-size:12px;" title="คำนวณคะแนน/ถูกผิด/จุดอ่อนใหม่จากเฉลยปัจจุบัน — ใช้ตอนแก้เฉลยผิดในหน้า editor แล้วอยากให้คะแนนของครั้งนี้ตรงตาม">🔄 คำนวณคะแนนใหม่จากเฉลยปัจจุบัน</button>
+          <button class="btn btnPrimary" id="reviewSetContinueBtn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;background:#0891b2;border-color:#0891b2;"></button>
           <button class="btn btnPrimary" id="reviewHalf2Btn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;">🤝 ทำครึ่งหลังต่อ</button>
           <button class="btn" id="reviewRevealBtn" style="display:none;margin-top:8px;width:100%;font-size:12px;color:#b91c1c;border-color:#fca5a5;" title="ดูเฉลยข้อที่ยังไม่ได้ทำได้เลย แต่จะหมดโอกาสทำครึ่งหลังต่อ">👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)</button>
           <button class="btn btnPrimary" id="reviewPracticeBtn" style="display:none;margin-top:10px;width:100%;font-size:13px;font-weight:700;background:#0d7f81;border-color:#0d7f81;"></button>
@@ -3524,7 +3528,15 @@ const FirebaseSync = (() => {
     });
   }
 
-  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, loadPrefix, listenPrefix, deleteDoc, ready: () => _ready, ns: _ns };
+  // v48.67: อัปโหลดไฟล์ทั่วไป (รูปกระดาษทด) ไปที่ scratch/<origin>_<name> — คืน download URL
+  async function uploadBlob(blob, name, contentType) {
+    if (!_ready || !storage) throw new Error('Firebase Storage ยังไม่พร้อม');
+    const ref = storage.ref('scratch/' + _origin + '_' + String(name).replace(/[^A-Za-z0-9_.-]/g, '_'));
+    const snap = await ref.put(blob, { contentType: contentType || blob.type || 'application/octet-stream' });
+    return await snap.ref.getDownloadURL();
+  }
+
+  return { init, saveDoc, loadDoc, docExists, listenDoc, migrateLS, uploadPdf, uploadBlob, deleteStoragePdf, claimSession, listenSession, getMyToken, saveManualBackup, listBackups, loadBackupData, deleteBackup, loadPrefix, listenPrefix, deleteDoc, ready: () => _ready, ns: _ns };
 })();
 
 function _updateBellBadge() {
@@ -4102,6 +4114,7 @@ const Store = {
   deleteRecords(kind,ids){
     const k=kind==='exams'?'exam':'att', map=k==='exam'?this._recExam:this._recAtt;
     const arr=this._cache?(k==='exam'?this._cache.exams:this._cache.attempts):null;
+    if(k==='att'&&Array.isArray(arr)) (ids||[]).forEach(id=>{ const a=arr.find(x=>x&&x.id===id); if(a&&a.scratch) Object.values(a.scratch).forEach(u=>{ try{ FirebaseSync.deleteStoragePdf(u); }catch(e){} }); }); // v48.67: ลบรูปกระดาษทดด้วย
     (ids||[]).forEach(id=>{
       if(!id) return;
       const isRec=map.has(id)||(Array.isArray(arr)&&arr.some(x=>x&&x.id===id&&x._rec));
@@ -4451,7 +4464,7 @@ const Store = {
     this._listenRecs();
     _updateOfflineBanner();
     setInterval(_updateOfflineBanner, 5000);
-    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} }, 30000);
+    setInterval(() => { try { Store.flushPendingSync(); } catch(e){} try { ScratchSync.flush(); } catch(e){} }, 30000); // v48.67: + รูปกระดาษทดที่ค้างอัปโหลด
     FirebaseSync.migrateLS(this.key, 'mainStore').then(()=>{
       this.syncFromCloud();
       this.flushPendingSync();
@@ -4573,6 +4586,80 @@ const PdfDB=(()=>{
     if(blobUrlCache[key]){ URL.revokeObjectURL(blobUrlCache[key]); delete blobUrlCache[key]; }
   }
   return{put,get,del,getPdfBlobUrl,revokePdfBlobUrl};
+})();
+
+// ===================== SCRATCH SYNC (v48.67) =====================
+// กระดาษทดแยกรายข้อ: ระหว่างทำเก็บใน IndexedDB (PdfDB) key scratch:<attemptId รอบที่ทำ>:<qid> → หลังส่งข้อสอบสำเร็จเข้าคิว
+// แล้วอัปโหลดเป็น JPEG (ครอบเฉพาะส่วนที่เขียน, พื้นขาว, กว้าง ≤ 900px) ไป Firebase Storage → URL เก็บใน attempt.scratch[qid]
+// อัปโหลดไม่ได้ (ออฟไลน์/กฎ Storage) → คิวค้างใน localStorage ลองใหม่ทุก 30 วิ; ระหว่างนั้นหน้าทบทวนบนเครื่องนี้แสดงจากเครื่องได้เลย
+function scratchKey(aid, qid) { return 'scratch:' + aid + ':' + qid; }
+const ScratchSync = (() => {
+  const LS = 'nanont:scratchPending';
+  let _busy = false;
+  const _list = () => { try { const v = JSON.parse(localStorage.getItem(LS) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+  const _setList = l => { try { localStorage.setItem(LS, JSON.stringify(l)); } catch (e) {} };
+  const _remove = it => _setList(_list().filter(x => !(x.aid === it.aid && x.qid === it.qid)));
+  // aid = attemptId ของรอบที่ทำ, owner = ผลสอบที่เก็บจริง (ครึ่งหลัง/ฝึกรอบต่อ = ผลเดิม), qids = ข้อของรอบ
+  let _lastQueue = Promise.resolve();
+  function queue(aid, owner, qids) { _lastQueue = _queue(aid, owner, qids).catch(() => {}); return _lastQueue; }
+  async function _queue(aid, owner, qids) {
+    try { if (typeof window.scratchSaveNow === 'function') await window.scratchSaveNow(); } catch (e) {}
+    const l = _list();
+    for (const qid of (qids || [])) {
+      let rec = null; try { rec = await PdfDB.get(scratchKey(aid, qid)); } catch (e) {}
+      if (rec && !l.some(x => x.aid === aid && x.qid === qid)) l.push({ aid, owner, qid, no: rec.no || null });
+    }
+    _setList(l);
+    flush();
+  }
+  function toJpeg(rec) {
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const W = img.naturalWidth, H = img.naturalHeight, sx = (rec.w || W) / W; // sx = CSS px ต่อพิกเซลภาพ
+          const t = document.createElement('canvas'); t.width = W; t.height = H;
+          const tx = t.getContext('2d'); tx.drawImage(img, 0, 0);
+          const d = tx.getImageData(0, 0, W, H).data;
+          let x0 = W, y0 = H, x1 = -1, y1 = -1;
+          for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (d[(y * W + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          if (x1 < 0) return res(null);
+          const pad = Math.round(24 / sx);
+          x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W, x1 + pad); y1 = Math.min(H, y1 + pad);
+          const cw = x1 - x0, ch = y1 - y0, sc = Math.min(1, 900 / (cw * sx)) * sx;
+          const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(cw * sc)); c.height = Math.max(1, Math.round(ch * sc));
+          const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+          x.drawImage(t, x0, y0, cw, ch, 0, 0, c.width, c.height);
+          c.toBlob(b => res(b), 'image/jpeg', 0.6);
+        } catch (e) { res(null); }
+      };
+      img.onerror = () => res(null);
+      img.src = rec.data;
+    });
+  }
+  async function flush() {
+    if (_busy) return;
+    if (!_list().length || !FirebaseSync.ready()) return;
+    _busy = true;
+    try {
+      for (const it of _list()) {
+        const k = scratchKey(it.aid, it.qid);
+        let rec = null; try { rec = await PdfDB.get(k); } catch (e) {}
+        if (!rec) { _remove(it); continue; }
+        const blob = await toJpeg(rec);
+        if (!blob) { _remove(it); PdfDB.del(k).catch(() => {}); continue; }
+        let url = null;
+        try { url = await FirebaseSync.uploadBlob(blob, 'scratch_' + it.owner + '_' + it.qid + '.jpg', 'image/jpeg'); } catch (e) { console.warn('[ScratchSync] upload failed — retry later', e && (e.code || e.message)); break; }
+        const s = Store.load(); const a = (s.attempts || []).find(x => x.id === it.owner);
+        if (a) { a.scratch = Object.assign({}, a.scratch || {}, { [it.qid]: url }); if (!Store.save(s)) break; }
+        _remove(it); PdfDB.del(k).catch(() => {});
+      }
+    } finally { _busy = false; }
+  }
+  // หน้าทบทวน: รูปที่ยังรออัปโหลดในเครื่องนี้ ของผลสอบ owner → {qid: item}
+  function localFor(owner) { const m = {}; _list().forEach(x => { if (x.owner === owner) m[x.qid] = x; }); return m; }
+  async function localImage(it) { try { const r = await PdfDB.get(scratchKey(it.aid, it.qid)); if (!r) return null; const b = await toJpeg(r); return b ? URL.createObjectURL(b) : r.data; } catch (e) { return null; } } // ครอบเฉพาะส่วนที่เขียนเหมือนรูปที่อัปโหลด
+  return { queue, flush, localFor, localImage, toJpeg, whenQueued: () => _lastQueue };
 })();
 
 // ===================== LINE NOTIFICATION =====================
@@ -5693,6 +5780,26 @@ function findPendingHalf2(s, examId, takerName) {
   return { parentAttempt: parent, qids: remainingQids };
 }
 
+// v48.67: ฝึกซ้อมแบบ "ตั้งเป้า" (practiceSet) — หาเซ็ตล่าสุดของ exam+ผู้ทำ ที่ยังมีข้อค้าง (ยังไม่ตอบ)
+// และยังไม่กด "ขอดูเฉลยเลย" (revealedAt) — ใช้ทั้งแผ่นตั้งเป้า (ทำต่อ), pill บนการ์ด และการซ่อนเฉลยในหน้าทบทวน
+// เซ็ตที่ถูกเซ็ตใหม่กว่าแทนที่แล้ว (เริ่มชุดใหม่) จะไม่ถือว่าค้าง → เปิดเฉลยได้ตามปกติ
+function findPendingPractice(s, examId, takerName) {
+  const _name = (takerName || '').trim();
+  if (!_name) return null;
+  const sets = (s.attempts || []).filter(a =>
+    a.examId === examId && (a.takerName || '').trim() === _name && a.practiceSet === true
+  ).sort((a, b) => new Date(b.startedSetAt || b.submittedAt || 0) - new Date(a.startedSetAt || a.submittedAt || 0));
+  const att = sets[0];
+  if (!att || att.revealedAt) return null;
+  const ans = att.answers || {};
+  const qids = (s.questions[examId] || [])
+    .map(q => ({ id: q.id, no: q.no ?? q.number ?? 0, isFree: !!q.isFree }))
+    .filter(q => !q.isFree && (ans[q.id] == null || ans[q.id] === ''))
+    .sort((a, b) => a.no - b.no).map(q => q.id);
+  if (!qids.length) return null;
+  return { attempt: att, qids };
+}
+
 // v48.19p: รวม attempt ครึ่งแรก+ครึ่งหลังของ session เดียวกัน (จับคู่ผ่าน parentAttemptId)
 // เป็นก้อนเดียว — ใช้ร่วมกันทั้งหน้าสถิติ (แท็บคนละครึ่ง) และหน้ารีวิว (พัฒนาการ/ข้อผิดบ่อย)
 // attempt ที่ไม่ใช่ครึ่งหลัง หรือหา parent ไม่เจอ (ถูกกรอง/ถูกลบ) จะผ่านเข้า out ตามเดิมเฉยๆ
@@ -6347,15 +6454,16 @@ function initExams(){
         const isPrac = badge.dataset.practice === '1';
         const isHalf = badge.dataset.half === '1';
         const examDur = Number(badge.dataset.dur) || 0;
-        const effDur = isHalf ? Math.ceil(examDur/2/60)*60 : examDur;
+        const setSec = Number(badge.dataset.setsec) || 0; // v48.67: ฝึกซ้อมตั้งเป้า นับถอยหลัง
+        const effDur = setSec || (isHalf ? Math.ceil(examDur/2/60)*60 : examDur);
         const startedAt = Number(badge.dataset.startedAt) || 0;
         if(!startedAt) return;
         const pauseOff = Number(badge.dataset.pauseoffset) || 0;
         const pausedAt = Number(badge.dataset.pausedat) || Date.now();
         const pausedAtOff = Math.floor((Date.now() - pausedAt) / 1000);
         const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000) - pauseOff - Math.max(0, pausedAtOff));
-        const val = isPrac ? elapsed : Math.max(0, effDur - elapsed);
-        const label = isPrac ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
+        const val = (isPrac && !setSec) ? elapsed : Math.max(0, effDur - elapsed);
+        const label = (isPrac && !setSec) ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
         const el = badge.querySelector('.resume-time');
         if(el) el.textContent = label + ' ' + String(Math.floor(val/60)).padStart(2,'0') + ':' + String(val%60).padStart(2,'0');
       });
@@ -6466,21 +6574,22 @@ function initExams(){
       if (_hasResume) {
         const _isPrac0 = !!_myResume.practiceMode;
         const _isHalf0 = !!_myResume.halfMode;
-        const _effDur0 = _isHalf0 ? Math.ceil(e.durationSeconds/2/60)*60 : e.durationSeconds;
+        const _setSec0 = (_isPrac0 && _myResume.practiceSet) ? (Number(_myResume.setMin)||0)*60 : 0; // v48.67: ฝึกซ้อมตั้งเป้า นับถอยหลัง
+        const _effDur0 = _setSec0 || (_isHalf0 ? Math.ceil(e.durationSeconds/2/60)*60 : e.durationSeconds);
         const _pauseOff0 = _myResume.pauseOffset || 0;
         const _pausedAt0 = _myResume.pausedAt || Date.now();
         const _pausedAtOff0 = Math.floor((Date.now() - _pausedAt0) / 1000);
         const _elapsed0 = Math.max(0, Math.floor((Date.now() - _myResume.startedAt) / 1000) - _pauseOff0 - Math.max(0, _pausedAtOff0));
-        const _val0 = _isPrac0 ? _elapsed0 : Math.max(0, _effDur0 - _elapsed0);
+        const _val0 = (_isPrac0 && !_setSec0) ? _elapsed0 : Math.max(0, _effDur0 - _elapsed0);
         const _fmt0 = String(Math.floor(_val0/60)).padStart(2,'0') + ':' + String(_val0%60).padStart(2,'0');
-        const _label0 = _isPrac0 ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
+        const _label0 = (_isPrac0 && !_setSec0) ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
         const _isHalf2_0 = _isHalf0 && !!_myResume.half2Mode;
         const _title0 = (_isPrac0 ? 'ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? 'ครึ่งหลังค้างอยู่' : _isHalf0 ? 'คนละครึ่งค้างอยู่' : 'ทำค้างอยู่') + (_myResume.hardMode ? ' · โหมดยาก' : ''); // v48.66
         const _bg0 = _isPrac0 ? '#F0FBFC' : _isHalf0 ? '#ECECFC' : '#FFF3E0';
         const _border0 = _isPrac0 ? '#B2EBF2' : _isHalf0 ? '#D1D1F0' : '#FFD9A8';
         const _titleColor0 = _isPrac0 ? '#0E7C8C' : _isHalf0 ? '#5856D6' : '#A34E00';
         const _timeColor0 = _titleColor0;
-        resumeHtml = `<div class="resume-badge" data-resumeid="${e.id}" data-practice="${_isPrac0?'1':'0'}" data-half="${_isHalf0?'1':'0'}" data-startedAt="${_myResume.startedAt}" data-dur="${e.durationSeconds}" data-pauseoffset="${_pauseOff0}" data-pausedat="${_pausedAt0}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:${_bg0};border:1px solid ${_border0};border-radius:10px;cursor:pointer;">
+        resumeHtml = `<div class="resume-badge" data-resumeid="${e.id}" data-practice="${_isPrac0?'1':'0'}" data-half="${_isHalf0?'1':'0'}" data-startedAt="${_myResume.startedAt}" data-dur="${e.durationSeconds}" data-setsec="${_setSec0}" data-pauseoffset="${_pauseOff0}" data-pausedat="${_pausedAt0}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:${_bg0};border:1px solid ${_border0};border-radius:10px;cursor:pointer;">
           <span style="display:flex;color:${_titleColor0};">${_icon(_ICONS.pause,14)}</span>
           <span style="font-size:13px;font-weight:700;color:${_titleColor0};">${_title0}</span>
           <span class="resume-time" style="font-size:12px;color:${_timeColor0};">${_label0} ${_fmt0}</span>
@@ -6499,6 +6608,14 @@ function initExams(){
           <span style="font-size:13px;font-weight:700;color:#5856D6;">ทำครึ่งหลังต่อ</span>
           <span style="font-size:12px;color:#5856D6;">เหลือ ${_pendingHalf2.qids.length} ข้อ</span>
           <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#1C1C1E;background:#fff;border:1px solid #C6C6C8;border-radius:6px;padding:3px 8px;">${_icon(_ICONS.play,11)} เริ่ม</span>
+        </div>` : '';
+      // v48.67: ฝึกซ้อมตั้งเป้าที่ยังค้าง — pill "ทำต่อ" (ไม่โชว์ถ้ามี resume ค้างของชุดนี้อยู่แล้ว)
+      const _pendingSet = (!isTeacher && !_hasResume && _myName) ? findPendingPractice(s, e.id, _myName) : null;
+      const psetHtml = _pendingSet ? `<div class="pset-badge" data-examid="${e.id}" style="margin-top:4px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F0FBFC;border:1px solid #B2EBF2;border-radius:10px;cursor:pointer;">
+          <span style="display:flex;color:#0E7C8C;">${_icon(_ICONS.clock,14)}</span>
+          <span style="font-size:13px;font-weight:700;color:#0E7C8C;">ฝึกค้าง</span>
+          <span style="font-size:12px;color:#0E7C8C;">เหลือ ${_pendingSet.qids.length} ข้อ</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#1C1C1E;background:#fff;border:1px solid #C6C6C8;border-radius:6px;padding:3px 8px;">${_icon(_ICONS.play,11)} ทำต่อ</span>
         </div>` : '';
 
       card.innerHTML=`
@@ -6523,6 +6640,7 @@ function initExams(){
         ${practiceBtnHtml}
         ${resumeHtml}
         ${half2Html}
+        ${psetHtml}
       `;
 
       // Assignment + Notification Bell System
@@ -6640,9 +6758,11 @@ function initExams(){
           // v48.15: ทำต่อ "ครึ่งหลัง" ค้างอยู่ — ต้องส่ง qids/parentAttemptId ตามที่บันทึกไว้
           // ตอน saveTakeResume ไม่งั้น initTake จะ rebuild qsList เป็นชุดเต็มแทน subset เดิม
           const _isHalf2 = _isHalf && _myResume && !!_myResume.half2Mode;
-          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:_isHalf2?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode)}); // v48.66: + โหมดยาก
+          const _isSet = _isPrac && _myResume && !!_myResume.practiceSet; // v48.67: ฝึกซ้อมตั้งเป้า — ส่งข้อของรอบ/เวลาเดิม
+          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:(_isHalf2||_isSet)?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode), ...(_isSet?{setMin:_myResume.setMin, setParentId:_myResume.setParentId||null}:{})}); // v48.66: + โหมดยาก
           return;
         }
+        if(ev.target.closest('.pset-badge')){ navigate('exam',{id:e.id, practiceSheet:true}); return; } // v48.67
         if(ev.target.closest('.half2-badge')){
           if(_pendingHalf2) navigate('take',{id:e.id, takerName:_myName, half2:true, qids:_pendingHalf2.qids, parentAttemptId:_pendingHalf2.parentAttempt.id});
           return;
@@ -6751,11 +6871,16 @@ function initExamDetail(id){
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
     navigate('take', _isHard() ? {id:exam.id, takerName:name, hard:true} : {id:exam.id, takerName:name});
   };
+  // v48.67: ปุ่มฝึกซ้อมเปิดแผ่นเลือก — "ฝึกทั้งชุด" (แบบเดิมทุกอย่าง) หรือ "ตั้งเป้าเอง" (กี่ข้อ/กี่นาที, ทำต่อข้อที่ค้างได้)
   document.getElementById('examStartPracticeBtn').onclick=()=>{
     const name = _memberName || takerEl.value.trim();
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
-    navigate('take', _isHard() ? {id:exam.id, takerName:name, practice:true, hard:true} : {id:exam.id, takerName:name, practice:true});
+    openPracticeSetSheet(exam, name, _isHard());
   };
+  if (_pageParams && _pageParams.practiceSheet) {
+    const _n0 = _memberName || takerEl.value.trim();
+    setTimeout(() => { if (window._currentPage === 'exam') openPracticeSetSheet(exam, _n0, _isHard()); }, 0);
+  }
   document.getElementById('examStartHalfBtn').onclick=()=>{
     if(_isHard() || exam.examType==='hard') return;
     const name = _memberName || takerEl.value.trim();
@@ -6766,6 +6891,75 @@ function initExamDetail(id){
   takerEl.addEventListener('keydown', (e)=>{
     if(e.key==='Enter') document.getElementById('examStartBtn').click();
   });
+}
+
+// v48.67: แผ่นเลือกโหมดฝึกซ้อม — ฝึกทั้งชุด (เดิม) / ตั้งเป้าเอง (N ข้อ ใน M นาที) / ทำต่อข้อที่ค้างของเซ็ตเดิม
+// ข้อของรอบ = ข้อค้าง N ข้อแรกตามลำดับเลขข้อ (ข้อฟรีไม่ต้องทำ — ได้คะแนนอัตโนมัติ)
+function openPracticeSetSheet(exam, name, hardOn, forceNew) {
+  const old = document.getElementById('practiceSetSheet'); if (old) old.remove();
+  const s = Store.load();
+  const qs = (s.questions[exam.id] || []).map(q => ({ id: q.id, no: q.no ?? q.number ?? 0, isFree: !!q.isFree })).sort((a, b) => a.no - b.no);
+  const allPool = qs.filter(q => !q.isFree).map(q => q.id);
+  const pending = forceNew ? null : findPendingPractice(s, exam.id, name);
+  const pool = pending ? pending.qids : allPool;
+  const totalQ = qs.length || exam.questionCount || 0;
+  const perQSec = totalQ ? (exam.durationSeconds || 0) / totalQ : 0;
+  const suggest = n => Math.max(1, Math.ceil(perQSec * n / 60));
+  let n = Math.max(1, Math.min(10, pool.length || 1)), min = suggest(n), minTouched = false;
+  const hard = pending ? !!pending.attempt.hardMode : !!hardOn;
+  const ov = document.createElement('div');
+  ov.id = 'practiceSetSheet';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px;';
+  const done = pending ? (qs.length - pending.qids.length) : 0;
+  const stepBtn = (id, label) => `<button type="button" id="${id}" class="btn" style="width:40px;height:40px;padding:0;border-radius:12px;font-size:20px;font-weight:700;">${label}</button>`;
+  ov.innerHTML = `<div style="background:#fff;border-radius:20px;padding:20px;width:100%;max-width:420px;max-height:calc(100vh - 32px);overflow:auto;display:grid;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div style="font-size:18px;font-weight:800;">📝 ฝึกซ้อม${hard ? ' · โหมดยาก' : ''}</div>
+      <button type="button" id="psClose" class="btn" style="padding:6px 12px;border-radius:10px;font-size:13px;">ปิด</button>
+    </div>
+    ${pending ? '' : `<button type="button" id="psWhole" class="btn" style="padding:12px 16px;font-size:15px;border-radius:14px;color:#0891b2;border-color:#67e8f9;text-align:left;">ฝึกทั้งชุด (ไม่จับเวลา)<div class="muted" style="font-size:12px;font-weight:400;margin-top:2px;">แบบเดิม · ส่งแล้วดูเฉลยได้ทุกข้อ</div></button>`}
+    <div style="border:1.5px solid #e5e7eb;border-radius:14px;padding:14px;display:grid;gap:12px;">
+      <div style="font-weight:800;font-size:15px;">⏱ ${pending ? 'ทำต่อข้อที่ค้าง' : 'ตั้งเป้าเอง'}</div>
+      ${pending ? `<div id="psPendingInfo" style="font-size:13px;color:#0E7C8C;background:#F0FBFC;border:1px solid #B2EBF2;border-radius:10px;padding:8px 10px;">ทำแล้ว ${done}/${totalQ} ข้อ · ค้าง <b>${pending.qids.length}</b> ข้อ</div>` : ''}
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="min-width:28px;">ทำ</span>${stepBtn('psNMinus', '−')}<input id="psN" type="number" inputmode="numeric" min="1" style="width:64px;height:40px;text-align:center;font-size:17px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:12px;">${stepBtn('psNPlus', '+')}<span>ข้อ</span></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="min-width:28px;">ใน</span>${stepBtn('psMMinus', '−')}<input id="psM" type="number" inputmode="numeric" min="1" style="width:64px;height:40px;text-align:center;font-size:17px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:12px;">${stepBtn('psMPlus', '+')}<span>นาที</span></div>
+      <div id="psHint" class="muted" style="font-size:12px;"></div>
+      <button type="button" id="psStart" class="btn btnPrimary" style="padding:12px 16px;font-size:15px;border-radius:14px;"></button>
+      <div class="muted" style="font-size:12px;">หมดเวลาแล้วส่งอัตโนมัติ · ถ้ายังไม่ครบทั้งชุด จะยังไม่เปิดเฉลยข้อที่ยังไม่ทำ และกลับมาทำต่อได้</div>
+    </div>
+    ${pending ? `<button type="button" id="psRestart" class="btn" style="padding:10px 14px;font-size:13px;border-radius:12px;color:#6b7280;">เริ่มชุดใหม่ทั้งหมด / ฝึกทั้งชุด</button>` : ''}
+  </div>`;
+  document.body.appendChild(ov);
+  const nEl = ov.querySelector('#psN'), mEl = ov.querySelector('#psM');
+  const paint = () => {
+    nEl.value = n; mEl.value = min;
+    ov.querySelector('#psHint').textContent = `ทำได้สูงสุด ${pool.length} ข้อ` + (perQSec ? ` · เวลาชุดนี้ ${Math.round((exam.durationSeconds || 0) / 60)} นาที / ${totalQ} ข้อ → ${n} ข้อ แนะนำ ~${suggest(n)} นาที` : '');
+    ov.querySelector('#psStart').textContent = `▶ ${pending ? 'ทำต่อ' : 'เริ่ม'} ${n} ข้อ · ${min} นาที`;
+  };
+  const setN = v => { n = Math.max(1, Math.min(pool.length || 1, Math.round(Number(v) || 1))); if (!minTouched) min = suggest(n); paint(); };
+  const setM = v => { min = Math.max(1, Math.min(600, Math.round(Number(v) || 1))); minTouched = true; paint(); };
+  ov.querySelector('#psNMinus').onclick = () => setN(n - 1);
+  ov.querySelector('#psNPlus').onclick = () => setN(n + 1);
+  ov.querySelector('#psMMinus').onclick = () => setM(min - (min > 5 ? 5 : 1));
+  ov.querySelector('#psMPlus').onclick = () => setM(min + 5);
+  nEl.onchange = () => setN(nEl.value);
+  mEl.onchange = () => setM(mEl.value);
+  const close = () => ov.remove();
+  ov.querySelector('#psClose').onclick = close;
+  ov.addEventListener('click', ev => { if (ev.target === ov) close(); });
+  const goWhole = () => { close(); navigate('take', hardOn ? { id: exam.id, takerName: name, practice: true, hard: true } : { id: exam.id, takerName: name, practice: true }); };
+  const wholeBtn = ov.querySelector('#psWhole'); if (wholeBtn) wholeBtn.onclick = goWhole;
+  const restartBtn = ov.querySelector('#psRestart');
+  if (restartBtn) restartBtn.onclick = () => {
+    if (!confirm(`เริ่มชุดใหม่ทั้งหมด?\n\nเซ็ตเดิม (ค้าง ${pending.qids.length} ข้อ) จะปิดไป และเปิดดูเฉลยได้ทุกข้อ`)) return;
+    close(); openPracticeSetSheet(exam, name, hardOn, true);
+  };
+  ov.querySelector('#psStart').onclick = () => {
+    if (!pool.length) { toast('ไม่มีข้อให้ทำ'); return; }
+    close();
+    navigate('take', { id: exam.id, takerName: name, practice: true, setMin: min, qids: pool.slice(0, n), setParentId: pending ? pending.attempt.id : null, ...(hard ? { hard: true } : {}) });
+  };
+  setN(n);
 }
 
 // ===================== LIVE SHARE (v48.64) =====================
@@ -6905,7 +7099,13 @@ function initTake(id){
   const _half2Mode = !!_pageParams.half2 && !_hardOnly;
   const _halfMode = (!!_pageParams.half && !_hardOnly) || _half2Mode;
   const _halfQuota = _half2Mode ? total : (_halfMode ? Math.ceil(total/2) : 0);
-  const _effDuration = _halfMode ? Math.ceil(exam.durationSeconds/2/60)*60 : exam.durationSeconds;
+  // v48.67: ฝึกซ้อมแบบตั้งเป้า (practiceSet) — ทำเฉพาะข้อของรอบ (qids) ใน setMin นาที นับถอยหลัง หมดเวลาส่งเอง
+  // _practiceFree = ฝึกซ้อมแบบเดิม (นับขึ้น ไม่มีลิมิต) — จุดที่เดิมเช็ค _practiceMode เรื่องนาฬิกาเปลี่ยนมาเช็คตัวนี้
+  const _setMin = _practiceMode ? Math.max(0, Math.round(Number(_pageParams.setMin)||0)) : 0;
+  const _practiceSet = _practiceMode && _setMin > 0 && !!_qidSubset;
+  const _practiceFree = _practiceMode && !_practiceSet;
+  const _setParentId = _practiceSet ? (_pageParams.setParentId||null) : null;
+  const _effDuration = _practiceSet ? _setMin*60 : (_halfMode ? Math.ceil(exam.durationSeconds/2/60)*60 : exam.durationSeconds);
   const _parentAttemptId = _half2Mode ? (_pageParams.parentAttemptId||null) : null;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
   // LINE notification — เริ่มทำข้อสอบ (ไม่ส่งใน practice mode เพื่อลด noise)
@@ -6923,7 +7123,8 @@ function initTake(id){
     halfQuota:_halfQuota,
     half2Mode:_half2Mode,
     qids:_qidSubset?[..._qidSubset]:null,
-    parentAttemptId:_parentAttemptId
+    parentAttemptId:_parentAttemptId,
+    practiceSet:_practiceSet, setMin:_setMin, setParentId:_setParentId // v48.67
   };
   const st=_takeState;
   // นับข้อที่ "ตอบแล้วจริง" สำหรับโหมดคนละครึ่ง — ต้องกัน '' ออก เพราะโหมดกรอกตัวเลข
@@ -6934,7 +7135,7 @@ function initTake(id){
     }).length;
   }
 
-  document.getElementById('takeExamTitle').textContent=(_practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_practiceSet ? `[ฝึกซ้อม · ${total} ข้อ ${_setMin} นาที${_hardMode ? ' · โหมดยาก' : ''}] ` : _practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
   // #page-take ไม่ได้ถูกสร้างใหม่จาก HTML ทุกครั้งที่ navigate('take') — เนื้อหาคงค้างข้าม
   // รอบก่อนหน้า ถ้ารอบก่อนเป็นโหมดคนละครึ่ง #takeQNoWrap จะถูกเขียนทับด้วย .textContent=
   // (ทำลาย span ลูก #takeQNo/#takeQTotal ทิ้ง) ต้อง reset โครงสร้างกลับก่อนเสมอ
@@ -7029,6 +7230,7 @@ function initTake(id){
     const qno=q.no||q.number;
     const last=st.visitOrder[st.visitOrder.length-1];
     if(last!==qno) st.visitOrder.push(qno);
+    if(typeof window.scratchSetQuestion==='function') window.scratchSetQuestion(st.attemptId, q.id, qno); // v48.67: กระดาษทดแยกรายข้อ
   }
   function gotoQuestion(idx){
     leaveQuestion();
@@ -7355,12 +7557,12 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const _pendingHard=q=>_hardMode && !q.isFree && !q.correct;
     const _counted=q=>{
       if(_pendingHard(q)) return false;
-      if(!_halfMode) return true;
+      if(!_halfMode && !_practiceSet) return true; // v48.67: ฝึกซ้อมตั้งเป้า นับเฉพาะข้อที่ตอบ (ข้อที่ข้ามกลับไปค้าง)
       const v=st.answers[q.id];
       return v!=='' && v!=null;
     };
     let score=0;
-    let total=_halfMode?st.halfQuota:(_hardMode?qsList.filter(_counted).length:qsList.length);
+    let total=_halfMode?st.halfQuota:((_hardMode||_practiceSet)?qsList.filter(_counted).length:qsList.length);
     if(_isWeighted){
       // weighted: total = sum points, score = sum points where correct
       let _sumAll=0,_sumOk=0;
@@ -7394,7 +7596,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     // นาฬิกาที่เดินสดใน doStart()/_calcRemaining() ไม่งั้นฝึกซ้อมที่ทำค้างข้ามวันจะได้
     // usedSeconds รวมเวลาที่ปิดแอปไปด้วย (บั๊กที่ทำให้เห็น "เวลาที่ใช้ 1440:00 นาที")
     const _rawElapsed = st.startedAt ? Math.max(0, Math.floor((Date.now()-st.startedAt)/1000) - _pauseOffset) : 0;
-    const usedSeconds = st.practiceMode ? _rawElapsed : Math.min(_rawElapsed, _effDuration);
+    const usedSeconds = _practiceFree ? _rawElapsed : Math.min(_rawElapsed, _effDuration);
     // ไม่กรอกชื่อ = บันทึกเป็น 'ไม่ระบุชื่อ' (ห้าม block — คำตอบต้องไม่หาย)
     const takerName = st.takerName || 'ไม่ระบุชื่อ';
     // ⚠️ HIGH-RISK: ลำดับใน _doSave ห้ามสลับ — Store.save ต้องสำเร็จก่อนค่อย clearTakeResume
@@ -7451,6 +7653,33 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
           _putAttempt();
           toast('⚠️ ไม่พบข้อมูลครึ่งแรก — บันทึกเป็นรายการแยกแทน');
         }
+      } else if (st.practiceSet) {
+        // v48.67: ฝึกซ้อมตั้งเป้า — 1 เซ็ต = 1 attempt ครอบทุกข้อของชุด (ข้อที่ยังไม่ทำ counted:false)
+        // รอบต่อไปรวมคำตอบเข้า attempt เดิม (เหมือนครึ่งหลัง) แล้วคิดคะแนนใหม่เฉพาะข้อที่ทำแล้ว
+        const _examQs = savedS.questions[exam.id] || [];
+        const _parent = st.setParentId ? (savedS.attempts||[]).find(a => a.id === st.setParentId && a.practiceSet) : null;
+        const _base = _parent || _newAttempt;
+        const _already = Array.isArray(_base.setRoundIds) && _base.setRoundIds.includes(st.attemptId); // ส่งซ้ำหลัง save ล้ม — ไม่บวกซ้ำ
+        const _ans = {...(_base === _parent ? (_parent.answers||{}) : {})};
+        Object.keys(st.answers).forEach(k => { const v = st.answers[k]; if (v !== '' && v != null) _ans[k] = v; });
+        const _r = computeHalfAwareScoring(exam, _examQs, _ans, false, 0, [...perQuestion, ...((_parent && _parent.perQuestion) || [])], {partial:true, hard:_hardMode, hardOnly:_hardOnly});
+        _base.answers = _ans; _base.score = _r.score; _base.total = _r.total; _base.perQuestion = _r.perQuestion; _base.weighted = _r.weighted;
+        _base.practiceSet = true; _base.setMin = st.setMin;
+        if (!_already) {
+          _base.setRoundIds = [...(_base.setRoundIds||[]), st.attemptId];
+          _base.practiceRounds = _base.setRoundIds.length;
+          if (_parent) _parent.usedSeconds = (_parent.usedSeconds||0) + usedSeconds;
+        }
+        if (!_base.startedSetAt) _base.startedSetAt = new Date(st.startedAt || Date.now()).toISOString();
+        const _left = _examQs.filter(q => !q.isFree && (_ans[q.id] == null || _ans[q.id] === '')).length;
+        if (!_left && !_base.setDoneAt) _base.setDoneAt = new Date().toISOString();
+        if (_parent) {
+          _parent.submittedAt = new Date().toISOString();
+          _parent.prediction = null; // total เปลี่ยนหลังรวมรอบ — ค่าที่ทายไว้ของรอบก่อนเทียบไม่ได้แล้ว
+          _mergedParent = _parent;
+        } else {
+          _putAttempt();
+        }
       } else {
         _putAttempt();
       }
@@ -7461,6 +7690,8 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       }
       if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       LiveShare.done({attemptId:_mergedParent?_mergedParent.id:st.attemptId, score, total, usedSeconds, submittedAt:Date.now()}); // v48.64: บันทึกสำเร็จแล้วเท่านั้น
+      if (st.practiceSet && (_mergedParent||_newAttempt).setDoneAt) toast('🎉 ฝึกครบทั้งชุดแล้ว — ดูเฉลยได้ทุกข้อ'); // v48.67
+      try { ScratchSync.queue(st.attemptId, _mergedParent ? _mergedParent.id : st.attemptId, qsList.map(q => q.id)); } catch (e) {} // v48.67: ส่งรูปกระดาษทดรายข้อขึ้น cloud (ไม่รอ)
       if (_mergedParent) {
         // นับจุดอ่อนเฉพาะข้อของครึ่งหลัง (ข้อของครึ่งแรกนับไปแล้วตอนส่งครึ่งแรก) — ใช้
         // pseudo-attempt ที่มีแค่ perQuestion ของเซตครึ่งหลัง กันนับซ้ำ
@@ -7534,7 +7765,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   const t1=document.getElementById('takeTimer'),t2=document.getElementById('takeTimer2');
   function setTimerDisplay(value){
     const fmt=fmtTime(value);
-    if(_practiceMode){
+    if(_practiceFree){
       t1.textContent=fmt; t2.textContent=fmt;
       [t1,t2].forEach(t=>{t.style.color='#0891b2';t.style.fontWeight='800';t.style.animation='';});
       return;
@@ -7550,7 +7781,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       t2.style.animation='pulse 1s infinite';
     }
   }
-  setTimerDisplay(_practiceMode ? 0 : _effDuration);
+  setTimerDisplay(_practiceFree ? 0 : _effDuration);
 
   // _pauseOffset: จำนวนวินาทีที่หยุดนับสะสม (pause-resume offset)
   let _pauseOffset = 0;
@@ -7592,7 +7823,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     return {mode:_practiceMode?'practice':(_half2Mode?'half2':(_halfMode?'half':'timed')),
       examId:exam.id,examTitle:exam.title,subject:exam.subject||'',examType:eType,weighted,
       ...(_hardMode?{hard:true}:{}),
-      startedAt:st.startedAt,pauseOffset:_pauseOffset,durSec:_practiceMode?0:_effDuration,quota:_halfMode?st.halfQuota:0,
+      startedAt:st.startedAt,pauseOffset:_pauseOffset,durSec:_practiceFree?0:_effDuration,quota:_halfMode?st.halfQuota:0,
       cur:curNo,nos,ans,ok,bad,nk,free,unsure,skipped,changes,
       score:Math.round(got*100)/100,scoreTotal:_halfMode?st.halfQuota:Math.round(all*100)/100,qElapsed};
   }
@@ -7611,7 +7842,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     let _lastSaveTs = 0;
     _takeInterval=setInterval(()=>{
       const now = Date.now();
-      if(_practiceMode){
+      if(_practiceFree){
         const elapsed = Math.max(0, Math.floor((now - st.startedAt) / 1000) - _pauseOffset);
         setTimerDisplay(elapsed);
         st._pauseOffset = _pauseOffset;
@@ -7636,7 +7867,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // Check resume data — show popup if exists (รายคน: ใช้ takerName เป็น key)
   // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
   const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
-  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode && !!_rawResume.hardMode === !!_hardMode) ? _rawResume : null;
+  const _resume = (_rawResume && _rawResume.examId === id && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode && !!_rawResume.hardMode === !!_hardMode && !!_rawResume.practiceSet === !!_practiceSet) ? _rawResume : null;
   if (_resume) {
 
     // คำนวณเวลา ณ ตอนนี้ (freeze ไว้แสดงใน popup — ไม่เดิน)
@@ -7644,7 +7875,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     const _pausedAtOffset = _resume.pausedAt ? Math.floor((Date.now() - _resume.pausedAt) / 1000) : 0;
     const _totalFrozenOffset = (_resume.pauseOffset || 0) + Math.max(0, _pausedAtOffset);
     const _rawSec = Math.max(0, Math.floor((Date.now() - _resume.startedAt) / 1000) - _totalFrozenOffset);
-    const _frozenVal = _practiceMode
+    const _frozenVal = _practiceFree
       ? _rawSec                                        // นับขึ้น: เวลาที่ใช้ไปแล้ว
       : Math.max(0, _effDuration - _rawSec);   // นับลง: เวลาที่เหลือ
     const _frozenFmt = String(Math.floor(_frozenVal/60)).padStart(2,'0') + ':' + String(_frozenVal%60).padStart(2,'0');
@@ -7656,7 +7887,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     _resumeOverlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
     const _resumeBox = document.createElement('div');
     _resumeBox.style.cssText = 'background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);';
-    const _resumeLabel = _practiceMode ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
+    const _resumeLabel = _practiceFree ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
     const _resumeTitle = (_practiceMode ? '📝 ฝึกซ้อมค้างอยู่' : _half2Mode ? '🤝 ครึ่งหลังค้างอยู่' : _halfMode ? '🤝 คนละครึ่งค้างอยู่' : 'ทำค้างอยู่') + (_hardMode ? ' · โหมดยาก' : '');
     _resumeBox.innerHTML = `
       <div style="font-size:32px;margin-bottom:8px;">⏸️</div>
@@ -7700,7 +7931,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   } else {
     // มี resume ค้างอยู่ที่ไม่ตรงกับรอบนี้ (คนละชุด หรือชุดเดิมแต่คนละโหมด) — เตือนก่อนเริ่ม กันคำตอบเก่าถูกทับแบบไม่รู้ตัว
     if (_rawResume && _rawResume.examId && _rawResume.startedAt &&
-        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode || !!_rawResume.half2Mode !== !!_half2Mode || !!_rawResume.hardMode !== !!_hardMode)) {
+        (_rawResume.examId !== id || !!_rawResume.practiceMode !== !!_practiceMode || !!_rawResume.halfMode !== !!_halfMode || !!_rawResume.half2Mode !== !!_half2Mode || !!_rawResume.hardMode !== !!_hardMode || !!_rawResume.practiceSet !== !!_practiceSet)) {
       const _oldExam = (Store.load().exams || []).find(e => e.id === _rawResume.examId);
       const _oldTitle = (_oldExam ? _oldExam.title : 'ชุดก่อนหน้า') + (_rawResume.practiceMode ? ' (ฝึกซ้อม)' : _rawResume.half2Mode ? ' (คนละครึ่ง ครึ่งหลัง)' : _rawResume.halfMode ? ' (คนละครึ่ง)' : ' (จับเวลา)') + (_rawResume.hardMode ? ' · โหมดยาก' : '');
       if (!confirm(`⚠️ คุณมี "${_oldTitle}" ที่ทำค้างอยู่\n\nถ้าเริ่มชุดนี้ คำตอบที่ทำค้างไว้ในชุดเก่าจะถูกลบ\n\nเริ่มชุดนี้เลยไหม?`)) {
@@ -7717,6 +7948,23 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   document.getElementById('takeExitBtn').onclick=()=>{if(confirm('ต้องการออกจากการทำข้อสอบใช่ไหม?\n\nถ้าออกตอนนี้ คำตอบที่เลือกไว้จะยังถูกบันทึกไว้')){cleanupTake();navigate('exams');}};
 
   render();
+}
+
+// v48.67: หน้าต่างดูรูปกระดาษทด (หน้าทบทวน) — กดพื้นหลัง/✕ ปิด
+function openScratchViewer(title, src) {
+  const old = document.getElementById('scratchViewer'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'scratchViewer';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;padding:14px;max-width:min(960px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><b style="font-size:15px;">${esc(title)}</b><button type="button" class="btn" id="scratchViewerClose" style="padding:6px 12px;border-radius:10px;font-size:13px;">✕ ปิด</button></div>
+    <div style="overflow:auto;min-height:0;border:1px solid #e5e7eb;border-radius:10px;background:#fff;"><img alt="${esc(title)}" style="display:block;max-width:100%;height:auto;margin:0 auto;"></div>
+  </div>`;
+  ov.querySelector('img').src = src;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector('#scratchViewerClose').onclick = close;
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
 }
 
 // ===================== REVIEW PAGE =====================
@@ -7774,7 +8022,7 @@ function initReview(attemptId){
   const _modeQTotal=(Array.isArray(att.perQuestion)&&att.perQuestion.length)||qs.length;
   // attempt ที่กรอกย้อนหลัง (ไม่ใช่ทำสดผ่านแอปจริง) — usedSeconds/mood จะว่างเสมอ
   // ต้องบอกไว้ชัดๆ กันดูเหมือนบั๊ก
-  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceMode?' 📝 ฝึกซ้อม':att.manualEntry?' 🕰️ (บันทึกย้อนหลัง)':'';
+  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceSet?' 📝 ฝึกซ้อม (ตั้งเป้า)':att.practiceMode?' 📝 ฝึกซ้อม':att.manualEntry?' 🕰️ (บันทึกย้อนหลัง)':'';
   document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}${att.hardMode?' 🔒 (hard mode)':''}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=(isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`)
@@ -7804,6 +8052,27 @@ function initReview(attemptId){
     const _pending=(att.halfMode && !att.halfPart) ? findPendingHalf2(s, att.examId, att.takerName) : null;
     const _showHalf2=!!(_pending && _pending.parentAttempt.id===att.id);
     _half2Pending=_showHalf2;
+    // v48.67: ฝึกซ้อมตั้งเป้าที่ยังค้าง — ซ่อนเฉลยข้อที่ยังไม่ทำ (ใช้ตัวแปรเดียวกับคนละครึ่ง) + ปุ่มทำต่อ/ขอดูเฉลยเลย
+    const _setPend=att.practiceSet ? findPendingPractice(s, att.examId, att.takerName) : null;
+    const _setPending=!!(_setPend && _setPend.attempt.id===att.id);
+    if(_setPending) _half2Pending=true;
+    if(_combinedEl) _combinedEl.style.color=att.practiceSet?'#0E7C8C':'#6d28d9';
+    if(att.practiceSet && _combinedEl){
+      const _nAll=(s.questions[att.examId]||[]).length||_modeQTotal;
+      _combinedEl.style.display='';
+      _combinedEl.textContent=_setPending
+        ? `ทำแล้ว ${_nAll-_setPend.qids.length}/${_nAll} ข้อ · ค้าง ${_setPend.qids.length} ข้อ (คะแนนนับเฉพาะข้อที่ทำ)`
+        : (att.setDoneAt ? `ฝึกครบทั้งชุดแล้ว (${att.practiceRounds||1} รอบ)` : `เปิดเฉลยแล้ว · ทำไป ${(att.perQuestion||[]).filter(p=>p&&p.counted!==false).length}/${_nAll} ข้อ`);
+    }
+    const _setBtn=document.getElementById('reviewSetContinueBtn');
+    if(_setBtn){
+      const _showSet=_setPending && !Auth.isTeacher();
+      _setBtn.style.display=_showSet?'':'none';
+      if(_showSet){
+        _setBtn.textContent=`⏱ ทำต่อข้อที่ค้าง (${_setPend.qids.length} ข้อ)`;
+        _setBtn.onclick=()=>navigate('exam',{id:att.examId, practiceSheet:true});
+      }
+    }
     if(_half2Btn){
       _half2Btn.style.display=_showHalf2?'':'none';
       _half2Btn.onclick=()=>{
@@ -7815,10 +8084,11 @@ function initReview(attemptId){
       };
     }
     if(_revealBtn){
-      const _showReveal=_showHalf2 && !Auth.isTeacher();
+      const _showReveal=(_showHalf2||_setPending) && !Auth.isTeacher();
       _revealBtn.style.display=_showReveal?'':'none';
+      _revealBtn.textContent=_setPending?'👁 ขอดูเฉลยเลย (จบเซ็ตนี้ ไม่ทำต่อ)':'👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)'; // v48.67
       _revealBtn.onclick=()=>{
-        if(!confirm('ถ้าดูเฉลยตอนนี้ จะไม่สามารถกลับมาทำ "ครึ่งหลัง" ของชุดนี้ได้อีก (เพื่อความยุติธรรม)\n\nยืนยันจะดูเฉลยเลยไหม?')) return;
+        if(!confirm(_setPending ? `ถ้าดูเฉลยตอนนี้ ข้อที่ยังไม่ได้ทำ (${_setPend.qids.length} ข้อ) จะเปิดเฉลยทั้งหมด และเซ็ตนี้จะจบ (ทำต่อไม่ได้แล้ว)\n\nยืนยันจะดูเฉลยเลยไหม?` : 'ถ้าดูเฉลยตอนนี้ จะไม่สามารถกลับมาทำ "ครึ่งหลัง" ของชุดนี้ได้อีก (เพื่อความยุติธรรม)\n\nยืนยันจะดูเฉลยเลยไหม?')) return;
         const _s2=Store.load();
         const _att2=(_s2.attempts||[]).find(a=>a.id===attemptId);
         if(_att2){ _att2.revealedAt=new Date().toISOString(); Store.save(_s2); }
@@ -7875,7 +8145,7 @@ function initReview(attemptId){
       // กรองเหลือ [] — ถ้าปล่อยผ่านไป computeHalfAwareScoring จะคืน score 0/perQuestion ว่าง
       // แล้ว Store.save เขียนทับ กลายเป็นลบประวัติรายข้อของ attempt นี้ทิ้งทั้งหมดเงียบๆ
       if (!qs2.length) { toast('⚠️ ข้อสอบชุดนี้ถูกแก้/สร้างใหม่จนไม่ตรงกับตอนที่ทำ — คำนวณคะแนนใหม่ไม่ได้'); return; }
-      const _result2 = computeHalfAwareScoring(exam2, qs2, att2.answers||{}, _halfMode2, att2.halfQuota, att2.perQuestion, { hard: !!att2.hardMode || exam2.examType==='hard', hardOnly: !!att2.hardOnly || exam2.examType==='hard' });
+      const _result2 = computeHalfAwareScoring(exam2, qs2, att2.answers||{}, _halfMode2, att2.halfQuota, att2.perQuestion, { hard: !!att2.hardMode || exam2.examType==='hard', hardOnly: !!att2.hardOnly || exam2.examType==='hard', partial: !!att2.practiceSet }); // v48.67: ฝึกตั้งเป้า นับเฉพาะข้อที่ทำเสมอ (รวมหลังเปิดเฉลย)
       att2.score = _result2.score;
       att2.total = _result2.total;
       att2.perQuestion = _result2.perQuestion;
@@ -7893,7 +8163,7 @@ function initReview(attemptId){
   const answers=att.answers||{};
   const _isWAtt=isWeightedAttempt(att);
   // v48.12: โหมดคนละครึ่ง — totalItems/correctCount นับเทียบกับโควตา ไม่ใช่จำนวนข้อเต็มชุด
-  const totalItems=att.halfMode?(att.halfQuota||0):(Array.isArray(att.perQuestion)&&att.perQuestion.length?att.perQuestion.length:qs.length);
+  const totalItems=att.halfMode?(att.halfQuota||0):(att.practiceSet&&Array.isArray(att.perQuestion))?att.perQuestion.filter(p=>p&&p.counted!==false).length:(Array.isArray(att.perQuestion)&&att.perQuestion.length?att.perQuestion.length:qs.length); // v48.67: ฝึกตั้งเป้า นับเฉพาะข้อที่ทำ
   const totalPoints=Number(att.total||qs.length||0);
   // correctCount = จำนวนข้อที่ถูก (ไม่ใช่คะแนน)
   let correctCount=0;
@@ -8023,7 +8293,7 @@ function initReview(attemptId){
   }
   // v48.12: ข้อที่ตั้งใจข้ามในโหมดคนละครึ่ง (counted:false) — แยกจาก "ผิด" จริง
   function isCountedQ(q){
-    if(!att.halfMode && !att.hardMode) return true; // v48.66: โหมดยาก ข้อรอตรวจ = counted:false
+    if(!att.halfMode && !att.hardMode && !att.practiceSet) return true; // v48.66: โหมดยาก ข้อรอตรวจ = counted:false; v48.67: ฝึกตั้งเป้า ข้อที่ยังไม่ทำ
     const no=Number(q.no)||0;
     if(Array.isArray(att.perQuestion)&&att.perQuestion.length){
       const p=att.perQuestion.find(x=>Number(x.no)===no);
@@ -8032,6 +8302,10 @@ function initReview(attemptId){
     return true;
   }
 
+  // v48.67: กระดาษทดรายข้อ — จาก cloud (att.scratch) หรือรูปที่ยังรออัปโหลดในเครื่องนี้
+  const _scrRemote=att.scratch||{}, _scrLocal=ScratchSync.localFor(att.id);
+  const _hasScr=q=>!!(_scrRemote[q.id]||_scrLocal[q.id]);
+  const _scrBtnHtml=q=>`<button type="button" class="scratchViewBtn" data-scr-qid="${esc(q.id)}" data-scr-no="${esc(q.no)}" aria-label="ดูกระดาษทด ข้อ ${esc(q.no)}">✏️ ดูทด</button>`;
   // Nav chips
   const nav=document.getElementById('reviewNavChips');
   nav.innerHTML='';
@@ -8041,9 +8315,9 @@ function initReview(attemptId){
     const skipped=!isCountedQ(q);
     const b=document.createElement('button');
     b.className='chip '+(skipped?'skip':(ok?'good':'bad'));
-    b.innerHTML=q.no+(isUns?'<span style="font-size:9px;margin-left:1px;vertical-align:super;">🤔</span>':'');
+    b.innerHTML=q.no+(isUns?'<span style="font-size:9px;margin-left:1px;vertical-align:super;">🤔</span>':'')+(_hasScr(q)?'<span class="chipScrDot" title="มีกระดาษทด"></span>':'');
     if(isUns){ b.title='🤔 ติ๊กไม่แน่ใจ'; }
-    else if(skipped){ b.title='— ไม่ได้เลือก (คนละครึ่ง)'; }
+    else if(skipped){ b.title=att.practiceSet?'— ยังไม่ได้ทำ':'— ไม่ได้เลือก (คนละครึ่ง)'; }
     b.onclick=()=>{
       if(!_reviewIsGDrive) setPdfPage(q.page||1);
     };
@@ -8147,7 +8421,8 @@ function initReview(attemptId){
         <span class="qRowNum">ข้อ ${q.no}${isFree?' <span style="background:#f59e0b;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;">ฟรี</span>':''}${isUns?' <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;border:1px solid #fde68a;">🤔 ไม่แน่ใจ</span>':''}</span>
         <span class="qRowPage">${_reviewIsGDrive?'':'หน้า '+(q.page||1)}${(Array.isArray(q.tags)&&q.tags.length?q.tags:(q.topic?[q.topic]:[])).map(t=>`<span style='color:#6366f1;font-size:10px;background:#ede9fe;border-radius:4px;padding:0 3px;margin-left:2px;'>${esc(t)}</span>`).join('')}${(Array.isArray(q.subTags)?q.subTags:[]).map(t=>`<span style='color:#7c3aed;font-size:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:4px;padding:0 3px;margin-left:2px;'>↳${esc(t)}</span>`).join('')}</span>
         <div class="qRowPills">${pillsHtml}</div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+        <div class="qRowRight" style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+          ${_hasScr(q)?_scrBtnHtml(q):''}
           ${timeBadgeHtml}
           <span class="qBadge ${badgeCls}">${badgeTxt}</span>
           ${tickHtml}
@@ -8178,6 +8453,27 @@ function initReview(attemptId){
     });
 
     list.appendChild(wrap);
+  });
+  // v48.67: ปุ่มดูกระดาษทด — กันคลิกทะลุไปกาง/หุบแถว
+  const _bindScrBtn=btn=>btn.addEventListener('click',async (e)=>{
+    e.stopPropagation();
+    const qid=btn.dataset.scrQid, title=`กระดาษทด ข้อ ${btn.dataset.scrNo}`;
+    if(_scrRemote[qid]) return openScratchViewer(title, _scrRemote[qid]);
+    const src=_scrLocal[qid]?await ScratchSync.localImage(_scrLocal[qid]):null;
+    if(src) openScratchViewer(title+' (ยังไม่ขึ้น cloud)', src); else toast('ไม่พบรูปกระดาษทด');
+  });
+  list.querySelectorAll('.scratchViewBtn').forEach(_bindScrBtn);
+  // เพิ่งส่งข้อสอบ: คิวรูปทดเขียนเสร็จหลังหน้านี้ render → เติมปุ่ม/จุดของข้อที่เพิ่งเข้าคิว
+  ScratchSync.whenQueued().then(()=>{
+    if(window._currentPage!=='review' || !window._currentParams || window._currentParams.attemptId!==attemptId) return;
+    Object.assign(_scrLocal, ScratchSync.localFor(att.id));
+    qs.forEach((q,idx)=>{
+      if(!_hasScr(q)) return;
+      const right=document.querySelector(`#rq-${q.no} .qRowRight`);
+      if(right && !right.querySelector('.scratchViewBtn')){ right.insertAdjacentHTML('afterbegin', _scrBtnHtml(q)); _bindScrBtn(right.querySelector('.scratchViewBtn')); }
+      const chip=nav.children[idx];
+      if(chip && !chip.querySelector('.chipScrDot')) chip.insertAdjacentHTML('beforeend','<span class="chipScrDot" title="มีกระดาษทด"></span>');
+    });
   });
   // v48.66: ปุ่มครูตรวจเอง (โหมดยาก) — กันคลิกทะลุไปกาง/หุบแถว
   list.querySelectorAll('.hardTick button').forEach(btn=>btn.addEventListener('click',(e)=>{
@@ -8808,7 +9104,7 @@ function buildAttemptSummary(att,s){
       no, page:q.page||(pq&&pq.page)||null, chosen, correct,
       ok:pq?!!pq.isCorrect:isAnswerCorrect(chosen,q.correct,examType),
       free:!!(q.isFree||(pq&&pq.isFree)),
-      skipped:!!((att.halfMode||att.hardMode)&&pq&&pq.counted===false),
+      skipped:!!((att.halfMode||att.hardMode||att.practiceSet)&&pq&&pq.counted===false),
       unsure:!!(pq&&pq.unsure),
       sec:(pq&&pq.elapsedMs>0)?pq.elapsedMs/1000:null,
     };
@@ -8816,7 +9112,7 @@ function buildAttemptSummary(att,s){
   const weighted=isWeightedAttempt(att);
   const total=Number(att.total||rows.length||0);
   const score=Number.isFinite(Number(att.score))?Number(att.score):0;
-  const totalItems=att.halfMode?(att.halfQuota||0):att.hardMode?pqAll.filter(p=>p&&p.counted!==false).length:(pqAll.length||rows.length);
+  const totalItems=att.halfMode?(att.halfQuota||0):(att.hardMode||att.practiceSet)?pqAll.filter(p=>p&&p.counted!==false).length:(pqAll.length||rows.length);
   const correctCount=pqAll.length?pqAll.filter(p=>p&&p.isCorrect&&p.counted!==false).length:(weighted?0:score);
   const wrongNos=Array.from(new Set(
     pqAll.length?pqAll.filter(p=>!p.isCorrect&&p.counted!==false).map(p=>Number(p.no)||0).filter(n=>n>0)
@@ -14495,6 +14791,8 @@ function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, old
   // v48.66: opts.hard = ผลสอบโหมดยาก — เทียบกับ hardAnswer ปัจจุบัน, ข้อไม่มีเฉลย = รอตรวจ (counted:false),
   // คงคำตัดสินที่ครูตรวจเอง (manual) จาก perQuestion เดิมไว้เหนือผลอัตโนมัติ
   const _hard = !!(opts && opts.hard);
+  // v48.67: opts.partial = ฝึกซ้อมแบบตั้งเป้า — นับเฉพาะข้อที่ตอบแล้ว (ข้อฟรีนับเสมอ) ข้อที่ยังไม่ทำ counted:false; ไม่บังคับ unweighted
+  const _partial = !!(opts && opts.partial);
   if (_hard) qsFull = qsFull.map(q => ({ ...q, correct: String((opts.hardOnly ? q.correct : q.hardAnswer)||'').trim() })); // v48.66: hardOnly ใช้ q.correct
   const _eType = _hard ? 'hard' : (exam.examType || 'mc');
   const _isWeighted = !!exam.weighted && !halfMode;
@@ -14502,8 +14800,8 @@ function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, old
   const _manualFor = q => { if (!_hard) return null; const o = _oldPQFor(q); return (o && (o.manual === 'ok' || o.manual === 'bad')) ? o.manual : null; };
   const _pendingFor = q => _hard && !q.isFree && !q.correct && !_manualFor(q);
   const _okFor = q => { const m = _manualFor(q); if (m) return m === 'ok'; return !!(q.isFree || (answers[q.id] && isAnswerCorrect(answers[q.id], q.correct, _eType))); };
-  const _isCountedFor = q => { if (_pendingFor(q)) return false; if (!halfMode) return true; const v = answers[q.id]; return v!=null && v!==''; };
-  let score = 0, total = halfMode ? (halfQuota||0) : (_hard ? qsFull.filter(_isCountedFor).length : qsFull.length);
+  const _isCountedFor = q => { if (_pendingFor(q)) return false; if (_partial && q.isFree) return true; if (!halfMode && !_partial) return true; const v = answers[q.id]; return v!=null && v!==''; };
+  let score = 0, total = halfMode ? (halfQuota||0) : ((_hard || _partial) ? qsFull.filter(_isCountedFor).length : qsFull.length);
   if (_isWeighted) {
     let _sumAll = 0, _sumOk = 0;
     qsFull.forEach(q => {
@@ -14539,7 +14837,7 @@ function computeHalfAwareScoring(exam, qsFull, answers, halfMode, halfQuota, old
       changes: _old ? (_old.changes||0) : 0,
     };
     if (_isWeighted) _pq.points = getQPoints(q);
-    if (halfMode || _hard) _pq.counted = _isCountedFor(q);
+    if (halfMode || _hard || _partial) _pq.counted = _isCountedFor(q);
     if (_hard) {
       if (!q.isFree && !q.correct) _pq.pending = true;
       if (_man) { _pq.manual = _man; _pq.autoIsCorrect = _autoOk; }
@@ -15156,8 +15454,9 @@ function saveTakeResume(state) {
       // v48.15: "ครึ่งหลัง" ต้องเก็บ qids ด้วย ไม่งั้น refresh กลางคันแล้ว initTake จะ
       // rebuild qsList เป็นชุดเต็มแทนที่จะเป็น subset เดิม (เพราะ _pageParams หายไปตอน reload)
       half2Mode: !!state.half2Mode,
-      qids: state.half2Mode ? (state.qids||null) : null,
+      qids: (state.half2Mode || state.practiceSet) ? (state.qids||null) : null, // v48.67: + ฝึกซ้อมตั้งเป้า (ข้อของรอบ)
       parentAttemptId: state.half2Mode ? (state.parentAttemptId||null) : null,
+      practiceSet: !!state.practiceSet, setMin: state.practiceSet ? (state.setMin||0) : 0, setParentId: state.practiceSet ? (state.setParentId||null) : null,
     }));
   } catch(e) {}
 }
@@ -16799,7 +17098,7 @@ const _takeResume = loadTakeResume(Auth.getName());
 
 if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   if (_savedState.page === 'take' && _takeResume) {
-    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: _takeResume.half2Mode ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null });
+    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: (_takeResume.half2Mode || _takeResume.practiceSet) ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null, ...(_takeResume.practiceSet ? { setMin: _takeResume.setMin, setParentId: _takeResume.setParentId||null } : {}), ...(_takeResume.hardMode ? { hard: true } : {}) });
   } else {
     navigate(_savedState.page, _savedState.params);
   }
@@ -17786,7 +18085,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.66';
+  const CURRENT_VERSION = 'v48.67';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
@@ -17885,6 +18184,7 @@ function initEntranceCompare(params) {
   pad.innerHTML =
     '<div id="scratchPadHeader">' +
       '<span class="scratch-title">📝 กระดาษทด</span>' +
+      '<span id="scratchQLabel" style="font-size:12px;font-weight:800;background:#fbbf24;color:#111;border-radius:8px;padding:2px 8px;display:none;"></span>' +
       '<button type="button" class="scratch-tool active" data-tool="pen">✏️ ปากกา</button>' +
       '<button type="button" class="scratch-tool" data-tool="eraser">🩹 ลบ</button>' +
       '<span id="scratchEraserSizes">' +
@@ -17908,6 +18208,8 @@ function initEntranceCompare(params) {
   let dpr = window.devicePixelRatio || 1;
   let penSize = 2;
   let eraserSize = 28;
+  let _sq = null, _dirty = false, _pendingRec = null; // v48.67: ข้อที่ผูกอยู่ {aid,qid,no} / มีการขีดตั้งแต่โหลด / ภาพที่รอวาดตอนเปิดแผ่น
+  const _mem = {};
 
   function resizeCanvas(preserve) {
     const w = Math.max(10, Math.floor(window.innerWidth));
@@ -17959,6 +18261,7 @@ function initEntranceCompare(params) {
     }
   }
   function drawDot(x, y) {
+    _dirty = true; // v48.67: มีการขีด/ลบ → ต้องบันทึกของข้อนี้
     applyStrokeStyle();
     const r = (tool === 'eraser' ? eraserSize : penSize) / 2;
     ctx.beginPath();
@@ -17966,6 +18269,7 @@ function initEntranceCompare(params) {
     ctx.fill();
   }
   function drawSegment(x, y) {
+    _dirty = true;
     applyStrokeStyle();
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -18089,7 +18393,7 @@ function initEntranceCompare(params) {
     });
   });
   document.getElementById('scratchClearBtn').addEventListener('click', () => {
-    if (confirm('ล้างกระดาษทดทั้งหมด?')) clearCanvas();
+    if (confirm(_sq ? 'ล้างกระดาษทดของข้อนี้?' : 'ล้างกระดาษทดทั้งหมด?')) { clearCanvas(); _dirty = true; }
   });
   // ให้ .takeGrid หด/คืนพื้นที่ตามสถานะ open/full ปัจจุบันของกระดาษทด — เปิดปกติ
   // (ไม่เต็มจอ) เท่านั้นที่ split (ดูโจทย์ไม่ถูกบัง), เต็มจอ/ปิด ไม่ split (พฤติกรรมเดิม)
@@ -18155,7 +18459,7 @@ function initEntranceCompare(params) {
     const willOpen = !pad.classList.contains('open');
     pad.classList.toggle('open', willOpen);
     _syncScratchSplit();
-    if (willOpen) requestAnimationFrame(() => resizeCanvas(true));
+    if (willOpen) requestAnimationFrame(() => { resizeCanvas(true); if (_pendingRec) { const r = _pendingRec; _pendingRec = null; clearCanvas(); _drawRec(r); } });
   });
   window.addEventListener('resize', () => {
     if (pad.classList.contains('open')) resizeCanvas(true);
@@ -18167,8 +18471,51 @@ function initEntranceCompare(params) {
     btn.classList.remove('visible');
     pad.classList.remove('open');
     _syncScratchSplit();
-    clearCanvas(); // ทดหายเมื่อออกจากข้อสอบ (เหมือนสอบจริงที่ส่งกระดาษทดคืน)
+    _saveCurrent(); // v48.67: เก็บแผ่นของข้อปัจจุบันก่อน (ส่วนที่อ่านภาพทำแบบ sync ก่อนล้าง)
+    _sq = null; _pendingRec = null; _setLabel();
+    clearCanvas(); // แผ่นบนจอว่างเมื่อออกจากข้อสอบ — ภาพรายข้อเก็บไว้ใน IndexedDB แล้วส่งขึ้น cloud หลังส่งข้อสอบ
   };
+
+  // ── v48.67: กระดาษทดแยกรายข้อ — 1 ข้อ = 1 แผ่น; เปลี่ยนข้อ = เก็บแผ่นเดิม (IndexedDB key scratch:<attemptId>:<qid>) แล้วโหลดแผ่นของข้อใหม่ ──
+  function _setLabel() { const el = document.getElementById('scratchQLabel'); if (!el) return; el.style.display = _sq ? '' : 'none'; el.textContent = _sq ? ('ข้อ ' + _sq.no) : ''; }
+  function _isBlank() {
+    if (!canvas.width || !canvas.height) return true;
+    try { const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return false; } catch (e) { return false; }
+    return true;
+  }
+  function _saveCurrent() {
+    if (!_sq || !_dirty) return Promise.resolve();
+    _dirty = false;
+    const k = scratchKey(_sq.aid, _sq.qid);
+    if (_isBlank()) { delete _mem[k]; return PdfDB.del(k).catch(() => {}); }
+    let data = ''; try { data = canvas.toDataURL('image/png'); } catch (e) { return Promise.resolve(); }
+    const rec = { data, w: canvas.width / dpr, h: canvas.height / dpr, no: _sq.no, ts: Date.now() };
+    _mem[k] = rec;
+    return PdfDB.put(k, rec).catch(() => {});
+  }
+  function _drawRec(rec) {
+    if (!pad.classList.contains('open') || !canvas.width) { _pendingRec = rec; return; } // แผ่นยังไม่เปิด → วาดตอนเปิด (ขนาดจริง)
+    const want = _sq ? scratchKey(_sq.aid, _sq.qid) : '';
+    const i = new Image();
+    i.onload = () => {
+      if (!_sq || scratchKey(_sq.aid, _sq.qid) !== want) return;
+      ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.drawImage(i, 0, 0, rec.w, rec.h); ctx.restore();
+    };
+    i.src = rec.data;
+  }
+  window.scratchSetQuestion = function(aid, qid, no) {
+    if (!aid || !qid) return;
+    if (_sq && _sq.aid === aid && _sq.qid === qid) return;
+    _saveCurrent();
+    clearCanvas(); _pendingRec = null; _dirty = false;
+    _sq = { aid, qid, no };
+    _setLabel();
+    const k = scratchKey(aid, qid);
+    const done = rec => { if (rec && _sq && scratchKey(_sq.aid, _sq.qid) === k && !_dirty) _drawRec(rec); };
+    if (_mem[k]) done(_mem[k]);
+    else PdfDB.get(k).then(rec => { if (rec) { _mem[k] = rec; done(rec); } }).catch(() => {});
+  };
+  window.scratchSaveNow = function() { return _saveCurrent(); };
 })();
 
 // ── PDF ANNOTATE — เขียน/Highlight ทับ PDF ข้อสอบ (desktop/iPad ≥901px เท่านั้น) ──
