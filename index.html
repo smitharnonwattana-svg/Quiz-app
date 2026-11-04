@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.69 -->
+  <!-- APP_VERSION: v48.70 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1599,7 +1599,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.69</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.70</div>
     </div>
   </div>
 </div>
@@ -6778,7 +6778,7 @@ function initExams(){
           // ตอน saveTakeResume ไม่งั้น initTake จะ rebuild qsList เป็นชุดเต็มแทน subset เดิม
           const _isHalf2 = _isHalf && _myResume && !!_myResume.half2Mode;
           const _isSet = _isPrac && _myResume && !!_myResume.practiceSet; // v48.67: ฝึกซ้อมตั้งเป้า — ส่งข้อของรอบ/เวลาเดิม
-          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:(_isHalf2||_isSet)?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode), ...(_isSet?{setMin:_myResume.setMin, setParentId:_myResume.setParentId||null}:{})}); // v48.66: + โหมดยาก
+          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:(_isHalf2||_isSet)?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode), ...(_isSet?{setMin:_myResume.setMin, setParentId:_myResume.setParentId||null, setN:_myResume.setN||0}:{})}); // v48.66: + โหมดยาก
           return;
         }
         if(ev.target.closest('.pset-badge')){ navigate('exam',{id:e.id, practiceSheet:true}); return; } // v48.67
@@ -6913,7 +6913,7 @@ function initExamDetail(id){
 }
 
 // v48.67: แผ่นเลือกโหมดฝึกซ้อม — ฝึกทั้งชุด (เดิม) / ตั้งเป้าเอง (N ข้อ ใน M นาที) / ทำต่อข้อที่ค้างของเซ็ตเดิม
-// ข้อของรอบ = ข้อค้าง N ข้อแรกตามลำดับเลขข้อ (ข้อฟรีไม่ต้องทำ — ได้คะแนนอัตโนมัติ)
+// v48.70: รอบหนึ่งแสดงทุกข้อที่ยังไม่ได้ทำ เลือกตอบข้อไหนก็ได้ สูงสุด N ข้อ (เดิมบังคับข้อค้าง N ข้อแรกตามลำดับ) — ข้อฟรีไม่ต้องทำ
 function openPracticeSetSheet(exam, name, hardOn, forceNew) {
   const old = document.getElementById('practiceSetSheet'); if (old) old.remove();
   const s = Store.load();
@@ -6940,7 +6940,7 @@ function openPracticeSetSheet(exam, name, hardOn, forceNew) {
     <div style="border:1.5px solid #e5e7eb;border-radius:14px;padding:14px;display:grid;gap:12px;">
       <div style="font-weight:800;font-size:15px;">⏱ ${pending ? 'ทำต่อข้อที่ค้าง' : 'ตั้งเป้าเอง'}</div>
       ${pending ? `<div id="psPendingInfo" style="font-size:13px;color:#0E7C8C;background:#F0FBFC;border:1px solid #B2EBF2;border-radius:10px;padding:8px 10px;">ทำแล้ว ${done}/${totalQ} ข้อ · ค้าง <b>${pending.qids.length}</b> ข้อ</div>` : ''}
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="min-width:28px;">ทำ</span>${stepBtn('psNMinus', '−')}<input id="psN" type="number" inputmode="numeric" min="1" style="width:64px;height:40px;text-align:center;font-size:17px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:12px;">${stepBtn('psNPlus', '+')}<span>ข้อ</span></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="min-width:28px;">ตอบได้</span>${stepBtn('psNMinus', '−')}<input id="psN" type="number" inputmode="numeric" min="1" style="width:64px;height:40px;text-align:center;font-size:17px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:12px;">${stepBtn('psNPlus', '+')}<span>ข้อ</span></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="min-width:28px;">ใน</span>${stepBtn('psMMinus', '−')}<input id="psM" type="number" inputmode="numeric" min="1" style="width:64px;height:40px;text-align:center;font-size:17px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:12px;">${stepBtn('psMPlus', '+')}<span>นาที</span></div>
       <div id="psHint" class="muted" style="font-size:12px;"></div>
       <button type="button" id="psStart" class="btn btnPrimary" style="padding:12px 16px;font-size:15px;border-radius:14px;"></button>
@@ -6952,8 +6952,8 @@ function openPracticeSetSheet(exam, name, hardOn, forceNew) {
   const nEl = ov.querySelector('#psN'), mEl = ov.querySelector('#psM');
   const paint = () => {
     nEl.value = n; mEl.value = min;
-    ov.querySelector('#psHint').textContent = `ทำได้สูงสุด ${pool.length} ข้อ` + (perQSec ? ` · เวลาชุดนี้ ${Math.round((exam.durationSeconds || 0) / 60)} นาที / ${totalQ} ข้อ → ${n} ข้อ แนะนำ ~${suggest(n)} นาที` : '');
-    ov.querySelector('#psStart').textContent = `▶ ${pending ? 'ทำต่อ' : 'เริ่ม'} ${n} ข้อ · ${min} นาที`;
+    ov.querySelector('#psHint').textContent = `เลือกตอบข้อไหนก็ได้ จาก ${pool.length} ข้อที่ยังไม่ได้ทำ` + (perQSec ? ` · เวลาชุดนี้ ${Math.round((exam.durationSeconds || 0) / 60)} นาที / ${totalQ} ข้อ → ${n} ข้อ แนะนำ ~${suggest(n)} นาที` : '');
+    ov.querySelector('#psStart').textContent = `▶ ${pending ? 'ทำต่อ' : 'เริ่ม'} · ตอบได้ ${n} ข้อ · ${min} นาที`;
   };
   const setN = v => { n = Math.max(1, Math.min(pool.length || 1, Math.round(Number(v) || 1))); if (!minTouched) min = suggest(n); paint(); };
   const setM = v => { min = Math.max(1, Math.min(600, Math.round(Number(v) || 1))); minTouched = true; paint(); };
@@ -6979,7 +6979,7 @@ function openPracticeSetSheet(exam, name, hardOn, forceNew) {
   ov.querySelector('#psStart').onclick = () => {
     if (!pool.length) { toast('ไม่มีข้อให้ทำ'); return; }
     close();
-    navigate('take', { id: exam.id, takerName: name, practice: true, setMin: min, qids: pool.slice(0, n), setParentId: pending ? pending.attempt.id : null, ...(hard ? { hard: true } : {}) });
+    navigate('take', { id: exam.id, takerName: name, practice: true, setMin: min, setN: n, qids: pool.slice(), setParentId: pending ? pending.attempt.id : null, ...(hard ? { hard: true } : {}) });
   };
   setN(n);
 }
@@ -7127,6 +7127,9 @@ function initTake(id){
   const _practiceSet = _practiceMode && _setMin > 0 && !!_qidSubset;
   const _practiceFree = _practiceMode && !_practiceSet;
   const _setParentId = _practiceSet ? (_pageParams.setParentId||null) : null;
+  // v48.70: ตอบได้สูงสุด N ข้อในรอบ (เลือกข้อไหนก็ได้) — ใช้กลไกโควตาเดียวกับคนละครึ่ง; resume เก่าที่ไม่มี setN = ทุกข้อในรอบ (พฤติกรรมเดิม)
+  const _setN = _practiceSet ? Math.max(1, Math.min(total, Math.round(Number(_pageParams.setN)) || total)) : 0;
+  const _quotaN = _halfMode ? _halfQuota : _setN;
   const _effDuration = _practiceSet ? _setMin*60 : (_halfMode ? Math.ceil(exam.durationSeconds/2/60)*60 : exam.durationSeconds);
   const _parentAttemptId = _half2Mode ? (_pageParams.parentAttemptId||null) : null;
   if(_takerName) localStorage.setItem(LAST_TAKER_KEY, _takerName);
@@ -7146,7 +7149,7 @@ function initTake(id){
     half2Mode:_half2Mode,
     qids:_qidSubset?[..._qidSubset]:null,
     parentAttemptId:_parentAttemptId,
-    practiceSet:_practiceSet, setMin:_setMin, setParentId:_setParentId // v48.67
+    practiceSet:_practiceSet, setMin:_setMin, setParentId:_setParentId, setN:_setN // v48.67; v48.70: setN
   };
   const st=_takeState;
   // นับข้อที่ "ตอบแล้วจริง" สำหรับโหมดคนละครึ่ง — ต้องกัน '' ออก เพราะโหมดกรอกตัวเลข
@@ -7157,7 +7160,7 @@ function initTake(id){
     }).length;
   }
 
-  document.getElementById('takeExamTitle').textContent=(_practiceSet ? `[ฝึกซ้อม · ${total} ข้อ ${_setMin} นาที${_hardMode ? ' · โหมดยาก' : ''}] ` : _practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_practiceSet ? `[ฝึกซ้อม · ตอบได้ ${_setN} ข้อ ${_setMin} นาที${_hardMode ? ' · โหมดยาก' : ''}] ` : _practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
   // #page-take ไม่ได้ถูกสร้างใหม่จาก HTML ทุกครั้งที่ navigate('take') — เนื้อหาคงค้างข้าม
   // รอบก่อนหน้า ถ้ารอบก่อนเป็นโหมดคนละครึ่ง #takeQNoWrap จะถูกเขียนทับด้วย .textContent=
   // (ทำลาย span ลูก #takeQNo/#takeQTotal ทิ้ง) ต้อง reset โครงสร้างกลับก่อนเสมอ
@@ -7172,7 +7175,7 @@ function initTake(id){
   const _qNoWrapParent=_qNoWrapReset&&_qNoWrapReset.parentElement;
   if(_qNoWrapParent){
     _qNoWrapParent.style.cssText='';
-    if(_halfMode) _qNoWrapParent.style.cssText='min-width:0;flex:1;overflow:hidden;';
+    if(_quotaN) _qNoWrapParent.style.cssText='min-width:0;flex:1;overflow:hidden;'; // v48.70: + ฝึกตั้งเป้า
   }
   document.getElementById('takeQTotal').textContent=total;
 
@@ -7306,10 +7309,10 @@ function initTake(id){
     // (ของเดิมวางไว้เหนือ #takeChoices แล้วโดนบัง — ย้ายมาแถบบนซึ่งมีที่ว่างเสมอ)
     // หมายเหตุ: ห้ามใช้ .textContent= ทับ #takeQNoWrap ตอนไม่ใช่ half mode เพราะจะทำลาย
     // span ลูก #takeQNo/#takeQTotal ทิ้ง แล้ว getElementById ด้านล่างจะ null ในรอบ render ถัดไป
-    if(_halfMode){
+    if(_quotaN){ // v48.70: + ฝึกตั้งเป้า (ตอบได้สูงสุด N ข้อ)
       const _qNoWrap=document.getElementById('takeQNoWrap');
       // v48.13: ย่อจาก "ตอบแล้ว N / โควตา ข้อ" เป็น "ตอบ N/โควตา" กันปุ่ม "ส่ง" เลยขอบจอ iPad
-      if(_qNoWrap) _qNoWrap.textContent=`ตอบ ${_answeredCount()}/${st.halfQuota}`;
+      if(_qNoWrap) _qNoWrap.textContent=`ตอบ ${_answeredCount()}/${_quotaN}`;
     } else {
       document.getElementById('takeQNo').textContent=q.number||q.no;
     }
@@ -7347,7 +7350,12 @@ function initTake(id){
       disp.setAttribute('aria-label','คำตอบ');
       const noneBtn=document.createElement('button'); noneBtn.type='button'; noneBtn.className='hardNoneBtn';
       const _cur=()=>{ const v=st.answers[q.id]; return (v==null)?'':String(v); };
-      const _set=(v)=>{ if(!st.started) return; if(v==='') delete st.answers[q.id]; else st.answers[q.id]=v; _show(); setNumStyles(); };
+      const _set=(v)=>{ if(!st.started) return;
+        // v48.70: ฝึกตั้งเป้า — ข้อที่ยังว่างจะเริ่มตอบไม่ได้ถ้าตอบครบโควตาแล้ว (ลบคำตอบข้ออื่นก่อน)
+        if(_quotaN && v!=='' && (st.answers[q.id]==null || st.answers[q.id]==='') && _answeredCount()>=_quotaN){ toast(`ครบ ${_quotaN} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมก่อน`); return; }
+        const _was=(st.answers[q.id]==null || st.answers[q.id]==='');
+        if(v==='') delete st.answers[q.id]; else st.answers[q.id]=v; _show(); setNumStyles();
+        if(_quotaN && _was!==(v==='')) render(); }; // จำนวนที่ตอบเปลี่ยน → อัปเดตแถบ "ตอบ x/N"
       const _isPhone=window.matchMedia&&window.matchMedia('(max-width:600px)').matches;
       const kp=createHardKeypad(_isPhone,
         k=>{ let c=_cur(); if(c===HARD_NONE) c=''; if(c.length>=12) return; if(k==='-' && c!=='') return; _set(c+k); },
@@ -7382,8 +7390,8 @@ function initTake(id){
       function _setAns(v){
         const prev=st.answers[q.id];
         const _prevEmpty=(prev===''||prev==null);
-        if(_halfMode && _prevEmpty && v!=='' && _answeredCount()>=st.halfQuota){
-          toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
+        if(_quotaN && _prevEmpty && v!=='' && _answeredCount()>=_quotaN){
+          toast(`ครบ ${_quotaN} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
           return;
         }
         st.answers[q.id]=v;
@@ -7399,8 +7407,8 @@ function initTake(id){
           if(v!==inp.value) inp.value=v;
           const prev=st.answers[q.id];
           const _prevEmpty=(prev===''||prev==null);
-          if(_halfMode && _prevEmpty && v!=='' && _answeredCount()>=st.halfQuota){
-            toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
+          if(_quotaN && _prevEmpty && v!=='' && _answeredCount()>=_quotaN){
+            toast(`ครบ ${_quotaN} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้ล้างคำตอบข้อเดิมเพื่อยกเลิกก่อน`);
             inp.value=prev||'';
             return;
           }
@@ -7445,8 +7453,8 @@ function initTake(id){
           if(!st.started) return;
           const prev=st.answers[q.id];
           if(prev===lab){ delete st.answers[q.id]; render(); return; } // กดซ้ำ = ยกเลิกคำตอบ
-          if(_halfMode && !prev && _answeredCount()>=st.halfQuota){
-            toast(`ครบ ${st.halfQuota} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้กดคำตอบเดิมซ้ำเพื่อยกเลิกก่อน`);
+          if(_quotaN && !prev && _answeredCount()>=_quotaN){ // v48.70: + ฝึกตั้งเป้า
+            toast(`ครบ ${_quotaN} ข้อแล้ว — ถ้าจะเปลี่ยนข้อ ให้กดคำตอบเดิมซ้ำเพื่อยกเลิกก่อน`);
             return;
           }
           if(prev && prev!==lab){
@@ -7786,7 +7794,10 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   submitBtn.parentNode.replaceChild(newSubmitBtn,submitBtn);
   newSubmitBtn.addEventListener('click',()=>{
     let _msg='ส่งคำตอบตอนนี้?\n\n(คำตอบจะถูกส่งและดูผลคะแนน)';
-    if(_halfMode){
+    if(_practiceSet){ // v48.70
+      const _a=_answeredCount();
+      if(_a>0 && _a<_quotaN) _msg=`ตอบไป ${_a}/${_quotaN} ข้อ — ส่งเลยไหม?\n\nข้อที่ยังไม่ได้ตอบทำต่อได้รอบหน้า`;
+    } else if(_halfMode){
       const _left=st.halfQuota-_answeredCount();
       if(_left>0) _msg=`ยังเหลืออีก ${_left} ข้อ — ถ้าส่งตอนนี้จะไม่ได้คะแนนข้อที่ยังไม่ตอบ\n\nส่งคำตอบตอนนี้เลยไหม?`;
     }
@@ -7854,7 +7865,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
     return {mode:_practiceMode?'practice':(_half2Mode?'half2':(_halfMode?'half':'timed')),
       examId:exam.id,examTitle:exam.title,subject:exam.subject||'',examType:eType,weighted,
       ...(_hardMode?{hard:true}:{}),
-      startedAt:st.startedAt,pauseOffset:_pauseOffset,durSec:_practiceFree?0:_effDuration,quota:_halfMode?st.halfQuota:0,
+      startedAt:st.startedAt,pauseOffset:_pauseOffset,durSec:_practiceFree?0:_effDuration,quota:_quotaN,
       cur:curNo,nos,ans,ok,bad,nk,free,unsure,skipped,changes,
       score:Math.round(got*100)/100,scoreTotal:_halfMode?st.halfQuota:Math.round(all*100)/100,qElapsed};
   }
@@ -7899,8 +7910,8 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
   const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
   // v48.69: ฝึกตั้งเป้า — resume ต้องเป็นรอบเดียวกันจริง (เซ็ต/ชุดข้อ/เวลา) ไม่งั้นรอบใหม่จะได้คำตอบ+เวลาของรอบเก่า
-  const _setSig = r => (r && r.practiceSet) ? [r.setParentId || '', Number(r.setMin) || 0, (r.qids || []).slice().sort().join(',')].join('|') : '';
-  const _curSetSig = _practiceSet ? [_setParentId || '', _setMin, [..._qidSubset].sort().join(',')].join('|') : '';
+  const _setSig = r => (r && r.practiceSet) ? [r.setParentId || '', Number(r.setMin) || 0, (r.qids || []).slice().sort().join(','), Number(r.setN) || (r.qids || []).length].join('|') : ''; // setN ว่าง (resume ก่อน v48.70) = ทุกข้อในรอบ
+  const _curSetSig = _practiceSet ? [_setParentId || '', _setMin, [..._qidSubset].sort().join(','), _setN].join('|') : '';
   // v48.69: ทิ้งรอบที่ค้าง → ลบรูปกระดาษทดของรอบนั้นในเครื่องด้วย (ไม่งั้นค้างใน IndexedDB ถาวร)
   const _dropScratchOf = r => { try { if (!r || !r.attemptId) return; ((Store.load().questions || {})[r.examId] || []).forEach(q => PdfDB.del(scratchKey(r.attemptId, q.id)).catch(() => {})); } catch (e) {} };
   const _resume = (_rawResume && _rawResume.examId === id && _setSig(_rawResume) === _curSetSig && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode && !!_rawResume.hardMode === !!_hardMode && !!_rawResume.practiceSet === !!_practiceSet) ? _rawResume : null;
@@ -15497,7 +15508,7 @@ function saveTakeResume(state) {
       half2Mode: !!state.half2Mode,
       qids: (state.half2Mode || state.practiceSet) ? (state.qids||null) : null, // v48.67: + ฝึกซ้อมตั้งเป้า (ข้อของรอบ)
       parentAttemptId: state.half2Mode ? (state.parentAttemptId||null) : null,
-      practiceSet: !!state.practiceSet, setMin: state.practiceSet ? (state.setMin||0) : 0, setParentId: state.practiceSet ? (state.setParentId||null) : null,
+      practiceSet: !!state.practiceSet, setMin: state.practiceSet ? (state.setMin||0) : 0, setParentId: state.practiceSet ? (state.setParentId||null) : null, setN: state.practiceSet ? (state.setN||0) : 0, // v48.70: setN
     }));
   } catch(e) {}
 }
@@ -17139,7 +17150,7 @@ const _takeResume = loadTakeResume(Auth.getName());
 
 if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   if (_savedState.page === 'take' && _takeResume) {
-    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: (_takeResume.half2Mode || _takeResume.practiceSet) ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null, ...(_takeResume.practiceSet ? { setMin: _takeResume.setMin, setParentId: _takeResume.setParentId||null } : {}), ...(_takeResume.hardMode ? { hard: true } : {}) });
+    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: (_takeResume.half2Mode || _takeResume.practiceSet) ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null, ...(_takeResume.practiceSet ? { setMin: _takeResume.setMin, setParentId: _takeResume.setParentId||null, setN: _takeResume.setN||0 } : {}), ...(_takeResume.hardMode ? { hard: true } : {}) });
   } else {
     navigate(_savedState.page, _savedState.params);
   }
@@ -18126,7 +18137,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.69';
+  const CURRENT_VERSION = 'v48.70';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —

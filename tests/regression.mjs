@@ -5921,7 +5921,7 @@ currentSection = 'hardMode';
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'practiceSet';
 {
-  const PS_FILE = 'index_preview.html';
+  const PS_FILE = 'index.html';
   const pq = (id, no, correct) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
   const cacheP = () => baseCache({
     exams: [
