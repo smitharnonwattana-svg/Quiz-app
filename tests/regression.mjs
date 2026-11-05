@@ -6390,6 +6390,62 @@ currentSection = 'bugfix1103';
   check('bugfix1103: ไม่มี error ในหน้า', errsAll.length === 0, JSON.stringify(errsAll));
 }
 
+
+// ─────────────────────────────────────────────────────────────────
+// Section: summaryScratch (v48.90p, ชี้ index_preview.html) — รูปสรุปผลสอบ (📸) ต่อท้ายด้วยหน้า "กระดาษทด" ของแต่ละข้อ
+// (เลขข้อ + ผล + คำตอบ→เฉลย + รูปทด, 6 ข้อ/ภาพ), รูปจาก cloud โหลดเป็น blob ก่อนวาด, รูปในเครื่องที่ยังไม่ขึ้น cloud ก็ใส่ได้, โหลดไม่ได้ → ข้าม + แจ้ง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'summaryScratch';
+{
+  const SC2_FILE = 'index_preview.html';
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
+  const mk = (scratchNos, extra = {}) => {
+    const qs = [], pq = [], ans = {}, scratch = {};
+    for (let i = 1; i <= 10; i++) {
+      const c = 'ABCD'[i % 4], wrong = [2, 7].includes(i), ch = wrong ? 'ABCD'[(i + 1) % 4] : c;
+      qs.push({ id: 'q' + i, no: i, number: i, page: Math.ceil(i / 4), correct: c, choices: { A: 'a', B: 'b', C: 'c', D: 'd' } });
+      ans['q' + i] = ch; pq.push({ qid: 'q' + i, no: i, page: Math.ceil(i / 4), chosen: ch, correct: c, isCorrect: !wrong, elapsedMs: 20000 + i * 1000, visited: true, changes: 0 });
+    }
+    scratchNos.forEach(n => { scratch['q' + n] = (extra.bad || []).includes(n) ? 'https://img.test/missing.jpg' : `https://img.test/s${n}.png`; });
+    const att = { id: 'sa1', examId: 'se1', examTitle: 'ชุดรูปทด', examSubject: 'คณิตศาสตร์', examType: 'mc', takerName: 'ณนนท์', submittedAt: '2026-11-05T01:00:00.000Z', usedSeconds: 600, score: 8, total: 10, answers: ans, perQuestion: pq, practiceMode: false, halfMode: false, ...(scratchNos.length ? { scratch } : {}) };
+    return baseCache({ exams: [mkExam('se1', 'ชุดรูปทด', 'คณิตศาสตร์', { questionCount: 10 })], questions: { se1: qs }, attempts: [att], members: [{ pin: '1', name: 'ณนนท์' }] });
+  };
+  const run = async (cache, prep) => {
+    const r = await newSeededPage({ file: SC2_FILE, cache, viewport: { width: 1180, height: 820 } });
+    const errs = []; r.page.on('pageerror', e => errs.push(e.message));
+    await r.ctx.route('https://img.test/**', route => route.request().url().includes('missing') ? route.fulfill({ status: 404, body: '' }) : route.fulfill({ status: 200, contentType: 'image/png', body: PNG, headers: { 'access-control-allow-origin': '*' } }));
+    await r.page.evaluate(() => {
+      window.__h2c = []; window.__toasts = []; const t0 = window.toast; window.toast = (m) => { window.__toasts.push(m); return t0 && t0(m); };
+      window.html2canvas = async (el, opts) => { window.__h2c.push({ text: el.textContent.replace(/\s+/g, ' '), cards: [...el.querySelectorAll('.shScr')].map(c => c.querySelector('.shScrHd').textContent.replace(/\s+/g, '')), imgs: [...el.querySelectorAll('.shScr img')].map(i => i.src.slice(0, 5)) }); const c = document.createElement('canvas'); c.width = 10; c.height = 10; return c; };
+      localStorage.removeItem('nanont:scratchPending');
+    });
+    if (prep) await r.page.evaluate(prep);
+    await r.page.evaluate(() => captureAttemptSummary('sa1', null)); await r.page.waitForTimeout(600);
+    const out = await r.page.evaluate(() => ({ h: window.__h2c, toasts: window.__toasts, modal: document.querySelectorAll('#shotModalBody img').length }));
+    await r.ctx.close(); return { ...out, errs };
+  };
+  // 1) 3 ข้อ → +1 ภาพกระดาษทด เรียงตามเลขข้อ ระบุข้อ/ผล
+  const r1 = await run(mk([9, 2, 5]));
+  const sp = r1.h[1] || {};
+  check('summaryScratch: ผลที่มีรูปทด 3 ข้อ → รูปสรุปเดิม + ภาพ "กระดาษทด" 1 ภาพ (รวม 2 รูปในหน้าต่าง)', r1.h.length === 2 && r1.modal === 2 && /กระดาษทด/.test(sp.text || ''), JSON.stringify({ n: r1.h.length, modal: r1.modal }));
+  check('summaryScratch: การ์ดเรียงตามเลขข้อ (2, 5, 9) ระบุข้อ + ผล ✓/✕ และรูปเป็น blob ในเครื่อง (ไม่ติด CORS)', JSON.stringify(sp.cards) === JSON.stringify(['ข้อ2✕ผิด', 'ข้อ5✓ถูก', 'ข้อ9✓ถูก']) && (sp.imgs || []).every(s => s === 'blob:'), JSON.stringify(sp));
+  check('summaryScratch: การ์ดข้อผิดมีคำตอบที่เลือก → เฉลย + หน้า PDF + เวลา', /ข้อ 2[\s\S]*→[\s\S]*หน้า 1[\s\S]*⏱ 00:22/.test(sp.text || ''), (sp.text || '').slice(0, 400));
+  // 2) 8 ข้อ → 2 ภาพ (6 + 2)
+  const r2 = await run(mk([1, 2, 3, 4, 5, 6, 7, 8]));
+  check('summaryScratch: รูปทด 8 ข้อ → แบ่ง 2 ภาพ (6 + 2) ป้าย "ภาพ 1/2", "ภาพ 2/2"', r2.h.length === 3 && r2.h[1].cards.length === 6 && r2.h[2].cards.length === 2 && /ภาพ 1\/2/.test(r2.h[1].text) && /ภาพ 2\/2/.test(r2.h[2].text), JSON.stringify(r2.h.map(x => x.cards.length)));
+  // 3) รูปบน cloud โหลดไม่ได้ + รูปในเครื่องที่ยังไม่ขึ้น cloud
+  const r3 = await run(mk([3], { bad: [3] }), async () => {
+    const c = document.createElement('canvas'); c.width = 200; c.height = 80; const x = c.getContext('2d'); x.fillStyle = '#111'; x.fillRect(10, 10, 80, 30);
+    await PdfDB.put(scratchKey('sa1', 'q6'), { data: c.toDataURL('image/png'), w: 200, h: 80, no: 6, ts: Date.now() });
+    localStorage.setItem('nanont:scratchPending', JSON.stringify([{ aid: 'sa1', owner: 'sa1', qid: 'q6', no: 6 }]));
+  });
+  check('summaryScratch: รูปในเครื่อง (ยังไม่ขึ้น cloud) ใส่ได้, รูปที่โหลดไม่ได้ข้าม + แจ้ง "โหลดรูปกระดาษทดไม่ได้ 1 ข้อ" ไม่ล้ม', r3.h.length === 2 && JSON.stringify(r3.h[1].cards) === JSON.stringify(['ข้อ6✓ถูก']) && r3.toasts.some(m => /โหลดรูปกระดาษทดไม่ได้ 1 ข้อ/.test(m)), JSON.stringify({ cards: (r3.h[1] || {}).cards, toasts: r3.toasts }));
+  // 4) ไม่มีรูปทด → เหมือนเดิม
+  const r4 = await run(mk([]));
+  check('summaryScratch: ผลที่ไม่มีรูปทด → รูปสรุป 1 ภาพเหมือนเดิม', r4.h.length === 1 && r4.modal === 1, JSON.stringify({ n: r4.h.length }));
+  check('summaryScratch: ไม่มี error ในหน้า', [...r1.errs, ...r2.errs, ...r3.errs, ...r4.errs].length === 0, JSON.stringify([...r1.errs, ...r2.errs, ...r3.errs, ...r4.errs]));
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');

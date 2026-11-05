@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.89p -->
+  <!-- APP_VERSION: v48.90p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -629,6 +629,13 @@
     .shSt{text-align:right;width:92px;}
     .shTag{display:inline-block;border-radius:999px;padding:3px 14px;font-weight:700;font-size:14px;border:1.5px solid;white-space:nowrap;}
     .shTag.g{border-color:#4ade80;background:#f0fdf4;color:#166534;}.shTag.r{border-color:#f87171;background:#fff5f5;color:#b91c1c;}.shTag.f{border-color:#fcd34d;background:#fffbeb;color:#b45309;}
+    /* v48.90p: หน้า "กระดาษทด" ในรูปสรุป — 2 คอลัมน์ การ์ดละข้อ (หัวข้อ+ผล+คำตอบ→เฉลย แล้วรูปทด) */
+    .shScrGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    .shScr{background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .shScr.r{border-color:#fecaca;}.shScr.g{border-color:#bbf7d0;}
+    .shScrHd{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:17px;}
+    .shScrAns{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:800;flex-wrap:wrap;}
+    .shScrImg{border:1px solid #f3f4f6;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;height:220px;overflow:hidden;}
     .shWg{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
     .shWc{display:flex;align-items:center;gap:8px;border:1.5px solid #fecaca;background:#fff5f5;border-radius:12px;padding:8px 10px;}
     .shWc .shN{width:30px;height:30px;border-radius:50%;background:#ef4444;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -1629,7 +1636,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.89p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.90p</div>
     </div>
   </div>
 </div>
@@ -9192,7 +9199,7 @@ function buildAttemptSummary(att,s){
       if(chosen!=null) chosen=fmtHardAns(chosen);
     }
     return {
-      no, page:q.page||(pq&&pq.page)||null, chosen, correct,
+      no, qid:q.id, page:q.page||(pq&&pq.page)||null, chosen, correct, // v48.90p: qid ใช้จับคู่รูปกระดาษทด
       ok:pq?!!pq.isCorrect:isAnswerCorrect(chosen,q.correct,examType),
       free:!!(q.isFree||(pq&&pq.isFree)),
       skipped:!!((att.halfMode||att.hardMode||att.practiceSet)&&pq&&pq.counted===false),
@@ -9358,6 +9365,43 @@ function _openShotModal(blobs,baseName){
   document.addEventListener('keydown',_shotEsc);
   document.getElementById('shotModalClose').focus();
 }
+// v48.90p: หน้า "กระดาษทด" ต่อท้ายรูปสรุป — รูปทดของแต่ละข้อ (cloud + ที่ยังรออัปโหลดในเครื่องนี้) พร้อมเลขข้อ ผล และคำตอบ→เฉลย
+const SHOT_SCR_PER_PAGE=6, SHOT_SCR_W=300, SHOT_SCR_H=220;
+async function _shotScratchItems(m){
+  const att=m.att, remote=att.scratch||{}, local=(typeof ScratchSync!=='undefined')?ScratchSync.localFor(att.id):{};
+  const qids=[...new Set([...Object.keys(remote),...Object.keys(local)])];
+  const items=[], urls=[]; let failed=0;
+  for(const qid of qids){
+    const r=m.rows.find(x=>x.qid===qid); if(!r) continue; // ข้อถูกลบออกจากชุดแล้ว
+    let src=null;
+    try{
+      const u=remote[qid];
+      if(u){
+        if(/^(data|blob):/.test(u)) src=u;
+        else { const res=await fetch(u); if(!res.ok) throw new Error(res.status); src=URL.createObjectURL(await res.blob()); urls.push(src); } // blob ในเครื่อง → ไม่เปื้อน canvas
+      } else if(local[qid]){ src=await ScratchSync.localImage(local[qid]); if(src&&src.startsWith('blob:')) urls.push(src); }
+    }catch(e){ src=null; }
+    const dim=src?await new Promise(res=>{ const i=new Image(); i.onload=()=>res([i.naturalWidth,i.naturalHeight]); i.onerror=()=>res(null); i.src=src; }):null;
+    if(!dim||!dim[0]||!dim[1]){ failed++; continue; }
+    const k=Math.min(SHOT_SCR_W/dim[0], SHOT_SCR_H/dim[1], 1.6); // ขนาดชัดเจน (html2canvas ไม่รองรับ object-fit)
+    items.push({ r, src, w:Math.round(dim[0]*k), h:Math.round(dim[1]*k) });
+  }
+  items.sort((a,b)=>a.r.no-b.r.no);
+  return { items, failed, urls };
+}
+function renderScratchPages(m,items){
+  const pages=[], n=Math.ceil(items.length/SHOT_SCR_PER_PAGE);
+  for(let i=0;i<n;i++){
+    const cards=items.slice(i*SHOT_SCR_PER_PAGE,(i+1)*SHOT_SCR_PER_PAGE).map(({r,src,w,h})=>{
+      const tag=r.skipped?'<span class="shTag" style="border-color:#d1d5db;color:#6b7280">ยังไม่ได้ตอบ</span>':(r.free?'<span class="shTag f">ฟรี</span>':`<span class="shTag ${r.ok?'g':'r'}">${r.ok?'✓ ถูก':'✕ ผิด'}</span>`);
+      return `<div class="shScr ${r.skipped||r.free?'':(r.ok?'g':'r')}"><div class="shScrHd"><b>ข้อ ${r.no}</b>${tag}</div>`+
+        `<div class="shScrAns">${r.skipped?'':_shotAnsHtml(r,m.isFillNum)}${r.unsure?' 🤔':''}<span class="shMuted" style="font-size:12px;font-weight:400;margin-left:auto">${r.page?'หน้า '+esc(r.page):''}${r.sec!=null?' · ⏱ '+_shotMmss(r.sec):''}</span></div>`+
+        `<div class="shScrImg"><img src="${esc(src)}" width="${w}" height="${h}" style="width:${w}px;height:${h}px" alt="กระดาษทด ข้อ ${r.no}"></div></div>`;
+    }).join('');
+    pages.push(`<div class="shSheet">${_shotHeadCard(m,`✏️ กระดาษทด${n>1?` · ภาพ ${i+1}/${n}`:''}`,true)}<div class="shScrGrid">${cards}</div><div class="shLegend">กระดาษทดที่เขียนระหว่างทำแต่ละข้อ (${items.length} ข้อ) · ป้าย ✓/✕ = ผลของข้อนั้น · <span class="shBd" style="font-weight:700">ที่เลือก</span> → <b class="shOk">เฉลย</b> · หน้า PDF · เวลาที่ใช้</div>${_shotFoot()}</div>`);
+  }
+  return pages;
+}
 async function captureAttemptSummary(attId,btn){
   const s=Store.load(), att=(s.attempts||[]).find(a=>a.id===attId);
   if(!att){ toast('ไม่พบผลสอบนี้'); return; }
@@ -9365,10 +9409,14 @@ async function captureAttemptSummary(attId,btn){
   if(btn){ btn.disabled=true; btn.textContent='⏳ กำลังสร้างรูป…'; }
   window._shotReturnFocus=btn||null;
   const host=document.createElement('div'); host.className='shHost';
+  let _scrUrls=[];
   try{
     const h2c=await _shotLoadLib();
     const m=buildAttemptSummary(att,s);
     const pages=renderSummaryPages(m);
+    const _scr=await _shotScratchItems(m); _scrUrls=_scr.urls; // v48.90p: + หน้ากระดาษทด
+    pages.push(...renderScratchPages(m,_scr.items));
+    if(_scr.failed) toast(`โหลดรูปกระดาษทดไม่ได้ ${_scr.failed} ข้อ — รูปสรุปหลักยังบันทึกได้`);
     document.body.appendChild(host);
     if(document.fonts&&document.fonts.ready){ try{await document.fonts.ready;}catch(e){} }
     const blobs=[];
@@ -9391,6 +9439,7 @@ async function captureAttemptSummary(attId,btn){
     toast('สร้างรูปไม่สำเร็จ: '+((err&&err.message)||err));
   }finally{
     host.remove();
+    _scrUrls.forEach(u=>{ try{URL.revokeObjectURL(u);}catch(e){} });
     if(btn){ btn.disabled=false; btn.textContent=oldTxt; }
   }
 }
@@ -18137,7 +18186,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.89p';
+  const CURRENT_VERSION = 'v48.90p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 
