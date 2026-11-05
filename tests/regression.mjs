@@ -6392,12 +6392,12 @@ currentSection = 'bugfix1103';
 
 
 // ─────────────────────────────────────────────────────────────────
-// Section: summaryScratch (v48.90p, ชี้ index_preview.html) — รูปสรุปผลสอบ (📸) ต่อท้ายด้วยหน้า "กระดาษทด" ของแต่ละข้อ
+// Section: summaryScratch (v48.90p → production v48.71, ชี้ index.html) — รูปสรุปผลสอบ (📸) ต่อท้ายด้วยหน้า "กระดาษทด" ของแต่ละข้อ
 // (เลขข้อ + ผล + คำตอบ→เฉลย + รูปทด, 6 ข้อ/ภาพ), รูปจาก cloud โหลดเป็น blob ก่อนวาด, รูปในเครื่องที่ยังไม่ขึ้น cloud ก็ใส่ได้, โหลดไม่ได้ → ข้าม + แจ้ง
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'summaryScratch';
 {
-  const SC2_FILE = 'index_preview.html';
+  const SC2_FILE = 'index.html';
   const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
   const mk = (scratchNos, extra = {}) => {
     const qs = [], pq = [], ans = {}, scratch = {};
