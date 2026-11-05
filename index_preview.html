@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.91p -->
+  <!-- APP_VERSION: v48.92p -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1639,7 +1639,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.91p</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.92p</div>
     </div>
   </div>
 </div>
@@ -5669,6 +5669,7 @@ function _showAssignModal(examId, examTitle, examSubject) {
   modal.firstElementChild.style.overflow = 'auto';
   modal.querySelectorAll('[data-asg-tab]').forEach(tb => tb.addEventListener('click', () => {
     const pick = tb.dataset.asgTab === 'pick';
+    if (!pick && modal.querySelector('#asgPanePick').dataset.ready) { _showAssignModal(examId, examTitle, examSubject); return; } // v48.92p: ส่ง/ยกเลิกในแท็บเลือกข้อแล้ว รายชื่อทั้งชุดเดิมค้างข้อมูลเก่า
     modal.querySelectorAll('[data-asg-tab]').forEach(b => { b.classList.toggle('on', b === tb); b.setAttribute('aria-selected', b === tb ? 'true' : 'false'); });
     modal.querySelector('#asgPaneWhole').style.display = pick ? 'none' : '';
     modal.querySelector('#asgPanePick').style.display = pick ? '' : 'none';
@@ -5841,7 +5842,7 @@ function _renderAssignPick(pane, ctx) {
       if (k === 'clear') sel = new Set(); else (k === 'wrong' ? st.wrong : st.never).forEach(id => sel.add(id));
       paint();
     });
-    pane.querySelectorAll('[data-pick-min]').forEach(b => b.onclick = () => { min = b.dataset.pickMin === '+' ? min + 5 : Math.max(1, min - (min > 5 ? 5 : 1)); minTouched = true; paint(); });
+    pane.querySelectorAll('[data-pick-min]').forEach(b => b.onclick = () => { min = b.dataset.pickMin === '+' ? Math.min(600, min + 5) : Math.max(1, min - (min > 5 ? 5 : 1)); minTouched = true; paint(); });
     const mEl = pane.querySelector('#hwPickMin');
     if (mEl) mEl.onchange = () => { min = Math.max(1, Math.min(600, Math.round(Number(mEl.value) || 1))); minTouched = true; paint(); };
     const send = pane.querySelector('#hwPickSend');
@@ -6015,6 +6016,8 @@ function findPendingPractice(s, examId, takerName, hwId) {
   ).sort((a, b) => new Date(b.startedSetAt || b.submittedAt || 0) - new Date(a.startedSetAt || a.submittedAt || 0));
   const att = sets[0];
   if (!att || att.revealedAt) return null;
+  // v48.92p: การบ้านที่พ่อยกเลิกแล้ว = จบเซ็ต (เปิดเฉลยข้อค้าง) — เดิมล็อกถาวร เพราะการบ้านไม่มีปุ่มขอดูเฉลย/ทำต่อไม่ได้
+  if (hwId && ((s.assignments || []).find(a => a.id === hwId) || {}).status === 'cancelled') return null;
   const ans = att.answers || {};
   const _scope = Array.isArray(att.setScope) ? new Set(att.setScope) : null;
   const qids = (s.questions[examId] || [])
@@ -6810,7 +6813,7 @@ function initExams(){
         const _fmt0 = String(Math.floor(_val0/60)).padStart(2,'0') + ':' + String(_val0%60).padStart(2,'0');
         const _label0 = (_isPrac0 && !_setSec0) ? 'ใช้เวลาไปแล้ว' : 'เวลาเหลือ';
         const _isHalf2_0 = _isHalf0 && !!_myResume.half2Mode;
-        const _title0 = (_isPrac0 ? 'ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? 'ครึ่งหลังค้างอยู่' : _isHalf0 ? 'คนละครึ่งค้างอยู่' : 'ทำค้างอยู่') + (_myResume.hardMode ? ' · โหมดยาก' : ''); // v48.82p
+        const _title0 = (_myResume.hwId ? 'การบ้านค้างอยู่' : _isPrac0 ? 'ฝึกซ้อมค้างอยู่' : _isHalf2_0 ? 'ครึ่งหลังค้างอยู่' : _isHalf0 ? 'คนละครึ่งค้างอยู่' : 'ทำค้างอยู่') + (_myResume.hardMode ? ' · โหมดยาก' : ''); // v48.82p
         const _bg0 = _isPrac0 ? '#F0FBFC' : _isHalf0 ? '#ECECFC' : '#FFF3E0';
         const _border0 = _isPrac0 ? '#B2EBF2' : _isHalf0 ? '#D1D1F0' : '#FFD9A8';
         const _titleColor0 = _isPrac0 ? '#0E7C8C' : _isHalf0 ? '#5856D6' : '#A34E00';
@@ -7114,7 +7117,10 @@ function initExamDetail(id){
       const _msg = !_r ? (Store._cloudLoaded ? 'ไม่พบการบ้านนี้ — ทำข้อสอบแบบปกติได้' : '') : _r.assignedTo !== _memberName ? `การบ้านนี้เป็นของ ${_r.assignedTo} — ทำข้อสอบแบบปกติได้` : _r.status === 'done' ? 'การบ้านนี้ทำครบแล้ว' : _r.status === 'cancelled' ? 'การบ้านนี้ถูกยกเลิกแล้ว — ทำข้อสอบแบบปกติได้' : '';
       if (_msg) toast(_msg);
     }
-    if (_hwA) {
+    if (_hwA && !_hwSetPlan(s, _hwA, _memberName).scope.length) {
+      // v48.92p: ข้อที่พ่อเลือกถูกลบ/เปลี่ยนเป็นข้อฟรีหมดแล้ว — เดิมการ์ดขึ้น "0 ข้อ" + ปุ่ม "ทำครบแล้ว"
+      document.getElementById('hwSetCardSlot').innerHTML = `<div class="card hwSetCard hwSetEmpty" style="padding:14px 18px;max-width:480px;margin-bottom:12px;border:1.5px solid #e5e7eb;background:#f9fafb;font-size:13px;color:#6b7280;">📌 ชุดฝึกที่พ่อกำหนด — ข้อที่เลือกไว้ถูกแก้/ลบไปแล้ว ให้พ่อส่งชุดใหม่</div>`;
+    } else if (_hwA) {
       const _p = _hwSetPlan(s, _hwA, _memberName);
       const _doneN = _p.scope.length - _p.left.length;
       document.getElementById('hwSetCardSlot').innerHTML = `
@@ -9386,6 +9392,7 @@ function buildAttemptSummary(att,s){
   if(!qs.length&&pqAll.length) qs=pqAll.map(p=>({id:p.qid||String(p.no),no:p.no,page:p.page||1,correct:p.correct||null}));
   if(att.halfPart===2&&pqAll.length){ const ids=new Set(pqAll.map(p=>p.qid)); qs=qs.filter(q=>ids.has(q.id)); }
   else if(att.mode==='weakness_practice'&&pqAll.length){ const nos=new Set(pqAll.map(p=>Number(p.no))); qs=qs.filter(q=>nos.has(Number(q.no))); }
+  else if(att.hwId&&Array.isArray(att.setScope)&&att.setScope.length){ const ids=new Set(att.setScope); qs=qs.filter(q=>ids.has(q.id)); } // v48.92p: ชุดฝึกที่พ่อกำหนด — เดิมข้อนอกชุดขึ้นเป็น "ผิด"
   const answers=att.answers||{};
   const rows=qs.map((q,idx)=>{
     const no=Number(q.no)||idx+1;
@@ -9435,7 +9442,7 @@ function buildAttemptSummary(att,s){
     taker:(att.takerName||'').trim()||'ไม่ระบุ', isFillNum, weighted,
     typeLabel:att.hardMode?'พิมพ์คำตอบเอง (โหมดยาก)':isFillNum?'กรอกตัวเลข':'เลือกตอบ ก–ง',
     diffLabel:SHOT_DIFF[att.difficulty||(exam&&exam.difficulty)]||null,
-    modeLabel:att.halfMode?(att.halfPart===2?'🤝 คนละครึ่ง (ครึ่งหลัง)':'🤝 คนละครึ่ง'):att.mode==='weakness_practice'?'🎯 แก้จุดอ่อน':att.practiceMode?'📝 ฝึกซ้อม':att.manualEntry?'🕰️ บันทึกย้อนหลัง':'⏱ สอบจริง',
+    modeLabel:att.halfMode?(att.halfPart===2?'🤝 คนละครึ่ง (ครึ่งหลัง)':'🤝 คนละครึ่ง'):att.mode==='weakness_practice'?'🎯 แก้จุดอ่อน':att.hwId?'📌 ชุดฝึกที่พ่อกำหนด':att.practiceMode?'📝 ฝึกซ้อม':att.manualEntry?'🕰️ บันทึกย้อนหลัง':'⏱ สอบจริง',
     submitted:att.submittedAt?(()=>{try{return new Date(att.submittedAt).toLocaleString('th-TH');}catch(e){return att.submittedAt;}})():null,
     dur, scoreHead:weighted?`คะแนน ${fmtPts(score)}/${fmtPts(total)} (${pct}%)`:`คะแนน ${score}/${total}`,
     summaryText, wrongNos, rows, wrongRows:rows.filter(r=>wrongSet.has(r.no)),
@@ -18389,7 +18396,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.91p';
+  const CURRENT_VERSION = 'v48.92p';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
 

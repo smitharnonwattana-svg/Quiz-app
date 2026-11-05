@@ -6447,13 +6447,13 @@ currentSection = 'summaryScratch';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: hwSet (v48.91p → production v48.72, ชี้ index.html) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
+// Section: hwSet (v48.91p → production v48.72; บั๊กรอบหา v48.92p ชี้ preview ชั่วคราว) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
 // ปุ่มเลือกเร็ว "เคยผิด"/"ยังไม่เคยทำ", ลูกเห็นการ์ดในหน้าเริ่มทำ → ทำเฉพาะข้อที่เลือก, ค้างทำต่อได้ (เวลาตามสัดส่วน),
 // ครบแล้วปิดการบ้าน + เปิดเฉลย, ไม่ปนกับฝึกตั้งเป้าที่ลูกตั้งเอง, ลิงก์ของคนอื่น/ยกเลิกแล้ว → แจ้ง
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'hwSet';
 {
-  const HW_FILE = 'index.html';
+  const HW_FILE = 'index_preview.html';
   const hq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
   const pqr = (qid, no, ok) => ({ qid, no, isCorrect: ok, chosen: ok ? 'A' : 'B', correct: 'A' });
   const cacheH = (over = {}) => baseCache({
@@ -6601,6 +6601,40 @@ currentSection = 'hwSet';
     const m = await p5.evaluate(() => { const r = document.querySelector('#assignModal > div').getBoundingClientRect(); return { l: r.left, r: r.right, sw: document.documentElement.scrollWidth }; });
     check('hwSet: มือถือ 390 — หน้าต่างเลือกข้อไม่ล้นจอ', m.l >= 0 && m.r <= 390 && m.sw <= 390, JSON.stringify(m));
     await c5.close();
+  }
+
+  // 8) v48.92p บั๊กจากรอบหาบั๊ก
+  {
+    const asgX = (id, qids, minutes = 10) => ({ id, examId: 'h1', examTitle: 'ชุดการบ้าน', examSubject: 'คณิตศาสตร์', assignedTo: 'ณนนท์', assignedBy: 'teacher', assignedAt: 1, status: 'pending', set: { qids, minutes } });
+    const { ctx: c6, page: p6 } = await newSeededPage({ file: HW_FILE, cache: cacheH({ attempts: [], assignments: [asgX('X1', ['q2', 'q6', 'q8'])] }), role: 'student', name: 'ณนนท์' });
+    p6.on('pageerror', e => errs.push(e.message));
+    await stub(p6);
+    await p6.evaluate(() => navigate('exam', { id: 'h1' })); await p6.waitForTimeout(250);
+    await p6.click('#hwSetStartBtn'); await mood(p6); await pick(p6, 'B'); await submit(p6);
+    const xid = await p6.evaluate(() => Store.load().attempts.find(a => a.hwId).id);
+    const sm = await p6.evaluate((id) => { const s = Store.load(); const m = buildAttemptSummary(s.attempts.find(a => a.id === id), s); return { rows: m.rows.map(r => r.no + (r.skipped ? 's' : r.ok ? 'v' : 'x')).join(), label: m.modeLabel }; }, xid);
+    check('hwSet: รูปสรุปผล (📸) ของการบ้าน — เฉพาะข้อที่พ่อเลือก (2 ✓, 6/8 ค้าง) ไม่ขึ้นข้ออื่นเป็น "ผิด" + ป้าย "ชุดฝึกที่พ่อกำหนด"', sm.rows === '2v,6s,8s' && /ชุดฝึกที่พ่อกำหนด/.test(sm.label), JSON.stringify(sm));
+    await p6.evaluate(() => { const s = Store.load(); s.assignments[0].status = 'cancelled'; Store.save(s); });
+    await p6.evaluate((id) => navigate('review', { attemptId: id }), xid); await p6.waitForTimeout(400);
+    const cx = await p6.evaluate(() => ({ locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display }));
+    check('hwSet: พ่อยกเลิกการบ้านที่ลูกทำค้าง → เปิดเฉลยข้อค้าง ไม่มีปุ่มทำต่อ (เดิมล็อกถาวร)', cx.locks === 0 && cx.cont === 'none', JSON.stringify(cx));
+    await c6.close();
+    const c0 = cacheH({ assignments: [asgX('X2', ['q6'])] }); c0.questions.h1 = c0.questions.h1.filter(q => q.id !== 'q6');
+    const { ctx: c7, page: p7 } = await newSeededPage({ file: HW_FILE, cache: c0, role: 'student', name: 'ณนนท์' });
+    await p7.evaluate(() => navigate('exam', { id: 'h1' })); await p7.waitForTimeout(250);
+    const em = await p7.evaluate(() => ({ empty: !!document.querySelector('.hwSetEmpty'), btn: !!document.getElementById('hwSetStartBtn'), txt: document.querySelector('.hwSetCard')?.textContent || '' }));
+    check('hwSet: ข้อที่พ่อเลือกถูกลบหมดแล้ว → การ์ดแจ้ง "ถูกแก้/ลบไปแล้ว" ไม่มีปุ่ม (เดิม "0 ข้อ · ทำครบแล้ว")', em.empty && !em.btn && /ถูกแก้\/ลบ/.test(em.txt), JSON.stringify(em));
+    await c7.close();
+    const { ctx: c8, page: p8 } = await newSeededPage({ file: HW_FILE, cache: cacheH() });
+    p8.on('pageerror', e => errs.push(e.message));
+    await p8.evaluate(() => { _showAssignModal('h1', 'ชุดการบ้าน', 'คณิตศาสตร์'); document.querySelector('[data-asg-tab="pick"]').click(); document.querySelector('[data-pick-q="q2"]').click(); });
+    await p8.click('#hwPickSend'); await p8.click('[data-asg-tab="whole"]');
+    const wr = await p8.evaluate(() => ({ row: document.querySelector('[data-asg-row="ณนนท์"]').textContent.replace(/\s+/g, ' '), tab: document.querySelector('.asgTab.on').dataset.asgTab }));
+    check('hwSet: ส่งในแท็บเลือกข้อแล้วกลับแท็บ "ทั้งชุด" → รายชื่อเป็นข้อมูลล่าสุด ("ส่งแล้ว") ไม่ค้าง "ส่งให้"', /ส่งแล้ว/.test(wr.row) && wr.tab === 'whole', JSON.stringify(wr));
+    await p8.click('[data-asg-tab="pick"]');
+    await p8.evaluate(() => { document.querySelector('[data-pick-who="1"]').click(); for (let i = 0; i < 150; i++) document.querySelector('[data-pick-min="+"]').click(); });
+    check('hwSet: ปุ่ม + เวลาไม่เกิน 600 นาที (เท่าช่องพิมพ์)', (await p8.evaluate(() => document.getElementById('hwPickMin').value)) === '600', '');
+    await c8.close();
   }
   check('hwSet: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
 }
