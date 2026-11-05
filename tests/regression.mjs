@@ -6446,6 +6446,165 @@ currentSection = 'summaryScratch';
   check('summaryScratch: ไม่มี error ในหน้า', [...r1.errs, ...r2.errs, ...r3.errs, ...r4.errs].length === 0, JSON.stringify([...r1.errs, ...r2.errs, ...r3.errs, ...r4.errs]));
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Section: hwSet (v48.91p, ชี้ preview) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
+// ปุ่มเลือกเร็ว "เคยผิด"/"ยังไม่เคยทำ", ลูกเห็นการ์ดในหน้าเริ่มทำ → ทำเฉพาะข้อที่เลือก, ค้างทำต่อได้ (เวลาตามสัดส่วน),
+// ครบแล้วปิดการบ้าน + เปิดเฉลย, ไม่ปนกับฝึกตั้งเป้าที่ลูกตั้งเอง, ลิงก์ของคนอื่น/ยกเลิกแล้ว → แจ้ง
+// ─────────────────────────────────────────────────────────────────
+currentSection = 'hwSet';
+{
+  const HW_FILE = 'index_preview.html';
+  const hq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
+  const pqr = (qid, no, ok) => ({ qid, no, isCorrect: ok, chosen: ok ? 'A' : 'B', correct: 'A' });
+  const cacheH = (over = {}) => baseCache({
+    exams: [mkExam('h1', 'ชุดการบ้าน', 'คณิตศาสตร์', { questionCount: 8, durationSeconds: 1600, pdfUrl: 'https://x/h.pdf' })],
+    questions: { h1: [hq('q1', 1, 'A'), hq('q2', 2, 'B'), hq('q3', 3, 'C'), hq('q4', 4, 'D'), hq('q5', 5, 'A', { isFree: true }), hq('q6', 6, 'A'), hq('q7', 7, 'B'), hq('q8', 8, 'C')] },
+    members: [{ pin: '311257', name: 'ณนนท์' }, { pin: '222333', name: 'น้อง' }],
+    attempts: [
+      { id: 'old1', examId: 'h1', takerName: 'ณนนท์', practiceMode: true, submittedAt: '2026-10-01T10:00:00Z', score: 2, total: 4, answers: {}, perQuestion: [pqr('q1', 1, true), pqr('q2', 2, false), pqr('q3', 3, false), pqr('q4', 4, true)] },
+      { id: 'old2', examId: 'h1', takerName: 'ณนนท์', practiceMode: true, submittedAt: '2026-10-05T10:00:00Z', score: 1, total: 1, answers: {}, perQuestion: [pqr('q3', 3, true)] },
+    ],
+    ...over,
+  });
+  const stub = (page) => page.evaluate(() => { const st = document.createElement('style'); st.textContent = '#offlineBanner{display:none!important;pointer-events:none!important}'; document.head.appendChild(st); PdfViewer.create = () => ({ loadUrl: async () => {}, setPage() {}, destroy() {} }); window.confirm = () => true; MemeScore.show = (a, b, cb) => { if (cb) cb(); }; window.__t = []; const t0 = window.toast; window.toast = (m) => { window.__t.push(m); return t0 && t0(m); }; });
+  const mood = async (page) => { await page.waitForTimeout(450); if (await page.$('.takeOverlay button[data-val="good"]')) await page.click('.takeOverlay button[data-val="good"]'); await page.waitForTimeout(300); };
+  const pick = (page, l) => page.evaluate((l) => { [...document.querySelectorAll('#takeChoices .choice')].find(el => el.textContent.trim() === ({ A: 'ก', B: 'ข', C: 'ค', D: 'ง' })[l]).click(); }, l);
+  const goNo = (page, no) => page.evaluate((no) => { [...document.querySelectorAll('#takeNums .numBtn')].find(b => b.textContent.trim() === String(no)).click(); }, no);
+  const submit = async (page) => {
+    await page.click('#takeSubmitBtn'); await page.waitForTimeout(400);
+    await page.evaluate(() => { document.querySelector('body > div[style*="fixed"] button[data-val="ok"]')?.click(); }); await page.waitForTimeout(300);
+    await page.evaluate(() => { document.querySelector('[data-n="1"]')?.click(); document.querySelector('#_predConfirm')?.click(); }); await page.waitForTimeout(900);
+  };
+  const errs = [];
+
+  // 1) ครู: หน้าต่างส่งการบ้าน → แท็บ "เลือกข้อเอง"
+  const { ctx, page } = await newSeededPage({ file: HW_FILE, cache: cacheH() });
+  page.on('pageerror', e => errs.push(e.message));
+  await stub(page);
+  await page.evaluate(() => _showAssignModal('h1', 'ชุดการบ้าน', 'คณิตศาสตร์'));
+  await page.click('[data-asg-tab="pick"]'); await page.waitForTimeout(100);
+  const t1 = await page.evaluate(() => { const p = document.getElementById('asgPanePick'); return { whole: getComputedStyle(document.getElementById('asgPaneWhole')).display, who: [...p.querySelectorAll('[data-pick-who]')].map(b => b.textContent), grid: [...p.querySelectorAll('.hwPickGrid button')].map(b => b.textContent.trim() + (b.disabled ? 'x' : '')), wrong: p.querySelector('[data-pick-quick="wrong"]').textContent, never: p.querySelector('[data-pick-quick="never"]').textContent, send: p.querySelector('#hwPickSend').disabled }; });
+  check('hwSet: ครูเปิด "ส่งการบ้าน" → แท็บ "เลือกข้อเอง" มีเลือกเด็ก 2 คน + ตารางเลขข้อ (ข้อฟรีกดไม่ได้) + ปุ่มส่งยังกดไม่ได้', t1.whole === 'none' && t1.who.join() === 'ณนนท์,น้อง' && t1.grid.join() === '1,2,3,4,5x,6,7,8' && t1.send, JSON.stringify(t1));
+  check('hwSet: ปุ่มเร็ว "เคยผิด" นับจากผลล่าสุดต่อข้อ (ข้อ 3 ผิดแล้วแก้ถูก → ไม่นับ) = 1, "ยังไม่เคยทำ" = 3 (6, 7, 8 — ไม่นับข้อฟรี)', /เคยผิด \(1\)/.test(t1.wrong) && /ยังไม่เคยทำ \(3\)/.test(t1.never), JSON.stringify(t1));
+  await page.click('[data-pick-quick="wrong"]'); await page.click('[data-pick-quick="never"]');
+  await page.evaluate(() => document.querySelector('[data-pick-q="q7"]').click()); // เอาข้อ 7 ออก
+  const t2 = await page.evaluate(() => ({ on: [...document.querySelectorAll('[data-pick-q][aria-pressed="true"]')].map(b => b.dataset.pickQ), min: document.getElementById('hwPickMin').value, btn: document.getElementById('hwPickSend').textContent }));
+  check('hwSet: กด "เคยผิด" + "ยังไม่เคยทำ" (รวมกัน) แล้วกดเอาข้อ 7 ออก → เลือก 2, 6, 8 · เวลาแนะนำ 10 นาที (200 วิ/ข้อ × 3)', t2.on.join() === 'q2,q6,q8' && t2.min === '10' && /ส่งการบ้าน · 3 ข้อ · 10 นาที/.test(t2.btn), JSON.stringify(t2));
+  await page.click('#hwPickSend'); await page.waitForTimeout(200);
+  const asg = await page.evaluate(() => Store.load().assignments.find(a => a.examId === 'h1'));
+  const t3 = await page.evaluate(() => ({ sent: !!document.querySelector('#asgPanePick .hwPickSent'), txt: document.querySelector('#asgPanePick').textContent.replace(/\s+/g, ' '), modal: !!document.getElementById('assignModal') }));
+  check('hwSet: กดส่ง → การบ้านมี set {qids 2,6,8, minutes 10} ของ ณนนท์ · หน้าต่างยังเปิด แสดง "ส่งแล้ว" + "3 ข้อ · 10 นาที · ข้อ 2, 6, 8" + ปุ่มแชร์ลิงก์', asg && asg.assignedTo === 'ณนนท์' && asg.status === 'pending' && JSON.stringify(asg.set) === JSON.stringify({ qids: ['q2', 'q6', 'q8'], minutes: 10 }) && t3.sent && t3.modal && /3 ข้อ · 10 นาที · ข้อ 2, 6, 8/.test(t3.txt) && /แชร์ลิงก์ให้ ณนนท์/.test(t3.txt), JSON.stringify({ asg, t3 }));
+  await page.evaluate(() => { window.__sh = []; navigator.share = (d) => { window.__sh.push(d); return Promise.resolve(); }; document.querySelector('[data-pick-share]').click(); });
+  const sh = await page.evaluate(() => window.__sh[0]);
+  check('hwSet: แชร์ลิงก์ → ลิงก์หน้าจริง ?exam=h1&hw=<id การบ้าน> + ข้อความบอกจำนวนข้อ/เวลา', sh && sh.url === 'https://smitharnonwattana-svg.github.io/Quiz-app/?exam=h1&hw=' + encodeURIComponent(asg.id) && /3 ข้อ · 10 นาที/.test(sh.text) && /การบ้าน/.test(sh.title), JSON.stringify(sh));
+  await page.evaluate(() => _assignToStudent('ณนนท์', 'h1', 'ชุดการบ้าน', 'คณิตศาสตร์', { qids: ['q1'], minutes: 3 }));
+  check('hwSet: ส่งซ้ำชุดเดิมให้เด็กคนเดิม (ยังค้าง) → ไม่สร้างซ้ำ', (await page.evaluate(() => Store.load().assignments.filter(a => a.examId === 'h1' && a.status === 'pending').length)) === 1, '');
+  await page.evaluate(() => document.getElementById('assignModal')?.remove());
+  await page.evaluate(() => _showAssignModal('h1', 'ชุดการบ้าน', 'คณิตศาสตร์'));
+  const t4 = await page.evaluate(() => document.querySelector('[data-asg-row="ณนนท์"]').textContent.replace(/\s+/g, ' '));
+  check('hwSet: แท็บ "ทั้งชุด" ขึ้น "ส่งแล้ว" ให้ ณนนท์ (กติกาเดิม: ชุดเดียวกันค้างได้ 1 รายการ)', /ส่งแล้ว/.test(t4), t4);
+  await page.evaluate(() => document.getElementById('assignModal').remove());
+  await ctx.close();
+
+  // 2) ลูก: กระดิ่ง → การ์ดชุดฝึก → รอบ 1 (ตอบ 1 ใน 3 ข้อ)
+  const cacheKid = () => cacheH({ assignments: [{ ...asg }] });
+  const { ctx: c2, page: p2 } = await newSeededPage({ file: HW_FILE, cache: cacheKid(), role: 'student', name: 'ณนนท์' });
+  p2.on('pageerror', e => errs.push(e.message));
+  await stub(p2);
+  check('hwSet: ป้ายในกระดิ่ง "3 ข้อ · 10 นาที · ข้อ 2, 6, 8"', (await p2.evaluate((id) => _hwSetLabel(Store.load().assignments.find(a => a.id === id)), asg.id)) === '3 ข้อ · 10 นาที · ข้อ 2, 6, 8', '');
+  await p2.evaluate((id) => _doAssignment(id, 'h1'), asg.id); await p2.waitForTimeout(300);
+  const k1 = await p2.evaluate(() => { const c = document.querySelector('.hwSetCard'); return c && { txt: c.textContent.replace(/\s+/g, ' '), btn: document.getElementById('hwSetStartBtn').textContent, top: c.getBoundingClientRect().top < document.getElementById('examStartBtn').getBoundingClientRect().top, page: window._currentPage }; });
+  check('hwSet: "ทำเลย" → หน้าเริ่มทำมีการ์ด "ชุดฝึกที่พ่อกำหนด · 3 ข้อ · 10 นาที · ข้อ 2, 6, 8" อยู่บนปุ่มเดิม + ปุ่ม "เริ่มทำ · 3 ข้อ · 10 นาที"', k1 && k1.page === 'exam' && /ชุดฝึกที่พ่อกำหนด/.test(k1.txt) && /3 ข้อ · 10 นาที/.test(k1.txt) && /ข้อ 2, 6, 8/.test(k1.txt) && /เริ่มทำ · 3 ข้อ · 10 นาที/.test(k1.btn) && k1.top, JSON.stringify(k1));
+  await p2.click('#hwSetStartBtn'); await mood(p2);
+  const k2 = await p2.evaluate(() => ({ nos: _takeState.qsList.map(q => q.no), title: document.getElementById('takeExamTitle').textContent, timer: document.getElementById('takeTimer').textContent, hw: _takeState.hwId, quota: document.getElementById('takeQNoWrap').textContent.trim() }));
+  check('hwSet: เริ่ม → เห็นเฉพาะข้อ 2, 6, 8 หัว "[การบ้าน · 3 ข้อ 10 นาที]" นับถอยหลัง 10:00 ตอบได้ทุกข้อ (ตอบ 0/3)', k2.nos.join() === '2,6,8' && /^\[การบ้าน · 3 ข้อ 10 นาที\]/.test(k2.title) && /^(10:00|09:5\d)$/.test(k2.timer) && k2.hw === asg.id && k2.quota === 'ตอบ 0/3', JSON.stringify(k2));
+  await pick(p2, 'B'); // ข้อ 2 ถูก
+  await submit(p2);
+  let at = await p2.evaluate(() => { const a = Store.load().attempts.find(x => x.hwId); return a && { id: a.id, hw: a.hwId, scope: a.setScope, pq: a.perQuestion.map(p => p.no + (p.counted === false ? '-' : '')), score: a.score, total: a.total, done: !!a.setDoneAt }; });
+  const st1 = await p2.evaluate((id) => ({ status: Store.load().assignments.find(a => a.id === id).status, own: !!findPendingPractice(Store.load(), 'h1', 'ณนนท์'), hwp: (findPendingPractice(Store.load(), 'h1', 'ณนนท์', id) || {}).qids }), asg.id);
+  check('hwSet: ส่งรอบ 1 (ตอบ 1/3) → ผล hwId + setScope, เก็บเฉพาะข้อในชุด (2 ✓, 6/8 ค้าง) 1/1, การบ้านยังค้าง', at && at.hw === asg.id && at.scope.join() === 'q2,q6,q8' && at.pq.join() === '2,6-,8-' && at.score === 1 && at.total === 1 && !at.done && st1.status === 'pending', JSON.stringify({ at, st1 }));
+  check('hwSet: เซ็ตการบ้านไม่ปนกับฝึกตั้งเป้าที่ลูกตั้งเอง (ไม่มีเซ็ตของตัวเองค้าง) · ข้อค้างของการบ้าน = 6, 8', !st1.own && (st1.hwp || []).join() === 'q6,q8', JSON.stringify(st1));
+  const r1 = await p2.evaluate(() => ({ page: window._currentPage, rows: document.querySelectorAll('#reviewQList .qItem').length, chips: document.querySelectorAll('#reviewNavChips .chip').length, locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display !== 'none' ? document.getElementById('reviewSetContinueBtn').textContent : '', reveal: getComputedStyle(document.getElementById('reviewRevealBtn')).display, line: document.getElementById('reviewHalfCombinedLine').textContent, title: document.getElementById('reviewTitle').textContent }));
+  check('hwSet: หน้าทบทวน — แสดงเฉพาะ 3 ข้อของการบ้าน, ข้อค้าง 2 ข้อล็อกเฉลย, "ทำแล้ว 1/3 · ค้าง 2", ปุ่มทำต่อ, ไม่มีปุ่มสละสิทธิ์ดูเฉลย', r1.page === 'review' && r1.rows === 3 && r1.chips === 3 && r1.locks === 2 && /ทำแล้ว 1\/3 ข้อ · ค้าง 2 ข้อ/.test(r1.line) && /ค้าง \(2 ข้อ\)/.test(r1.cont) && r1.reveal === 'none' && /ชุดฝึกที่พ่อกำหนด/.test(r1.title), JSON.stringify(r1));
+
+  // 3) ฝึกซ้อมเองยังเป็นแบบเดิม (ไม่ถูกเซ็ตการบ้านทับ)
+  await p2.evaluate(() => navigate('exam', { id: 'h1' })); await p2.waitForTimeout(200);
+  await p2.click('#examStartPracticeBtn'); await p2.waitForTimeout(150);
+  const own = await p2.evaluate(() => ({ whole: !!document.getElementById('psWhole'), pend: !!document.getElementById('psPendingInfo'), hint: document.getElementById('psHint').textContent }));
+  check('hwSet: กดฝึกซ้อมเอง → แผ่นตั้งเป้าแบบใหม่ (ไม่ใช่ "ทำต่อ" ของการบ้าน) เลือกได้จาก 7 ข้อ', own.whole && !own.pend && /จาก 7 ข้อ/.test(own.hint), JSON.stringify(own));
+  await p2.evaluate(() => document.getElementById('practiceSetSheet').remove());
+
+  // 4) ทำต่อ (จากปุ่มหน้าทบทวน) → เวลาตามสัดส่วน → ครบ → ปิดการบ้าน
+  await p2.evaluate((id) => navigate('review', { attemptId: id }), at.id); await p2.waitForTimeout(300);
+  await p2.click('#reviewSetContinueBtn'); await p2.waitForTimeout(300);
+  const k3 = await p2.evaluate(() => ({ page: window._currentPage, prog: document.querySelector('.hwSetProg')?.textContent, btn: document.getElementById('hwSetStartBtn')?.textContent }));
+  check('hwSet: กด "ทำต่อ" → การ์ด "ทำแล้ว 1/3 · เหลือ 2" ปุ่ม "ทำต่อ · 2 ข้อ · 7 นาที" (10 × 2/3 ปัดขึ้น)', k3.page === 'exam' && /ทำแล้ว 1\/3 ข้อ · เหลือ 2 ข้อ/.test(k3.prog || '') && /ทำต่อ · 2 ข้อ · 7 นาที/.test(k3.btn || ''), JSON.stringify(k3));
+  await p2.click('#hwSetStartBtn'); await mood(p2);
+  const k4 = await p2.evaluate(() => ({ nos: _takeState.qsList.map(q => q.no), parent: _takeState.setParentId, title: document.getElementById('takeExamTitle').textContent }));
+  check('hwSet: รอบ 2 = เฉพาะข้อค้าง 6, 8 ผูกกับผลเดิม หัว "[การบ้าน · 2 ข้อ 7 นาที]"', k4.nos.join() === '6,8' && k4.parent === at.id && /^\[การบ้าน · 2 ข้อ 7 นาที\]/.test(k4.title), JSON.stringify(k4));
+  await pick(p2, 'A'); await goNo(p2, 8); await pick(p2, 'A'); // ข้อ 6 ถูก, ข้อ 8 ผิด
+  await submit(p2);
+  at = await p2.evaluate(() => { const l = Store.load().attempts.filter(x => x.hwId); const a = l[0]; return a && { n: l.length, pq: a.perQuestion.map(p => p.no + (p.counted === false ? '-' : '')), score: a.score, total: a.total, done: !!a.setDoneAt, rounds: a.practiceRounds }; });
+  const st2 = await p2.evaluate((id) => ({ status: Store.load().assignments.find(a => a.id === id).status, toast: window.__t.some(m => /ทำการบ้านครบแล้ว/.test(m)) }), asg.id);
+  check('hwSet: ครบทุกข้อที่เลือก → ผลเดียว 2/3, 2 รอบ, setDoneAt (ไม่ต้องทำข้ออื่นของชุด) · การบ้าน done + แจ้ง "ทำการบ้านครบแล้ว"', at && at.n === 1 && at.pq.join() === '2,6,8' && at.score === 2 && at.total === 3 && at.done && at.rounds === 2 && st2.status === 'done' && st2.toast, JSON.stringify({ at, st2 }));
+  const r2 = await p2.evaluate(() => ({ locks: (document.getElementById('reviewQList').textContent.match(/ยังไม่ได้ตอบ/g) || []).length, cont: getComputedStyle(document.getElementById('reviewSetContinueBtn')).display, line: document.getElementById('reviewHalfCombinedLine').textContent }));
+  check('hwSet: หน้าทบทวนหลังครบ — เฉลยเปิดทุกข้อ "ทำการบ้านครบแล้ว (2 รอบ)" ไม่มีปุ่มทำต่อ', r2.locks === 0 && r2.cont === 'none' && /ทำการบ้านครบแล้ว \(2 รอบ\)/.test(r2.line), JSON.stringify(r2));
+  await p2.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'teacher', name: 'Admin', ts: Date.now() })); });
+  await p2.evaluate((id) => navigate('review', { attemptId: id }), at.id || (await p2.evaluate(() => Store.load().attempts.find(x => x.hwId).id))); await p2.waitForTimeout(400);
+  await p2.evaluate(() => document.getElementById('reviewRecalcBtn').click()); await p2.waitForTimeout(600);
+  const rc = await p2.evaluate(() => { const a = Store.load().attempts.find(x => x.hwId); return [a.score, a.total, a.perQuestion.length]; });
+  check('hwSet: ครู "คำนวณคะแนนใหม่" ผลการบ้าน → คิดเฉพาะข้อที่เลือก (2/3, 3 ข้อ — ไม่ดึงข้อฟรี/ข้ออื่นของชุด)', JSON.stringify(rc) === '[2,3,3]', JSON.stringify(rc));
+  await p2.evaluate(() => { sessionStorage.setItem('appSession', JSON.stringify({ role: 'student', name: 'ณนนท์', ts: Date.now() })); });
+  await p2.evaluate((id) => navigate('exam', { id: 'h1', hw: id }), asg.id); await p2.waitForTimeout(300);
+  const k5 = await p2.evaluate(() => ({ card: !!document.querySelector('.hwSetCard'), toast: window.__t.slice(-1)[0] }));
+  check('hwSet: เปิดลิงก์การบ้านที่ทำครบแล้ว → ไม่มีการ์ด + แจ้ง "ทำครบแล้ว"', !k5.card && /ทำครบแล้ว/.test(k5.toast), JSON.stringify(k5));
+  await c2.close();
+
+  // 5) การบ้านทั้งชุดแบบเดิม: ฝึกตั้งเป้าเองครบไม่ปิดการบ้านชุดฝึก (และกลับกัน) — ทำข้อสอบปกติปิดการบ้านทั้งชุดตามเดิม
+  {
+    const whole = { id: 'w1', examId: 'h1', examTitle: 'ชุดการบ้าน', examSubject: 'คณิตศาสตร์', assignedTo: 'ณนนท์', assignedBy: 'teacher', assignedAt: 1, status: 'pending' };
+    const hwP = { ...asg, id: 'hs2', status: 'pending' };
+    const { ctx: c3, page: p3 } = await newSeededPage({ file: HW_FILE, cache: cacheH({ assignments: [whole, hwP] }), role: 'student', name: 'ณนนท์' });
+    p3.on('pageerror', e => errs.push(e.message));
+    await stub(p3);
+    await p3.evaluate(() => navigate('exam', { id: 'h1' })); await p3.waitForTimeout(200);
+    await p3.click('#examStartBtn'); await mood(p3);
+    await pick(p3, 'A'); await submit(p3);
+    const ss = await p3.evaluate(() => Store.load().assignments.map(a => a.id + ':' + a.status).join());
+    check('hwSet: ทำข้อสอบแบบปกติ → ปิดการบ้านทั้งชุด (เดิม) แต่ไม่ปิดการบ้านชุดฝึกที่เลือกข้อ', ss === 'w1:done,hs2:pending', ss);
+    await c3.close();
+  }
+
+  // 6) ลิงก์ ?exam=&hw= ก่อนล็อกอิน → ใส่ PIN → หน้าเริ่มทำพร้อมการ์ด; ลิงก์ของคนอื่น/ยกเลิกแล้ว → แจ้ง
+  {
+    const { ctx: c4, page: p4 } = await newSeededPage({ file: HW_FILE + '?exam=h1&hw=' + encodeURIComponent(asg.id), cache: cacheKid() });
+    p4.on('pageerror', e => errs.push(e.message));
+    const b = await p4.evaluate(() => ({ pend: window._pendingExamId, hw: window._pendingHwId, ls: JSON.parse(localStorage.getItem('nanont:pendingExam') || 'null'), page: window._currentPage }));
+    check('hwSet: เปิดลิงก์การบ้าน → จำทั้ง exam + hw (หน่วยความจำ + localStorage) อยู่หน้า login', b.pend === 'h1' && b.hw === asg.id && b.ls && b.ls.hw === asg.id && b.page === 'login', JSON.stringify(b));
+    await p4.evaluate(() => { sessionStorage.removeItem('appSession'); localStorage.removeItem('appSession'); document.getElementById('offlineBanner')?.remove(); _pinVal = '311257'; doLogin(); }); await p4.waitForTimeout(500);
+    const lg = await p4.evaluate(() => ({ page: window._currentPage, hw: _pageParams.hw, card: (document.querySelector('.hwSetCard') || {}).textContent, ls: localStorage.getItem('nanont:pendingExam') }));
+    check('hwSet: ใส่ PIN ลูก → หน้าเริ่มทำของชุดนั้น + การ์ดชุดฝึก (ล้างค่าที่จำ)', lg.page === 'exam' && lg.hw === asg.id && /3 ข้อ · 10 นาที/.test(lg.card || '') && lg.ls === null, JSON.stringify(lg));
+    await stub(p4);
+    await p4.evaluate((id) => { const s = Store.load(); s.assignments.find(a => a.id === id).assignedTo = 'น้อง'; Store.save(s); navigate('exam', { id: 'h1', hw: id }); }, asg.id); await p4.waitForTimeout(200);
+    const o1 = await p4.evaluate(() => ({ card: !!document.querySelector('.hwSetCard'), t: window.__t.slice(-1)[0] }));
+    await p4.evaluate((id) => { const s = Store.load(); const a = s.assignments.find(a => a.id === id); a.assignedTo = 'ณนนท์'; a.status = 'cancelled'; Store.save(s); navigate('exam', { id: 'h1', hw: id }); }, asg.id); await p4.waitForTimeout(200);
+    const o2 = await p4.evaluate(() => ({ card: !!document.querySelector('.hwSetCard'), t: window.__t.slice(-1)[0], start: !!document.getElementById('examStartBtn') }));
+    check('hwSet: ลิงก์การบ้านของเด็กอีกคน → ไม่มีการ์ด + แจ้ง "เป็นของ น้อง"; ถูกยกเลิกแล้ว → แจ้ง "ถูกยกเลิก" หน้าเริ่มทำปกติยังใช้ได้', !o1.card && /เป็นของ น้อง/.test(o1.t) && !o2.card && /ถูกยกเลิก/.test(o2.t) && o2.start, JSON.stringify({ o1, o2 }));
+    await c4.close();
+  }
+
+  // 7) มือถือ 390: หน้าต่างครู/การ์ดลูกไม่ล้นจอ
+  {
+    const { ctx: c5, page: p5 } = await newSeededPage({ file: HW_FILE, cache: cacheH(), viewport: { width: 390, height: 844 } });
+    p5.on('pageerror', e => errs.push(e.message));
+    await p5.evaluate(() => { _showAssignModal('h1', 'ชุดการบ้าน', 'คณิตศาสตร์'); document.querySelector('[data-asg-tab="pick"]').click(); });
+    const m = await p5.evaluate(() => { const r = document.querySelector('#assignModal > div').getBoundingClientRect(); return { l: r.left, r: r.right, sw: document.documentElement.scrollWidth }; });
+    check('hwSet: มือถือ 390 — หน้าต่างเลือกข้อไม่ล้นจอ', m.l >= 0 && m.r <= 390 && m.sw <= 390, JSON.stringify(m));
+    await c5.close();
+  }
+  check('hwSet: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
+}
+
 await browser.close();
 const fails = results.filter(r => !r.pass);
 console.log('\n══════════════════════════════════════');
