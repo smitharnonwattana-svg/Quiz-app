@@ -6447,13 +6447,13 @@ currentSection = 'summaryScratch';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: hwSet (v48.91p, ชี้ preview) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
+// Section: hwSet (v48.91p → production v48.72, ชี้ index.html) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
 // ปุ่มเลือกเร็ว "เคยผิด"/"ยังไม่เคยทำ", ลูกเห็นการ์ดในหน้าเริ่มทำ → ทำเฉพาะข้อที่เลือก, ค้างทำต่อได้ (เวลาตามสัดส่วน),
 // ครบแล้วปิดการบ้าน + เปิดเฉลย, ไม่ปนกับฝึกตั้งเป้าที่ลูกตั้งเอง, ลิงก์ของคนอื่น/ยกเลิกแล้ว → แจ้ง
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'hwSet';
 {
-  const HW_FILE = 'index_preview.html';
+  const HW_FILE = 'index.html';
   const hq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
   const pqr = (qid, no, ok) => ({ qid, no, isCorrect: ok, chosen: ok ? 'A' : 'B', correct: 'A' });
   const cacheH = (over = {}) => baseCache({

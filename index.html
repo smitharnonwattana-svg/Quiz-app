@@ -31,7 +31,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- APP_VERSION: v48.71 -->
+  <!-- APP_VERSION: v48.72 -->
   <style>
     :root{--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--black:#111827;--ok:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box;}
@@ -1463,6 +1463,9 @@
     .lvPill.cur:not(.ok):not(.bad):not(.nk):not(.fr){border-color:#2563eb;color:#2563eb;}
     .lvPill sup{position:absolute;top:-5px;right:-3px;font-size:9px;}
     /* v48.66: โหมดยาก (ซ่อนตัวเลือก) */
+    /* v48.72: แท็บหน้าต่างส่งการบ้าน (ทั้งชุด / เลือกข้อเอง) */
+    .asgTab{flex:1;padding:8px 10px;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff;color:#6b7280;font-size:13px;font-weight:700;cursor:pointer;}
+    .asgTab.on{border-color:#0E7C8C;background:#F0FBFC;color:#0E7C8C;}
     .hardToggle{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fafafa;font-weight:800;cursor:pointer;user-select:none;}
     .hardToggle input{position:absolute;opacity:0;width:1px;height:1px;}
     .hardSw{width:38px;height:22px;border-radius:11px;background:#d1d5db;position:relative;flex-shrink:0;transition:background .15s;}
@@ -1606,7 +1609,7 @@
           <button class="iPadBtn iPadBtnGhost" onclick="numpadBack()">⌫</button>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.71</div>
+      <div style="text-align:right;margin-top:10px;font-size:11px;color:#6E6E73;opacity:0.5;">v48.72</div>
     </div>
   </div>
 </div>
@@ -5498,7 +5501,7 @@ function _toggleNotifDropdown(userId) {
           align-items:center;padding:10px 14px;
           border-bottom:1px solid #C6C6C8;gap:8px;">
           <div style="font-size:13px;color:#1C1C1E;flex:1;display:flex;align-items:center;gap:6px;">
-            <span style="color:#8E8E93;flex-shrink:0;">${_icon(_ICONS.bookOpen, 14)}</span>${esc(a.examTitle)}
+            <span style="color:#8E8E93;flex-shrink:0;">${_icon(_ICONS.bookOpen, 14)}</span><span>${esc(a.examTitle)}${a.set ? `<span class="hwSetSub" style="display:block;font-size:11px;color:#0E7C8C;margin-top:1px;">${esc(_hwSetLabel(a, s))}</span>` : ''}</span>
           </div>
           ${isTeacher
             ? `<button class="btn" style="font-size:11px;padding:3px 8px;
@@ -5546,7 +5549,7 @@ function _doAssignment(assignId, examId) {
   // Status will be set to 'done' after actual submit
   const existing = document.getElementById('notifDropdown');
   if (existing) existing.remove();
-  navigate('exam', { id: examId });
+  navigate('exam', { id: examId, hw: assignId });
 }
 
 function _cancelAssignment(assignId, userId) {
@@ -5612,9 +5615,24 @@ function _showAssignModal(examId, examTitle, examSubject) {
       </div>
       <div style="padding:10px 14px;font-size:13px;color:#6b7280;
         border-bottom:1px solid #f3f4f6;">${esc(examTitle)}</div>
-      ${itemsHtml}
+      <div class="asgTabs" role="tablist" style="display:flex;gap:6px;padding:10px 14px 0;">
+        <button type="button" role="tab" class="asgTab on" data-asg-tab="whole">ทั้งชุด</button>
+        <button type="button" role="tab" class="asgTab" data-asg-tab="pick">เลือกข้อเอง</button>
+      </div>
+      <div id="asgPaneWhole">${itemsHtml}</div>
+      <div id="asgPanePick" style="display:none;"></div>
     </div>
   `;
+  modal.firstElementChild.style.maxWidth = '420px';
+  modal.firstElementChild.style.maxHeight = 'calc(100vh - 40px)';
+  modal.firstElementChild.style.overflow = 'auto';
+  modal.querySelectorAll('[data-asg-tab]').forEach(tb => tb.addEventListener('click', () => {
+    const pick = tb.dataset.asgTab === 'pick';
+    modal.querySelectorAll('[data-asg-tab]').forEach(b => { b.classList.toggle('on', b === tb); b.setAttribute('aria-selected', b === tb ? 'true' : 'false'); });
+    modal.querySelector('#asgPaneWhole').style.display = pick ? 'none' : '';
+    modal.querySelector('#asgPanePick').style.display = pick ? '' : 'none';
+    if (pick && !modal.querySelector('#asgPanePick').dataset.ready) _renderAssignPick(modal.querySelector('#asgPanePick'), { examId, examTitle, examSubject, members });
+  }));
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   modal.querySelectorAll('[data-asg-to]').forEach(btn => btn.addEventListener('click', () => {
     _assignToStudent(members[Number(btn.dataset.asgTo)].name, examId, examTitle, examSubject);
@@ -5636,7 +5654,7 @@ function _cancelAssignmentInModal(assignId) {
   toast('✅ ยกเลิกการบ้านแล้ว');
 }
 
-function _assignToStudent(studentName, examId, examTitle, examSubject) {
+function _assignToStudent(studentName, examId, examTitle, examSubject, set) {
   const s = Store.load();
   const assignments = s.assignments || [];
   // v48.63: ชุดนี้ส่งให้เด็กคนนี้ไปแล้ว (ยัง pending) → ไม่สร้างซ้ำ (กดรัว / modal ค้าง / ลิงก์เก่า)
@@ -5659,13 +5677,150 @@ function _assignToStudent(studentName, examId, examTitle, examSubject) {
     assignedTo: studentName,
     assignedBy: 'teacher',
     assignedAt: Date.now(),
-    status: 'pending'
+    status: 'pending',
+    ...(set ? { set: { qids: set.qids.slice(), minutes: set.minutes } } : {}) // v48.72
   };
   s.assignments = [...assignments, newAssignment];
   Store.save(s);
+  if (set) { toast('✅ ส่งชุดฝึกให้ ' + studentName + ' แล้ว'); return newAssignment; } // v48.72: หน้าต่างยังเปิด (แชร์ลิงก์ต่อได้)
   const modal = document.getElementById('assignModal');
   if (modal) modal.remove();
   toast('✅ ส่งการบ้านให้ ' + studentName + ' แล้ว');
+}
+
+// ===================== v48.72: ชุดฝึกที่พ่อกำหนด (การบ้านเลือกข้อ + ตั้งเวลา) =====================
+// การบ้าน (assignment) มี set:{qids,minutes} → ลูกทำเป็น "ฝึกตั้งเป้า" เฉพาะข้อที่เลือก ทำได้ทุกข้อในเวลาที่ตั้ง
+// ทำไม่ครบ = ค้าง (ทำต่อข้อที่เหลือได้ เวลาตามสัดส่วน) · ครบ = ปิดการบ้าน + เปิดเฉลย · ผลสอบมี hwId/setScope
+function _hwQNos(s, examId, qids) {
+  const byId = new Map((s.questions[examId] || []).map(q => [q.id, q.no ?? q.number ?? 0]));
+  return (qids || []).filter(id => byId.has(id)).map(id => Number(byId.get(id))).sort((a, b) => a - b);
+}
+function _hwSetLabel(a, s) {
+  const nos = _hwQNos(s || Store.load(), a.examId, a.set && a.set.qids);
+  const list = nos.length > 8 ? nos.slice(0, 8).join(', ') + ' …' : nos.join(', ');
+  return `${nos.length} ข้อ · ${a.set.minutes} นาที · ข้อ ${list}`;
+}
+// แผนของรอบถัดไป: ข้อที่ยังไม่ได้ทำในขอบเขต + เวลาตามสัดส่วน (รอบแรก = เวลาเต็ม)
+function _hwSetPlan(s, a, name) {
+  const qs = s.questions[a.examId] || [];
+  const valid = new Map(qs.map(q => [q.id, q]));
+  const scope = ((a.set && a.set.qids) || []).filter(id => valid.has(id) && !valid.get(id).isFree);
+  const no = id => Number(valid.get(id).no ?? valid.get(id).number ?? 0);
+  scope.sort((x, y) => no(x) - no(y));
+  const pend = findPendingPractice(s, a.examId, name, a.id);
+  const started = (s.attempts || []).some(x => x.hwId === a.id && (x.takerName || '').trim() === (name || '').trim());
+  const left = pend ? pend.qids : (started ? [] : scope);
+  const full = Math.max(1, Number(a.set && a.set.minutes) || 1);
+  const minutes = left.length === scope.length ? full : Math.max(1, Math.ceil(full * left.length / Math.max(1, scope.length)));
+  return { scope, left, minutes, parentId: pend ? pend.attempt.id : null };
+}
+function startHwSet(exam, a, name) {
+  const p = _hwSetPlan(Store.load(), a, name);
+  if (!p.left.length) { toast('ทำการบ้านชุดนี้ครบแล้ว'); return; }
+  navigate('take', { id: exam.id, takerName: name, practice: true, setMin: p.minutes, setN: p.left.length, qids: p.left.slice(), setParentId: p.parentId, hwId: a.id, ...(exam.examType === 'hard' ? { hard: true } : {}) });
+}
+function hwShareUrl(a) { return examShareUrl(a.examId) + '&hw=' + encodeURIComponent(a.id); }
+// สถิติของเด็กคนนั้นในชุดนี้: ข้อที่ผิดล่าสุด / ข้อที่ไม่เคยทำ (ข้อฟรี/รอตรวจไม่นับ)
+function _hwPickStats(s, examId, name) {
+  const last = {};
+  (s.attempts || []).filter(a => a.examId === examId && (a.takerName || '').trim() === name)
+    .sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0))
+    .forEach(a => (a.perQuestion || []).forEach(p => {
+      if (!p || !p.qid || p.isFree || p.pending || p.counted === false) return;
+      last[p.qid] = !!p.isCorrect;
+    }));
+  const qs = (s.questions[examId] || []).filter(q => !q.isFree);
+  return { wrong: qs.filter(q => last[q.id] === false).map(q => q.id), never: qs.filter(q => !(q.id in last)).map(q => q.id) };
+}
+function _renderAssignPick(pane, ctx) {
+  pane.dataset.ready = '1';
+  const { examId, examTitle, examSubject, members } = ctx;
+  const s0 = Store.load();
+  const exam = (s0.exams || []).find(e => e.id === examId) || {};
+  const qs = (s0.questions[examId] || []).map(q => ({ id: q.id, no: Number(q.no ?? q.number ?? 0), isFree: !!q.isFree })).sort((a, b) => a.no - b.no);
+  const perQSec = qs.length ? (exam.durationSeconds || 0) / qs.length : 0;
+  const suggest = n => Math.max(1, Math.ceil(perQSec * n / 60)) || 1;
+  let who = (members.find(m => !(s0.assignments || []).some(a => a.assignedTo === m.name && a.examId === examId && a.status === 'pending')) || members[0] || {}).name || '';
+  let sel = new Set(), min = 10, minTouched = false;
+  const chip = (on) => `padding:6px 12px;border-radius:999px;font-size:13px;border:1.5px solid ${on ? '#0E7C8C' : '#e5e7eb'};background:${on ? '#F0FBFC' : '#fff'};color:${on ? '#0E7C8C' : '#374151'};font-weight:${on ? 700 : 500};cursor:pointer;`;
+  const paint = () => {
+    const s = Store.load();
+    if (!members.length) { pane.innerHTML = '<div style="padding:14px;color:#9ca3af;font-size:13px;">ไม่มีนักเรียน</div>'; return; }
+    const mine = (s.assignments || []).filter(a => a.assignedTo === who && a.status === 'pending');
+    const sent = mine.find(a => a.examId === examId);
+    const whoHtml = members.length > 1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:13px;color:#6b7280;">ส่งให้</span>${members.map((m, i) => `<button type="button" data-pick-who="${i}" style="${chip(m.name === who)}">${esc(m.name)}</button>`).join('')}</div>` : `<div style="font-size:13px;color:#6b7280;">ส่งให้ <b style="color:#374151;">${esc(who)}</b></div>`;
+    let body;
+    if (sent) {
+      body = `<div class="hwPickSent" style="border:1.5px solid #B2EBF2;background:#F0FBFC;border-radius:12px;padding:12px;display:grid;gap:8px;">
+        <div style="font-size:14px;font-weight:700;color:#0E7C8C;">✓ ส่งแล้ว${sent.set ? ' — ชุดฝึกที่เลือกข้อ' : ' — ทั้งชุด'}</div>
+        ${sent.set ? `<div style="font-size:13px;color:#374151;">${esc(_hwSetLabel(sent, s))}</div>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${sent.set ? `<button type="button" class="btn btnPrimary" data-pick-share="${esc(sent.id)}" style="font-size:13px;padding:8px 14px;">🔗 แชร์ลิงก์ให้ ${esc(who)}</button>` : ''}
+          <button type="button" class="btn" data-pick-cancel="${esc(sent.id)}" style="font-size:13px;padding:8px 14px;color:#D70015;border-color:#D70015;">ยกเลิกการบ้าน</button>
+        </div>
+        <div style="font-size:12px;color:#6b7280;">การบ้านชุดนี้ค้างได้ทีละ 1 รายการ — ยกเลิกก่อนถ้าจะส่งชุดใหม่</div>
+      </div>`;
+    } else if (mine.length >= 3) {
+      body = `<div style="font-size:13px;color:#9ca3af;">${esc(who)} มีการบ้านค้างอยู่ 3 ชุดแล้ว</div>`;
+    } else {
+      const st = _hwPickStats(s, examId, who);
+      const n = sel.size;
+      if (!minTouched) min = suggest(n || 1);
+      body = `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn" data-pick-quick="wrong" ${st.wrong.length ? '' : 'disabled'} style="font-size:12px;padding:6px 10px;">+ ข้อที่ ${esc(who)} เคยผิด (${st.wrong.length})</button>
+          <button type="button" class="btn" data-pick-quick="never" ${st.never.length ? '' : 'disabled'} style="font-size:12px;padding:6px 10px;">+ ข้อที่ยังไม่เคยทำ (${st.never.length})</button>
+          <button type="button" class="btn" data-pick-quick="clear" ${n ? '' : 'disabled'} style="font-size:12px;padding:6px 10px;color:#6b7280;">ล้าง</button>
+        </div>
+        <div class="hwPickGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px;max-height:240px;overflow:auto;padding:2px;">
+          ${qs.map(q => {
+            const on = sel.has(q.id), w = st.wrong.includes(q.id);
+            return q.isFree
+              ? `<button type="button" disabled title="ข้อฟรี" style="height:40px;border-radius:10px;border:1px dashed #e5e7eb;background:#f9fafb;color:#c0c4cc;font-size:13px;">${q.no}</button>`
+              : `<button type="button" data-pick-q="${esc(q.id)}" aria-pressed="${on}" title="${w ? 'เคยผิด' : ''}" style="position:relative;height:40px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:1.5px solid ${on ? '#0E7C8C' : '#e5e7eb'};background:${on ? '#0E7C8C' : '#fff'};color:${on ? '#fff' : '#374151'};">${q.no}${w ? `<span aria-hidden="true" style="position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:${on ? '#fff' : '#D70015'};"></span>` : ''}</button>`;
+          }).join('')}
+        </div>
+        <div style="font-size:12px;color:#6b7280;display:flex;align-items:center;gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:#D70015;display:inline-block;"></span>จุดแดง = ${esc(who)} ทำผิดครั้งล่าสุด</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:14px;">เวลา</span>
+          <button type="button" class="btn" data-pick-min="-" style="width:40px;height:40px;padding:0;border-radius:12px;font-size:20px;font-weight:700;">−</button>
+          <input id="hwPickMin" type="number" inputmode="numeric" min="1" value="${min}" style="width:64px;height:40px;text-align:center;font-size:17px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:12px;">
+          <button type="button" class="btn" data-pick-min="+" style="width:40px;height:40px;padding:0;border-radius:12px;font-size:20px;font-weight:700;">+</button>
+          <span style="font-size:14px;">นาที</span>
+        </div>
+        ${perQSec ? `<div style="font-size:12px;color:#6b7280;">เวลาชุดนี้ ${Math.round((exam.durationSeconds || 0) / 60)} นาที / ${qs.length} ข้อ → ${n || 1} ข้อ แนะนำ ~${suggest(n || 1)} นาที</div>` : ''}
+        <button type="button" class="btn btnPrimary" id="hwPickSend" ${n ? '' : 'disabled'} style="padding:12px 16px;font-size:15px;border-radius:14px;">${n ? `ส่งการบ้าน · ${n} ข้อ · ${min} นาที` : 'เลือกข้ออย่างน้อย 1 ข้อ'}</button>
+        <div style="font-size:12px;color:#6b7280;">ลูกเห็นเฉพาะข้อที่เลือก ทำได้ทุกข้อในเวลานี้ · ทำไม่ครบกลับมาทำต่อได้ · ครบแล้วเปิดเฉลย</div>`;
+    }
+    pane.innerHTML = `<div style="padding:12px 14px 14px;display:grid;gap:10px;">${whoHtml}${body}</div>`;
+    pane.querySelectorAll('[data-pick-who]').forEach(b => b.onclick = () => { who = members[Number(b.dataset.pickWho)].name; sel = new Set(); minTouched = false; paint(); });
+    pane.querySelectorAll('[data-pick-q]').forEach(b => b.onclick = () => { const id = b.dataset.pickQ; sel.has(id) ? sel.delete(id) : sel.add(id); paint(); });
+    pane.querySelectorAll('[data-pick-quick]').forEach(b => b.onclick = () => {
+      const k = b.dataset.pickQuick, st = _hwPickStats(Store.load(), examId, who);
+      if (k === 'clear') sel = new Set(); else (k === 'wrong' ? st.wrong : st.never).forEach(id => sel.add(id));
+      paint();
+    });
+    pane.querySelectorAll('[data-pick-min]').forEach(b => b.onclick = () => { min = b.dataset.pickMin === '+' ? min + 5 : Math.max(1, min - (min > 5 ? 5 : 1)); minTouched = true; paint(); });
+    const mEl = pane.querySelector('#hwPickMin');
+    if (mEl) mEl.onchange = () => { min = Math.max(1, Math.min(600, Math.round(Number(mEl.value) || 1))); minTouched = true; paint(); };
+    const send = pane.querySelector('#hwPickSend');
+    if (send) send.onclick = () => {
+      if (!sel.size) return;
+      const qids = qs.filter(q => sel.has(q.id)).map(q => q.id);
+      const a = _assignToStudent(who, examId, examTitle, examSubject, { qids, minutes: min });
+      if (a) { sel = new Set(); minTouched = false; }
+      paint();
+    };
+    pane.querySelectorAll('[data-pick-share]').forEach(b => b.onclick = () => shareExamLink(examId, b.dataset.pickShare));
+    pane.querySelectorAll('[data-pick-cancel]').forEach(b => b.onclick = () => {
+      if (!confirm('ยกเลิกการบ้านนี้?')) return;
+      const s = Store.load(), a = (s.assignments || []).find(x => x.id === b.dataset.pickCancel);
+      if (a) { a.status = 'cancelled'; Store.save(s); }
+      toast('✅ ยกเลิกการบ้านแล้ว');
+      paint();
+    });
+  };
+  paint();
 }
 
 // ===================== AUTH =====================
@@ -5809,18 +5964,21 @@ function findPendingHalf2(s, examId, takerName) {
 // v48.67: ฝึกซ้อมแบบ "ตั้งเป้า" (practiceSet) — หาเซ็ตล่าสุดของ exam+ผู้ทำ ที่ยังมีข้อค้าง (ยังไม่ตอบ)
 // และยังไม่กด "ขอดูเฉลยเลย" (revealedAt) — ใช้ทั้งแผ่นตั้งเป้า (ทำต่อ), pill บนการ์ด และการซ่อนเฉลยในหน้าทบทวน
 // เซ็ตที่ถูกเซ็ตใหม่กว่าแทนที่แล้ว (เริ่มชุดใหม่) จะไม่ถือว่าค้าง → เปิดเฉลยได้ตามปกติ
-function findPendingPractice(s, examId, takerName) {
+// v48.72: hwId = เซ็ตของ "ชุดฝึกที่พ่อกำหนด" (การบ้านเลือกข้อ) — ไม่ระบุ = เฉพาะเซ็ตที่ลูกตั้งเอง (ไม่ปนกัน)
+// เซ็ตการบ้านนับข้อค้างเฉพาะข้อที่พ่อเลือก (setScope)
+function findPendingPractice(s, examId, takerName, hwId) {
   const _name = (takerName || '').trim();
   if (!_name) return null;
   const sets = (s.attempts || []).filter(a =>
-    a.examId === examId && (a.takerName || '').trim() === _name && a.practiceSet === true
+    a.examId === examId && (a.takerName || '').trim() === _name && a.practiceSet === true && (a.hwId || null) === (hwId || null)
   ).sort((a, b) => new Date(b.startedSetAt || b.submittedAt || 0) - new Date(a.startedSetAt || a.submittedAt || 0));
   const att = sets[0];
   if (!att || att.revealedAt) return null;
   const ans = att.answers || {};
+  const _scope = Array.isArray(att.setScope) ? new Set(att.setScope) : null;
   const qids = (s.questions[examId] || [])
     .map(q => ({ id: q.id, no: q.no ?? q.number ?? 0, isFree: !!q.isFree }))
-    .filter(q => !q.isFree && (ans[q.id] == null || ans[q.id] === ''))
+    .filter(q => !q.isFree && (!_scope || _scope.has(q.id)) && (ans[q.id] == null || ans[q.id] === ''))
     .sort((a, b) => a.no - b.no).map(q => q.id);
   if (!qids.length) return null;
   return { attempt: att, qids };
@@ -5917,7 +6075,8 @@ function doLogin() {
   const _pendingId = window._pendingExamId || null;
   window._pendingExamId = null;
   if (_pendingId && typeof _clearPendingExam === 'function') _clearPendingExam();
-  navigate(_pendingId ? 'exam' : 'home', _pendingId ? {id: _pendingId} : {});
+  const _pendingHw = window._pendingHwId || null; window._pendingHwId = null; // v48.72
+  navigate(_pendingId ? 'exam' : 'home', _pendingId ? (_pendingHw ? {id: _pendingId, hw: _pendingHw} : {id: _pendingId}) : {});
   const _loginName = Auth.getName();
   if (_loginName && !Auth.isTeacher()) {
     setTimeout(() => WeaknessTracker.runBackfillIfNeeded(_loginName), 1500);
@@ -6785,7 +6944,7 @@ function initExams(){
           // ตอน saveTakeResume ไม่งั้น initTake จะ rebuild qsList เป็นชุดเต็มแทน subset เดิม
           const _isHalf2 = _isHalf && _myResume && !!_myResume.half2Mode;
           const _isSet = _isPrac && _myResume && !!_myResume.practiceSet; // v48.67: ฝึกซ้อมตั้งเป้า — ส่งข้อของรอบ/เวลาเดิม
-          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:(_isHalf2||_isSet)?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode), ...(_isSet?{setMin:_myResume.setMin, setParentId:_myResume.setParentId||null, setN:_myResume.setN||0}:{})}); // v48.66: + โหมดยาก
+          navigate('take',{id:e.id, takerName:_myName, practice:_isPrac, half:_isHalf && !_isHalf2, half2:_isHalf2, qids:(_isHalf2||_isSet)?(_myResume.qids||null):null, parentAttemptId:_isHalf2?(_myResume.parentAttemptId||null):null, hard:!!(_myResume && _myResume.hardMode), ...(_isSet?{setMin:_myResume.setMin, setParentId:_myResume.setParentId||null, setN:_myResume.setN||0, hwId:_myResume.hwId||null}:{})}); // v48.66: + โหมดยาก
           return;
         }
         if(ev.target.closest('.pset-badge')){ navigate('exam',{id:e.id, practiceSheet:true}); return; } // v48.67
@@ -6854,6 +7013,7 @@ function initExamDetail(id){
       ${exam.examType==='hard' ? `<span class="badge" style="background:#111827;border-color:#111827;color:#fff;">✍️ พิมพ์คำตอบ (โหมดยาก)</span>` : ''}
     </div>
     <div class="hr"></div>
+    <div id="hwSetCardSlot"></div>
     <div class="card" style="padding:20px;display:grid;gap:10px;max-width:480px;">
       <input id="detailTakerName" class="btn" style="text-align:left;padding:12px 14px;font-size:15px;border-radius:14px;" placeholder="ชื่อผู้ทำ (ไม่บังคับ)" />
       ${(exam.hardPdfUrl && exam.examType!=='hard') ? `<label class="hardToggle" id="examHardToggleRow"><input type="checkbox" id="examHardToggle"><span class="hardSw" aria-hidden="true"></span><span>🔒 โหมดยาก (ซ่อนตัวเลือก)</span></label>` : ''}
@@ -6903,6 +7063,33 @@ function initExamDetail(id){
     if(name && !_memberName) localStorage.setItem(LAST_TAKER_KEY, name);
     openPracticeSetSheet(exam, name, _isHard());
   };
+  // v48.72: ชุดฝึกที่พ่อกำหนด — การ์ดเด่นบนสุด (การบ้านเลือกข้อของลูกที่ยังค้าง) + แจ้งถ้าลิงก์การบ้านใช้ไม่ได้แล้ว
+  if (_memberName) {
+    const _hwAll = s.assignments || [];
+    const _hwA = _hwAll.find(a => a.set && a.examId === exam.id && a.assignedTo === _memberName && a.status === 'pending');
+    const _hwReq = _pageParams && _pageParams.hw;
+    if (_hwReq && (!_hwA || _hwA.id !== _hwReq)) {
+      const _r = _hwAll.find(a => a.id === _hwReq);
+      const _msg = !_r ? (Store._cloudLoaded ? 'ไม่พบการบ้านนี้ — ทำข้อสอบแบบปกติได้' : '') : _r.assignedTo !== _memberName ? `การบ้านนี้เป็นของ ${_r.assignedTo} — ทำข้อสอบแบบปกติได้` : _r.status === 'done' ? 'การบ้านนี้ทำครบแล้ว' : _r.status === 'cancelled' ? 'การบ้านนี้ถูกยกเลิกแล้ว — ทำข้อสอบแบบปกติได้' : '';
+      if (_msg) toast(_msg);
+    }
+    if (_hwA) {
+      const _p = _hwSetPlan(s, _hwA, _memberName);
+      const _doneN = _p.scope.length - _p.left.length;
+      document.getElementById('hwSetCardSlot').innerHTML = `
+      <div class="card hwSetCard" style="padding:18px 20px;display:grid;gap:8px;max-width:480px;margin-bottom:12px;border:1.5px solid #0E7C8C;background:#F0FBFC;">
+        <div style="font-size:12px;font-weight:700;color:#0E7C8C;letter-spacing:.02em;">📌 ชุดฝึกที่พ่อกำหนด</div>
+        <div style="font-size:22px;font-weight:800;color:#1C1C1E;line-height:1.25;">${_p.scope.length} ข้อ · ${_hwA.set.minutes} นาที</div>
+        <div style="font-size:13px;color:#374151;">ข้อ ${esc(_hwQNos(s, exam.id, _p.scope).join(', '))}</div>
+        ${_doneN ? `<div class="hwSetProg" style="font-size:13px;color:#0E7C8C;">ทำแล้ว ${_doneN}/${_p.scope.length} ข้อ · เหลือ <b>${_p.left.length}</b> ข้อ</div>` : ''}
+        <button type="button" class="btn btnPrimary" id="hwSetStartBtn" style="padding:12px 16px;font-size:15px;border-radius:14px;margin-top:4px;">${_p.left.length ? `▶ ${_doneN ? 'ทำต่อ' : 'เริ่มทำ'} · ${_p.left.length} ข้อ · ${_p.minutes} นาที` : 'ทำครบแล้ว'}</button>
+        <div class="muted" style="font-size:12px;">หมดเวลาแล้วส่งอัตโนมัติ · ทำไม่ครบกลับมาทำต่อข้อที่เหลือได้ · ทำครบแล้วดูเฉลยได้ทุกข้อ</div>
+      </div>`;
+      const _hb = document.getElementById('hwSetStartBtn');
+      if (!_p.left.length) _hb.disabled = true;
+      _hb.onclick = () => startHwSet(exam, _hwA, _memberName);
+    }
+  }
   if (_pageParams && _pageParams.practiceSheet) {
     const _n0 = _memberName || takerEl.value.trim();
     setTimeout(() => { if (window._currentPage === 'exam') openPracticeSetSheet(exam, _n0, _isHard()); }, 0);
@@ -7134,6 +7321,7 @@ function initTake(id){
   const _practiceSet = _practiceMode && _setMin > 0 && !!_qidSubset;
   const _practiceFree = _practiceMode && !_practiceSet;
   const _setParentId = _practiceSet ? (_pageParams.setParentId||null) : null;
+  const _hwId = _practiceSet ? (_pageParams.hwId||null) : null; // v48.72: ชุดฝึกที่พ่อกำหนด (id การบ้าน)
   // v48.70: ตอบได้สูงสุด N ข้อในรอบ (เลือกข้อไหนก็ได้) — ใช้กลไกโควตาเดียวกับคนละครึ่ง; resume เก่าที่ไม่มี setN = ทุกข้อในรอบ (พฤติกรรมเดิม)
   const _setN = _practiceSet ? Math.max(1, Math.min(total, Math.round(Number(_pageParams.setN)) || total)) : 0;
   const _quotaN = _halfMode ? _halfQuota : _setN;
@@ -7156,7 +7344,7 @@ function initTake(id){
     half2Mode:_half2Mode,
     qids:_qidSubset?[..._qidSubset]:null,
     parentAttemptId:_parentAttemptId,
-    practiceSet:_practiceSet, setMin:_setMin, setParentId:_setParentId, setN:_setN // v48.67; v48.70: setN
+    practiceSet:_practiceSet, setMin:_setMin, setParentId:_setParentId, setN:_setN, hwId:_hwId // v48.67; v48.70: setN; v48.72: hwId
   };
   const st=_takeState;
   // นับข้อที่ "ตอบแล้วจริง" สำหรับโหมดคนละครึ่ง — ต้องกัน '' ออก เพราะโหมดกรอกตัวเลข
@@ -7167,7 +7355,7 @@ function initTake(id){
     }).length;
   }
 
-  document.getElementById('takeExamTitle').textContent=(_practiceSet ? `[ฝึกซ้อม · ตอบได้ ${_setN} ข้อ ${_setMin} นาที${_hardMode ? ' · โหมดยาก' : ''}] ` : _practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
+  document.getElementById('takeExamTitle').textContent=(_hwId ? `[การบ้าน · ${_setN} ข้อ ${_setMin} นาที] ` : _practiceSet ? `[ฝึกซ้อม · ตอบได้ ${_setN} ข้อ ${_setMin} นาที${_hardMode ? ' · โหมดยาก' : ''}] ` : _practiceMode ? (_hardMode ? '[ฝึกซ้อม · โหมดยาก] ' : '[ฝึกซ้อม] ') : _hardMode ? '[โหมดยาก] ' : _half2Mode ? '[คนละครึ่ง ครึ่งหลัง] ' : _halfMode ? '[คนละครึ่ง] ' : '') + exam.title;
   // #page-take ไม่ได้ถูกสร้างใหม่จาก HTML ทุกครั้งที่ navigate('take') — เนื้อหาคงค้างข้าม
   // รอบก่อนหน้า ถ้ารอบก่อนเป็นโหมดคนละครึ่ง #takeQNoWrap จะถูกเขียนทับด้วย .textContent=
   // (ทำลาย span ลูก #takeQNo/#takeQTotal ทิ้ง) ต้อง reset โครงสร้างกลับก่อนเสมอ
@@ -7709,16 +7897,20 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
         const _already = Array.isArray(_base.setRoundIds) && _base.setRoundIds.includes(st.attemptId); // ส่งซ้ำหลัง save ล้ม — ไม่บวกซ้ำ
         const _ans = {...(_base === _parent ? (_parent.answers||{}) : {})};
         Object.keys(st.answers).forEach(k => { const v = st.answers[k]; if (v !== '' && v != null) _ans[k] = v; });
-        const _r = computeHalfAwareScoring(exam, _examQs, _ans, false, 0, [...perQuestion, ...((_parent && _parent.perQuestion) || [])], {partial:true, hard:_hardMode, hardOnly:_hardOnly});
+        // v48.72: ชุดฝึกที่พ่อกำหนด — ขอบเขต = ข้อที่พ่อเลือก (จากการบ้าน; สำรอง: เซ็ตเดิม/ข้อของรอบนี้) คะแนน/ผลคิดเฉพาะข้อในขอบเขต
+        const _hwScope = st.hwId ? (((savedS.assignments||[]).find(a => a.id === st.hwId) || {}).set || {}).qids || (_parent && _parent.setScope) || st.qids || [] : null;
+        const _inScope = _hwScope ? new Set(_hwScope) : null;
+        const _r = computeHalfAwareScoring(exam, _inScope ? _examQs.filter(q => _inScope.has(q.id)) : _examQs, _ans, false, 0, [...perQuestion, ...((_parent && _parent.perQuestion) || [])], {partial:true, hard:_hardMode, hardOnly:_hardOnly});
         _base.answers = _ans; _base.score = _r.score; _base.total = _r.total; _base.perQuestion = _r.perQuestion; _base.weighted = _r.weighted;
         _base.practiceSet = true; _base.setMin = st.setMin;
+        if (_inScope) { _base.hwId = st.hwId; _base.setScope = [..._hwScope]; }
         if (!_already) {
           _base.setRoundIds = [...(_base.setRoundIds||[]), st.attemptId];
           _base.practiceRounds = _base.setRoundIds.length;
           if (_parent) _parent.usedSeconds = (_parent.usedSeconds||0) + usedSeconds;
         }
         if (!_base.startedSetAt) _base.startedSetAt = new Date(st.startedAt || Date.now()).toISOString();
-        const _left = _examQs.filter(q => !q.isFree && (_ans[q.id] == null || _ans[q.id] === '')).length;
+        const _left = _examQs.filter(q => !q.isFree && (!_inScope || _inScope.has(q.id)) && (_ans[q.id] == null || _ans[q.id] === '')).length;
         if (!_left && !_base.setDoneAt) _base.setDoneAt = new Date().toISOString();
         if (_parent) {
           _parent.submittedAt = new Date().toISOString();
@@ -7737,7 +7929,7 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       }
       if(typeof clearTakeResume === 'function') clearTakeResume(st.takerName);
       LiveShare.done({attemptId:_mergedParent?_mergedParent.id:st.attemptId, score, total, usedSeconds, submittedAt:Date.now()}); // v48.64: บันทึกสำเร็จแล้วเท่านั้น
-      if (st.practiceSet && (_mergedParent||_newAttempt).setDoneAt) toast('🎉 ฝึกครบทั้งชุดแล้ว — ดูเฉลยได้ทุกข้อ'); // v48.67
+      if (st.practiceSet && (_mergedParent||_newAttempt).setDoneAt) toast(st.hwId ? '🎉 ทำการบ้านครบแล้ว — ดูเฉลยได้ทุกข้อ' : '🎉 ฝึกครบทั้งชุดแล้ว — ดูเฉลยได้ทุกข้อ'); // v48.67
       try { ScratchSync.queue(st.attemptId, _mergedParent ? _mergedParent.id : st.attemptId, qsList.map(q => q.id)); } catch (e) {} // v48.67: ส่งรูปกระดาษทดรายข้อขึ้น cloud (ไม่รอ)
       if (_mergedParent) {
         // นับจุดอ่อนเฉพาะข้อของครึ่งหลัง (ข้อของครึ่งแรกนับไปแล้วตอนส่งครึ่งแรก) — ใช้
@@ -7769,10 +7961,12 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
       }
       if (st.takerName && !Auth.isTeacher() && (!st.practiceSet || (_mergedParent||_newAttempt).setDoneAt)) { // v48.69: ฝึกตั้งเป้า → ปิดการบ้านเมื่อทำครบเซ็ต
         const _s3 = Store.load();
+        // v48.72: การบ้านเลือกข้อ (a.set) ปิดได้เฉพาะเซ็ตของการบ้านนั้น (hwId) — ทำทั้งชุด/ฝึกเองไม่ปิดให้
         const _ai = (_s3.assignments||[]).findIndex(a =>
           a.assignedTo === takerName &&
           a.examId === _newAttempt.examId &&
-          a.status === 'pending'
+          a.status === 'pending' &&
+          (st.hwId ? a.id === st.hwId : !a.set)
         );
         if (_ai !== -1) {
           _s3.assignments[_ai].status = 'done';
@@ -7917,8 +8111,8 @@ ${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-n="${n}" style="padding:16px;border-r
   // ดู resume เฉพาะเมื่อ mode ตรงกัน (timed ↔ timed, practice ↔ practice)
   const _rawResume = (typeof loadTakeResume === 'function') ? loadTakeResume(_takerName) : null;
   // v48.69: ฝึกตั้งเป้า — resume ต้องเป็นรอบเดียวกันจริง (เซ็ต/ชุดข้อ/เวลา) ไม่งั้นรอบใหม่จะได้คำตอบ+เวลาของรอบเก่า
-  const _setSig = r => (r && r.practiceSet) ? [r.setParentId || '', Number(r.setMin) || 0, (r.qids || []).slice().sort().join(','), Number(r.setN) || (r.qids || []).length].join('|') : ''; // setN ว่าง (resume ก่อน v48.70) = ทุกข้อในรอบ
-  const _curSetSig = _practiceSet ? [_setParentId || '', _setMin, [..._qidSubset].sort().join(','), _setN].join('|') : '';
+  const _setSig = r => (r && r.practiceSet) ? [r.setParentId || '', Number(r.setMin) || 0, (r.qids || []).slice().sort().join(','), Number(r.setN) || (r.qids || []).length, r.hwId || ''].join('|') : ''; // setN ว่าง (resume ก่อน v48.70) = ทุกข้อในรอบ
+  const _curSetSig = _practiceSet ? [_setParentId || '', _setMin, [..._qidSubset].sort().join(','), _setN, _hwId || ''].join('|') : '';
   // v48.69: ทิ้งรอบที่ค้าง → ลบรูปกระดาษทดของรอบนั้นในเครื่องด้วย (ไม่งั้นค้างใน IndexedDB ถาวร)
   const _dropScratchOf = r => { try { if (!r || !r.attemptId) return; ((Store.load().questions || {})[r.examId] || []).forEach(q => PdfDB.del(scratchKey(r.attemptId, q.id)).catch(() => {})); } catch (e) {} };
   const _resume = (_rawResume && _rawResume.examId === id && _setSig(_rawResume) === _curSetSig && _rawResume.startedAt && !!_rawResume.practiceMode === !!_practiceMode && !!_rawResume.halfMode === !!_halfMode && !!_rawResume.half2Mode === !!_half2Mode && !!_rawResume.hardMode === !!_hardMode && !!_rawResume.practiceSet === !!_practiceSet) ? _rawResume : null;
@@ -8063,6 +8257,10 @@ function initReview(attemptId){
     // เลขข้อแทน กันหน้ารีวิวโชว์ข้อที่ไม่ได้ฝึกทั้งชุดข้อสอบปนมา (เหมือนบั๊กที่เคยแก้กับครึ่งหลัง)
     const _ownNos=new Set(att.perQuestion.map(p=>Number(p.no)));
     qs=qs.filter(q=>_ownNos.has(Number(q.no)));
+  } else if(att.hwId && Array.isArray(att.setScope) && att.setScope.length){
+    // v48.72: ชุดฝึกที่พ่อกำหนด — แสดงเฉพาะข้อที่พ่อเลือก (ข้ออื่นไม่ใช่การบ้านนี้)
+    const _scopeQ=new Set(att.setScope);
+    qs=qs.filter(q=>_scopeQ.has(q.id));
   }
 
   const taker=(att.takerName||'').trim()||'ไม่ระบุ';
@@ -8078,7 +8276,7 @@ function initReview(attemptId){
   const _modeQTotal=(Array.isArray(att.perQuestion)&&att.perQuestion.length)||qs.length;
   // attempt ที่กรอกย้อนหลัง (ไม่ใช่ทำสดผ่านแอปจริง) — usedSeconds/mood จะว่างเสมอ
   // ต้องบอกไว้ชัดๆ กันดูเหมือนบั๊ก
-  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.practiceSet?' 📝 ฝึกซ้อม (ตั้งเป้า)':att.practiceMode?' 📝 ฝึกซ้อม':att.manualEntry?' 🕰️ (บันทึกย้อนหลัง)':'';
+  const _modeBadge=att.halfMode?(att.halfPart===2?` 🤝 คนละครึ่ง (ครึ่งหลัง) (${att.halfQuota||0}/${_modeQTotal} ข้อ)`:` 🤝 คนละครึ่ง (${att.halfQuota||0}/${_modeQTotal} ข้อ)`):att.hwId?' 📌 ชุดฝึกที่พ่อกำหนด':att.practiceSet?' 📝 ฝึกซ้อม (ตั้งเป้า)':att.practiceMode?' 📝 ฝึกซ้อม':att.manualEntry?' 🕰️ (บันทึกย้อนหลัง)':'';
   document.getElementById('reviewTitle').textContent=`โหมดทบทวน: ${att.examTitle||'ข้อสอบ'}${_modeBadge}${att.hardMode?' 🔒 (hard mode)':''}`;
   document.getElementById('reviewSub').textContent=`วิชา: ${subj} • ผู้ทำ: ${taker}`;
   document.getElementById('reviewScore').textContent=(isWeightedAttempt(att)?`คะแนน ${fmtPts(att.score)}/${fmtPts(att.total)} (${att.total?Math.round(att.score/att.total*100):0}%)`:`คะแนน ${att.score}/${att.total}`)
@@ -8109,16 +8307,16 @@ function initReview(attemptId){
     const _showHalf2=!!(_pending && _pending.parentAttempt.id===att.id);
     _half2Pending=_showHalf2;
     // v48.67: ฝึกซ้อมตั้งเป้าที่ยังค้าง — ซ่อนเฉลยข้อที่ยังไม่ทำ (ใช้ตัวแปรเดียวกับคนละครึ่ง) + ปุ่มทำต่อ/ขอดูเฉลยเลย
-    const _setPend=att.practiceSet ? findPendingPractice(s, att.examId, att.takerName) : null;
+    const _setPend=att.practiceSet ? findPendingPractice(s, att.examId, att.takerName, att.hwId) : null;
     const _setPending=!!(_setPend && _setPend.attempt.id===att.id);
     if(_setPending) _half2Pending=true;
     if(_combinedEl) _combinedEl.style.color=att.practiceSet?'#0E7C8C':'#6d28d9';
     if(att.practiceSet && _combinedEl){
-      const _nAll=(s.questions[att.examId]||[]).length||_modeQTotal;
+      const _nAll=att.hwId ? qs.length : ((s.questions[att.examId]||[]).length||_modeQTotal);
       _combinedEl.style.display='';
       _combinedEl.textContent=_setPending
         ? `ทำแล้ว ${_nAll-_setPend.qids.length}/${_nAll} ข้อ · ค้าง ${_setPend.qids.length} ข้อ (คะแนนนับเฉพาะข้อที่ทำ)`
-        : (att.setDoneAt ? `ฝึกครบทั้งชุดแล้ว (${att.practiceRounds||1} รอบ)` : `เปิดเฉลยแล้ว · ทำไป ${(att.perQuestion||[]).filter(p=>p&&p.counted!==false).length}/${_nAll} ข้อ`);
+        : (att.setDoneAt ? (att.hwId ? `ทำการบ้านครบแล้ว (${att.practiceRounds||1} รอบ)` : `ฝึกครบทั้งชุดแล้ว (${att.practiceRounds||1} รอบ)`) : `เปิดเฉลยแล้ว · ทำไป ${(att.perQuestion||[]).filter(p=>p&&p.counted!==false).length}/${_nAll} ข้อ`);
     }
     const _setBtn=document.getElementById('reviewSetContinueBtn');
     if(_setBtn){
@@ -8126,7 +8324,7 @@ function initReview(attemptId){
       _setBtn.style.display=_showSet?'':'none';
       if(_showSet){
         _setBtn.textContent=`⏱ ทำต่อข้อที่ค้าง (${_setPend.qids.length} ข้อ)`;
-        _setBtn.onclick=()=>navigate('exam',{id:att.examId, practiceSheet:true});
+        _setBtn.onclick=()=>navigate('exam',att.hwId?{id:att.examId, hw:att.hwId}:{id:att.examId, practiceSheet:true});
       }
     }
     if(_half2Btn){
@@ -8140,7 +8338,7 @@ function initReview(attemptId){
       };
     }
     if(_revealBtn){
-      const _showReveal=(_showHalf2||_setPending) && !Auth.isTeacher();
+      const _showReveal=(_showHalf2||_setPending) && !Auth.isTeacher() && !att.hwId; // v48.72: การบ้านที่พ่อกำหนด ไม่มีปุ่มสละสิทธิ์
       _revealBtn.style.display=_showReveal?'':'none';
       _revealBtn.textContent=_setPending?'👁 ขอดูเฉลยเลย (จบเซ็ตนี้ ไม่ทำต่อ)':'👁 ขอดูเฉลยเลย (สละสิทธิ์ทำครึ่งหลัง)'; // v48.67
       _revealBtn.onclick=()=>{
@@ -8196,6 +8394,7 @@ function initReview(attemptId){
       // ทับด้วยข้อของครึ่งแรกที่ไม่ใช่ของตัวเองไปด้วย
       const qs2 = (_halfMode2 && Array.isArray(att2.perQuestion) && att2.perQuestion.length)
         ? qs2Full.filter(q => att2.perQuestion.some(p => p && p.qid === q.id))
+        : (att2.hwId && Array.isArray(att2.setScope)) ? qs2Full.filter(q => att2.setScope.includes(q.id)) // v48.72: ชุดฝึกที่พ่อกำหนด = เฉพาะข้อที่เลือก
         : qs2Full;
       // v48.24p: ถ้าครูลบชุดคำถามเดิมแล้วสร้าง/import ใหม่ (q.id เปลี่ยนไปทั้งชุด) qs2 จะ
       // กรองเหลือ [] — ถ้าปล่อยผ่านไป computeHalfAwareScoring จะคืน score 0/perQuestion ว่าง
@@ -15557,7 +15756,7 @@ function saveTakeResume(state) {
       half2Mode: !!state.half2Mode,
       qids: (state.half2Mode || state.practiceSet) ? (state.qids||null) : null, // v48.67: + ฝึกซ้อมตั้งเป้า (ข้อของรอบ)
       parentAttemptId: state.half2Mode ? (state.parentAttemptId||null) : null,
-      practiceSet: !!state.practiceSet, setMin: state.practiceSet ? (state.setMin||0) : 0, setParentId: state.practiceSet ? (state.setParentId||null) : null, setN: state.practiceSet ? (state.setN||0) : 0, // v48.70: setN
+      practiceSet: !!state.practiceSet, setMin: state.practiceSet ? (state.setMin||0) : 0, setParentId: state.practiceSet ? (state.setParentId||null) : null, setN: state.practiceSet ? (state.setN||0) : 0, hwId: state.practiceSet ? (state.hwId||null) : null, // v48.70: setN; v48.72: hwId
     }));
   } catch(e) {}
 }
@@ -17133,9 +17332,9 @@ function examShareUrl(id) { return PROD_BASE_URL + '?exam=' + encodeURIComponent
 // → ค่าที่อยู่แค่ในหน่วยความจำ (_pendingExamId) หาย; เก็บไว้ชั่วคราว (10 นาที) และใช้คืนเฉพาะตอนรีโหลดอัตโนมัติเท่านั้น
 // (เปิดแอปปกติภายหลังจะไม่ถูกพาไปข้อสอบเก่า)
 const _PENDING_EXAM_KEY = 'nanont:pendingExam', _PENDING_EXAM_TTL = 10 * 60 * 1000;
-function _savePendingExam(id) { try { localStorage.setItem(_PENDING_EXAM_KEY, JSON.stringify({ id, ts: Date.now() })); } catch (e) {} }
+function _savePendingExam(id, hw) { try { localStorage.setItem(_PENDING_EXAM_KEY, JSON.stringify({ id, hw: hw || null, ts: Date.now() })); } catch (e) {} }
 function _loadPendingExam() {
-  try { const v = JSON.parse(localStorage.getItem(_PENDING_EXAM_KEY) || 'null'); if (v && v.id && Date.now() - v.ts < _PENDING_EXAM_TTL) return v.id; } catch (e) {}
+  try { const v = JSON.parse(localStorage.getItem(_PENDING_EXAM_KEY) || 'null'); if (v && v.id && Date.now() - v.ts < _PENDING_EXAM_TTL) { window._pendingHwId = v.hw || null; return v.id; } } catch (e) {}
   return null;
 }
 function _clearPendingExam() { try { localStorage.removeItem(_PENDING_EXAM_KEY); } catch (e) {} }
@@ -17143,7 +17342,7 @@ function _clearPendingExam() { try { localStorage.removeItem(_PENDING_EXAM_KEY);
   const p = new URLSearchParams(location.search);
   const fromLink = p.get('exam');
   let eid = fromLink;
-  if (fromLink) _savePendingExam(fromLink);
+  if (fromLink) { window._pendingHwId = p.get('hw') || null; _savePendingExam(fromLink, window._pendingHwId); } // v48.72: + การบ้านชุดฝึก
   else if (p.has('_v')) eid = _loadPendingExam(); // รีโหลดอัตโนมัติตอนอัปเวอร์ชัน
   if (eid) {
     window._pendingExamId = eid;
@@ -17177,18 +17376,21 @@ function copyExamLink(btn, ev) {
 
 // v48.63: ปุ่ม "🔗 แชร์ลิงก์" ในหน้ารายการข้อสอบ (admin_exams) — เมนูแชร์ของเครื่อง (LINE/ข้อความ/คัดลอก) ถ้ามี
 // ไม่งั้นคัดลอกลงคลิปบอร์ด; ต้องเรียก navigator.share ทันทีในการกด (iOS ไม่ยอมถ้ามี await คั่น)
-function shareExamLink(examId) {
-  const ex = (Store.load().exams || []).find(e => e.id === examId);
+// v48.72: hwId = แชร์ลิงก์ "ชุดฝึกที่พ่อกำหนด" (?exam=&hw=) — ลิงก์ชี้การบ้าน ไม่ได้ฝังรายการข้อ (ลูกแก้ลิงก์เองไม่ได้)
+function shareExamLink(examId, hwId) {
+  const _s = Store.load();
+  const ex = (_s.exams || []).find(e => e.id === examId);
   if (!ex) { toast('ไม่พบข้อสอบนี้'); return; }
-  const url = examShareUrl(ex.id);
-  const title = 'ข้อสอบ: ' + (ex.title || '');
-  const text = `📚 ${ex.title || 'ข้อสอบ'}\nเปิดลิงก์แล้วใส่ PIN เพื่อทำข้อสอบ`;
+  const hw = hwId ? (_s.assignments || []).find(a => a.id === hwId && a.set) : null;
+  const url = hw ? hwShareUrl(hw) : examShareUrl(ex.id);
+  const title = (hw ? 'การบ้าน: ' : 'ข้อสอบ: ') + (ex.title || '');
+  const text = hw ? `📌 การบ้าน ${ex.title || ''}\n${_hwSetLabel(hw, _s)}\nเปิดลิงก์แล้วใส่ PIN เพื่อเริ่มทำ` : `📚 ${ex.title || 'ข้อสอบ'}\nเปิดลิงก์แล้วใส่ PIN เพื่อทำข้อสอบ`;
   const copyFallback = () => {
     const t = `${text}\n${url}`;
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast('คัดลอกลิงก์แล้ว 🔗')).catch(() => prompt('คัดลอกลิงก์ด้านล่าง:', t));
     else prompt('คัดลอกลิงก์ด้านล่าง:', t);
   };
-  if (!ex.published) toast('ข้อสอบนี้ยังซ่อนอยู่ — เด็กไม่เห็นในรายการ แต่เปิดจากลิงก์/การบ้านได้');
+  if (!ex.published && !hw) toast('ข้อสอบนี้ยังซ่อนอยู่ — เด็กไม่เห็นในรายการ แต่เปิดจากลิงก์/การบ้านได้');
   if (navigator.share) navigator.share({ title, text, url }).catch(e => { if (!(e && e.name === 'AbortError')) copyFallback(); });
   else copyFallback();
 }
@@ -17199,7 +17401,7 @@ const _takeResume = loadTakeResume(Auth.getName());
 
 if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   if (_savedState.page === 'take' && _takeResume) {
-    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: (_takeResume.half2Mode || _takeResume.practiceSet) ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null, ...(_takeResume.practiceSet ? { setMin: _takeResume.setMin, setParentId: _takeResume.setParentId||null, setN: _takeResume.setN||0 } : {}), ...(_takeResume.hardMode ? { hard: true } : {}) });
+    navigate('take', { id: _takeResume.examId, practice: !!_takeResume.practiceMode, half: !!_takeResume.halfMode && !_takeResume.half2Mode, half2: !!_takeResume.half2Mode, qids: (_takeResume.half2Mode || _takeResume.practiceSet) ? (_takeResume.qids||null) : null, parentAttemptId: _takeResume.half2Mode ? (_takeResume.parentAttemptId||null) : null, ...(_takeResume.practiceSet ? { setMin: _takeResume.setMin, setParentId: _takeResume.setParentId||null, setN: _takeResume.setN||0, hwId: _takeResume.hwId||null } : {}), ...(_takeResume.hardMode ? { hard: true } : {}) });
   } else {
     navigate(_savedState.page, _savedState.params);
   }
@@ -17207,7 +17409,8 @@ if (_savedState && Auth.isLoggedIn() && !window._pendingExamId) {
   const _pid = window._pendingExamId;
   window._pendingExamId = null;
   _clearPendingExam();
-  navigate('exam', { id: _pid });
+  const _phw = window._pendingHwId || null; window._pendingHwId = null;
+  navigate('exam', _phw ? { id: _pid, hw: _phw } : { id: _pid });
 } else {
   navigate('login');
   setTimeout(()=>document.querySelectorAll('#page-login input').forEach(el=>el.blur()), 300);
@@ -18186,7 +18389,7 @@ function initEntranceCompare(params) {
 </style>
 <script>
 (function(){
-  const CURRENT_VERSION = 'v48.71';
+  const CURRENT_VERSION = 'v48.72';
   const CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 minutes
   let _prompted = false;
   // v48.44: PWA ติดตั้งจากไอคอนโฮมสกรีน (manifest start_url ตายตัว "/Quiz-app/") —
