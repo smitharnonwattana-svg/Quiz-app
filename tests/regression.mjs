@@ -6447,13 +6447,13 @@ currentSection = 'summaryScratch';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: hwSet (v48.91p → production v48.72; บั๊กรอบหา v48.92p → production v48.73; v48.93p → production v48.74, ชี้ index.html) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
+// Section: hwSet (v48.91p → production v48.72; บั๊กรอบหา v48.92p → production v48.73; v48.93p → production v48.74; v48.94p ชี้ preview ชั่วคราว) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
 // ปุ่มเลือกเร็ว "เคยผิด"/"ยังไม่เคยทำ", ลูกเห็นการ์ดในหน้าเริ่มทำ → ทำเฉพาะข้อที่เลือก, ค้างทำต่อได้ (เวลาตามสัดส่วน),
 // ครบแล้วปิดการบ้าน + เปิดเฉลย, ไม่ปนกับฝึกตั้งเป้าที่ลูกตั้งเอง, ลิงก์ของคนอื่น/ยกเลิกแล้ว → แจ้ง
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'hwSet';
 {
-  const HW_FILE = 'index.html';
+  const HW_FILE = 'index_preview.html';
   const hq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
   const pqr = (qid, no, ok) => ({ qid, no, isCorrect: ok, chosen: ok ? 'A' : 'B', correct: 'A' });
   const cacheH = (over = {}) => baseCache({
@@ -6650,6 +6650,14 @@ currentSection = 'hwSet';
     const cf = await p9.evaluate(() => (window.__cf || []).find(m => /ทำค้างอยู่/.test(m)) || '');
     check('hwSet: มีการบ้านทำค้าง แล้วเริ่มฝึกซ้อมเอง → คำเตือนบอก "(การบ้าน)" ที่ทำค้างอยู่', /\(การบ้าน\)" ที่ทำค้างอยู่/.test(cf), cf.slice(0, 120));
     await c9.close();
+  }
+
+  // 10) v48.94p: ข้อสอบ/ข้อที่เลือกถูกลบ → ป้ายการบ้าน (กระดิ่ง) บอกว่าถูกแก้/ลบ ไม่ขึ้น "0 ข้อ · ข้อ " ว่าง
+  {
+    const { ctx: c10, page: p10 } = await newSeededPage({ file: HW_FILE, cache: cacheH() });
+    const lb = await p10.evaluate(() => [_hwSetLabel({ examId: 'h1', set: { qids: ['zz1', 'zz2'], minutes: 7 } }), _hwSetLabel({ examId: 'nope', set: { qids: ['q1'], minutes: 5 } }), _hwSetLabel({ examId: 'h1', set: { qids: ['q8', 'q2'], minutes: 3 } })]);
+    check('hwSet: ป้ายการบ้านเมื่อข้อ/ข้อสอบถูกลบ → "ข้อที่เลือกถูกแก้/ลบไปแล้ว" (ปกติยังเป็น "2 ข้อ · 3 นาที · ข้อ 2, 8")', /ถูกแก้\/ลบไปแล้ว/.test(lb[0]) && !/0 ข้อ/.test(lb[0]) && /ถูกแก้\/ลบไปแล้ว/.test(lb[1]) && lb[2] === '2 ข้อ · 3 นาที · ข้อ 2, 8', JSON.stringify(lb));
+    await c10.close();
   }
   check('hwSet: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
 }
