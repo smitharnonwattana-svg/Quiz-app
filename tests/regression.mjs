@@ -6447,13 +6447,13 @@ currentSection = 'summaryScratch';
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Section: hwSet (v48.91p → production v48.72; บั๊กรอบหา v48.92p → production v48.73, ชี้ index.html) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
+// Section: hwSet (v48.91p → production v48.72; บั๊กรอบหา v48.92p → production v48.73; v48.93p ชี้ preview ชั่วคราว) — "ชุดฝึกที่พ่อกำหนด": ครูเลือกข้อ + ตั้งเวลา ส่งเป็นการบ้าน/ลิงก์ (?exam=&hw=),
 // ปุ่มเลือกเร็ว "เคยผิด"/"ยังไม่เคยทำ", ลูกเห็นการ์ดในหน้าเริ่มทำ → ทำเฉพาะข้อที่เลือก, ค้างทำต่อได้ (เวลาตามสัดส่วน),
 // ครบแล้วปิดการบ้าน + เปิดเฉลย, ไม่ปนกับฝึกตั้งเป้าที่ลูกตั้งเอง, ลิงก์ของคนอื่น/ยกเลิกแล้ว → แจ้ง
 // ─────────────────────────────────────────────────────────────────
 currentSection = 'hwSet';
 {
-  const HW_FILE = 'index.html';
+  const HW_FILE = 'index_preview.html';
   const hq = (id, no, correct, extra = {}) => ({ id, no, number: no, page: 1, correct, choices: { A: 'a', B: 'b', C: 'c', D: 'd' }, ...extra });
   const pqr = (qid, no, ok) => ({ qid, no, isCorrect: ok, chosen: ok ? 'A' : 'B', correct: 'A' });
   const cacheH = (over = {}) => baseCache({
@@ -6635,6 +6635,21 @@ currentSection = 'hwSet';
     await p8.evaluate(() => { document.querySelector('[data-pick-who="1"]').click(); for (let i = 0; i < 150; i++) document.querySelector('[data-pick-min="+"]').click(); });
     check('hwSet: ปุ่ม + เวลาไม่เกิน 600 นาที (เท่าช่องพิมพ์)', (await p8.evaluate(() => document.getElementById('hwPickMin').value)) === '600', '');
     await c8.close();
+  }
+
+  // 9) v48.93p: ออกจากการบ้านกลางรอบแล้วเริ่มฝึกซ้อมเอง → คำเตือนทับของค้างบอกว่าเป็น "การบ้าน" (เดิมขึ้น "ฝึกซ้อม")
+  {
+    const { ctx: c9, page: p9 } = await newSeededPage({ file: HW_FILE, cache: cacheH({ attempts: [], assignments: [{ id: 'Y1', examId: 'h1', examTitle: 'ชุดการบ้าน', examSubject: 'คณิตศาสตร์', assignedTo: 'ณนนท์', assignedBy: 'teacher', assignedAt: 1, status: 'pending', set: { qids: ['q2', 'q6'], minutes: 10 } }] }), role: 'student', name: 'ณนนท์' });
+    p9.on('pageerror', e => errs.push(e.message));
+    await stub(p9);
+    await p9.evaluate(() => { window.confirm = (m) => { (window.__cf = window.__cf || []).push(String(m)); return true; }; navigate('exam', { id: 'h1' }); }); await p9.waitForTimeout(250);
+    await p9.click('#hwSetStartBtn'); await mood(p9); await pick(p9, 'B'); await p9.waitForTimeout(1100);
+    await p9.click('#takeExitBtn'); await p9.waitForTimeout(300);
+    await p9.evaluate(() => { window.__cf = []; navigate('exam', { id: 'h1' }); }); await p9.waitForTimeout(250);
+    await p9.click('#examStartPracticeBtn'); await p9.click('#psStart'); await p9.waitForTimeout(400);
+    const cf = await p9.evaluate(() => (window.__cf || []).find(m => /ทำค้างอยู่/.test(m)) || '');
+    check('hwSet: มีการบ้านทำค้าง แล้วเริ่มฝึกซ้อมเอง → คำเตือนบอก "(การบ้าน)" ที่ทำค้างอยู่', /\(การบ้าน\)" ที่ทำค้างอยู่/.test(cf), cf.slice(0, 120));
+    await c9.close();
   }
   check('hwSet: ไม่มี error ในหน้า', errs.length === 0, JSON.stringify(errs));
 }
